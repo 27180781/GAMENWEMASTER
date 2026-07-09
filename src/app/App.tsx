@@ -16,6 +16,7 @@ import { SettingsScreen } from '../render/SettingsScreen.tsx';
 import { Stage } from '../render/Stage.tsx';
 import { GameHost } from './GameHost.tsx';
 import { DEFAULT_GAME_SETTINGS, parseAppParams, type GameSettings } from './urlParams.ts';
+import { loadGameFromZip } from './zipLoader.ts';
 
 import hadassah from '../../fixtures/hadassah-ozen.json';
 import masaa from '../../fixtures/masaa-sync-manual-link.json';
@@ -137,6 +138,17 @@ export function App() {
     }
   };
 
+  const loadZipFile = (file: File) => {
+    file
+      .arrayBuffer()
+      .then((buffer) => loadGameFromZip(buffer))
+      .then(({ game }) => {
+        setPendingGame(game);
+        setError(null);
+      })
+      .catch((e: unknown) => setError(`טעינת ה-ZIP נכשלה:\n${(e as Error).message}`));
+  };
+
   return (
     <Shell>
       <div className="screen">
@@ -151,6 +163,20 @@ export function App() {
             ))}
           </div>
           <label className="picker-button picker-upload">
+            📦 טעינת משחק אופליין (ZIP)
+            <input
+              type="file"
+              accept=".zip,application/zip"
+              hidden
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                setError(null);
+                loadZipFile(file);
+              }}
+            />
+          </label>
+          <label className="picker-button picker-upload picker-upload--secondary">
             העלאת game.json...
             <input
               type="file"

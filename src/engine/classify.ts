@@ -36,10 +36,28 @@ const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'a
 const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'mov', 'm4v', 'ogv']);
 const AUDIO_EXTENSIONS = new Set(['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac']);
 
-/** זיהוי סוג מדיה לפי ה-URL בלבד. */
+/**
+ * רישום סוג-מדיה מפורש עבור כתובות שאין בהן סיומת (בעיקר blob: URLs שנוצרים
+ * מ-ZIP אופליין). ה-loader רושם כאן את הסוג לפי הקובץ המקורי; classifyMediaUrl
+ * בודק את הרישום קודם. מפה טהורה בזיכרון — בלי DOM.
+ */
+const mediaKindRegistry = new Map<string, MediaKind>();
+
+export function registerMediaKind(url: string, kind: MediaKind): void {
+  mediaKindRegistry.set(url, kind);
+}
+
+export function clearMediaKindRegistry(): void {
+  mediaKindRegistry.clear();
+}
+
+/** זיהוי סוג מדיה לפי ה-URL (או רישום מפורש עבור blob: URLs). */
 export function classifyMediaUrl(src: string): MediaKind {
   const url = src.trim();
   if (url.length === 0) return 'unknown';
+
+  const registered = mediaKindRegistry.get(url);
+  if (registered !== undefined) return registered;
 
   if (/(?:youtube\.com\/embed\/|youtube\.com\/watch|youtu\.be\/)/i.test(url)) {
     return 'youtube';

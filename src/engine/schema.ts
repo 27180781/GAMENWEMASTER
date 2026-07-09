@@ -145,20 +145,22 @@ export const assetEntrySchema = z.object({
 // המבנה העליון (SPEC 3.1)
 // ---------------------------------------------------------------------------
 
+// קובץ משחק אונליין מכיל את כל השדות; קובץ אופליין (data.json ב-ZIP) דק
+// יותר. לכן השדות שאינם מהותיים למנוע הם אופציונליים עם ברירת מחדל.
 export const gameFileSchema = z.object({
   name: z.string(),
-  id: z.string(),
+  id: z.string().optional().default(''),
   questions: z.array(slideSchema).min(1, 'קובץ משחק חייב לפחות שקופית אחת'),
   setting: globalSettingsSchema,
-  assets: z.array(assetEntrySchema),
-  createdAt: z.string(),
-  cloudinaryFolder: z.string(),
-  credit: z.string().nullable(),
-  users: z.string(),
-  room: z.string().nullable(),
-  baseUrl: z.string(),
-  cloudinaryAbsolutePathImage: z.string(),
-  cloudinaryAbsolutePathVideo: z.string(),
+  assets: z.array(assetEntrySchema).optional().default([]),
+  createdAt: z.string().optional().default(''),
+  cloudinaryFolder: z.string().optional().default(''),
+  credit: z.string().nullable().optional().default(null),
+  users: z.string().optional().default('{}'),
+  room: z.string().nullable().optional().default(null),
+  baseUrl: z.string().optional().default(''),
+  cloudinaryAbsolutePathImage: z.string().optional().default(''),
+  cloudinaryAbsolutePathVideo: z.string().optional().default(''),
 });
 
 // ---------------------------------------------------------------------------
