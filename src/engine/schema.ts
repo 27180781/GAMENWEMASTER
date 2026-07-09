@@ -127,7 +127,12 @@ export const globalSettingsSchema = z.object({
     timerMediaSound: soundRef,
     inShowAnsMediaSound: soundRef,
   }),
-  limit: z.object({ type: z.string() }),
+  // סוג המשחק (clickers / phones) ומגבלת המשתתפים לפי הרישיון (number).
+  // number ריק כ-"" מנורמל, ואם חסר — אין הגבלה (Infinity בפועל).
+  limit: z.object({
+    type: z.string(),
+    number: emptyableNumber(Number.MAX_SAFE_INTEGER).optional(),
+  }),
 });
 
 // ---------------------------------------------------------------------------
