@@ -469,6 +469,62 @@ body {
   text-align: right;
 }
 
+/* ---- מצב דמו ---- */
+
+.demo-checkbox {
+  font-size: clamp(16px, 1.5vw, 22px);
+  opacity: 0.9;
+  cursor: pointer;
+}
+
+.demo-game-name { font-size: clamp(18px, 1.8vw, 26px); opacity: 0.9; }
+
+.demo-form {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  width: min(88vw, 620px);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 14px;
+  padding: 26px;
+}
+
+.demo-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: clamp(16px, 1.5vw, 22px);
+}
+
+.demo-field input[type='number'],
+.demo-field select {
+  background: #1d2440;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 16px;
+  max-width: 300px;
+}
+
+.demo-field input[type='range'] { accent-color: #4ade80; }
+
+.demo-start { font-weight: 700; }
+
+.demo-badge {
+  position: fixed;
+  bottom: 10px;
+  inset-inline-end: 12px;
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 13px;
+  opacity: 0.85;
+}
+
 /* נורית סטטוס חיבור (SPEC סעיף 6 — יוצג בעיקר מ-M3) */
 
 .status-dot {

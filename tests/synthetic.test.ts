@@ -19,7 +19,7 @@ describe('planCrowdVotes — קהל סינתטי דטרמיניסטי', () => {
       expect(a[i]!.atOffsetMs).toBeGreaterThanOrEqual(a[i - 1]!.atOffsetMs);
     }
     for (const vote of a) {
-      expect(vote.atOffsetMs).toBeGreaterThanOrEqual(500);
+      expect(vote.atOffsetMs).toBeGreaterThanOrEqual(100);
       expect(vote.atOffsetMs).toBeLessThanOrEqual(15000);
       expect([1, 2, 3, 4]).toContain(vote.answerId);
     }

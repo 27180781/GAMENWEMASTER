@@ -30,16 +30,27 @@ export interface CrowdOptions {
   seed?: number;
   /** הסתברות לבחור בתשובה הנכונה ב-trivia (ברירת מחדל 0.55). */
   correctBias?: number;
+  /**
+   * מהירות ההצבעה: בתוך איזה חלק מחלון ההצבעה מגיעות כל ההצבעות (0–1).
+   * 1 = מפוזר על כל החלון; 0.1 = כולם מצביעים ב-10% הראשונים.
+   */
+  speedFactor?: number;
 }
 
 /** תוכנית הצבעות אקראית-דטרמיניסטית לשקופית. */
 export function planCrowdVotes(slide: Slide, options: CrowdOptions = {}): PlannedVote[] {
-  const { voterCount = 40, seed = slide.id * 7919 + 17, correctBias = 0.55 } = options;
+  const {
+    voterCount = 40,
+    seed = slide.id * 7919 + 17,
+    correctBias = 0.55,
+    speedFactor = 1,
+  } = options;
   const answers = slide.question.answers;
   if (answers.length === 0) return [];
 
   const random = mulberry32(seed);
   const windowMs = Math.max(2000, slide.question.timeForQue * 1000);
+  const usableMs = Math.max(1200, windowMs * Math.min(1, Math.max(0.05, speedFactor)));
   const correct = answers.find((a) => a.correct);
 
   const plan: PlannedVote[] = [];
@@ -54,7 +65,7 @@ export function planCrowdVotes(slide: Slide, options: CrowdOptions = {}): Planne
     plan.push({
       voterId: `משתתף ${i}`,
       answerId,
-      atOffsetMs: Math.floor(500 + random() * (windowMs - 1000)),
+      atOffsetMs: Math.floor(100 + random() * (usableMs - 200)),
     });
   }
   return plan.sort((a, b) => a.atOffsetMs - b.atOffsetMs);

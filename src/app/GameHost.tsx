@@ -17,11 +17,18 @@ import { SlideView } from '../render/SlideView.tsx';
 import { themeStyle } from '../render/theme.ts';
 import { AudioManager } from './AudioManager.ts';
 import { planCrowdVotes, snapshotAt } from './syntheticVotes.ts';
+import { DEFAULT_DEMO_CONFIG, type DemoConfig } from './urlParams.ts';
 import { useEngineState } from './useEngineState.ts';
 
 type Stage = 'opening' | 'playing' | 'winners' | 'winnersList';
 
-export function GameHost({ game }: { game: GameFile }) {
+interface GameHostProps {
+  game: GameFile;
+  /** מצב דמו: הצבעות משחקני דמה לפי הקונפיגורציה, במקום מהסוקט (M3). */
+  demo?: DemoConfig | null;
+}
+
+export function GameHost({ game, demo = null }: GameHostProps) {
   const engine = useMemo(() => new GameEngine(game), [game]);
   const adapter = useMemo(() => new ReplayAdapter(), []);
   const audio = useMemo(() => new AudioManager(), []);
@@ -30,7 +37,9 @@ export function GameHost({ game }: { game: GameFile }) {
   const [stage, setStage] = useState<Stage>('opening');
   const [menuOpen, setMenuOpen] = useState(false);
   const [volume, setVolume] = useState(1);
-  const [syntheticCrowd, setSyntheticCrowd] = useState(true);
+  // בלי דמו — ההצבעות יגיעו מהסוקט (M3); המפעיל יכול להדליק קהל דמה מהתפריט
+  const [syntheticCrowd, setSyntheticCrowd] = useState(demo !== null);
+  const crowdConfig = demo ?? DEFAULT_DEMO_CONFIG;
   const [timer, setTimer] = useState<{ remaining: number; total: number } | null>(null);
   const snapshotSeqRef = useRef(0);
 
@@ -81,17 +90,21 @@ export function GameHost({ game }: { game: GameFile }) {
     // מפתח על השקופית והפאזה — פתיחה מחדש מאתחלת את הספירה
   }, [stage, state.phase, state.currentSlideId, engine, audio, slide, sounds]);
 
-  // קהל סינתטי: מזרים snapshots מצטברים כל ~300ms בזמן הצבעה
+  // שחקני דמה: מזרימים snapshots מצטברים בזמן הצבעה, לפי קונפיגורציית הדמו
   useEffect(() => {
     if (stage !== 'playing' || state.phase !== 'voting' || !syntheticCrowd) return;
-    const plan = planCrowdVotes(slide);
+    const plan = planCrowdVotes(slide, {
+      voterCount: crowdConfig.voterCount,
+      speedFactor: crowdConfig.speedFactor,
+      correctBias: crowdConfig.correctBias,
+    });
     const openedAt = Date.now();
     const interval = window.setInterval(() => {
       const elapsed = Date.now() - openedAt;
       adapter.emit(snapshotAt(plan, slide.id, elapsed, ++snapshotSeqRef.current));
-    }, 300);
+    }, crowdConfig.intervalMs);
     return () => window.clearInterval(interval);
-  }, [stage, state.phase, state.currentSlideId, syntheticCrowd, adapter, slide]);
+  }, [stage, state.phase, state.currentSlideId, syntheticCrowd, adapter, slide, crowdConfig]);
 
   // automaticSkip: מעבר אוטומטי אחרי X שניות כשאין מדיה פעילה
   useEffect(() => {
@@ -198,7 +211,15 @@ export function GameHost({ game }: { game: GameFile }) {
       {stage === 'winners' && <WinnersScreen engine={engine} />}
       {stage === 'winnersList' && <WinnersListScreen engine={engine} />}
 
-      <span className="status-dot status-dot--connected" title="מקור הצבעות: Replay (ללא שרת)" />
+      <span
+        className="status-dot status-dot--connected"
+        title={
+          demo !== null
+            ? `מצב דמו: ${crowdConfig.voterCount} שחקני דמה`
+            : 'מקור הצבעות: Replay (סוקט יגיע ב-M3)'
+        }
+      />
+      {demo !== null && <span className="demo-badge">דמו · {crowdConfig.voterCount.toLocaleString()} שחקנים</span>}
 
       {menuOpen && (
         <OperatorMenu
