@@ -657,6 +657,9 @@ body {
 
 .picker-button:hover { background: rgba(255, 255, 255, 0.25); }
 
+.picker-upload { cursor: pointer; }
+.picker-upload--secondary { font-size: 20px; opacity: 0.7; }
+
 .picker-error {
   max-width: 1400px;
   max-height: 300px;
