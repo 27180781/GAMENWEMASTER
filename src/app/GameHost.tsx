@@ -75,9 +75,10 @@ export function GameHost({ game, settings, onSettingsChange }: GameHostProps) {
   const revealRef = useRef<RevealState>(reveal);
   revealRef.current = reveal;
 
-  // איפוס שלבי חשיפה במעבר שקופית
+  // איפוס שלבי חשיפה + זיהוי הקשת שלט המנחה, במעבר שקופית
   useEffect(() => {
     setReveal(NO_REVEAL);
+    lastHostAnswerRef.current = null;
   }, [state.currentSlideId]);
 
   // -------------------------------------------------------------------------
@@ -229,6 +230,26 @@ export function GameHost({ game, settings, onSettingsChange }: GameHostProps) {
     engine.dispatch({ type: 'ADVANCE', at: now });
   }, [engine, audio, sounds]);
 
+  /**
+   * כניסה מחדש לשקופית במצב "כל התשובות חשופות, טיימר טרם הופעל" — בלי
+   * לנגן שוב את מדיית הפתיחה (GOTO לבדו היה מציג אותה מחדש בשקופיות עם מדיה).
+   */
+  const reenterAtAnswers = useCallback(
+    (slideId: number) => {
+      const now = Date.now();
+      engine.dispatch({ type: 'GOTO', slideId, at: now });
+      if (engine.getState().activeMedia === 'open') {
+        engine.dispatch({ type: 'MEDIA_ENDED', at: now });
+      }
+      setReveal({
+        questionShown: true,
+        answersShown: engine.getCurrentSlide().question.answers.length,
+        revealCorrect: false,
+      });
+    },
+    [engine],
+  );
+
   /** צעד אחד אחורה בכל שלב — מקש 2; בתחילת שקופית חוזר לשקופית הקודמת. */
   const stepBack = useCallback(() => {
     const current = engine.getState();
@@ -256,19 +277,13 @@ export function GameHost({ game, settings, onSettingsChange }: GameHostProps) {
         setReveal((r) => ({ ...r, revealCorrect: false }));
         return;
       }
-      // חזרה לשלב שלפני ההצבעה: כניסה מחדש לשקופית עם הכל חשוף
-      engine.dispatch({ type: 'GOTO', slideId: s.id, at: now });
-      setReveal({ questionShown: true, answersShown: s.question.answers.length, revealCorrect: false });
+      // חזרה לשלב שלפני ההצבעה: כל התשובות חשופות, בלי לנגן שוב את המדיה
+      reenterAtAnswers(s.id);
       return;
     }
     if (current.phase === 'voting') {
       // ביטול ההצבעה — חזרה למצב שבו כל התשובות חשופות והטיימר טרם הופעל
-      engine.dispatch({ type: 'GOTO', slideId: s.id, at: now });
-      setReveal({
-        questionShown: true,
-        answersShown: s.question.answers.length,
-        revealCorrect: false,
-      });
+      reenterAtAnswers(s.id);
       return;
     }
     // showing
@@ -283,7 +298,7 @@ export function GameHost({ game, settings, onSettingsChange }: GameHostProps) {
       }
     }
     engine.dispatch({ type: 'BACK', at: now });
-  }, [engine]);
+  }, [engine, reenterAtAnswers]);
 
   // -------------------------------------------------------------------------
   // פקודות מנחה (מקלדת + שלט מנחה): 0 קדימה · 1 מובילים · 2 אחורה ·
