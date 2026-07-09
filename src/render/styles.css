@@ -1,0 +1,486 @@
+/* עיצוב המשחק — RTL, טיפוגרפיה גדולה למסך מרוחק, צבעים מ-CSS variables */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: 'Heebo', 'Assistant', 'Rubik', 'Segoe UI', system-ui, sans-serif;
+  background: #0b0e1a;
+  color: #fff;
+  overflow: hidden;
+}
+
+.game-root {
+  position: relative;
+  height: 100%;
+  background: var(--main-color, #222b45);
+  user-select: none;
+}
+
+/* ---- מסכים ---- */
+
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: screen-fade 0.45s ease;
+}
+
+@keyframes screen-fade {
+  from { opacity: 0; transform: scale(0.985); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.screen-background {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.screen-background .media-fill,
+.screen-background img,
+.screen-background video,
+.screen-background iframe {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.screen-background::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(var(--main-rgb, 34, 43, 69), 0.55);
+}
+
+.screen-content {
+  position: relative;
+  z-index: 1;
+  width: min(92vw, 1600px);
+  max-height: 94vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3vh;
+}
+
+/* ---- מסך פתיחה ---- */
+
+.opening-logo { max-height: 22vh; }
+
+.opening-title {
+  font-size: clamp(40px, 6vw, 96px);
+  font-weight: 800;
+  color: var(--secondary-color, #fff);
+  text-align: center;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+}
+
+.opening-hint {
+  font-size: clamp(18px, 2vw, 28px);
+  opacity: 0.85;
+  animation: hint-pulse 2s infinite;
+}
+
+@keyframes hint-pulse {
+  50% { opacity: 0.4; }
+}
+
+/* ---- שקופית שאלה ---- */
+
+.question-slide {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 3vh;
+  align-items: center;
+}
+
+.question-text {
+  font-size: clamp(48px, 4.5vw, 72px); /* ≥48px לפי המפרט */
+  font-weight: 800;
+  line-height: 1.25;
+  text-align: center;
+  color: var(--secondary-color, #fff);
+  text-shadow: 0 3px 16px rgba(0, 0, 0, 0.45);
+  white-space: pre-wrap;
+}
+
+.question-image { max-height: 30vh; border-radius: 12px; }
+
+.answers {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2vh 2vw;
+  width: 100%;
+}
+
+.answers--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.answers--5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.answer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 2px solid rgba(var(--secondary-rgb, 255, 255, 255), 0.35);
+  border-radius: 14px;
+  padding: 2vh 1.5vw;
+  font-size: clamp(24px, 2.2vw, 40px);
+  transition: border-color 0.3s, box-shadow 0.3s, opacity 0.3s, transform 0.3s;
+  overflow: hidden;
+}
+
+.answer--correct {
+  border-color: #4ade80;
+  box-shadow: 0 0 32px rgba(74, 222, 128, 0.55);
+  transform: scale(1.03);
+}
+
+.answer--dimmed { opacity: 0.35; }
+
+.answer-number {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2em;
+  height: 2.2em;
+  border-radius: 50%;
+  background: var(--secondary-color, #fff);
+  color: #111;
+  font-weight: 800;
+  font-size: 0.9em;
+}
+
+.answer-text { position: relative; z-index: 1; }
+
+.answer-bar-wrap {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.answer-bar {
+  display: block;
+  height: 100%;
+  background: var(--secondary-color, #fff);
+  transition: width 0.35s ease; /* עדכון חלק של הברים */
+}
+
+.answer-percent {
+  position: absolute;
+  bottom: 12px;
+  inset-inline-end: 12px;
+  font-size: 0.65em;
+  opacity: 0.9;
+}
+
+/* גריד תמונות (ans_images) */
+
+.answers--images .answer { flex-direction: column; padding: 0; }
+.answers--images.answers--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.answer-image {
+  width: 100%;
+  height: 32vh;
+  object-fit: cover;
+}
+
+.answers--images .answer-number {
+  position: absolute;
+  top: 10px;
+  inset-inline-start: 10px;
+  z-index: 2;
+  font-size: clamp(22px, 2vw, 34px);
+}
+
+.votes-total {
+  font-size: clamp(18px, 1.6vw, 26px);
+  opacity: 0.8;
+}
+
+/* ---- טיימר ---- */
+
+.timer-ring {
+  position: fixed;
+  top: 3vh;
+  inset-inline-start: 3vw;
+  width: 128px;
+  height: 128px;
+  z-index: 5;
+}
+
+.timer-ring-track {
+  fill: rgba(0, 0, 0, 0.45);
+  stroke: rgba(255, 255, 255, 0.2);
+  stroke-width: 10;
+}
+
+.timer-ring-progress {
+  fill: none;
+  stroke: var(--secondary-color, #fff);
+  stroke-width: 10;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.2s linear;
+}
+
+.timer-ring--urgent .timer-ring-progress { stroke: #f87171; }
+.timer-ring--urgent { animation: hint-pulse 0.8s infinite; }
+
+.timer-ring-value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44px;
+  font-weight: 800;
+}
+
+/* ---- מדיה ---- */
+
+.media-fill {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+.slide-media-screen { background: #000; }
+.slide-media-screen .media-fill { position: absolute; inset: 0; }
+
+.media-audio,
+.media-unknown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2vh;
+  width: 100%;
+  height: 100%;
+  font-size: clamp(20px, 2vw, 32px);
+}
+
+.media-audio-icon { font-size: 12vh; animation: hint-pulse 1.6s infinite; }
+
+/* ---- subject ---- */
+
+.subject-slide {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3vh;
+  width: 100%;
+}
+
+.subject-text {
+  font-size: clamp(40px, 4vw, 68px);
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+  color: var(--secondary-color, #fff);
+  white-space: pre-wrap;
+  text-shadow: 0 3px 16px rgba(0, 0, 0, 0.45);
+}
+
+.subject-text--muted { opacity: 0.55; font-size: clamp(24px, 2.4vw, 40px); }
+
+.subject-slide--image { position: absolute; inset: 0; }
+
+.subject-waiting,
+.subject-url { font-size: clamp(18px, 1.8vw, 26px); opacity: 0.85; }
+
+.spinner {
+  width: 72px;
+  height: 72px;
+  border: 8px solid rgba(255, 255, 255, 0.25);
+  border-top-color: var(--secondary-color, #fff);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---- זוכים ---- */
+
+.winners-title {
+  font-size: clamp(44px, 5vw, 84px);
+  font-weight: 800;
+  color: var(--secondary-color, #fff);
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+}
+
+.winners-podium {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1.6vh;
+  width: min(80vw, 900px);
+}
+
+.winner {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 14px;
+  padding: 1.8vh 2vw;
+  font-size: clamp(24px, 2.4vw, 42px);
+  animation: winner-in 0.5s ease backwards;
+}
+
+.winner:nth-child(1) { animation-delay: 0.1s; border: 2px solid #facc15; font-size: clamp(30px, 3vw, 52px); }
+.winner:nth-child(2) { animation-delay: 0.25s; border: 2px solid #cbd5e1; }
+.winner:nth-child(3) { animation-delay: 0.4s; border: 2px solid #d97706; }
+
+@keyframes winner-in {
+  from { opacity: 0; transform: translateY(24px); }
+}
+
+.winner-rank { font-weight: 800; min-width: 1.6em; }
+.winner-name { flex: 1; }
+.winner-score { font-weight: 700; }
+
+.winners-list {
+  list-style: none;
+  columns: 2;
+  column-gap: 4vw;
+  width: min(86vw, 1200px);
+  max-height: 70vh;
+  overflow-y: auto;
+  font-size: clamp(18px, 1.7vw, 28px);
+}
+
+.winners-list li {
+  display: flex;
+  gap: 12px;
+  padding: 0.7vh 0;
+  break-inside: avoid;
+}
+
+.winners-list .winner-name { flex: 1; }
+
+/* ---- תפריט מפעיל ---- */
+
+.operator-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.operator-menu-panel {
+  background: #151a2e;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  width: min(92vw, 760px);
+  max-height: 86vh;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  font-size: 16px;
+}
+
+.operator-menu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.operator-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.operator-menu button {
+  background: #26304f;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.operator-menu button:hover { background: #34406a; }
+.operator-menu button.current { border-color: #4ade80; }
+
+.operator-status { width: 100%; opacity: 0.7; font-size: 13px; }
+
+.operator-slides ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.operator-slides button { width: 100%; text-align: start; }
+
+/* ---- מסך בחירת משחק ---- */
+
+.picker-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: center;
+}
+
+.picker-button {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-radius: 12px;
+  padding: 16px 26px;
+  font-size: clamp(18px, 1.8vw, 26px);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.picker-button:hover { background: rgba(255, 255, 255, 0.25); }
+
+.picker-error {
+  max-width: 80vw;
+  color: #f87171;
+  font-size: 16px;
+  text-align: right;
+}
+
+/* נורית סטטוס חיבור (SPEC סעיף 6 — יוצג בעיקר מ-M3) */
+
+.status-dot {
+  position: fixed;
+  bottom: 12px;
+  inset-inline-start: 12px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  z-index: 40;
+}
+
+.status-dot--connected { background: #4ade80; }
+.status-dot--reconnecting { background: #facc15; }
+.status-dot--offline { background: #f87171; }
