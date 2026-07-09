@@ -55,7 +55,7 @@ function freshBookkeeping(): VotingBookkeeping {
 }
 
 export class GameEngine {
-  private readonly game: GameFile;
+  private game: GameFile;
   private readonly surveyParticipationScoring: boolean;
   private roomId: string | null;
 
@@ -206,6 +206,69 @@ export class GameEngine {
       votesBySlide: structuredClone(snapshot.votesBySlide),
       slidesCompleted: [...snapshot.slidesCompleted],
       firstClickWinners: structuredClone(snapshot.firstClickWinners),
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // רענון תוכן "חם" (push של רענון למשחק אונליין)
+  // -------------------------------------------------------------------------
+
+  /**
+   * החלפת תוכן המשחק תוך כדי ריצה, בלי לאבד את מהלך המשחק — מיועד ל"פוש
+   * רענון": העורך עדכן את קובץ ה-JSON (תיקון טקסט, תמונה, תשובה, הוספת/מחיקת
+   * שקופית) ורוצים שהשינוי ישתקף במשחק הפעיל מיד, אך *רק* כשנשלח אות רענון,
+   * לא בסקרים אוטומטיים.
+   *
+   * נשמר: הניקוד המצטבר (`scores`), ההצבעות הסופיות של שקופיות שנסגרו
+   * (`votesBySlide`), זוכי firstClicker, רשימת השקופיות שהושלמו, וכן המיקום
+   * הנוכחי — לפי **id** השקופית ולא לפי אינדקס, כך שהוספה/הסרה של שקופיות
+   * קודמות אינה מזיזה את המיקום. אם השקופית הנוכחית נעלמה מהקובץ המעודכן,
+   * נכנסים מחדש לשקופית הקרובה ביותר שנותרה.
+   *
+   * מגבלה: אם השקופית הנוכחית עצמה שונתה בזמן הצבעה פעילה, ה-phase נשמר אך
+   * מוני ההצבעה החיים עשויים להתייחס ל-answerId שכבר לא קיים — הרענון נועד
+   * להישלח בין שקופיות ולא באמצע חלון הצבעה.
+   */
+  updateGame(newGame: GameFile): void {
+    if (newGame.questions.length === 0) {
+      throw new Error('קובץ המשחק המעודכן חייב לכלול לפחות שקופית אחת');
+    }
+    this.game = newGame;
+
+    if (this.state.phase === 'ended') {
+      // המשחק הסתיים — הזוכים מחושבים מ-scores; רק מיישרים את המיקום לסוף
+      const lastIndex = newGame.questions.length - 1;
+      this.setState({
+        currentSlideIndex: lastIndex,
+        currentSlideId: newGame.questions[lastIndex]!.id,
+      });
+      return;
+    }
+
+    const index = this.slideIndexById(this.state.currentSlideId);
+    if (index === -1) {
+      // השקופית הנוכחית נמחקה מהקובץ החדש — כניסה מחדש לקרובה ביותר, נקי
+      const fallbackIndex = Math.min(
+        this.state.currentSlideIndex,
+        newGame.questions.length - 1,
+      );
+      this.voting = freshBookkeeping();
+      this.setState(this.enterSlideState(fallbackIndex, {}));
+      return;
+    }
+
+    // השקופית הנוכחית עדיין קיימת — שומרים מיקום/phase, מרעננים תוכן נגזר
+    const slide = newGame.questions[index]!;
+    const activeMedia =
+      this.state.activeMedia === 'open' && slide.openMedia.src !== ''
+        ? 'open'
+        : this.state.activeMedia === 'end' && slide.endMedia.src !== ''
+          ? 'end'
+          : null;
+    this.setState({
+      currentSlideIndex: index,
+      subjectCommand: this.subjectCommandFor(slide),
+      activeMedia,
     });
   }
 

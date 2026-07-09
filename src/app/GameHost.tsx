@@ -43,10 +43,18 @@ interface GameHostProps {
   /** הגדרות המשחק (שחקני דמה, שלט מנחה...) — נשמרות ברמת האפליקציה. */
   settings: GameSettings;
   onSettingsChange: (settings: GameSettings) => void;
+  /**
+   * "פוש רענון" למשחק אונליין: משיכה חוזרת של קובץ המשחק מכתובת ‎?game=URL‎.
+   * מוזרק מ-App; undefined כשאין מקור למשוך ממנו (אופליין/העלאה ידנית).
+   */
+  onRequestRefresh?: () => void;
 }
 
-export function GameHost({ game, settings, onSettingsChange }: GameHostProps) {
-  const engine = useMemo(() => new GameEngine(game), [game]);
+export function GameHost({ game, settings, onSettingsChange, onRequestRefresh }: GameHostProps) {
+  // המנוע נוצר פעם אחת; רענון תוכן מתבצע דרך engine.updateGame בלי remount,
+  // כדי לשמר את מהלך המשחק (ניקוד/מיקום). ראו useEffect על שינוי game למטה.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const engine = useMemo(() => new GameEngine(game), []);
   const adapter = useMemo(() => new ReplayAdapter(), []);
   const audio = useMemo(() => new AudioManager(), []);
   const state = useEngineState(engine);
@@ -80,6 +88,16 @@ export function GameHost({ game, settings, onSettingsChange }: GameHostProps) {
     setReveal(NO_REVEAL);
     lastHostAnswerRef.current = null;
   }, [state.currentSlideId]);
+
+  // רענון תוכן חם ("פוש"): כשמגיע אובייקט game חדש — מחליפים את התוכן במנוע
+  // בלי remount, כדי לשמר ניקוד/מיקום. שלבי החשיפה של השקופית הנוכחית נשמרים;
+  // אם השקופית הנוכחית נמחקה, currentSlideId משתנה וה-effect שלמעלה מאפס אותם.
+  const gameRef = useRef(game);
+  useEffect(() => {
+    if (gameRef.current === game) return; // אותו אובייקט — הטעינה הראשונית, לא רענון
+    gameRef.current = game;
+    engine.updateGame(game);
+  }, [game, engine]);
 
   // -------------------------------------------------------------------------
   // טיימר ההצבעה — כולל עצירה והוספת/החסרת זמן (פקודות מנחה 4/5/6)
@@ -466,11 +484,15 @@ export function GameHost({ game, settings, onSettingsChange }: GameHostProps) {
         if (stage === 'playing' && window.confirm('לחזור שקופית שלמה אחורה?')) {
           engine.dispatch({ type: 'BACK', at: Date.now() });
         }
+      } else if (event.key === 'r' || event.key === 'R') {
+        // רענון יזום של קובץ המשחק מהשרת (בלי לאבד ניקוד/מיקום)
+        event.preventDefault();
+        onRequestRefresh?.();
       }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [stage, menuOpen, settingsOpen, engine, advanceStep, stepBack]);
+  }, [stage, menuOpen, settingsOpen, engine, advanceStep, stepBack, onRequestRefresh]);
 
   // מסך מלא — כפתור בפינה (window resize מעדכן את סקייל הבמה אוטומטית)
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));

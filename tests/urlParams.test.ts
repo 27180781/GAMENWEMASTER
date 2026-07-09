@@ -7,6 +7,7 @@ describe('parseAppParams — פרמטרים בכתובת', () => {
   it('?game=<URL> נקלט', () => {
     expect(parseAppParams('?game=https://example.com/game.json')).toEqual({
       gameUrl: 'https://example.com/game.json',
+      pushUrl: null,
       demo: false,
     });
   });
@@ -14,6 +15,7 @@ describe('parseAppParams — פרמטרים בכתובת', () => {
   it('&demo=1 (וגם demo ריק / true) מדליק מצב דמו', () => {
     expect(parseAppParams('?game=https://x.dev/g.json&demo=1')).toEqual({
       gameUrl: 'https://x.dev/g.json',
+      pushUrl: null,
       demo: true,
     });
     expect(parseAppParams('?demo').demo).toBe(true);
@@ -21,9 +23,17 @@ describe('parseAppParams — פרמטרים בכתובת', () => {
     expect(parseAppParams('?demo=0').demo).toBe(false);
   });
 
+  it('&push=<URL> — ערוץ הפוש נקלט', () => {
+    const encoded = encodeURIComponent('https://srv.example/events?room=42');
+    const { pushUrl } = parseAppParams(`?game=https://x.dev/g.json&push=${encoded}`);
+    expect(pushUrl).toBe('https://srv.example/events?room=42');
+    expect(parseAppParams('?game=https://x.dev/g.json').pushUrl).toBe(null);
+    expect(parseAppParams('?push=').pushUrl).toBe(null);
+  });
+
   it('בלי פרמטרים — ברירות מחדל', () => {
-    expect(parseAppParams('')).toEqual({ gameUrl: null, demo: false });
-    expect(parseAppParams('?game=')).toEqual({ gameUrl: null, demo: false });
+    expect(parseAppParams('')).toEqual({ gameUrl: null, pushUrl: null, demo: false });
+    expect(parseAppParams('?game=')).toEqual({ gameUrl: null, pushUrl: null, demo: false });
   });
 
   it('URL עם פרמטרים משלו (מקודד) נשמר במלואו', () => {
