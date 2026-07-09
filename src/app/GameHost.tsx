@@ -5,7 +5,7 @@
  *
  * זרימת שלבים בשקופית שאלה — כל מעבר ברווח (מקלדת) או 0 (שלט מנחה/טלפון):
  *   כניסה לשקופית → [מדיית פתיחה] → הצגת השאלה → חשיפת כל תשובה בלחיצה
- *   (חשיפת האחרונה פותחת הצבעה וטיימר) → עצירת הטיימר (אם לא נגמר לבד)
+ *   → לחיצה להפעלת הטיימר ופתיחת ההצבעה → עצירת הטיימר (אם לא נגמר לבד)
  *   → חשיפת התשובה הנכונה → [מדיית סיום] → השקופית הבאה.
  * מקש 2 צועד אחורה בכל שלב, עד חזרה לשקופית הקודמת.
  *
@@ -189,14 +189,13 @@ export function GameHost({ game, demo = null }: GameHostProps) {
         audio.play('showQuestion', sounds.showQuestionMediaSound.src);
         return;
       }
-      // שלב חשיפת התשובות — האחרונה פותחת את ההצבעה והטיימר
+      // שלב חשיפת התשובות — אחת בכל לחיצה
       const totalAnswers = s.question.answers.length;
       if (revealRef.current.answersShown < totalAnswers) {
-        const next = revealRef.current.answersShown + 1;
-        setReveal((r) => ({ ...r, answersShown: next }));
-        if (next === totalAnswers) engine.dispatch({ type: 'OPEN_VOTING', at: now });
+        setReveal((r) => ({ ...r, answersShown: r.answersShown + 1 }));
         return;
       }
+      // כל התשובות חשופות — לחיצה נוספת מפעילה את הטיימר ופותחת את ההצבעה
       engine.dispatch({ type: 'OPEN_VOTING', at: now });
       return;
     }
@@ -249,10 +248,11 @@ export function GameHost({ game, demo = null }: GameHostProps) {
       return;
     }
     if (current.phase === 'voting') {
+      // ביטול ההצבעה — חזרה למצב שבו כל התשובות חשופות והטיימר טרם הופעל
       engine.dispatch({ type: 'GOTO', slideId: s.id, at: now });
       setReveal({
         questionShown: true,
-        answersShown: Math.max(0, s.question.answers.length - 1),
+        answersShown: s.question.answers.length,
         revealCorrect: false,
       });
       return;
@@ -442,27 +442,50 @@ export function GameHost({ game, demo = null }: GameHostProps) {
     return () => window.removeEventListener('keydown', handleKey);
   }, [stage, menuOpen, engine, advanceStep, stepBack]);
 
-  const handleClick = (event: React.MouseEvent) => {
-    if (menuOpen) return;
-    const target = event.target as HTMLElement;
-    if (target.closest('button, input, select, textarea, a')) return;
-    if (stage === 'opening') setStage('playing');
-    else if (stage === 'playing' && !leadersOverlay) advanceStep();
-    else if (stage === 'winners') setStage('winnersList');
-  };
+  // מסך מלא — כפתור בפינה (window resize מעדכן את סקייל הבמה אוטומטית)
+  const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void document.documentElement.requestFullscreen().catch(() => {});
+  }, []);
 
+  // קליק עכבר אינו מקדם שלבים — קידום רק ברווח/0 (בקשת המנחה)
   return (
-    <div className="game-root" dir="rtl" style={themeStyle(setting)} onClick={handleClick}>
+    <div className="game-root" dir="rtl" style={themeStyle(setting)}>
       <Stage>
         {stage === 'opening' && <OpeningScreen engine={engine} />}
         {stage === 'playing' && (
-          <SlideView engine={engine} state={state} timer={timer} reveal={reveal} />
+          <>
+            <SlideView engine={engine} state={state} timer={timer} reveal={reveal} />
+            {/* מיקום במשחק: שקופית נוכחית מתוך סה"כ */}
+            <span className="slide-counter" dir="ltr">
+              {state.currentSlideIndex + 1}/{engine.getGame().questions.length}
+            </span>
+          </>
         )}
         {stage === 'winners' && <WinnersScreen engine={engine} />}
         {stage === 'winnersList' && <WinnersListScreen engine={engine} />}
 
         {/* מסך מובילים באמצע משחק (פקודת מנחה 1) — שכבה מעל, המשחק ממשיך מתחת */}
         {stage === 'playing' && leadersOverlay && <WinnersListScreen engine={engine} />}
+
+        {/* כפתורי פינה: מסך מלא + הגדרות (תפריט המפעיל) */}
+        <div className="corner-buttons">
+          <button
+            title={isFullscreen ? 'יציאה ממסך מלא' : 'מסך מלא'}
+            onClick={toggleFullscreen}
+          >
+            {isFullscreen ? '🗗' : '⛶'}
+          </button>
+          <button title="הגדרות (ESC)" onClick={() => setMenuOpen((open) => !open)}>
+            ⚙
+          </button>
+        </div>
 
         <span
           className="status-dot status-dot--connected"

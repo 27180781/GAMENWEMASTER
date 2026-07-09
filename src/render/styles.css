@@ -273,11 +273,52 @@ body {
   flex: none;
 }
 
+/* מונה שקופיות — פינה ימנית עליונה, לבן עם מתאר שחור (קריא על כל צבע) */
+.slide-counter {
+  position: absolute;
+  top: 14px;
+  inset-inline-start: 22px; /* ימין ב-RTL */
+  z-index: 30;
+  font-size: 30px;
+  font-weight: 800;
+  color: #fff;
+  -webkit-text-stroke: 1px #000;
+  text-shadow:
+    -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000,
+    0 0 8px rgba(0, 0, 0, 0.6);
+}
+
+/* כפתורי פינה שמאלית עליונה: מסך מלא + הגדרות */
+.corner-buttons {
+  position: absolute;
+  top: 14px;
+  inset-inline-end: 22px; /* שמאל ב-RTL */
+  display: flex;
+  gap: 12px;
+  z-index: 40;
+}
+
+.corner-buttons button {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.2s, background 0.2s;
+}
+
+.corner-buttons button:hover { opacity: 1; background: rgba(0, 0, 0, 0.7); }
+
 /* ---- טיימר ---- */
 
 .timer-ring {
   position: absolute;
-  top: 32px;
+  top: 64px;
   inset-inline-start: 48px;
   width: 128px;
   height: 128px;
