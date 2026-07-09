@@ -27,10 +27,11 @@ import { SlideView } from '../render/SlideView.tsx';
 import { Stage } from '../render/Stage.tsx';
 import { themeStyle } from '../render/theme.ts';
 import type { TimerView } from '../render/TimerRing.tsx';
+import { SettingsScreen } from '../render/SettingsScreen.tsx';
 import { AudioManager } from './AudioManager.ts';
 import { extractHostVote } from './hostRemote.ts';
 import { planCrowdVotes, snapshotAt } from './syntheticVotes.ts';
-import { DEFAULT_DEMO_CONFIG, type DemoConfig } from './urlParams.ts';
+import type { GameSettings } from './urlParams.ts';
 import { useEngineState } from './useEngineState.ts';
 
 type HostStage = 'opening' | 'playing' | 'winners' | 'winnersList';
@@ -39,11 +40,12 @@ const NO_REVEAL: RevealState = { questionShown: false, answersShown: 0, revealCo
 
 interface GameHostProps {
   game: GameFile;
-  /** מצב דמו: הצבעות משחקני דמה לפי הקונפיגורציה, במקום מהסוקט (M3). */
-  demo?: DemoConfig | null;
+  /** הגדרות המשחק (שחקני דמה, שלט מנחה...) — נשמרות ברמת האפליקציה. */
+  settings: GameSettings;
+  onSettingsChange: (settings: GameSettings) => void;
 }
 
-export function GameHost({ game, demo = null }: GameHostProps) {
+export function GameHost({ game, settings, onSettingsChange }: GameHostProps) {
   const engine = useMemo(() => new GameEngine(game), [game]);
   const adapter = useMemo(() => new ReplayAdapter(), []);
   const audio = useMemo(() => new AudioManager(), []);
@@ -51,17 +53,18 @@ export function GameHost({ game, demo = null }: GameHostProps) {
 
   const [stage, setStage] = useState<HostStage>('opening');
   const [menuOpen, setMenuOpen] = useState(false);
+  /** מסך ההגדרות באמצע משחק (כפתור ⚙) — שכבה מעל; מצב המשחק נשמר. */
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [volume, setVolume] = useState(1);
-  // בלי דמו — ההצבעות יגיעו מהסוקט (M3); המפעיל יכול להדליק קהל דמה מהתפריט
-  const [syntheticCrowd, setSyntheticCrowd] = useState(demo !== null);
+  const syntheticCrowd = settings.crowdEnabled;
   /** מסך מובילים באמצע משחק (פקודת מנחה 1) — שכבה מעל, המשחק ממשיך מתחת. */
   const [leadersOverlay, setLeadersOverlay] = useState(false);
   const [timer, setTimer] = useState<TimerView | null>(null);
   /** שלבי החשיפה של השקופית הנוכחית (שאלה / תשובות / תשובה נכונה). */
   const [reveal, setReveal] = useState<RevealState>(NO_REVEAL);
 
-  const crowdConfig = demo ?? DEFAULT_DEMO_CONFIG;
-  const hostVoterId = demo?.hostVoterId.trim() ?? '';
+  const crowdConfig = settings;
+  const hostVoterId = settings.hostVoterId.trim();
 
   const slide = engine.getCurrentSlide();
   const setting = engine.getGame().setting;
@@ -414,10 +417,11 @@ export function GameHost({ game, demo = null }: GameHostProps) {
       const target = event.target as HTMLElement | null;
       if (target?.closest('input, select, textarea')) return; // הקלדה בטפסים
       if (event.key === 'Escape') {
-        setMenuOpen((open) => !open);
+        if (settingsOpen) setSettingsOpen(false);
+        else setMenuOpen((open) => !open);
         return;
       }
-      if (menuOpen) return;
+      if (menuOpen || settingsOpen) return;
       if (event.key >= '0' && event.key <= '6') {
         if (event.key === '0' && stage !== 'playing') advance();
         else runHostCommandRef.current(Number(event.key));
@@ -440,7 +444,7 @@ export function GameHost({ game, demo = null }: GameHostProps) {
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [stage, menuOpen, engine, advanceStep, stepBack]);
+  }, [stage, menuOpen, settingsOpen, engine, advanceStep, stepBack]);
 
   // מסך מלא — כפתור בפינה (window resize מעדכן את סקייל הבמה אוטומטית)
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
@@ -482,7 +486,7 @@ export function GameHost({ game, demo = null }: GameHostProps) {
           >
             {isFullscreen ? '🗗' : '⛶'}
           </button>
-          <button title="הגדרות (ESC)" onClick={() => setMenuOpen((open) => !open)}>
+          <button title="הגדרות" onClick={() => setSettingsOpen((open) => !open)}>
             ⚙
           </button>
         </div>
@@ -490,16 +494,28 @@ export function GameHost({ game, demo = null }: GameHostProps) {
         <span
           className="status-dot status-dot--connected"
           title={
-            demo !== null
+            syntheticCrowd
               ? `מצב דמו: ${crowdConfig.voterCount} שחקני דמה`
-              : 'מקור הצבעות: Replay (סוקט יגיע ב-M3)'
+              : 'מקור הצבעות: סוקט (M3)'
           }
         />
-        {demo !== null && (
+        {syntheticCrowd && (
           <span className="demo-badge">
             דמו · {crowdConfig.voterCount.toLocaleString()} שחקנים
             {hostVoterId !== '' && ` · שלט מנחה: ${hostVoterId}`}
           </span>
+        )}
+
+        {settingsOpen && (
+          <SettingsScreen
+            game={game}
+            initial={settings}
+            mode="ingame"
+            onSave={(saved) => {
+              onSettingsChange(saved);
+              setSettingsOpen(false);
+            }}
+          />
         )}
 
         {menuOpen && (
@@ -509,7 +525,7 @@ export function GameHost({ game, demo = null }: GameHostProps) {
             volume={volume}
             onVolumeChange={setVolume}
             syntheticCrowd={syntheticCrowd}
-            onSyntheticCrowdChange={setSyntheticCrowd}
+            onSyntheticCrowdChange={(on) => onSettingsChange({ ...settings, crowdEnabled: on })}
             hostVoterId={hostVoterId}
             onEndGame={() => {
               setLeadersOverlay(false);

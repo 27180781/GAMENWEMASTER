@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DEMO_CONFIG, parseAppParams } from '../src/app/urlParams.ts';
+import { DEFAULT_GAME_SETTINGS, parseAppParams } from '../src/app/urlParams.ts';
 import { planCrowdVotes } from '../src/app/syntheticVotes.ts';
 import { fourAnswers, makeGame, rawSlide } from './helpers.ts';
 
@@ -54,12 +54,14 @@ describe('מהירות הצבעה (speedFactor) בקהל הדמה', () => {
     expect(new Set(plan.map((v) => v.voterId)).size).toBe(5000);
   });
 
-  it('קונפיגורציית ברירת המחדל של הדמו שפויה', () => {
-    expect(DEFAULT_DEMO_CONFIG.voterCount).toBeGreaterThan(0);
-    expect(DEFAULT_DEMO_CONFIG.speedFactor).toBeGreaterThan(0);
-    expect(DEFAULT_DEMO_CONFIG.speedFactor).toBeLessThanOrEqual(1);
-    expect(DEFAULT_DEMO_CONFIG.correctBias).toBeGreaterThanOrEqual(0);
-    expect(DEFAULT_DEMO_CONFIG.correctBias).toBeLessThanOrEqual(1);
-    expect(DEFAULT_DEMO_CONFIG.intervalMs).toBeGreaterThanOrEqual(50);
+  it('קונפיגורציית ברירת המחדל של ההגדרות שפויה', () => {
+    expect(DEFAULT_GAME_SETTINGS.voterCount).toBeGreaterThan(0);
+    expect(DEFAULT_GAME_SETTINGS.speedFactor).toBeGreaterThan(0);
+    expect(DEFAULT_GAME_SETTINGS.speedFactor).toBeLessThanOrEqual(1);
+    expect(DEFAULT_GAME_SETTINGS.correctBias).toBeGreaterThanOrEqual(0);
+    expect(DEFAULT_GAME_SETTINGS.correctBias).toBeLessThanOrEqual(1);
+    expect(DEFAULT_GAME_SETTINGS.intervalMs).toBeGreaterThanOrEqual(50);
+    expect(typeof DEFAULT_GAME_SETTINGS.crowdEnabled).toBe('boolean');
+    expect(DEFAULT_GAME_SETTINGS.hostVoterId).toBe('');
   });
 });

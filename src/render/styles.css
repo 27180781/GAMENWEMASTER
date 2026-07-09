@@ -88,12 +88,8 @@ body {
   object-fit: cover;
 }
 
-.screen-background::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: rgba(var(--main-rgb, 34, 43, 69), 0.55);
-}
+/* אין שכבת הכהיה על הרקעים — הצבעים והמדיה מוצגים כמו שהם;
+   קריאות הטקסט נשמרת בעזרת text-shadow על הכותרות והתשובות */
 
 .screen-content {
   position: relative;
@@ -273,11 +269,12 @@ body {
   flex: none;
 }
 
-/* מונה שקופיות — פינה ימנית עליונה, לבן עם מתאר שחור (קריא על כל צבע) */
+/* מונה שקופיות — פינה ימנית עליונה, לבן עם מתאר שחור (קריא על כל צבע).
+   מיקום פיזי (right) ולא לוגי — כי dir="ltr" של המספר הופך inline-start */
 .slide-counter {
   position: absolute;
   top: 14px;
-  inset-inline-start: 22px; /* ימין ב-RTL */
+  right: 22px;
   z-index: 30;
   font-size: 30px;
   font-weight: 800;
@@ -288,11 +285,11 @@ body {
     0 0 8px rgba(0, 0, 0, 0.6);
 }
 
-/* כפתורי פינה שמאלית עליונה: מסך מלא + הגדרות */
+/* כפתורי פינה שמאלית עליונה: מסך מלא + הגדרות (מיקום פיזי חד-משמעי) */
 .corner-buttons {
   position: absolute;
   top: 14px;
-  inset-inline-end: 22px; /* שמאל ב-RTL */
+  left: 22px;
   display: flex;
   gap: 12px;
   z-index: 40;

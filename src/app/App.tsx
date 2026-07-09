@@ -3,29 +3,19 @@
  *
  * פרמטרים בכתובת:
  *   ?game=<URL של game.json>  — טעינת קובץ המשחק מהכתובת ופתיחתו ישירות.
- *   &demo=1                   — מצב דמו: מסך הגדרות (כמות שחקנים, מהירות
- *                               הצבעה...) ואז הצבעות משחקני דמה במקום סוקט.
+ *   &demo=1                   — מדליק מראש את שחקני הדמה במסך ההגדרות.
  *
- * בלי פרמטרים: מסך בחירה (fixtures מובנים / העלאת game.json).
+ * הזרימה: בחירת/טעינת משחק → מסך ההגדרות (תמיד ראשון) → המשחק.
  * ניתוב מינימלי לפי hash: ‎#debug פותח את מסך הדיבאג של M1.
  */
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { parseGameFile, type GameFile } from '../engine/index.ts';
 import { DebugApp } from '../debug/DebugApp.tsx';
-import { DemoSettingsScreen } from '../render/DemoSettingsScreen.tsx';
+import { SettingsScreen } from '../render/SettingsScreen.tsx';
 import { Stage } from '../render/Stage.tsx';
 import { GameHost } from './GameHost.tsx';
-import { parseAppParams, type DemoConfig } from './urlParams.ts';
-
-/** מעטפת במה 16:9 למסכים שמחוץ למשחק עצמו (בחירה, הגדרות דמו, טעינה). */
-function Shell({ children }: { children: ReactNode }) {
-  return (
-    <div className="game-root" dir="rtl">
-      <Stage>{children}</Stage>
-    </div>
-  );
-}
+import { DEFAULT_GAME_SETTINGS, parseAppParams, type GameSettings } from './urlParams.ts';
 
 import hadassah from '../../fixtures/hadassah-ozen.json';
 import masaa from '../../fixtures/masaa-sync-manual-link.json';
@@ -49,22 +39,28 @@ function useHash(): string {
   return hash;
 }
 
+/** מעטפת במה 16:9 למסכים שמחוץ למשחק עצמו (בחירה, הגדרות, טעינה). */
+function Shell({ children }: { children: ReactNode }) {
+  return (
+    <div className="game-root" dir="rtl">
+      <Stage>{children}</Stage>
+    </div>
+  );
+}
+
 export function App() {
   const hash = useHash();
   const params = useMemo(() => parseAppParams(window.location.search), []);
 
-  /** משחק שממתין להגדרות דמו לפני שהוא נפתח. */
+  /** משחק שנטען וממתין למסך ההגדרות (המסך הראשון תמיד). */
   const [pendingGame, setPendingGame] = useState<GameFile | null>(null);
   const [game, setGame] = useState<GameFile | null>(null);
-  const [demoConfig, setDemoConfig] = useState<DemoConfig | null>(null);
-  const [demoWanted, setDemoWanted] = useState(params.demo);
+  const [settings, setSettings] = useState<GameSettings>({
+    ...DEFAULT_GAME_SETTINGS,
+    crowdEnabled: params.demo || DEFAULT_GAME_SETTINGS.crowdEnabled,
+  });
   const [remoteLoading, setRemoteLoading] = useState(params.gameUrl !== null);
   const [error, setError] = useState<string | null>(null);
-
-  const openGame = (loaded: GameFile, wantDemo: boolean) => {
-    if (wantDemo) setPendingGame(loaded);
-    else setGame(loaded);
-  };
 
   // טעינת משחק מכתובת חיצונית (?game=URL)
   useEffect(() => {
@@ -79,7 +75,7 @@ export function App() {
         const raw: unknown = await response.json();
         const loaded = parseGameFile(raw);
         if (!cancelled) {
-          openGame(loaded, params.demo);
+          setPendingGame(loaded);
           setRemoteLoading(false);
         }
       } catch (e) {
@@ -96,15 +92,22 @@ export function App() {
 
   if (hash === '#debug') return <DebugApp />;
 
-  if (game !== null) return <GameHost key={game.id} game={game} demo={demoConfig} />;
+  if (game !== null) {
+    return (
+      <GameHost key={game.id} game={game} settings={settings} onSettingsChange={setSettings} />
+    );
+  }
 
+  // מסך ההגדרות — המסך הראשון אחרי טעינת משחק
   if (pendingGame !== null) {
     return (
       <Shell>
-        <DemoSettingsScreen
+        <SettingsScreen
           game={pendingGame}
-          onStart={(config) => {
-            setDemoConfig(config);
+          initial={settings}
+          mode="start"
+          onSave={(saved) => {
+            setSettings(saved);
             setGame(pendingGame);
           }}
         />
@@ -127,7 +130,7 @@ export function App() {
 
   const loadRaw = (raw: unknown) => {
     try {
-      openGame(parseGameFile(raw), demoWanted);
+      setPendingGame(parseGameFile(raw));
       setError(null);
     } catch (e) {
       setError((e as Error).message);
@@ -162,14 +165,6 @@ export function App() {
                   .catch((e: unknown) => setError(`קריאת הקובץ נכשלה: ${(e as Error).message}`));
               }}
             />
-          </label>
-          <label className="demo-checkbox">
-            <input
-              type="checkbox"
-              checked={demoWanted}
-              onChange={(e) => setDemoWanted(e.target.checked)}
-            />{' '}
-            מצב דמו — הצבעות משחקני דמה (מסך הגדרות ייפתח קודם)
           </label>
           {error !== null && (
             <pre className="picker-error" style={{ whiteSpace: 'pre-wrap' }}>
