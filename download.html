@@ -26,6 +26,7 @@
       }
       h1 { font-size: 40px; margin-bottom: 8px; }
       .sub { opacity: 0.7; font-size: 18px; margin-bottom: 32px; }
+      .btns { display: flex; flex-direction: column; gap: 14px; align-items: center; }
       .btn {
         display: inline-block;
         background: #facc15;
@@ -36,8 +37,17 @@
         padding: 18px 40px;
         border-radius: 14px;
         transition: transform 0.15s, box-shadow 0.15s;
+        min-width: 340px;
       }
       .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(250, 204, 21, 0.35); }
+      .btn.secondary {
+        background: transparent;
+        color: #facc15;
+        border: 2px solid rgba(250, 204, 21, 0.6);
+        font-size: 20px;
+      }
+      .btn.secondary:hover { box-shadow: 0 8px 28px rgba(250, 204, 21, 0.2); }
+      .btn .small { display: block; font-size: 14px; font-weight: 500; opacity: 0.75; margin-top: 4px; }
       .note { margin-top: 28px; font-size: 15px; opacity: 0.6; line-height: 1.7; text-align: right; }
       .note strong { opacity: 0.9; }
       code { background: rgba(255, 255, 255, 0.1); padding: 2px 6px; border-radius: 5px; }
@@ -48,15 +58,25 @@
       <h1>🎯 Trivia Engine</h1>
       <p class="sub">גרסת שולחן עבודה — אופליין לגמרי, בלי התקנה</p>
 
-      <a
-        class="btn"
-        href="https://github.com/27180781/GAMENWEMASTER/releases/download/desktop-latest/TriviaEngine-Portable.exe"
-      >
-        ⬇ הורדת המנוע ל-Windows
-      </a>
+      <div class="btns">
+        <a
+          class="btn"
+          href="https://github.com/27180781/GAMENWEMASTER/releases/download/desktop-latest/TriviaEngine-Setup.exe"
+        >
+          ⬇ הורדה והתקנה
+          <span class="small">מתקין + קיצור דרך בשולחן העבודה ובתפריט התחל</span>
+        </a>
+        <a
+          class="btn secondary"
+          href="https://github.com/27180781/GAMENWEMASTER/releases/download/desktop-latest/TriviaEngine-Portable.exe"
+        >
+          גרסה ניידת (בלי התקנה)
+          <span class="small">קובץ בודד שרץ ישירות</span>
+        </a>
+      </div>
 
       <div class="note">
-        <p><strong>הפעלה:</strong> לחיצה כפולה על הקובץ — נפתח במסך מלא, בלי אינטרנט.</p>
+        <p><strong>הפעלה:</strong> המתקין יוצר קיצור דרך; הגרסה הניידת רצה בלחיצה כפולה. שניהם אופליין, במסך מלא.</p>
         <p>
           <strong>הערה:</strong> בהרצה הראשונה Windows עשוי להציג אזהרת SmartScreen
           (הקובץ אינו חתום דיגיטלית) — יש ללחוץ «מידע נוסף» → «הפעל בכל זאת».
