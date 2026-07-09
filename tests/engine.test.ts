@@ -28,8 +28,8 @@ function votingEngine(triviaSettings: Record<string, unknown> = {}): GameEngine 
   return engine;
 }
 
-describe('מחזור חיים של שקופית — כל שלב ב-ADVANCE מפורש', () => {
-  it('שום דבר לא קורה אוטומטית בכניסה: מדיה והצבעה הם שלבים', () => {
+describe('מחזור חיים של שקופית — מדיה בכניסה, שאר השלבים ב-ADVANCE מפורש', () => {
+  it('מדיית פתיחה מוצגת מיד בכניסה; הצבעה ומדיית סיום הם שלבים', () => {
     const game = makeGame([
       rawSlide({
         id: 1,
@@ -43,19 +43,14 @@ describe('מחזור חיים של שקופית — כל שלב ב-ADVANCE מפ�
     ]);
     const engine = new GameEngine(game);
 
-    // כניסה: בלי מדיה, בלי הצבעה
+    // כניסה: מדיית הפתיחה מוצגת מיד (בלי מסך צבע ריק לפניה)
     expect(engine.getState()).toMatchObject({
       phase: 'showing',
-      activeMedia: null,
-      openMediaPlayed: false,
+      activeMedia: 'open',
       currentSlideId: 1,
     });
 
-    // שלב 1: לחיצה מציגה את מדיית הפתיחה
-    engine.dispatch({ type: 'ADVANCE' });
-    expect(engine.getState()).toMatchObject({ phase: 'showing', activeMedia: 'open' });
-
-    // המדיה הסתיימה — חוזרים לתצוגה, עדיין בלי הצבעה
+    // המדיה הסתיימה/דולגה — חוזרים לתצוגה, עדיין בלי הצבעה
     engine.dispatch({ type: 'MEDIA_ENDED', at: T0 });
     expect(engine.getState()).toMatchObject({
       phase: 'showing',
@@ -97,7 +92,7 @@ describe('מחזור חיים של שקופית — כל שלב ב-ADVANCE מפ�
     expect(engine.getState().scores).toEqual({ a: 10 });
   });
 
-  it('OPEN_VOTING פותח הצבעה ישירות ומדלג על שלב המדיה', () => {
+  it('OPEN_VOTING פותח הצבעה ישירות ומדלג על מדיית הפתיחה שמוצגת', () => {
     const game = makeGame([
       rawSlide({
         id: 1,
@@ -108,22 +103,22 @@ describe('מחזור חיים של שקופית — כל שלב ב-ADVANCE מפ�
       }),
     ]);
     const engine = new GameEngine(game);
+    expect(engine.getState().activeMedia).toBe('open'); // מדיה מוצגת בכניסה
     engine.dispatch({ type: 'OPEN_VOTING', at: T0 });
-    expect(engine.getState()).toMatchObject({ phase: 'voting', openMediaPlayed: true });
+    expect(engine.getState()).toMatchObject({ phase: 'voting', activeMedia: null, openMediaPlayed: true });
   });
 
-  it('שקופית מדיה: לחיצה מנגנת, לחיצה מדלגת, לחיצה עוברת הלאה', () => {
+  it('שקופית מדיה: המדיה מוצגת בכניסה, לחיצה מדלגת ועוברת לשקופית הבאה', () => {
     const game = makeGame([
       rawSlide({ id: 1, type: 'media', openMediaSrc: 'https://x.dev/v.mp4' }),
       rawSlide({ id: 2, type: 'subject', que: 'טקסט' }),
     ]);
     const engine = new GameEngine(game);
-    expect(engine.getState().activeMedia).toBeNull();
-    engine.dispatch({ type: 'ADVANCE' }); // הצגת המדיה
+    // המדיה מוצגת מיד בכניסה
     expect(engine.getState()).toMatchObject({ currentSlideId: 1, activeMedia: 'open' });
-    engine.dispatch({ type: 'ADVANCE' }); // דילוג על הסרטון — לא מעבר שקופית
+    engine.dispatch({ type: 'MEDIA_ENDED' }); // דילוג על הסרטון
     expect(engine.getState()).toMatchObject({ currentSlideId: 1, activeMedia: null, openMediaPlayed: true });
-    engine.dispatch({ type: 'ADVANCE' }); // עכשיו מעבר
+    engine.dispatch({ type: 'ADVANCE' }); // מעבר לשקופית הבאה
     expect(engine.getState().currentSlideId).toBe(2);
   });
 

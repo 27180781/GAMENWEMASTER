@@ -30,7 +30,10 @@ export function QuestionSlide({ slide, state, ansIsNumber, timer, reveal }: Ques
   const answers = slide.question.answers;
   const counts = state.liveVotes?.counts ?? {};
   const total = state.liveVotes?.total ?? 0;
-  const showBars = state.phase === 'voting' || isResults;
+  // התפלגות ההצבעות (ברים + אחוזים) מוצגת רק עם חשיפת התשובה הנכונה
+  // (ב-trivia); בסקר/תמונות אין תשובה נכונה — ההתפלגות מוצגת בתוצאות.
+  const showDistribution =
+    reveal.revealCorrect || (isResults && slide.type !== 'trivia');
 
   return (
     <div className="question-slide">
@@ -62,7 +65,7 @@ export function QuestionSlide({ slide, state, ansIsNumber, timer, reveal }: Ques
               ) : (
                 <span className="answer-text">{answer.ans}</span>
               )}
-              {showBars && (
+              {showDistribution && (
                 <span className="answer-bar-wrap">
                   <span className="answer-bar" style={{ width: `${percent}%` }} />
                   <span className="answer-percent">{percent}%</span>
@@ -73,7 +76,10 @@ export function QuestionSlide({ slide, state, ansIsNumber, timer, reveal }: Ques
         })}
       </ul>
 
-      {showBars && <footer className="votes-total">{total} הצבעות</footer>}
+      {/* מונה השתתפות בזמן ההצבעה (בלי התפלגות), והתפלגות מלאה בחשיפה */}
+      {(state.phase === 'voting' || showDistribution) && (
+        <footer className="votes-total">{total} הצבעות</footer>
+      )}
     </div>
   );
 }

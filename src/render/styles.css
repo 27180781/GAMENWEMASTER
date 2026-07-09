@@ -45,7 +45,8 @@ body {
   width: 1920px;
   height: 1080px;
   overflow: hidden;
-  background: var(--main-color, #222b45);
+  /* רקע כללי ניטרלי — צבעי המשחק משמשים לטקסט ולרקע-הטקסט בלבד, לא לכל המסך */
+  background: #0b0e1a;
 }
 
 /* מסך הדיבאג (כלי פיתוח) — כן נגלל, מחוץ לבמה */
@@ -144,12 +145,15 @@ body {
 .question-text {
   font-size: 60px; /* ≥48px לפי המפרט */
   font-weight: 800;
-  line-height: 1.25;
+  line-height: 1.3;
   text-align: center;
+  /* צבע הטקסט + רקע-הטקסט מקובץ המשחק (secondaryColor / mainColor) */
   color: var(--secondary-color, #fff);
-  text-shadow: 0 3px 16px rgba(0, 0, 0, 0.45);
+  background: var(--main-color, #222b45);
+  padding: 24px 40px;
+  border-radius: 18px;
   white-space: pre-wrap;
-  max-height: 300px;
+  max-height: 320px;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 4;
@@ -181,7 +185,9 @@ body {
   display: flex;
   align-items: center;
   gap: 20px;
-  background: rgba(0, 0, 0, 0.35);
+  /* רקע-הטקסט = mainColor, צבע הטקסט = secondaryColor (מקובץ המשחק) */
+  background: var(--main-color, #222b45);
+  color: var(--secondary-color, #fff);
   border: 2px solid rgba(var(--secondary-rgb, 255, 255, 255), 0.35);
   border-radius: 14px;
   padding: 26px 28px 30px;
@@ -207,8 +213,9 @@ body {
   width: 64px;
   height: 64px;
   border-radius: 50%;
+  /* היפוך הצבעים ביחס לתיבה — עיגול בצבע הטקסט, ספרה בצבע הרקע */
   background: var(--secondary-color, #fff);
-  color: #111;
+  color: var(--main-color, #222b45);
   font-weight: 800;
   font-size: 30px;
 }
@@ -414,11 +421,13 @@ body {
 .subject-text {
   font-size: 56px;
   font-weight: 700;
-  line-height: 1.35;
+  line-height: 1.4;
   text-align: center;
   color: var(--secondary-color, #fff);
+  background: var(--main-color, #222b45);
+  padding: 32px 48px;
+  border-radius: 18px;
   white-space: pre-wrap;
-  text-shadow: 0 3px 16px rgba(0, 0, 0, 0.45);
   max-height: 840px;
   overflow: hidden;
   display: -webkit-box;

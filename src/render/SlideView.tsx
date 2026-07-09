@@ -28,12 +28,13 @@ function backgroundSrc(slide: Slide, engine: GameEngine): string {
 export function SlideView({ engine, state, timer, reveal }: SlideViewProps) {
   const slide = engine.getCurrentSlide();
 
-  // מדיה חוסמת — מסך מלא
+  // מדיה חוסמת — מסך מלא. מנוגנת אוטומטית; המעבר ממנה הוא ידני (רווח/0),
+  // ולכן אין onEnded שמדלג אוטומטית ומשאיר מסך ריק.
   if (state.activeMedia !== null) {
     const src = state.activeMedia === 'open' ? slide.openMedia.src : slide.endMedia.src;
     return (
       <div className="screen slide-media-screen">
-        <MediaPlayer src={src} onEnded={() => engine.dispatch({ type: 'MEDIA_ENDED', at: Date.now() })} />
+        <MediaPlayer src={src} />
       </div>
     );
   }
@@ -51,10 +52,8 @@ export function SlideView({ engine, state, timer, reveal }: SlideViewProps) {
         {slide.type === 'subject' ? (
           <SubjectSlide slide={slide} command={state.subjectCommand} />
         ) : slide.type === 'media' ? (
-          /* הקהל רואה רקע נקי; רמז עדין למפעיל בלבד בתחתית */
-          <p className="media-standby-hint">
-            {state.openMediaPlayed ? 'רווח — לשקופית הבאה' : 'רווח — ניגון המדיה'}
-          </p>
+          // שקופית מדיה בלי מדיה פעילה — מצב חולף בלבד (רקע נקי, בלי טקסט)
+          <span aria-hidden="true" />
         ) : (
           <QuestionSlide
             slide={slide}

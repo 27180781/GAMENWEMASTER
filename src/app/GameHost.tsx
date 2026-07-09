@@ -174,18 +174,22 @@ export function GameHost({ game, settings, onSettingsChange }: GameHostProps) {
     const s = engine.getCurrentSlide();
     const now = Date.now();
 
-    // מדיה מתנגנת — הלחיצה מדלגת עליה
+    // מדיה חוסמת מוצגת — הלחיצה מסיימת אותה ועוברת מיד לשלב הבא
     if (current.activeMedia !== null) {
+      const wasOpen = current.activeMedia === 'open';
       engine.dispatch({ type: 'MEDIA_ENDED', at: now });
+      if (wasOpen && isVotableSlide(s)) {
+        // מדיית הפתיחה הסתיימה → הצגת השאלה (אותה לחיצה, בלי מסך ביניים)
+        setReveal((r) => ({ ...r, questionShown: true }));
+        audio.play('showQuestion', sounds.showQuestionMediaSound.src);
+      } else {
+        // שקופית מדיה בלבד, או מדיית סיום → השקופית הבאה (בלי מסך צבע ריק)
+        engine.dispatch({ type: 'ADVANCE', at: now });
+      }
       return;
     }
 
     if (current.phase === 'showing' && isVotableSlide(s)) {
-      // שלב מדיית הפתיחה
-      if (s.openMedia.src !== '' && !current.openMediaPlayed) {
-        engine.dispatch({ type: 'ADVANCE', at: now });
-        return;
-      }
       // שלב הצגת השאלה
       if (!revealRef.current.questionShown) {
         setReveal((r) => ({ ...r, questionShown: true }));
@@ -235,9 +239,16 @@ export function GameHost({ game, settings, onSettingsChange }: GameHostProps) {
       engine.dispatch({ type: 'BACK', at: now });
       return;
     }
-    // מדיה מתנגנת — הלחיצה סוגרת אותה
-    if (current.activeMedia !== null) {
+    // מדיה חוסמת מוצגת:
+    if (current.activeMedia === 'open') {
+      // מדיית הפתיחה היא ההתחלה של השקופית — חזרה = לשקופית הקודמת
+      engine.dispatch({ type: 'BACK', at: now });
+      return;
+    }
+    if (current.activeMedia === 'end') {
+      // ביטול מדיית הסיום — חזרה לתוצאות עם התשובה הנכונה חשופה
       engine.dispatch({ type: 'MEDIA_ENDED', at: now });
+      setReveal({ questionShown: true, answersShown: s.question.answers.length, revealCorrect: true });
       return;
     }
     if (current.phase === 'results') {
