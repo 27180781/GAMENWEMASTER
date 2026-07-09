@@ -1,0 +1,30 @@
+# אריזת מנוע הטריוויה ל-EXE נייד (portable) ל-Windows — קובץ בודד, בלי
+# התקנה, רץ בלחיצה כפולה על כל מחשב. הבנייה עצמה מתבצעת ב-CI על windows-latest.
+
+appId: com.gamenwe.trivia-engine
+productName: Trivia Engine
+copyright: © GAMENWEMASTER
+
+directories:
+  output: release
+  buildResources: build
+
+# מה נכנס לתוך ה-EXE: הבנייה הסטטית + תהליכי Electron
+files:
+  - dist/**/*
+  - electron/**/*
+  - package.json
+
+win:
+  target:
+    - target: portable
+      arch:
+        - x64
+  # אפשר להוסיף אייקון ב-build/icon.ico בעתיד
+
+portable:
+  # שם קובץ קבוע כדי שקישור ההורדה יישאר יציב
+  artifactName: TriviaEngine-Portable.exe
+
+# בלי חתימת קוד (אין תעודה) — Windows יציג אזהרת SmartScreen בהרצה ראשונה
+publish: null

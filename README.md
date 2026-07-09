@@ -76,6 +76,18 @@ https://<host>/?game=<URL של game.json>&demo=1     ← מצב דמו: שחקנ
 
 הפריסה משתמשת ב-`Dockerfile` (בנייה + הגשה עם nginx) ו-`captain-definition` שבשורש — אפשר גם לפרוס ידנית עם `caprover deploy` מקומי.
 
+### שולחן עבודה — EXE אופליין (Electron)
+
+גרסת שולחן עבודה נארזת כ-**EXE נייד ל-Windows** (Electron portable) — קובץ בודד, בלי התקנה, רץ אופליין לגמרי:
+
+- **עמוד הורדה:** `<host>/download.html` (מצביע ל-Release האחרון בגיטהאב).
+- **בנייה אוטומטית:** `.github/workflows/build-desktop.yml` בונה את ה-EXE על `windows-latest` בכל דחיפה ל-`main` ומפרסם אותו ל-Release בשם `desktop-latest`. הקישור היציב:
+  `https://github.com/27180781/GAMENWEMASTER/releases/download/desktop-latest/TriviaEngine-Portable.exe`
+- **בנייה מקומית** (על Windows): `npm run dist:win` → הפלט ב-`release/`.
+- **פיתוח מקומי:** `npm run electron:dev` (דורש הורדת בינארי Electron — חסום בחלק מהסביבות המבודדות).
+
+הליבה (`src/engine/`) רצה בדפדפן ולכן פועלת אופליין ללא שינוי. מדיה מרוחקת (יוטיוב / וידאו בענן) עדיין דורשת אינטרנט — תמיכה במשחק ארוז מקומית (ZIP) + placeholder ליוטיוב תיווסף ב-Milestone 5. קליקרים: מקלדת / קליקר-מצגת עובדים כבר; קליקרי קהל (base station) ייכנסו כ-adapter מאחורי `VoteAdapter`.
+
 ### דמו — GitHub Pages
 
 ‏`deploy-pages.yml` מפרסם את ה-build לענף `gh-pages` בכל מיזוג ל-`main`:

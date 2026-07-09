@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -10,7 +11,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "electron:dev": "npm run build && electron .",
+    "dist:win": "npm run build && electron-builder --win --config electron-builder.yml"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -19,6 +22,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
     "@types/node": "^22.20.1",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
