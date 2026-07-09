@@ -234,8 +234,9 @@ export class GameEngine {
       this.reenterSlide(this.state.currentSlideIndex, at);
       return;
     }
-    if (this.state.currentSlideIndex === 0) return;
-    this.reenterSlide(this.state.currentSlideIndex - 1, at);
+    // בשקופית הראשונה אין "קודמת" — BACK מריץ אותה מחדש
+    const targetIndex = Math.max(0, this.state.currentSlideIndex - 1);
+    this.reenterSlide(targetIndex, at);
   }
 
   private handleGoto(slideId: number, at?: number): void {
