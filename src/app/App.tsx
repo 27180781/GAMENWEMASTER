@@ -1,12 +1,21 @@
 /**
- * שורש האפליקציה: בחירת קובץ משחק (fixture או העלאת JSON) → GameHost.
+ * שורש האפליקציה.
+ *
+ * פרמטרים בכתובת:
+ *   ?game=<URL של game.json>  — טעינת קובץ המשחק מהכתובת ופתיחתו ישירות.
+ *   &demo=1                   — מצב דמו: מסך הגדרות (כמות שחקנים, מהירות
+ *                               הצבעה...) ואז הצבעות משחקני דמה במקום סוקט.
+ *
+ * בלי פרמטרים: מסך בחירה (fixtures מובנים / העלאת game.json).
  * ניתוב מינימלי לפי hash: ‎#debug פותח את מסך הדיבאג של M1.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { parseGameFile, type GameFile } from '../engine/index.ts';
 import { DebugApp } from '../debug/DebugApp.tsx';
+import { DemoSettingsScreen } from '../render/DemoSettingsScreen.tsx';
 import { GameHost } from './GameHost.tsx';
+import { parseAppParams, type DemoConfig } from './urlParams.ts';
 
 import hadassah from '../../fixtures/hadassah-ozen.json';
 import masaa from '../../fixtures/masaa-sync-manual-link.json';
@@ -32,16 +41,81 @@ function useHash(): string {
 
 export function App() {
   const hash = useHash();
+  const params = useMemo(() => parseAppParams(window.location.search), []);
+
+  /** משחק שממתין להגדרות דמו לפני שהוא נפתח. */
+  const [pendingGame, setPendingGame] = useState<GameFile | null>(null);
   const [game, setGame] = useState<GameFile | null>(null);
+  const [demoConfig, setDemoConfig] = useState<DemoConfig | null>(null);
+  const [demoWanted, setDemoWanted] = useState(params.demo);
+  const [remoteLoading, setRemoteLoading] = useState(params.gameUrl !== null);
   const [error, setError] = useState<string | null>(null);
+
+  const openGame = (loaded: GameFile, wantDemo: boolean) => {
+    if (wantDemo) setPendingGame(loaded);
+    else setGame(loaded);
+  };
+
+  // טעינת משחק מכתובת חיצונית (?game=URL)
+  useEffect(() => {
+    if (params.gameUrl === null) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch(params.gameUrl!);
+        if (!response.ok) {
+          throw new Error(`השרת החזיר ${response.status} ${response.statusText}`);
+        }
+        const raw: unknown = await response.json();
+        const loaded = parseGameFile(raw);
+        if (!cancelled) {
+          openGame(loaded, params.demo);
+          setRemoteLoading(false);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(`טעינת קובץ המשחק מ-${params.gameUrl} נכשלה:\n${(e as Error).message}`);
+          setRemoteLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [params]);
 
   if (hash === '#debug') return <DebugApp />;
 
-  if (game !== null) return <GameHost key={game.id} game={game} />;
+  if (game !== null) return <GameHost key={game.id} game={game} demo={demoConfig} />;
+
+  if (pendingGame !== null) {
+    return (
+      <DemoSettingsScreen
+        game={pendingGame}
+        onStart={(config) => {
+          setDemoConfig(config);
+          setGame(pendingGame);
+        }}
+      />
+    );
+  }
+
+  if (remoteLoading) {
+    return (
+      <div className="game-root" dir="rtl">
+        <div className="screen">
+          <div className="screen-content">
+            <div className="spinner" />
+            <p className="opening-hint">טוען קובץ משחק מהכתובת...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const loadRaw = (raw: unknown) => {
     try {
-      setGame(parseGameFile(raw));
+      openGame(parseGameFile(raw), demoWanted);
       setError(null);
     } catch (e) {
       setError((e as Error).message);
@@ -77,13 +151,21 @@ export function App() {
               }}
             />
           </label>
+          <label className="demo-checkbox">
+            <input
+              type="checkbox"
+              checked={demoWanted}
+              onChange={(e) => setDemoWanted(e.target.checked)}
+            />{' '}
+            מצב דמו — הצבעות משחקני דמה (מסך הגדרות ייפתח קודם)
+          </label>
           {error !== null && (
             <pre className="picker-error" style={{ whiteSpace: 'pre-wrap' }}>
               {error}
             </pre>
           )}
           <p className="opening-hint" style={{ opacity: 0.5 }}>
-            מסך דיבאג: הוסיפו ‎#debug לכתובת
+            טעינה מקישור: ‎?game=&lt;URL&gt;&amp;demo=1 · מסך דיבאג: ‎#debug
           </p>
         </div>
       </div>
