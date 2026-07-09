@@ -3,8 +3,9 @@
  * ה-state כ-JSON, והזרקת VoteSnapshot ידנית. בלי עיצוב — כלי עבודה בלבד.
  */
 
-import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { GameEngine, parseGameFile, type GameFile, type VoteSnapshot } from '../engine/index.ts';
+import { useEngineState } from '../app/useEngineState.ts';
 
 import hadassah from '../../fixtures/hadassah-ozen.json';
 import masaa from '../../fixtures/masaa-sync-manual-link.json';
@@ -17,12 +18,6 @@ const RAW_FIXTURES: Record<string, unknown> = {
   'beficha-uvilvavcha': beficha,
   neuwirth: neuwirth,
 };
-
-function useEngineState(engine: GameEngine) {
-  const subscribe = useCallback((cb: () => void) => engine.subscribe(cb), [engine]);
-  const getSnapshot = useCallback(() => engine.getState(), [engine]);
-  return useSyncExternalStore(subscribe, getSnapshot);
-}
 
 export function DebugApp() {
   const [fixtureName, setFixtureName] = useState<string>('hadassah-ozen');

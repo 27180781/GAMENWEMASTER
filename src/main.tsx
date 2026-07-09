@@ -1,12 +1,13 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { DebugApp } from './debug/DebugApp.tsx';
+import { App } from './app/App.tsx';
+import './render/styles.css';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('אלמנט root לא נמצא');
 
 createRoot(rootElement).render(
   <StrictMode>
-    <DebugApp />
+    <App />
   </StrictMode>,
 );
