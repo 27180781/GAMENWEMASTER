@@ -28,6 +28,7 @@ export function DemoSettingsScreen({
     Math.round(DEFAULT_DEMO_CONFIG.correctBias * 100),
   );
   const [intervalMs, setIntervalMs] = useState(DEFAULT_DEMO_CONFIG.intervalMs);
+  const [hostVoterId, setHostVoterId] = useState(DEFAULT_DEMO_CONFIG.hostVoterId);
 
   const clampedVoters = Math.min(5000, Math.max(1, Math.floor(voterCount) || 1));
 
@@ -95,6 +96,20 @@ export function DemoSettingsScreen({
                 onChange={(e) => setIntervalMs(Number(e.target.value))}
               />
             </label>
+
+            <label className="demo-field">
+              <span>שלט מנחה — מזהה קליקר / מספר טלפון (אופציונלי)</span>
+              <input
+                type="text"
+                dir="ltr"
+                placeholder="למשל: 0501234567"
+                value={hostVoterId}
+                onChange={(e) => setHostVoterId(e.target.value)}
+              />
+              <span style={{ fontSize: 18, opacity: 0.7 }}>
+                ההקשות שלו הן פקודות מנחה (0 קדימה, 2 אחורה, 1 מובילים...) — הוא לא משתתף בהצבעות
+              </span>
+            </label>
           </div>
 
           <button
@@ -105,6 +120,7 @@ export function DemoSettingsScreen({
                 speedFactor,
                 correctBias: correctPercent / 100,
                 intervalMs: Math.min(2000, Math.max(50, intervalMs || 300)),
+                hostVoterId: hostVoterId.trim(),
               })
             }
           >

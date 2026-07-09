@@ -37,6 +37,11 @@ export interface DemoConfig {
   correctBias: number;
   /** קצב שליחת snapshots ב-ms (השרת האמיתי שולח ~250ms). */
   intervalMs: number;
+  /**
+   * שלט מנחה: מזהה קליקר / מספר טלפון שההקשות שלו הן פקודות מנחה (1–6)
+   * ולא הצבעות — הוא לא משתתף במשחק. ריק = אין שלט מנחה.
+   */
+  hostVoterId: string;
 }
 
 export const DEFAULT_DEMO_CONFIG: DemoConfig = {
@@ -44,4 +49,5 @@ export const DEFAULT_DEMO_CONFIG: DemoConfig = {
   speedFactor: 0.6,
   correctBias: 0.55,
   intervalMs: 300,
+  hostVoterId: '',
 };

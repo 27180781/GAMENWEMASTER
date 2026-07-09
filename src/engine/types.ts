@@ -47,7 +47,9 @@ export type GameEvent =
   | { type: 'GOTO'; slideId: number; at?: number }
   | { type: 'VOTE_SNAPSHOT'; snapshot: VoteSnapshot; at?: number }
   | { type: 'VOTING_TIMEOUT'; at?: number }
-  | { type: 'MEDIA_ENDED'; at?: number };
+  | { type: 'MEDIA_ENDED'; at?: number }
+  /** פתיחת הצבעה מפורשת, בדילוג על שלב המדיה (ה-host קורא לזה אחרי חשיפת התשובות). */
+  | { type: 'OPEN_VOTING'; at?: number };
 
 // ---------------------------------------------------------------------------
 // מצב המנוע
@@ -74,6 +76,8 @@ export interface GameState {
   currentSlideIndex: number;
   /** מדיה חוסמת שמתנגנת כרגע. */
   activeMedia: ActiveMedia;
+  /** האם openMedia כבר נוגן בשקופית הנוכחית (שלב שהושלם). */
+  openMediaPlayed: boolean;
   /** האם endMedia כבר נוגן בשקופית הנוכחית (כדי לא לנגן שוב). */
   endMediaPlayed: boolean;
   /** פקודת מערכת פעילה משקופית subject (או null). */

@@ -6,13 +6,15 @@
 
 import type { GameEngine, GameState, Slide } from '../engine/index.ts';
 import { MediaPlayer } from './MediaPlayer.tsx';
-import { QuestionSlide } from './QuestionSlide.tsx';
+import { QuestionSlide, type RevealState } from './QuestionSlide.tsx';
 import { SubjectSlide } from './SubjectSlide.tsx';
+import type { TimerView } from './TimerRing.tsx';
 
 interface SlideViewProps {
   engine: GameEngine;
   state: GameState;
-  timer: { remaining: number; total: number } | null;
+  timer: TimerView | null;
+  reveal: RevealState;
 }
 
 function backgroundSrc(slide: Slide, engine: GameEngine): string {
@@ -23,7 +25,7 @@ function backgroundSrc(slide: Slide, engine: GameEngine): string {
   return '';
 }
 
-export function SlideView({ engine, state, timer }: SlideViewProps) {
+export function SlideView({ engine, state, timer, reveal }: SlideViewProps) {
   const slide = engine.getCurrentSlide();
 
   // מדיה חוסמת — מסך מלא
@@ -61,6 +63,7 @@ export function SlideView({ engine, state, timer }: SlideViewProps) {
             state={state}
             ansIsNumber={engine.getGame().setting.ansIsNumber}
             timer={timer}
+            reveal={reveal}
           />
         )}
       </div>
