@@ -6,12 +6,14 @@
  * ההצבעה). ה-host אחראי להריץ את הטיימרים ולבצע side effects של שקופיות
  * פקודה (subjectCommand) — המנוע רק חושף אותם ב-state.
  *
- * מחזור חיים של שקופית שאלה (SPEC 5.1):
- *   ENTER → [openMedia] → SHOW_QUESTION → VOTING_OPEN (אם slideStartVoting)
- *         → VOTING_TIMEOUT/ADVANCE → תוצאות + ניקוד → [endMedia] → ADVANCE
+ * מחזור חיים של שקופית — כל שלב מתקדם ב-ADVANCE מפורש של המפעיל/המנחה
+ * (המפרט 5.1 בהתאמה לזרימת שלבים ידנית):
+ *   ENTER → ADVANCE מנגן openMedia (אם יש) → ADVANCE פותח הצבעה (בשקופית
+ *   הצבעה; ה-host קובע מתי אחרי חשיפת התשובות) → VOTING_TIMEOUT/ADVANCE
+ *   סוגר → תוצאות → ADVANCE מנגן endMedia (אם יש) → ADVANCE לשקופית הבאה.
  *
- * כלל ADVANCE: כשמדיה חוסמת מתנגנת — ADVANCE מדלג עליה בלבד; אחרת הוא מבצע
- * את הצעד הבא במחזור (פתיחת הצבעה → סגירה → שקופית הבאה).
+ * כלל ADVANCE: כשמדיה חוסמת מתנגנת — ADVANCE מדלג עליה בלבד. שום דבר לא
+ * מתנגן/נפתח אוטומטית בכניסה לשקופית — הצגת מדיה ופתיחת הצבעה הן שלבים.
  */
 
 import { classifySubjectSlide, extractDynamicImageUrl } from './classify.ts';
@@ -131,6 +133,17 @@ export class GameEngine {
       case 'MEDIA_ENDED':
         this.handleMediaEnded(event.at);
         break;
+      case 'OPEN_VOTING':
+        if (
+          this.state.phase === 'showing' &&
+          this.state.activeMedia === null &&
+          isVotableSlide(this.getCurrentSlide())
+        ) {
+          // פתיחה מפורשת מדלגת על שלב המדיה אם עוד לא נוגן
+          this.setState({ openMediaPlayed: true });
+          this.openVoting(event.at);
+        }
+        break;
     }
   }
 
@@ -184,7 +197,8 @@ export class GameEngine {
       currentSlideIndex: index === -1 ? this.game.questions.length - 1 : index,
       // מדיה היא מצב חולף — לא משוחזרת; ה-renderer מציג את השקופית מחדש.
       activeMedia: null,
-      endMediaPlayed: snapshot.phase === 'results',
+      openMediaPlayed: snapshot.phase !== 'showing',
+      endMediaPlayed: false,
       subjectCommand: slide ? this.subjectCommandFor(slide) : null,
       liveVotes: null,
       scores: structuredClone(snapshot.scores),
@@ -211,6 +225,11 @@ export class GameEngine {
     const slide = this.getCurrentSlide();
 
     if (phase === 'showing') {
+      // שלב מדיית הפתיחה — מוצג רק בלחיצה מפורשת
+      if (slide.openMedia.src !== '' && !this.state.openMediaPlayed) {
+        this.setState({ activeMedia: 'open' });
+        return;
+      }
       if (isVotableSlide(slide)) {
         this.openVoting(at);
       } else {
@@ -224,7 +243,11 @@ export class GameEngine {
       return;
     }
 
-    // results
+    // results: שלב מדיית הסיום — מוצג רק בלחיצה מפורשת
+    if (slide.endMedia.src !== '' && !this.state.endMediaPlayed) {
+      this.setState({ activeMedia: 'end' });
+      return;
+    }
     this.advanceToNextSlide(at);
   }
 
@@ -271,16 +294,11 @@ export class GameEngine {
     });
   }
 
-  private handleMediaEnded(at?: number): void {
+  private handleMediaEnded(_at?: number): void {
     const { activeMedia } = this.state;
     if (activeMedia === 'open') {
-      const slide = this.getCurrentSlide();
-      if (isVotableSlide(slide) && slide.setting.slideStartVoting) {
-        this.setState({ activeMedia: null });
-        this.openVoting(at);
-      } else {
-        this.setState({ activeMedia: null });
-      }
+      // המדיה הסתיימה/דולגה — חוזרים לשלב התצוגה; ההמשך בלחיצה הבאה
+      this.setState({ activeMedia: null, openMediaPlayed: true });
       return;
     }
     if (activeMedia === 'end') {
@@ -336,8 +354,8 @@ export class GameEngine {
       scores,
       votesBySlide: { ...this.state.votesBySlide, [slideId]: finalVotes },
       firstClickWinners,
-      // endMedia מתנגן אוטומטית עם הצגת התוצאות (SPEC 5.1)
-      activeMedia: slide.endMedia.src !== '' && !this.state.endMediaPlayed ? 'end' : null,
+      // endMedia אינו מתנגן אוטומטית — הוא שלב נפרד שמופעל ב-ADVANCE
+      activeMedia: null,
     });
   }
 
@@ -428,15 +446,15 @@ export class GameEngine {
   }
 
   /**
-   * בניית מצב הכניסה לשקופית. מאחד את לוגיקת ENTER של SPEC 5.1:
-   * openMedia אם קיים; אחרת אם slideStartVoting — ההצבעה נפתחת מיד.
+   * בניית מצב הכניסה לשקופית: תמיד phase 'showing', בלי מדיה ובלי הצבעה —
+   * כל שלב (מדיה, פתיחת הצבעה) מופעל ב-ADVANCE מפורש של המפעיל/המנחה.
    */
   private enterSlideState(
     index: number,
     carried: Partial<
       Pick<GameState, 'scores' | 'votesBySlide' | 'slidesCompleted' | 'firstClickWinners'>
     >,
-    at?: number,
+    _at?: number,
   ): GameState {
     const slide = this.game.questions[index];
     if (!slide) {
@@ -445,15 +463,12 @@ export class GameEngine {
 
     this.voting = freshBookkeeping();
 
-    const hasOpenMedia = slide.openMedia.src !== '';
-    const startVotingNow = !hasOpenMedia && isVotableSlide(slide) && slide.setting.slideStartVoting;
-    if (startVotingNow) this.voting.openedAt = at ?? null;
-
     const next: GameState = {
-      phase: startVotingNow ? 'voting' : 'showing',
+      phase: 'showing',
       currentSlideId: slide.id,
       currentSlideIndex: index,
-      activeMedia: hasOpenMedia ? 'open' : null,
+      activeMedia: null,
+      openMediaPlayed: false,
       endMediaPlayed: false,
       subjectCommand: this.subjectCommandFor(slide),
       liveVotes: null,

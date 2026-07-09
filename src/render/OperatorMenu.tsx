@@ -13,6 +13,7 @@ interface OperatorMenuProps {
   onVolumeChange: (volume: number) => void;
   syntheticCrowd: boolean;
   onSyntheticCrowdChange: (on: boolean) => void;
+  hostVoterId?: string;
   onEndGame: () => void;
   onClose: () => void;
 }
@@ -24,6 +25,7 @@ export function OperatorMenu({
   onVolumeChange,
   syntheticCrowd,
   onSyntheticCrowdChange,
+  hostVoterId = '',
   onEndGame,
   onClose,
 }: OperatorMenuProps) {
@@ -67,6 +69,12 @@ export function OperatorMenu({
           </label>
           <p className="operator-status">
             מקור הצבעות: ReplayAdapter — ללא שרת (M3) · הורדות ומטמון: M4
+            {hostVoterId !== '' && ` · שלט מנחה: ${hostVoterId}`}
+          </p>
+          <p className="operator-status">
+            <strong>פקודות מנחה (מקלדת / שלט):</strong> רווח או 0 — השלב הבא · 2 — שלב
+            אחורה · 1 — מסך מובילים/חזרה · 3 — מחיאות כפיים · 4 — ‏10+ שניות לטיימר ·
+            5 — ‏10- שניות · 6 — עצירת/המשך טיימר והצבעה
           </p>
         </section>
 

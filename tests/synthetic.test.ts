@@ -50,6 +50,7 @@ describe('planCrowdVotes — קהל סינתטי דטרמיניסטי', () => {
 
   it('הזרמת הקהל הסינתטי דרך המנוע מולידה ניקוד עקבי עם התוכנית', () => {
     const engine = new GameEngine(game);
+    engine.dispatch({ type: 'ADVANCE' }); // פתיחת ההצבעה
     expect(engine.getState().phase).toBe('voting');
     const plan = planCrowdVotes(slide, { seed: 11 });
     engine.dispatch({

@@ -21,8 +21,15 @@ function basicGame(triviaSettings: Record<string, unknown> = {}, triviaExtra = {
   ]);
 }
 
-describe('מחזור חיים של שקופית שאלה (SPEC 5.1)', () => {
-  it('ENTER → openMedia → שאלה+הצבעה → timeout → תוצאות → endMedia → ADVANCE', () => {
+/** מנוע על basicGame עם הצבעה פתוחה (ADVANCE ראשון פותח את ההצבעה). */
+function votingEngine(triviaSettings: Record<string, unknown> = {}): GameEngine {
+  const engine = new GameEngine(basicGame(triviaSettings));
+  engine.dispatch({ type: 'ADVANCE', at: T0 });
+  return engine;
+}
+
+describe('מחזור חיים של שקופית — כל שלב ב-ADVANCE מפורש', () => {
+  it('שום דבר לא קורה אוטומטית בכניסה: מדיה והצבעה הם שלבים', () => {
     const game = makeGame([
       rawSlide({
         id: 1,
@@ -36,56 +43,88 @@ describe('מחזור חיים של שקופית שאלה (SPEC 5.1)', () => {
     ]);
     const engine = new GameEngine(game);
 
-    // ENTER עם openMedia — עדיין לא הצבעה
-    expect(engine.getState()).toMatchObject({ phase: 'showing', activeMedia: 'open', currentSlideId: 1 });
+    // כניסה: בלי מדיה, בלי הצבעה
+    expect(engine.getState()).toMatchObject({
+      phase: 'showing',
+      activeMedia: null,
+      openMediaPlayed: false,
+      currentSlideId: 1,
+    });
 
-    // המדיה הסתיימה → slideStartVoting=true פותח הצבעה מיד
+    // שלב 1: לחיצה מציגה את מדיית הפתיחה
+    engine.dispatch({ type: 'ADVANCE' });
+    expect(engine.getState()).toMatchObject({ phase: 'showing', activeMedia: 'open' });
+
+    // המדיה הסתיימה — חוזרים לתצוגה, עדיין בלי הצבעה
     engine.dispatch({ type: 'MEDIA_ENDED', at: T0 });
-    expect(engine.getState()).toMatchObject({ phase: 'voting', activeMedia: null });
+    expect(engine.getState()).toMatchObject({
+      phase: 'showing',
+      activeMedia: null,
+      openMediaPlayed: true,
+    });
 
-    // snapshot מעדכן מונים חיים
+    // שלב הבא: פתיחת ההצבעה
+    engine.dispatch({ type: 'ADVANCE', at: T0 });
+    expect(engine.getState().phase).toBe('voting');
+
     engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(1, 1, { a: 2, b: 1 }), at: T0 + 3000 });
     expect(engine.getState().liveVotes).toEqual({ counts: { '2': 1, '1': 1 }, total: 2 });
 
-    // סגירת חלון → תוצאות + ניקוד + endMedia מתנגן אוטומטית
+    // סגירת חלון → תוצאות, בלי endMedia אוטומטי
     engine.dispatch({ type: 'VOTING_TIMEOUT', at: T0 + 15000 });
-    expect(engine.getState()).toMatchObject({ phase: 'results', activeMedia: 'end' });
+    expect(engine.getState()).toMatchObject({ phase: 'results', activeMedia: null });
     expect(engine.getState().scores).toEqual({ a: 10 });
 
+    // שלב מדיית הסיום — רק בלחיצה
+    engine.dispatch({ type: 'ADVANCE' });
+    expect(engine.getState()).toMatchObject({ phase: 'results', activeMedia: 'end' });
     engine.dispatch({ type: 'MEDIA_ENDED' });
     expect(engine.getState()).toMatchObject({ phase: 'results', activeMedia: null, endMediaPlayed: true });
 
+    // ולחיצה אחרונה — השקופית הבאה
     engine.dispatch({ type: 'ADVANCE' });
     expect(engine.getState()).toMatchObject({ currentSlideId: 2, phase: 'showing', slidesCompleted: [1] });
   });
 
-  it('slideStartVoting=false: ההצבעה נפתחת ידנית עם ADVANCE', () => {
-    const engine = new GameEngine(basicGame({ slideStartVoting: false }));
+  it('בשקופית ללא מדיה: ADVANCE ראשון פותח הצבעה, שני סוגר', () => {
+    const engine = new GameEngine(basicGame());
     expect(engine.getState().phase).toBe('showing');
     engine.dispatch({ type: 'ADVANCE', at: T0 });
     expect(engine.getState().phase).toBe('voting');
+    engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(1, 1, { a: 2 }) });
+    engine.dispatch({ type: 'ADVANCE', at: T0 + 4000 }); // עצירת הטיימר = סגירה
+    expect(engine.getState().phase).toBe('results');
+    expect(engine.getState().scores).toEqual({ a: 10 });
   });
 
-  it('ADVANCE בזמן מדיה חוסמת מדלג על המדיה בלבד', () => {
+  it('OPEN_VOTING פותח הצבעה ישירות ומדלג על שלב המדיה', () => {
+    const game = makeGame([
+      rawSlide({
+        id: 1,
+        type: 'trivia',
+        answers: fourAnswers(2),
+        scoreForQue: 10,
+        openMediaSrc: 'https://x.dev/intro.mp4',
+      }),
+    ]);
+    const engine = new GameEngine(game);
+    engine.dispatch({ type: 'OPEN_VOTING', at: T0 });
+    expect(engine.getState()).toMatchObject({ phase: 'voting', openMediaPlayed: true });
+  });
+
+  it('שקופית מדיה: לחיצה מנגנת, לחיצה מדלגת, לחיצה עוברת הלאה', () => {
     const game = makeGame([
       rawSlide({ id: 1, type: 'media', openMediaSrc: 'https://x.dev/v.mp4' }),
       rawSlide({ id: 2, type: 'subject', que: 'טקסט' }),
     ]);
     const engine = new GameEngine(game);
-    expect(engine.getState().activeMedia).toBe('open');
+    expect(engine.getState().activeMedia).toBeNull();
+    engine.dispatch({ type: 'ADVANCE' }); // הצגת המדיה
+    expect(engine.getState()).toMatchObject({ currentSlideId: 1, activeMedia: 'open' });
     engine.dispatch({ type: 'ADVANCE' }); // דילוג על הסרטון — לא מעבר שקופית
-    expect(engine.getState()).toMatchObject({ currentSlideId: 1, activeMedia: null, phase: 'showing' });
+    expect(engine.getState()).toMatchObject({ currentSlideId: 1, activeMedia: null, openMediaPlayed: true });
     engine.dispatch({ type: 'ADVANCE' }); // עכשיו מעבר
     expect(engine.getState().currentSlideId).toBe(2);
-  });
-
-  it('ADVANCE בזמן הצבעה סוגר את החלון (שליטת מפעיל)', () => {
-    const engine = new GameEngine(basicGame());
-    expect(engine.getState().phase).toBe('voting'); // slideStartVoting=true, אין openMedia
-    engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(1, 1, { a: 2 }), at: T0 });
-    engine.dispatch({ type: 'ADVANCE', at: T0 + 4000 });
-    expect(engine.getState().phase).toBe('results');
-    expect(engine.getState().scores).toEqual({ a: 10 });
   });
 
   it('סוף המשחק: ADVANCE מהשקופית האחרונה → ended', () => {
@@ -101,7 +140,7 @@ describe('מחזור חיים של שקופית שאלה (SPEC 5.1)', () => {
 
 describe('קליטת VoteSnapshots', () => {
   it('מתעלם מ-seq ישן/כפול ומ-slideId זר', () => {
-    const engine = new GameEngine(basicGame());
+    const engine = votingEngine();
     engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(5, 1, { a: 2, b: 2 }) });
     // seq ישן — נזרק
     engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(4, 1, { a: 1 }) });
@@ -111,7 +150,7 @@ describe('קליטת VoteSnapshots', () => {
   });
 
   it('snapshot אחרי סגירת ההצבעה לא משנה תוצאות', () => {
-    const engine = new GameEngine(basicGame());
+    const engine = votingEngine();
     engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(1, 1, { a: 2 }) });
     engine.dispatch({ type: 'VOTING_TIMEOUT' });
     const scoresBefore = engine.getState().scores;
@@ -123,7 +162,7 @@ describe('קליטת VoteSnapshots', () => {
 
 describe('ניקוד (SPEC 5.2)', () => {
   it('trivia: רק מי שבחר תשובה נכונה מקבל scoreForQue', () => {
-    const engine = new GameEngine(basicGame());
+    const engine = votingEngine();
     engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(1, 1, { a: 2, b: 1, c: 2 }) });
     engine.dispatch({ type: 'VOTING_TIMEOUT' });
     expect(engine.getState().scores).toEqual({ a: 10, c: 10 });
@@ -131,7 +170,7 @@ describe('ניקוד (SPEC 5.2)', () => {
   });
 
   it('allowChangeVote=false: ההצבעה הראשונה נועלת', () => {
-    const engine = new GameEngine(basicGame({ allowChangeVote: false }));
+    const engine = votingEngine({ allowChangeVote: false });
     engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(1, 1, { a: 1 }) });
     engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(2, 1, { a: 2 }) }); // ניסיון שינוי
     engine.dispatch({ type: 'VOTING_TIMEOUT' });
@@ -140,7 +179,7 @@ describe('ניקוד (SPEC 5.2)', () => {
   });
 
   it('allowChangeVote=true: ההצבעה האחרונה גוברת', () => {
-    const engine = new GameEngine(basicGame({ allowChangeVote: true }));
+    const engine = votingEngine({ allowChangeVote: true });
     engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(1, 1, { a: 1 }) });
     engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(2, 1, { a: 2 }) });
     engine.dispatch({ type: 'VOTING_TIMEOUT' });
@@ -149,18 +188,10 @@ describe('ניקוד (SPEC 5.2)', () => {
   });
 
   it('scoringReduction: אחרי seconds שניות הניקוד יורד ל-score', () => {
-    const engine = new GameEngine(
-      basicGame({
-        slideStartVoting: false,
-        scoringReduction: { active: true, seconds: 10, score: 3 },
-      }),
-    );
-    engine.dispatch({ type: 'ADVANCE', at: T0 }); // פתיחת הצבעה ב-T0
-    // a מצביע אחרי 5 שניות — ניקוד מלא
+    const engine = votingEngine({ scoringReduction: { active: true, seconds: 10, score: 3 } });
+    // ההצבעה נפתחה ב-T0 (ה-ADVANCE של votingEngine)
     engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(1, 1, { a: 2 }), at: T0 + 5000 });
-    // b מצביע בדיוק על הסף (10 שניות) — כבר מופחת
     engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(2, 1, { a: 2, b: 2 }), at: T0 + 10000 });
-    // c מצביע אחרי 12 שניות — מופחת
     engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(3, 1, { a: 2, b: 2, c: 2 }), at: T0 + 12000 });
     engine.dispatch({ type: 'VOTING_TIMEOUT', at: T0 + 15000 });
     expect(engine.getState().scores).toEqual({ a: 10, b: 3, c: 3 });
@@ -170,13 +201,14 @@ describe('ניקוד (SPEC 5.2)', () => {
     const engine = new GameEngine(
       basicGame({ scoringReduction: { active: true, seconds: 10, score: 3 } }),
     );
+    engine.dispatch({ type: 'ADVANCE' }); // פתיחה בלי חותמת זמן
     engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(1, 1, { a: 2 }) });
     engine.dispatch({ type: 'VOTING_TIMEOUT' });
     expect(engine.getState().scores).toEqual({ a: 10 });
   });
 
   it('firstClicker: רק המצביע הראשון מקבל ניקוד', () => {
-    const engine = new GameEngine(basicGame({ firstClicker: true }));
+    const engine = votingEngine({ firstClicker: true });
     engine.dispatch({
       type: 'VOTE_SNAPSHOT',
       snapshot: makeSnapshot(1, 1, { a: 2, b: 2, c: 1 }, 'b'),
@@ -187,7 +219,7 @@ describe('ניקוד (SPEC 5.2)', () => {
   });
 
   it('firstClicker שטעה בתשובה — לא מקבל ניקוד', () => {
-    const engine = new GameEngine(basicGame({ firstClicker: true }));
+    const engine = votingEngine({ firstClicker: true });
     engine.dispatch({
       type: 'VOTE_SNAPSHOT',
       snapshot: makeSnapshot(1, 1, { a: 2, c: 1 }, 'c'),
@@ -211,14 +243,17 @@ describe('ניקוד (SPEC 5.2)', () => {
     ]);
     const engine = new GameEngine(game);
     // שקופית 1: a צודק, b טועה
+    engine.dispatch({ type: 'ADVANCE' });
     engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(1, 1, { a: 2, b: 1 }) });
     engine.dispatch({ type: 'VOTING_TIMEOUT' });
     engine.dispatch({ type: 'ADVANCE' });
     // שקופית 2 (survey — לא משפיעה על הסינון)
+    engine.dispatch({ type: 'ADVANCE' });
     engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(2, 2, { a: 1, b: 1 }) });
     engine.dispatch({ type: 'VOTING_TIMEOUT' });
     engine.dispatch({ type: 'ADVANCE' });
     // שקופית 3: שניהם עונים נכון — אבל רק a זכאי
+    engine.dispatch({ type: 'ADVANCE' });
     engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(3, 3, { a: 3, b: 3 }) });
     engine.dispatch({ type: 'VOTING_TIMEOUT' });
     expect(engine.getState().scores).toEqual({ a: 25 });
@@ -229,11 +264,13 @@ describe('ניקוד (SPEC 5.2)', () => {
       makeGame([rawSlide({ id: 1, type: 'survey', answers: fourAnswers(0), scoreForQue: 7 })]);
 
     const noScoring = new GameEngine(surveyGame());
+    noScoring.dispatch({ type: 'ADVANCE' });
     noScoring.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(1, 1, { a: 1, b: 4 }) });
     noScoring.dispatch({ type: 'VOTING_TIMEOUT' });
     expect(noScoring.getState().scores).toEqual({});
 
     const withScoring = new GameEngine(surveyGame(), { surveyParticipationScoring: true });
+    withScoring.dispatch({ type: 'ADVANCE' });
     withScoring.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(1, 1, { a: 1, b: 4 }) });
     withScoring.dispatch({ type: 'VOTING_TIMEOUT' });
     expect(withScoring.getState().scores).toEqual({ a: 7, b: 7 });
@@ -245,9 +282,11 @@ describe('ניקוד (SPEC 5.2)', () => {
       rawSlide({ id: 2, type: 'trivia', answers: fourAnswers(1), scoreForQue: 5 }),
     ]);
     const engine = new GameEngine(game);
+    engine.dispatch({ type: 'ADVANCE' });
     engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(1, 1, { a: 1, b: 1, c: 2 }) });
     engine.dispatch({ type: 'VOTING_TIMEOUT' });
-    engine.dispatch({ type: 'ADVANCE' });
+    engine.dispatch({ type: 'ADVANCE' }); // לשקופית 2
+    engine.dispatch({ type: 'ADVANCE' }); // פתיחת הצבעה
     engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(2, 2, { b: 1 }) });
     engine.dispatch({ type: 'VOTING_TIMEOUT' });
     expect(engine.getWinners(2)).toEqual([
@@ -259,7 +298,7 @@ describe('ניקוד (SPEC 5.2)', () => {
 
 describe('ניווט: BACK / GOTO', () => {
   it('BACK חוזר לשקופית הקודמת ומוציא אותה מהמושלמות; ניקוד לא מוכפל בהרצה חוזרת', () => {
-    const engine = new GameEngine(basicGame());
+    const engine = votingEngine();
     engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(1, 1, { a: 2 }) });
     engine.dispatch({ type: 'VOTING_TIMEOUT' });
     engine.dispatch({ type: 'ADVANCE' });
@@ -267,15 +306,17 @@ describe('ניווט: BACK / GOTO', () => {
     expect(engine.getState().scores).toEqual({ a: 10 });
 
     engine.dispatch({ type: 'BACK' });
-    expect(engine.getState()).toMatchObject({ currentSlideId: 1, phase: 'voting', slidesCompleted: [] });
+    expect(engine.getState()).toMatchObject({ currentSlideId: 1, phase: 'showing', slidesCompleted: [] });
 
     // הרצה חוזרת של אותה שקופית — הניקוד מחושב מחדש, לא נערם
+    engine.dispatch({ type: 'ADVANCE' });
     engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(2, 1, { a: 2, b: 2 }) });
     engine.dispatch({ type: 'VOTING_TIMEOUT' });
     expect(engine.getState().scores).toEqual({ a: 10, b: 10 });
 
     // ובתיקון תשובה לשגויה — הניקוד הקודם יורד
-    engine.dispatch({ type: 'BACK' }); // אינדקס 0 — נשאר, נכנס מחדש
+    engine.dispatch({ type: 'BACK' }); // אינדקס 0 — נכנס מחדש
+    engine.dispatch({ type: 'ADVANCE' });
     engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(3, 1, { a: 1, b: 2 }) });
     engine.dispatch({ type: 'VOTING_TIMEOUT' });
     expect(engine.getState().scores).toEqual({ b: 10 });
@@ -335,9 +376,10 @@ describe('שקופיות subject ופקודות מערכת', () => {
 describe('serialize / restore (SPEC 7.1)', () => {
   function playedEngine(): GameEngine {
     const engine = new GameEngine(basicGame(), { roomId: 'room-7' });
+    engine.dispatch({ type: 'ADVANCE' }); // פתיחת הצבעה
     engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(1, 1, { a: 2, b: 1 }) });
     engine.dispatch({ type: 'VOTING_TIMEOUT' });
-    engine.dispatch({ type: 'ADVANCE' });
+    engine.dispatch({ type: 'ADVANCE' }); // לשקופית 2
     return engine;
   }
 
@@ -361,7 +403,6 @@ describe('serialize / restore (SPEC 7.1)', () => {
     expect(restored.serialize('2026-07-09T10:00:01.000Z')).toEqual(
       engine.serialize('2026-07-09T10:00:01.000Z'),
     );
-    // וגם ה-state הנצפה זהה בשדות המהותיים
     expect(restored.getState()).toMatchObject({
       phase: 'showing',
       currentSlideId: 2,
@@ -392,8 +433,9 @@ describe('serialize / restore (SPEC 7.1)', () => {
     const restored = new GameEngine(basicGame());
     restored.restore(engine.serialize('T'));
     for (const target of [engine, restored]) {
-      target.dispatch({ type: 'MEDIA_ENDED' }); // ה-media של שקופית 2 (במשוחזר אין מדיה פעילה — יתעלם)
-      target.dispatch({ type: 'ADVANCE' });
+      target.dispatch({ type: 'ADVANCE' }); // מדיית הפתיחה של שקופית 2
+      target.dispatch({ type: 'MEDIA_ENDED' });
+      target.dispatch({ type: 'ADVANCE' }); // מעבר הלאה → ended
     }
     expect(restored.getState().phase).toBe(engine.getState().phase);
     expect(restored.getState().scores).toEqual(engine.getState().scores);
@@ -403,7 +445,7 @@ describe('serialize / restore (SPEC 7.1)', () => {
 
 describe('subscribe — מנגנון המנויים', () => {
   it('מאזין מקבל עדכון על כל שינוי state; ביטול מנוי עוצר', () => {
-    const engine = new GameEngine(basicGame({ slideStartVoting: false }));
+    const engine = new GameEngine(basicGame());
     let calls = 0;
     const unsubscribe = engine.subscribe(() => { calls += 1; });
     engine.dispatch({ type: 'ADVANCE' });

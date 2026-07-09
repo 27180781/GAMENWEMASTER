@@ -300,6 +300,13 @@ body {
 
 .timer-ring--urgent .timer-ring-progress { stroke: #f87171; }
 .timer-ring--urgent { animation: hint-pulse 0.8s infinite; }
+.timer-ring--paused .timer-ring-progress { stroke: #facc15; }
+
+/* חשיפה מדורגת: אלמנט שמור-מקום אך בלתי-נראה עד שלב החשיפה שלו */
+.reveal-hidden { visibility: hidden; }
+
+.question-header,
+.answer { transition: opacity 0.35s ease; }
 
 .timer-ring-value {
   position: absolute;
