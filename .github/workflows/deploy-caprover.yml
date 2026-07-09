@@ -1,0 +1,50 @@
+# פריסת פרודקשן ל-CapRover בכל דחיפה ל-main.
+#
+# הגדרה חד-פעמית (Settings → Secrets and variables → Actions → Secrets):
+#   CAPROVER_SERVER    = https://captain.<root-domain>   (כתובת ה-captain של השרת)
+#   CAPROVER_APP       = שם האפליקציה ב-CapRover (למשל trivia-engine)
+#   CAPROVER_APP_TOKEN = App Token (באפליקציה: Deployment → Enable App Token)
+#
+# עד שה-secrets מוגדרים — שלב הפריסה מדלג בשקט (הבדיקות עדיין רצות).
+
+name: Deploy to CapRover
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: caprover
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+      - name: Check CapRover secrets
+        id: check
+        run: echo "enabled=${{ secrets.CAPROVER_SERVER != '' && secrets.CAPROVER_APP != '' && secrets.CAPROVER_APP_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to CapRover
+        if: steps.check.outputs.enabled == 'true'
+        run: |
+          npm install -g caprover
+          caprover deploy \
+            --caproverUrl "${{ secrets.CAPROVER_SERVER }}" \
+            --appName "${{ secrets.CAPROVER_APP }}" \
+            --appToken "${{ secrets.CAPROVER_APP_TOKEN }}" \
+            --branch "${GITHUB_REF_NAME}"
+
+      - name: Deployment skipped (secrets not configured)
+        if: steps.check.outputs.enabled != 'true'
+        run: echo "CAPROVER_* secrets are not set — skipping production deploy."

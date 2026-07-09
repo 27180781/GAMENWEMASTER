@@ -38,6 +38,27 @@ https://<host>/?game=<URL של game.json>&demo=1     ← מצב דמו: שחקנ
 - ‏`&demo=1` — לפני המשחק נפתח **מסך הגדרות דמו**: כמות שחקני דמה (עד 5,000), מהירות הצבעה (איטי/רגיל/מהיר/בזק), אחוז עונים נכון, וקצב עדכוני ההצבעות. ההבדל היחיד ממשחק אמיתי: ה-VoteSnapshots מגיעים משחקני הדמה במקום מהסוקט — לבחינת ביצועי המערכת תחת עומס.
 - בלי `demo` ההצבעות ימתינו ל-SocketAdapter (יגיע ב-M3); אפשר להדליק קהל דמה ידנית מתפריט המפעיל (ESC).
 
+## פריסה
+
+### פרודקשן — CapRover (אוטומטי בכל מיזוג ל-main)
+
+האפליקציה סטטית: כל מסך משחק נטען עם `?game=<URL>` משלו וכל הלוגיקה רצה בדפדפן — שרת nginx אחד מגיש מאות משחקים במקביל ללא מאמץ.
+
+הגדרה חד-פעמית:
+1. ב-CapRover: צור אפליקציה (למשל `trivia-engine`), הפעל HTTPS, וב-**Deployment** הפעל **App Token** והעתק אותו.
+2. בגיטהאב: ‏Settings → Secrets and variables → Actions → הוסף 3 סודות:
+   - `CAPROVER_SERVER` — ‏`https://captain.<root-domain>` של השרת
+   - `CAPROVER_APP` — שם האפליקציה
+   - `CAPROVER_APP_TOKEN` — הטוקן שהעתקת
+3. מכאן ואילך כל מיזוג ל-`main` מריץ בדיקות ופורס אוטומטית (workflow: ‏`deploy-caprover.yml`). עד שהסודות מוגדרים שלב הפריסה מדלג בשקט.
+
+הפריסה משתמשת ב-`Dockerfile` (בנייה + הגשה עם nginx) ו-`captain-definition` שבשורש — אפשר גם לפרוס ידנית עם `caprover deploy` מקומי.
+
+### דמו — GitHub Pages
+
+‏`deploy-pages.yml` מפרסם את ה-build לענף `gh-pages` בכל מיזוג ל-`main`:
+`https://27180781.github.io/GAMENWEMASTER/` (דורש הפעלה חד-פעמית של Pages בהגדרות הריפו: Source = Deploy from a branch → ‏gh-pages).
+
 ## סטטוס — Milestone 1 (ליבה) ✅
 
 - **`src/engine/schema.ts`** — סכמת Zod מלאה עם נרמול: שדות מספריים ריקים (`""`) → ברירות מחדל (time=15, score=0, seconds=0); 3/4/5 תשובות; צבעי HEX של 6/8 ספרות.
