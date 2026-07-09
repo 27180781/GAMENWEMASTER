@@ -35,12 +35,19 @@ export function QuestionSlide({ slide, state, ansIsNumber, timer, reveal }: Ques
   const showDistribution =
     reveal.revealCorrect || (isResults && slide.type !== 'trivia');
 
+  const hasImage = slide.question.src !== '';
+
   return (
     <div className="question-slide">
-      <header className={`question-header${reveal.questionShown ? '' : ' reveal-hidden'}`}>
+      <header
+        className={`question-header${hasImage ? ' question-header--with-image' : ''}${reveal.questionShown ? '' : ' reveal-hidden'}`}
+      >
         <h1 className="question-text">{slide.question.que}</h1>
-        {slide.question.src !== '' && (
-          <img className="question-image" src={slide.question.src} alt="" />
+        {hasImage && (
+          <div className="question-image-box">
+            {/* תמונה בתוך השאלה — ריבוע בצד; הרקע נשאר הרקע הרגיל */}
+            <img className="question-image" src={slide.question.src} alt="" />
+          </div>
         )}
       </header>
 
