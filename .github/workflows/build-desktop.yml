@@ -38,13 +38,16 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run dist:win
-      - name: Publish portable EXE to a stable release
+      - name: Publish EXE files to a stable release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: desktop-latest
-          name: Trivia Engine — מנוע אופליין (EXE נייד)
+          name: Trivia Engine — מנוע אופליין (Windows)
           body: |
-            גרסת שולחן עבודה אופליין — קובץ EXE נייד ל-Windows, בלי התקנה.
-            נבנה אוטומטית מהקומיט האחרון ב-main.
-          files: release/TriviaEngine-Portable.exe
+            גרסת שולחן עבודה אופליין ל-Windows, נבנית אוטומטית מהקומיט האחרון ב-main:
+            - **TriviaEngine-Setup.exe** — מתקין עם קיצור דרך בשולחן העבודה ובתפריט התחל.
+            - **TriviaEngine-Portable.exe** — נייד, רץ בלי התקנה.
+          files: |
+            release/TriviaEngine-Setup.exe
+            release/TriviaEngine-Portable.exe
           prerelease: false

@@ -17,7 +17,12 @@ files:
 
 win:
   target:
+    # (1) נייד — קובץ בודד שרץ בלי התקנה
     - target: portable
+      arch:
+        - x64
+    # (2) מתקין — עם קיצור דרך בשולחן העבודה ובתפריט התחל
+    - target: nsis
       arch:
         - x64
   # אפשר להוסיף אייקון ב-build/icon.ico בעתיד
@@ -25,6 +30,16 @@ win:
 portable:
   # שם קובץ קבוע כדי שקישור ההורדה יישאר יציב
   artifactName: TriviaEngine-Portable.exe
+
+nsis:
+  artifactName: TriviaEngine-Setup.exe
+  oneClick: false # אשף התקנה (לא התקנה שקטה)
+  perMachine: false # התקנה למשתמש הנוכחי — בלי צורך בהרשאות מנהל
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Trivia Engine
+  runAfterFinish: true
 
 # בלי חתימת קוד (אין תעודה) — Windows יציג אזהרת SmartScreen בהרצה ראשונה
 publish: null

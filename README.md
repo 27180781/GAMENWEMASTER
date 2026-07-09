@@ -83,6 +83,7 @@ https://<host>/?game=<URL של game.json>&demo=1     ← מצב דמו: שחקנ
 - **עמוד הורדה:** `<host>/download.html` (מצביע ל-Release האחרון בגיטהאב).
 - **בנייה אוטומטית:** `.github/workflows/build-desktop.yml` בונה את ה-EXE על `windows-latest` בכל דחיפה ל-`main` ומפרסם אותו ל-Release בשם `desktop-latest`. הקישור היציב:
   `https://github.com/27180781/GAMENWEMASTER/releases/download/desktop-latest/TriviaEngine-Portable.exe`
+- **שני יעדים:** `TriviaEngine-Setup.exe` (מתקין עם קיצור דרך בשולחן העבודה ובתפריט התחל, בלי הרשאות מנהל) ו-`TriviaEngine-Portable.exe` (נייד, בלי התקנה). שניהם מתעדכנים באותו Release בכל דחיפה ל-main.
 - **בנייה מקומית** (על Windows): `npm run dist:win` → הפלט ב-`release/`.
 - **פיתוח מקומי:** `npm run electron:dev` (דורש הורדת בינארי Electron — חסום בחלק מהסביבות המבודדות).
 
