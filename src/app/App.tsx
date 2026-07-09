@@ -9,12 +9,13 @@
  * ניתוב מינימלי לפי hash: ‎#debug פותח את מסך הדיבאג של M1.
  */
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { parseGameFile, type GameFile } from '../engine/index.ts';
 import { DebugApp } from '../debug/DebugApp.tsx';
 import { SettingsScreen } from '../render/SettingsScreen.tsx';
 import { Stage } from '../render/Stage.tsx';
 import { GameHost } from './GameHost.tsx';
+import { openPushChannel } from './pushChannel.ts';
 import { DEFAULT_GAME_SETTINGS, parseAppParams, type GameSettings } from './urlParams.ts';
 import { loadGameFromZip } from './zipLoader.ts';
 
@@ -91,11 +92,67 @@ export function App() {
     };
   }, [params]);
 
+  // -------------------------------------------------------------------------
+  // רענון יזום ("פוש") למשחק אונליין — התוכן מתעדכן רק כשמגיע אות רענון,
+  // בלי לאבד את מהלך המשחק (GameHost מריץ engine.updateGame, בלי remount).
+  // -------------------------------------------------------------------------
+
+  const gameStartedRef = useRef(false);
+  gameStartedRef.current = game !== null;
+
+  /** החלת קובץ משחק מעודכן: רענון חם באמצע משחק, או עדכון התצוגה לפני התחלה. */
+  const applyGame = useCallback((loaded: GameFile) => {
+    setError(null);
+    if (gameStartedRef.current) setGame(loaded); // אותו id → GameHost מרענן בלי remount
+    else setPendingGame(loaded);
+  }, []);
+
+  const applyRawGame = useCallback(
+    (raw: unknown) => {
+      try {
+        applyGame(parseGameFile(raw));
+      } catch (e) {
+        setError(`רענון מהפוש נכשל:\n${(e as Error).message}`);
+      }
+    },
+    [applyGame],
+  );
+
+  /** משיכה חוזרת של קובץ המשחק מכתובת ‎?game=URL‎ והחלתו (בלי מטמון). */
+  const refetchGame = useCallback(async () => {
+    if (params.gameUrl === null) return;
+    try {
+      const response = await fetch(params.gameUrl, { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`השרת החזיר ${response.status} ${response.statusText}`);
+      }
+      applyRawGame(await response.json());
+    } catch (e) {
+      setError(`רענון קובץ המשחק נכשל:\n${(e as Error).message}`);
+    }
+  }, [params, applyRawGame]);
+
+  // ערוץ הפוש (postMessage תמיד; SSE/WebSocket אם סופק &push=)
+  useEffect(() => {
+    if (params.gameUrl === null && params.pushUrl === null) return;
+    return openPushChannel({
+      pushUrl: params.pushUrl,
+      onRefetch: () => void refetchGame(),
+      onGame: applyRawGame,
+    });
+  }, [params, refetchGame, applyRawGame]);
+
   if (hash === '#debug') return <DebugApp />;
 
   if (game !== null) {
     return (
-      <GameHost key={game.id} game={game} settings={settings} onSettingsChange={setSettings} />
+      <GameHost
+        key={game.id}
+        game={game}
+        settings={settings}
+        onSettingsChange={setSettings}
+        onRequestRefresh={params.gameUrl !== null ? () => void refetchGame() : undefined}
+      />
     );
   }
 

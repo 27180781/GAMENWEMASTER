@@ -3,13 +3,18 @@
  *
  *   ?game=<URL של game.json>   — טעינת קובץ המשחק מהכתובת ופתיחתו ישירות.
  *   &demo=1                    — מדליק מראש את שחקני הדמה במסך ההגדרות.
+ *   &push=<URL>                — ערוץ "פוש רענון": SSE (ברירת מחדל) או
+ *                                WebSocket (ws://‎/wss://‎). כשמגיע אות בערוץ,
+ *                                המשחק מרענן את התוכן בלי לאבד את מהלך המשחק.
  *
- * דוגמה: https://host/?game=https://example.com/game.json&demo=1
+ * דוגמה: https://host/?game=https://example.com/game.json&push=https://example.com/events&demo=1
  */
 
 export interface AppParams {
   /** כתובת קובץ משחק חיצוני, או null אם לא סופקה. */
   gameUrl: string | null;
+  /** כתובת ערוץ הפוש (SSE/WebSocket) לרענון יזום, או null. */
+  pushUrl: string | null;
   /** האם התבקש מצב דמו. */
   demo: boolean;
 }
@@ -20,9 +25,11 @@ export function parseAppParams(search: string): AppParams {
   const params = new URLSearchParams(search);
   const rawGame = params.get('game');
   const gameUrl = rawGame !== null && rawGame.trim() !== '' ? rawGame.trim() : null;
+  const rawPush = params.get('push');
+  const pushUrl = rawPush !== null && rawPush.trim() !== '' ? rawPush.trim() : null;
   const rawDemo = params.get('demo');
   const demo = rawDemo !== null && TRUTHY.has(rawDemo.trim().toLowerCase());
-  return { gameUrl, demo };
+  return { gameUrl, pushUrl, demo };
 }
 
 /**
