@@ -109,7 +109,7 @@ function EngineDebugger({
   };
 
   return (
-    <div dir="rtl" style={{ fontFamily: 'monospace', padding: 16 }}>
+    <div dir="rtl" className="debug-root" style={{ fontFamily: 'monospace', padding: 16 }}>
       <h1>Trivia Engine — מסך דיבאג (M1)</h1>
 
       <p>

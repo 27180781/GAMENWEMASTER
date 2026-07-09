@@ -32,10 +32,9 @@ export function DemoSettingsScreen({
   const clampedVoters = Math.min(5000, Math.max(1, Math.floor(voterCount) || 1));
 
   return (
-    <div className="game-root" dir="rtl">
-      <div className="screen">
-        <div className="screen-content demo-settings">
-          <h1 className="opening-title">מצב דמו 🧪</h1>
+    <div className="screen">
+      <div className="screen-content demo-settings">
+        <h1 className="opening-title">מצב דמו 🧪</h1>
           <p className="demo-game-name">
             משחק: <strong>{game.name}</strong> · {game.questions.length} שקופיות
           </p>
@@ -114,7 +113,6 @@ export function DemoSettingsScreen({
           <p className="opening-hint" style={{ opacity: 0.6 }}>
             ההבדל היחיד ממשחק אמיתי: ההצבעות מגיעות משחקני הדמה במקום מהסוקט
           </p>
-        </div>
       </div>
     </div>
   );
