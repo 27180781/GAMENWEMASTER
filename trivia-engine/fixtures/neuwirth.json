@@ -1,0 +1,1080 @@
+{
+  "name": "נויבירט",
+  "questions": [
+    {
+      "question": {
+        "que": "שאלת סקר איזו פעילות אהובה עליכן במיוחד",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          { "ans": "הרקדה", "correct": false, "id": 1 },
+          { "ans": "סדנא", "correct": false, "id": 2 },
+          { "ans": "סרט", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" },
+      "endMedia": { "src": "" },
+      "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "survey", "id": 1
+    },
+    {
+      "question": {
+        "que": "מה הדימיון בין \"נוצות עפות ברוח\" לבין מדברי לשון הרע?",
+        "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "כשאם שאי אפשר לאסוף נוצות לאחר שהתפזרו ברוח, כך אי אפשר להחזיר את המילים לאחר שנאמרו.", "correct": true, "id": 1 },
+          { "ans": "כשם שנוצות משקלם מאד קל, כך דיבורי לשון הרע גם כן עבירה קלה", "correct": false, "id": 2 },
+          { "ans": "כשם שנוצות צבען לבן, כך עבירותיו של בעל לשה\"ר לאחר שחוזר עליהן בתשובה נעשות בצבע לבן", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 2
+    },
+    {
+      "question": { "que": "", "scoreForQue": "", "timeForQue": "", "answers": [], "src": "" },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "media", "id": 3
+    },
+    {
+      "question": {
+        "que": "איזה כיתה הוסרטה אחת לפני האחרונה", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "כיתה ה'", "correct": true, "id": 1 },
+          { "ans": "כיתה ב2", "correct": false, "id": 2 },
+          { "ans": "כיתה ח", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": 30, "score": 0 },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": 10 }, "showInLoop": false
+      },
+      "type": "trivia", "id": 4
+    },
+    {
+      "question": { "que": "", "scoreForQue": "", "timeForQue": "", "answers": [], "src": "" },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "media", "id": 5
+    },
+    {
+      "question": {
+        "que": "השלם את המאמר \"כל רגע ורגע שהאדם חוסם פיו, זוכה ל...\"", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "להקים חורבה מחורבות ירושלים", "correct": false, "id": 1 },
+          { "ans": "לאור הגנוז שאין כל מלאך ובריה יכול לשער", "correct": true, "id": 2 },
+          { "ans": "לנחלה בלי מיצרים", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 6
+    },
+    {
+      "question": {
+        "que": "מה יעשה \"...איש החפץ חיים אוהב ימים לראות טוב\"?", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "הולך תמים ופועל צדק ודובר אמת בלבבו", "correct": false, "id": 1 },
+          { "ans": "נצור לשונך מרע ושפתיך מדבר מרמה", "correct": true, "id": 2 },
+          { "ans": "להגיד בבוקר חסדך ואמונתך בלילות", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 7
+    },
+    {
+      "question": {
+        "que": "השלם את המשפט: \"החיים והמוות ביד....\"", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "המלך", "correct": true, "id": 1 },
+          { "ans": "העם", "correct": false, "id": 2 },
+          { "ans": "הלשון", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 8
+    },
+    {
+      "question": {
+        "que": "מה ההמשך של הפסוק: \"שומר פיו ולשונו...\"", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "אין חטא בא על ידו", "correct": false, "id": 1 },
+          { "ans": "לא ידע דבר רע", "correct": true, "id": 2 },
+          { "ans": "שומר מצרות נפשו", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 9
+    },
+    {
+      "question": {
+        "que": "איזו פעילות אהובה עליכן במיוחד", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "הרקדה", "correct": false, "id": 1 },
+          { "ans": "סדנא", "correct": false, "id": 2 },
+          { "ans": "סרט", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "survey", "id": 10
+    },
+    {
+      "question": {
+        "que": "\"כל השונה הלכות בכל יום, מובטח לו ש...\"", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "שלא ימות בלא תשובה", "correct": false, "id": 1 },
+          { "ans": "שהוא בן עולם הבא", "correct": true, "id": 2 },
+          { "ans": "שלא ימוש התורה מפי זרעו לעולם", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 11
+    },
+    {
+      "question": {
+        "que": "מדוע כדאי לומר כל יום את התפילה של ה'חפץ חיים' על שמירת הלשון?", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "כי זו סגולה לזכרון טוב", "correct": false, "id": 1 },
+          { "ans": "כי זו שמירה שלא להיכשל בעון לשון הרע.", "correct": true, "id": 2 },
+          { "ans": "כי זו סגולה לעשירות", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 12
+    },
+    {
+      "question": {
+        "que": "היכן נאמרות המילים \"זכות שתהא למשמרת שלום\"?", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "בתפילת ראש חודש", "correct": false, "id": 1 },
+          { "ans": "בברכת המזון", "correct": true, "id": 2 },
+          { "ans": "באגרת הרמב\"ן", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 13
+    },
+    {
+      "question": {
+        "que": "מי נכנסו לתוך האש כדי שחלילה לא יִפָּגְעוּ מהם?", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "רבי חנינא בן דוסא ואשתו", "correct": false, "id": 1 },
+          { "ans": "מר עוקבא ואשתו", "correct": true, "id": 2 },
+          { "ans": "יעקב אבינו ורחל", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 14
+    },
+    {
+      "question": {
+        "que": "בחרו בתשובה המדויקת ביותר: לדבר לשון הרע על בני משפחה", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "מותר כי הם פחות נעלבים", "correct": false, "id": 1 },
+          { "ans": "אסור", "correct": true, "id": 2 },
+          { "ans": "אסור אבל זה הרבה פחות חמור מלדבר על אנשים אחרים", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 15
+    },
+    {
+      "question": {
+        "que": "כמה מצוות אפשר לקיים בהימנעות מלשון הרע?", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "חמש", "correct": false, "id": 1 },
+          { "ans": "שלושים ואחת", "correct": true, "id": 2 },
+          { "ans": "תשע עשרה", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 16
+    },
+    {
+      "question": {
+        "que": "מה זה לשון הרע?", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "דיבור שמצחיק מישהו", "correct": false, "id": 1 },
+          { "ans": "דיבור רע שמדברים על אנשים וגורם להם לכעס, פחד, פגיעה, בושה, או צער, ולפעמים לאיבוד פרנסה וכסף, או גורם שלא ירצו להתחבר אליהם.", "correct": true, "id": 2 },
+          { "ans": "כשמשקרים על מישהו.", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 17
+    },
+    {
+      "question": {
+        "que": "מי המורה שיש לה בנות בבית הספר?", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "המורה פלק", "correct": false, "id": 1 },
+          { "ans": "המורה וינברג", "correct": false, "id": 2 },
+          { "ans": "המורה פינסקי", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "survey", "id": 18
+    },
+    {
+      "question": {
+        "que": "בגלל איזה עוון אומר החפץ חיים שאנו עדיין בגלות?", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "עבודה זרה", "correct": false, "id": 1 },
+          { "ans": "לשון הרע ושנאת חינם", "correct": true, "id": 2 },
+          { "ans": "ביטול הקרבנות", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 19
+    },
+    {
+      "question": { "que": "", "scoreForQue": "", "timeForQue": "", "answers": [], "src": "" },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "media", "id": 20
+    },
+    {
+      "question": {
+        "que": "איזו קופת צדקה החזיקה אילה לוי מב2?", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "חסדי נעמי", "correct": true, "id": 1 },
+          { "ans": "קופת החסד", "correct": false, "id": 2 },
+          { "ans": "קופת הקהילה", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": 30, "score": 0 },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": 10 }, "showInLoop": false
+      },
+      "type": "trivia", "id": 21
+    },
+    {
+      "question": { "que": "", "scoreForQue": "", "timeForQue": "", "answers": [], "src": "" },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "media", "id": 22
+    },
+    {
+      "question": {
+        "que": "האם מותר לספר לשון הרע בשביל להוציא מועקה מהלב", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "זה המקום היחיד שהחפץ חיים מתיר לדבר בלי שום תנאי", "correct": false, "id": 1 },
+          { "ans": "אסור אף פעם", "correct": false, "id": 2 },
+          { "ans": "רק במצבים מסוימים על פי כמה תנאים זה יכול להיות אפשרי.", "correct": true, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 23
+    },
+    {
+      "question": { "que": "", "scoreForQue": "", "timeForQue": "", "answers": [], "src": "" },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "media", "id": 24
+    },
+    {
+      "question": {
+        "que": "איזה כיתה לבשה חולצה צהובה", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "כיתה ה'", "correct": true, "id": 1 },
+          { "ans": "כיתה ו'", "correct": false, "id": 2 },
+          { "ans": "כיתה ח'", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": 30, "score": 0 },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": 10 }, "showInLoop": false
+      },
+      "type": "trivia", "id": 25
+    },
+    {
+      "question": { "que": "", "scoreForQue": "", "timeForQue": "", "answers": [], "src": "" },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "media", "id": 26
+    },
+    {
+      "question": {
+        "que": "האם מותר לדבר דברים רעים על אנשים, אם זה קרה באמת?", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "מותר", "correct": false, "id": 1 },
+          { "ans": "אסור", "correct": true, "id": 2 },
+          { "ans": "מותר רק אם המספר ראה בעצמו שזה קרה", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 27
+    },
+    {
+      "question": {
+        "que": "מה זה הוצאת שם רע ?", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "להעליב מישהו.", "correct": false, "id": 1 },
+          { "ans": "לספר על מישהו דברים רעים שהם שקר.", "correct": true, "id": 2 },
+          { "ans": "לשמוח כשהחבר לא מצליח.", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 28
+    },
+    {
+      "question": { "que": "", "scoreForQue": "", "timeForQue": "", "answers": [], "src": "" },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "media", "id": 29
+    },
+    {
+      "question": {
+        "que": "במה זכתה חנה ינקוביץ מכיתה א?", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "יצירת גרוד", "correct": true, "id": 1 },
+          { "ans": "ממתק", "correct": false, "id": 2 },
+          { "ans": "לא זכתה בכלל", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": 30, "score": 0 },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": 10 }, "showInLoop": false
+      },
+      "type": "trivia", "id": 30
+    },
+    {
+      "question": { "que": "", "scoreForQue": "", "timeForQue": "", "answers": [], "src": "" },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "media", "id": 31
+    },
+    {
+      "question": {
+        "que": "למה את מחכה לחופש?", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "כדי שאוכל לקום מאוחר", "correct": false, "id": 1 },
+          { "ans": "שאלך לים ולבריכה", "correct": false, "id": 2 },
+          { "ans": "שאוכל להרגיש משועממת", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "survey", "id": 32
+    },
+    {
+      "question": {
+        "que": "באיזה פרשה בתורה סיפור הצרעת של מרים הנביאה", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "בהעלותך", "correct": true, "id": 1 },
+          { "ans": "נח", "correct": false, "id": 2 },
+          { "ans": "שמות", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 33
+    },
+    {
+      "question": {
+        "que": "פגשתם שכנים והם לא אומרים לכם שלום, כיצד תנהגו?", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "ננתק איתם קשרים, כדי שיבינו שהם עצבנו אותנו ויבואו להתנצל", "correct": false, "id": 1 },
+          { "ans": "ננסה בכל דרך לדון אותם לכף זכות", "correct": true, "id": 2 },
+          { "ans": "פעם הבאה לא נאמר להם שלום.כדי שיבינו שלא כך השם רוצה שהם יתנהגו.", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 34
+    },
+    {
+      "question": {
+        "que": "מהו המקור לאיסור לשון הרע?", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "מתקנות עזרא הסופר", "correct": false, "id": 1 },
+          { "ans": "מן התורה", "correct": true, "id": 2 },
+          { "ans": "מגזרת החפץ חיים וגדולי דורו", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 35
+    },
+    {
+      "question": { "que": "", "scoreForQue": "", "timeForQue": "", "answers": [], "src": "" },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "media", "id": 36
+    },
+    {
+      "question": {
+        "que": "כמה פעמים המילה \"לך\" מופיעה בג'ינגל", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "פעמיים", "correct": true, "id": 1 },
+          { "ans": "פעם אחת", "correct": false, "id": 2 },
+          { "ans": "אף תשובה איננה נכונה", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": 30, "score": 0 },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": 10 }, "showInLoop": false
+      },
+      "type": "trivia", "id": 37
+    },
+    {
+      "question": { "que": "", "scoreForQue": "", "timeForQue": "", "answers": [], "src": "" },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "media", "id": 38
+    },
+    {
+      "question": {
+        "que": "מהי אומנותו של האדם?", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "ישים עצמו כפיקח", "correct": false, "id": 1 },
+          { "ans": "ישים עצמו כדרשן", "correct": false, "id": 2 },
+          { "ans": "ישים עצמו כאלם", "correct": true, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 39
+    },
+    {
+      "question": {
+        "que": "במסכת אבות שואלים: איזהו גיבור. ומהי התשובה?", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "הכובש את יצרו", "correct": true, "id": 1 },
+          { "ans": "הלומד מכל אדם", "correct": false, "id": 2 },
+          { "ans": "השמח בחלקו", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 40
+    },
+    {
+      "question": {
+        "que": "איך נקרא לשון הרע שהוא גם שקר?", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "אין דבר כזה: יש רק או שקר, או לשון הרע!", "correct": false, "id": 1 },
+          { "ans": "רכילות", "correct": false, "id": 2 },
+          { "ans": "הוצאת שם רע", "correct": true, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 41
+    },
+    {
+      "question": {
+        "que": "איך את רואה את עצמך בשנה הבאה", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "משקיענית יותר", "correct": false, "id": 1 },
+          { "ans": "חברותית יותר", "correct": false, "id": 2 },
+          { "ans": "ערכית יותר", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "survey", "id": 42
+    },
+    {
+      "question": { "que": "", "scoreForQue": "", "timeForQue": "", "answers": [], "src": "" },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "media", "id": 43
+    },
+    {
+      "question": {
+        "que": "מי הבת שירדה ועלתה באניה? ", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "חני אגדי ג2", "correct": true, "id": 1 },
+          { "ans": "מלי בן דוד ד", "correct": false, "id": 2 },
+          { "ans": "אביגיל מנגולד ג1", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": 30, "score": 0 },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": 10 }, "showInLoop": false
+      },
+      "type": "trivia", "id": 44
+    },
+    {
+      "question": { "que": "", "scoreForQue": "", "timeForQue": "", "answers": [], "src": "" },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "media", "id": 45
+    },
+    {
+      "question": {
+        "que": "האם מותר לספר לשון הרע על נפטר?", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "רק אם הוא היה ידוע כאיש צדיק אסור.", "correct": false, "id": 1 },
+          { "ans": "אסור", "correct": true, "id": 2 },
+          { "ans": "מותר", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 46
+    },
+    {
+      "question": { "que": "", "scoreForQue": "", "timeForQue": "", "answers": [], "src": "" },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "media", "id": 47
+    },
+    {
+      "question": {
+        "que": "איזו בת חבשה מטפחת בצבע ירוק מנטה", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "מלי לזנובסקי", "correct": false, "id": 1 },
+          { "ans": "תהילה דיין", "correct": false, "id": 2 },
+          { "ans": "אפרת שמש", "correct": true, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": 30, "score": 0 },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": 10 }, "showInLoop": false
+      },
+      "type": "trivia", "id": 48
+    },
+    {
+      "question": { "que": "", "scoreForQue": "", "timeForQue": "", "answers": [], "src": "" },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "media", "id": 49
+    },
+    {
+      "question": {
+        "que": "מי אמר \"ואהבת לרעך כמוך - זה כלל גדול בתורה\"", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "הלל הזקן", "correct": false, "id": 1 },
+          { "ans": "רבי שמעון בר יוחאי", "correct": false, "id": 2 },
+          { "ans": "רבי עקיבא", "correct": true, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 50
+    },
+    {
+      "question": {
+        "que": "למי כדאי לומר מילים טובות?", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "לאנשים מסכנים", "correct": false, "id": 1 },
+          { "ans": "לכל אחד", "correct": true, "id": 2 },
+          { "ans": "רק לילדים צעירים", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 51
+    },
+    {
+      "question": {
+        "que": "מה יעשה אדם שנקלע לחבורת מדברי לשון הרע, והעיר להם ובכל זאת הם ממשיכים?", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "יתרחק מהמקום, ואם אינו יכול - יסתום אוזניים או לפחות לא יאמין, ויַראה שאינו מרוצה", "correct": true, "id": 1 },
+          { "ans": "אם הוא מחליט לא להאמין, הוא יכול להמשיך להקשיב", "correct": false, "id": 2 },
+          { "ans": "שתי התשובות נכונות", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 52
+    },
+    {
+      "question": {
+        "que": "האם תרצי שתפרוץ מלחמה ולא יקבלו תעודות", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "כן, מאד", "correct": false, "id": 1 },
+          { "ans": "לא, כי זה לא יעזור יחלקו בכל מקרה את התעודות", "correct": false, "id": 2 },
+          { "ans": "לא, עד שהשקעתי שאראה תוצאות", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "survey", "id": 53
+    },
+    {
+      "question": {
+        "que": "האם יש תנאים בהם מותר להעליב ?", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "כן - בתנאי שזה לתועלת", "correct": false, "id": 1 },
+          { "ans": "כן - בתנאי שהם לא התנהגו כמו שצריך", "correct": false, "id": 2 },
+          { "ans": "לא - בשום אופן אסור להעליב! אין שום תנאי המתיר להעליב חברים.", "correct": true, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 54
+    },
+    {
+      "question": {
+        "que": "האם מותר לילד לספר לאביו או למחנך לשון הרע על חבר שמציק לו?", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "אסור בשום אופן.", "correct": false, "id": 1 },
+          { "ans": "מותר וגם חשוב מאד לעשות זאת, אך אם אפשר עדיף בלי שמות.", "correct": true, "id": 2 },
+          { "ans": "מותר, אבל אם מרגיש שהוא מסוגל להמשיך לסבול בשתיקה - אסור לספר.", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 55
+    },
+    {
+      "question": {
+        "que": "האם את חשה שינוי בעצמך לאחר הפעילות השנתית על דיבור", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "לא מידי", "correct": false, "id": 1 },
+          { "ans": "כן וודאי", "correct": false, "id": 2 },
+          { "ans": "לפעמים כן ולפעמים לא", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "survey", "id": 56
+    },
+    {
+      "question": {
+        "que": "כיצד חוזרים בתשובה על עברות שבין אדם לחברו?", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "בקשת סליחה מהחבר, חרטה, וידוי, קבלה לעתיד", "correct": true, "id": 1 },
+          { "ans": "חרטה, קבלה לעתיד, ושליחת מתנה לחבר", "correct": false, "id": 2 },
+          { "ans": "בקשת סליחה מספיק.", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "trivia", "id": 57
+    },
+    {
+      "question": { "que": "", "scoreForQue": "", "timeForQue": "", "answers": [], "src": "" },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "media", "id": 58
+    },
+    {
+      "question": {
+        "que": "איזו מורות היו בסרטון?", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "המורה פוזן והמורה וינברג", "correct": true, "id": 1 },
+          { "ans": "המורה וולך והמורה וינברג", "correct": false, "id": 2 },
+          { "ans": "המורה פוזן והמורה אסתי מנקין", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": 30, "score": 0 },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": 10 }, "showInLoop": false
+      },
+      "type": "trivia", "id": 59
+    },
+    {
+      "question": { "que": "", "scoreForQue": "", "timeForQue": "", "answers": [], "src": "" },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": "" }, "showInLoop": false
+      },
+      "type": "media", "id": 60
+    },
+    {
+      "question": {
+        "que": "איזה חלום את חולמת לאחר שגמרת את המבחנים", "scoreForQue": 3, "timeForQue": 15,
+        "answers": [
+          { "ans": "לישון", "correct": false, "id": 1 },
+          { "ans": "לפטפט עם חברה", "correct": false, "id": 2 },
+          { "ans": "לסוע לסבתא או לדודים", "correct": false, "id": 3 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" }, "endMedia": { "src": "" }, "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false, "slideStartVoting": true, "playAfterClicking": false, "exitGame": false,
+        "correctlyAnsweredBefore": false, "firstClicker": false, "answerIsSequenceClicks": false, "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": 30, "score": 0 },
+        "slidBackgroundMedia": { "src": "" }, "automaticSkip": { "active": false, "seconds": 10 }, "showInLoop": false
+      },
+      "type": "survey", "id": 61
+    }
+  ],
+  "createdAt": "2026-06-23T17:59:10.765962+00:00",
+  "cloudinaryFolder": "na73438@gmail.com",
+  "setting": {
+    "titleThroughoutGame": "חויה בקליק",
+    "ansIsNumber": true,
+    "multiWinners": 5,
+    "showWinnersListAfter": null,
+    "mainColor": "#1C284BC9",
+    "secondaryColor": "#FFFFFFC7",
+    "gameMedia": { "src": "https://r2-cors-proxy.na73438.workers.dev/system-media/1782226344610-87cb14dc-_________.mp4" },
+    "logo": { "src": "https://oousxptmdrrkybadikec.supabase.co/storage/v1/object/public/game-media/system/default-logo.png" },
+    "triviaMedia": { "src": "https://r2-cors-proxy.na73438.workers.dev/system-media/1782226344610-87cb14dc-_________.mp4" },
+    "winnersListMedia": { "src": "https://pub-3502362d8d6946f58e8cc2fa980dc7b5.r2.dev/system-media/1780822168245-13b3a163-download__4_.mp4" },
+    "winnersMedia": { "src": "https://r2-cors-proxy.na73438.workers.dev/system-media/1782226349737-a82e66d8-___________.mp4" },
+    "sound": {
+      "playersConnectingMediaSound": { "src": "https://r2-cors-proxy.na73438.workers.dev/system-media/1782226343827-631d5399-___________________.mp3" },
+      "showQuestionMediaSound": { "src": null },
+      "winnersMediaSound": { "src": null },
+      "winnersListMediaSound": { "src": null },
+      "genericMediaSound": { "src": null },
+      "timerMediaSound": { "src": null },
+      "inShowAnsMediaSound": { "src": null }
+    },
+    "limit": { "type": "phones" }
+  },
+  "credit": null,
+  "users": "{}",
+  "id": "92916bed-ce28-4ce3-9066-7a9bacb792ca",
+  "cloudinaryAbsolutePathImage": "",
+  "cloudinaryAbsolutePathVideo": "",
+  "baseUrl": "",
+  "assets": [
+    { "src": "https://oousxptmdrrkybadikec.supabase.co/storage/v1/object/public/game-media/system/default-logo.png", "progress": 0, "name": "default-logo.png", "type": "image" },
+    { "src": "https://r2-cors-proxy.na73438.workers.dev/system-media/1782226344610-87cb14dc-_________.mp4", "progress": 0, "name": "1782226344610-87cb14dc-_________.mp4", "type": "video" },
+    { "src": "https://pub-3502362d8d6946f58e8cc2fa980dc7b5.r2.dev/system-media/1780822168245-13b3a163-download__4_.mp4", "progress": 0, "name": "1780822168245-13b3a163-download__4_.mp4", "type": "video" },
+    { "src": "https://r2-cors-proxy.na73438.workers.dev/system-media/1782226349737-a82e66d8-___________.mp4", "progress": 0, "name": "1782226349737-a82e66d8-___________.mp4", "type": "video" },
+    { "src": "https://r2-cors-proxy.na73438.workers.dev/system-media/1782226343827-631d5399-___________________.mp3", "progress": 0, "name": "1782226343827-631d5399-___________________.mp3", "type": "audio" }
+  ],
+  "room": null
+}

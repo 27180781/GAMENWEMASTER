@@ -1,0 +1,875 @@
+{
+  "name": "הדסה אוזן",
+  "questions": [
+    {
+      "question": {
+        "que": "מה לדעתך רוב בנות ענו על שאלת הסקר \"למה את הכי מחוברת בסמינר\"?",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          { "ans": "לחברות ולשיעורים", "correct": true, "id": 1 },
+          { "ans": "למורות ולחברות", "correct": false, "id": 2 },
+          { "ans": "לחברות ולמבנה", "correct": false, "id": 3 },
+          { "ans": "למבנה ולמורות", "correct": false, "id": 4 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" },
+      "endMedia": { "src": "" },
+      "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" },
+        "automaticSkip": { "active": false, "seconds": "" },
+        "showInLoop": false
+      },
+      "type": "trivia",
+      "id": 1
+    },
+    {
+      "question": {
+        "que": "לאיזה שיעור הכי הרבה הבנות מתחברות?",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          { "ans": "ספורט ואנגלית", "correct": false, "id": 1 },
+          { "ans": "ספורט ויהדות", "correct": true, "id": 2 },
+          { "ans": "תורה וחברה", "correct": false, "id": 3 },
+          { "ans": "שיעור שלא מן המניין", "correct": false, "id": 4 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" },
+      "endMedia": { "src": "" },
+      "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" },
+        "automaticSkip": { "active": false, "seconds": "" },
+        "showInLoop": false
+      },
+      "type": "trivia",
+      "id": 2
+    },
+    {
+      "question": {
+        "que": "מה לדעתך רוב הבנות ענו על השאלה-מי  המורה הכי קשוחה בסמינר?",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          { "ans": "המורה אילת מלכא", "correct": false, "id": 1 },
+          { "ans": "המורה הדסה אוזן", "correct": false, "id": 2 },
+          { "ans": "המורה אילה לוי", "correct": false, "id": 3 },
+          { "ans": "המורה מירי בראנד", "correct": true, "id": 4 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" },
+      "endMedia": { "src": "" },
+      "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" },
+        "automaticSkip": { "active": false, "seconds": "" },
+        "showInLoop": false
+      },
+      "type": "trivia",
+      "id": 3
+    },
+    {
+      "question": {
+        "que": "על איזה מקצוע רוב הבנות היו מעדיפות לוותר?",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          { "ans": "חשבון", "correct": false, "id": 1 },
+          { "ans": "אנגלית", "correct": false, "id": 2 },
+          { "ans": "דקדוק", "correct": false, "id": 3 },
+          { "ans": "כל המקצועות", "correct": true, "id": 4 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" },
+      "endMedia": { "src": "" },
+      "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" },
+        "automaticSkip": { "active": false, "seconds": "" },
+        "showInLoop": false
+      },
+      "type": "trivia",
+      "id": 4
+    },
+    {
+      "question": {
+        "que": "מה לדעתך רוב הבנות ענו על השאלה - מה הכי צריך שיפוץ בסמינר?",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          { "ans": "חדר מורות", "correct": false, "id": 1 },
+          { "ans": "שרותים", "correct": true, "id": 2 },
+          { "ans": "כל הסמינר", "correct": false, "id": 3 },
+          { "ans": "כיתה י", "correct": false, "id": 4 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" },
+      "endMedia": { "src": "" },
+      "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" },
+        "automaticSkip": { "active": false, "seconds": "" },
+        "showInLoop": false
+      },
+      "type": "trivia",
+      "id": 5
+    },
+    {
+      "question": {
+        "que": "מי התלמידה שלרוב מגיעה ראשונה לסמינר?",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          { "ans": "אפרת בוכריס", "correct": false, "id": 1 },
+          { "ans": "אביה רוזיליו", "correct": false, "id": 2 },
+          { "ans": "הודיה אבנעים", "correct": true, "id": 3 },
+          { "ans": "אלישבע דוייב", "correct": false, "id": 4 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" },
+      "endMedia": { "src": "" },
+      "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" },
+        "automaticSkip": { "active": false, "seconds": "" },
+        "showInLoop": false
+      },
+      "type": "trivia",
+      "id": 6
+    },
+    {
+      "question": {
+        "que": "איך המנהלת מגיעה לסמינר?",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          { "ans": "באוטובוס", "correct": true, "id": 1 },
+          { "ans": "בדריבר", "correct": false, "id": 2 },
+          { "ans": "ברכבת", "correct": false, "id": 3 },
+          { "ans": "ברגל", "correct": false, "id": 4 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" },
+      "endMedia": { "src": "" },
+      "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" },
+        "automaticSkip": { "active": false, "seconds": "" },
+        "showInLoop": false
+      },
+      "type": "trivia",
+      "id": 7
+    },
+    {
+      "question": {
+        "que": "מי המורה הכי צעירה בסמינר?",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          { "ans": "המורה רננה לבל", "correct": false, "id": 1 },
+          { "ans": "המזכירה מרים עובדיה", "correct": false, "id": 2 },
+          { "ans": "המורה בת שבע נבטי", "correct": true, "id": 3 },
+          { "ans": "המורה הדסה אוזן", "correct": false, "id": 4 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" },
+      "endMedia": { "src": "" },
+      "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" },
+        "automaticSkip": { "active": false, "seconds": "" },
+        "showInLoop": false
+      },
+      "type": "trivia",
+      "id": 8
+    },
+    {
+      "question": {
+        "que": "מה השטח של הסמינר?",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          { "ans": "300 מ\"ר", "correct": false, "id": 1 },
+          { "ans": "200 מ\"ר", "correct": true, "id": 2 },
+          { "ans": "150 מ\"ר", "correct": false, "id": 3 },
+          { "ans": "120 מ\"ר", "correct": false, "id": 4 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" },
+      "endMedia": { "src": "" },
+      "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" },
+        "automaticSkip": { "active": false, "seconds": "" },
+        "showInLoop": false
+      },
+      "type": "trivia",
+      "id": 9
+    },
+    {
+      "question": {
+        "que": "איזה מורות למדו באותה כיתה?",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          { "ans": "המורה מירי צסטר והמורה בת שבע נבטי", "correct": false, "id": 1 },
+          { "ans": "המורה שרה מסיקה והמורה אילה לוי", "correct": true, "id": 2 },
+          { "ans": "המורה מירי בראנד והמזכירה תמר", "correct": false, "id": 3 },
+          { "ans": "המורה אילת מלכא והמורה תהילה סימאי", "correct": false, "id": 4 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" },
+      "endMedia": { "src": "" },
+      "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" },
+        "automaticSkip": { "active": false, "seconds": "" },
+        "showInLoop": false
+      },
+      "type": "trivia",
+      "id": 10
+    },
+    {
+      "question": {
+        "que": "באיזה סמינר המנהלת למדה?",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          { "ans": "בסמינר הישן", "correct": true, "id": 1 },
+          { "ans": "בסמינר החדש", "correct": false, "id": 2 },
+          { "ans": "בסניף", "correct": false, "id": 3 },
+          { "ans": "סמינר וולף ב\"ב", "correct": false, "id": 4 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" },
+      "endMedia": { "src": "" },
+      "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" },
+        "automaticSkip": { "active": false, "seconds": "" },
+        "showInLoop": false
+      },
+      "type": "trivia",
+      "id": 11
+    },
+    {
+      "question": {
+        "que": "באיזה חודש נולדה המורה דסי?",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          { "ans": "תשרי", "correct": false, "id": 1 },
+          { "ans": "כסלו", "correct": false, "id": 2 },
+          { "ans": "אדר", "correct": true, "id": 3 },
+          { "ans": "אלול", "correct": false, "id": 4 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" },
+      "endMedia": { "src": "" },
+      "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" },
+        "automaticSkip": { "active": false, "seconds": "" },
+        "showInLoop": false
+      },
+      "type": "trivia",
+      "id": 12
+    },
+    {
+      "question": {
+        "que": "איזה משפחחה אינה שכנה של הסמינר?",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          { "ans": "רווח", "correct": false, "id": 1 },
+          { "ans": "אביוב", "correct": true, "id": 2 },
+          { "ans": "שפירא", "correct": false, "id": 3 },
+          { "ans": "בנדיקט", "correct": false, "id": 4 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" },
+      "endMedia": { "src": "" },
+      "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" },
+        "automaticSkip": { "active": false, "seconds": "" },
+        "showInLoop": false
+      },
+      "type": "trivia",
+      "id": 13
+    },
+    {
+      "question": {
+        "que": "למי יש אחין יותר גדול ממנה?",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          { "ans": "נעמה כהן", "correct": true, "id": 1 },
+          { "ans": "נועה ישראל", "correct": false, "id": 2 },
+          { "ans": "אושרת גבאי", "correct": false, "id": 3 },
+          { "ans": "מלכה קיסנר", "correct": false, "id": 4 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" },
+      "endMedia": { "src": "" },
+      "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" },
+        "automaticSkip": { "active": false, "seconds": "" },
+        "showInLoop": false
+      },
+      "type": "trivia",
+      "id": 14
+    },
+    {
+      "question": {
+        "que": "כמה מוסדות יש לרב שמסיוב?",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          { "ans": "6", "correct": true, "id": 1 },
+          { "ans": "9", "correct": false, "id": 2 },
+          { "ans": "5", "correct": false, "id": 3 },
+          { "ans": "3", "correct": false, "id": 4 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" },
+      "endMedia": { "src": "" },
+      "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" },
+        "automaticSkip": { "active": false, "seconds": "" },
+        "showInLoop": false
+      },
+      "type": "trivia",
+      "id": 15
+    },
+    {
+      "question": {
+        "que": "כמה תלמידות גרות ברמות?",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          { "ans": "6", "correct": true, "id": 1 },
+          { "ans": "9", "correct": false, "id": 2 },
+          { "ans": "7", "correct": false, "id": 3 },
+          { "ans": "8", "correct": false, "id": 4 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" },
+      "endMedia": { "src": "" },
+      "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" },
+        "automaticSkip": { "active": false, "seconds": "" },
+        "showInLoop": false
+      },
+      "type": "trivia",
+      "id": 16
+    },
+    {
+      "question": {
+        "que": "איך קוראים לבן הבכור של המורה שרי אברמוביץ?",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          { "ans": "מוישי", "correct": false, "id": 1 },
+          { "ans": "אלחנן", "correct": true, "id": 2 },
+          { "ans": "יודי", "correct": false, "id": 3 },
+          { "ans": "איצי", "correct": false, "id": 4 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" },
+      "endMedia": { "src": "" },
+      "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" },
+        "automaticSkip": { "active": false, "seconds": "" },
+        "showInLoop": false
+      },
+      "type": "trivia",
+      "id": 17
+    },
+    {
+      "question": {
+        "que": "כמה נינים יש למנהלת?",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          { "ans": "16", "correct": false, "id": 1 },
+          { "ans": "3", "correct": false, "id": 2 },
+          { "ans": "5", "correct": true, "id": 3 },
+          { "ans": "10", "correct": false, "id": 4 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" },
+      "endMedia": { "src": "" },
+      "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" },
+        "automaticSkip": { "active": false, "seconds": "" },
+        "showInLoop": false
+      },
+      "type": "trivia",
+      "id": 18
+    },
+    {
+      "question": {
+        "que": "מי גרה הכי קרוב לסמינר?",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          { "ans": "אודל אלבויים", "correct": false, "id": 1 },
+          { "ans": "תהילה ביבס", "correct": true, "id": 2 },
+          { "ans": "שירה גרין", "correct": false, "id": 3 },
+          { "ans": "נחמי שיטרית", "correct": false, "id": 4 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" },
+      "endMedia": { "src": "" },
+      "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" },
+        "automaticSkip": { "active": false, "seconds": "" },
+        "showInLoop": false
+      },
+      "type": "trivia",
+      "id": 19
+    },
+    {
+      "question": {
+        "que": "מה הכי חסר בסמינר?",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          { "ans": "עטים", "correct": false, "id": 1 },
+          { "ans": "סבון ידיים", "correct": false, "id": 2 },
+          { "ans": "מראות", "correct": false, "id": 3 },
+          { "ans": "צלצולים", "correct": false, "id": 4 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" },
+      "endMedia": { "src": "" },
+      "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" },
+        "automaticSkip": { "active": false, "seconds": "" },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 20
+    },
+    {
+      "question": {
+        "que": "אם היה אפשר להוסיף עוד שיעור- איזה שיעור היית מוסיפה?",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          { "ans": "קולינריה", "correct": false, "id": 1 },
+          { "ans": "צילום ועיצוב", "correct": false, "id": 2 },
+          { "ans": "מזכירות", "correct": false, "id": 3 },
+          { "ans": "תפירה", "correct": false, "id": 4 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" },
+      "endMedia": { "src": "" },
+      "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" },
+        "automaticSkip": { "active": false, "seconds": "" },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 21
+    },
+    {
+      "question": {
+        "que": "על איזה נושא הכי היית רוצה לשמוע?",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          { "ans": "שמחה בכל מצב", "correct": false, "id": 1 },
+          { "ans": "אמונה", "correct": false, "id": 2 },
+          { "ans": "מעלת התפילה", "correct": false, "id": 3 },
+          { "ans": "כיבוד הורים", "correct": false, "id": 4 },
+          { "ans": "נפש האדם", "correct": false, "id": 5 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" },
+      "endMedia": { "src": "" },
+      "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" },
+        "automaticSkip": { "active": false, "seconds": "" },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 22
+    },
+    {
+      "question": {
+        "que": "איך את רואה את עצמך בעוד 10 שנים?(בחרי בתשובה הקרובה ביותר)",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          { "ans": "אחות", "correct": false, "id": 1 },
+          { "ans": "מורה או גננת", "correct": false, "id": 2 },
+          { "ans": "מטפלת רגשית", "correct": false, "id": 3 },
+          { "ans": "מזכירה", "correct": false, "id": 4 },
+          { "ans": "הייטקיסטית", "correct": false, "id": 5 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" },
+      "endMedia": { "src": "" },
+      "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" },
+        "automaticSkip": { "active": false, "seconds": "" },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 23
+    },
+    {
+      "question": {
+        "que": "מה הכי חשוב לאכוף בסמינר?",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          { "ans": "תקנון- לבוש", "correct": false, "id": 1 },
+          { "ans": "שמירה על הזמנים", "correct": false, "id": 2 },
+          { "ans": "מבחנים ביושר", "correct": false, "id": 3 },
+          { "ans": "דרך ארך", "correct": false, "id": 4 }
+        ],
+        "src": ""
+      },
+      "openMedia": { "src": "" },
+      "endMedia": { "src": "" },
+      "backgroundMedia": { "src": "" },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": { "active": false, "seconds": "", "score": "" },
+        "slidBackgroundMedia": { "src": "" },
+        "automaticSkip": { "active": false, "seconds": "" },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 24
+    }
+  ],
+  "createdAt": "2026-06-28T14:41:40.444989+00:00",
+  "cloudinaryFolder": "na73438@gmail.com",
+  "setting": {
+    "titleThroughoutGame": "חויה בקליק",
+    "ansIsNumber": true,
+    "multiWinners": 5,
+    "showWinnersListAfter": null,
+    "mainColor": "#222B45C2",
+    "secondaryColor": "#FFFFFFFF",
+    "gameMedia": {
+      "src": "https://r2-cors-proxy.na73438.workers.dev/system-media/1782226344610-87cb14dc-_________.mp4"
+    },
+    "logo": {
+      "src": "https://oousxptmdrrkybadikec.supabase.co/storage/v1/object/public/game-media/system/default-logo.png"
+    },
+    "triviaMedia": {
+      "src": "https://r2-cors-proxy.na73438.workers.dev/system-media/1782226344610-87cb14dc-_________.mp4"
+    },
+    "winnersListMedia": {
+      "src": "https://pub-3502362d8d6946f58e8cc2fa980dc7b5.r2.dev/system-media/1780822168245-13b3a163-download__4_.mp4"
+    },
+    "winnersMedia": {
+      "src": "https://r2-cors-proxy.na73438.workers.dev/system-media/1782226349737-a82e66d8-___________.mp4"
+    },
+    "sound": {
+      "playersConnectingMediaSound": {
+        "src": "https://r2-cors-proxy.na73438.workers.dev/system-media/1782226343827-631d5399-___________________.mp3"
+      },
+      "showQuestionMediaSound": { "src": null },
+      "winnersMediaSound": { "src": null },
+      "winnersListMediaSound": { "src": null },
+      "genericMediaSound": { "src": null },
+      "timerMediaSound": { "src": null },
+      "inShowAnsMediaSound": { "src": null }
+    },
+    "limit": { "type": "phones" }
+  },
+  "credit": null,
+  "users": "{}",
+  "id": "1e4fc6e3-db4d-4aa5-9719-aac9ff43ff1a",
+  "cloudinaryAbsolutePathImage": "",
+  "cloudinaryAbsolutePathVideo": "",
+  "baseUrl": "",
+  "assets": [
+    {
+      "src": "https://oousxptmdrrkybadikec.supabase.co/storage/v1/object/public/game-media/system/default-logo.png",
+      "progress": 0,
+      "name": "default-logo.png",
+      "type": "image"
+    },
+    {
+      "src": "https://r2-cors-proxy.na73438.workers.dev/system-media/1782226344610-87cb14dc-_________.mp4",
+      "progress": 0,
+      "name": "1782226344610-87cb14dc-_________.mp4",
+      "type": "video"
+    },
+    {
+      "src": "https://pub-3502362d8d6946f58e8cc2fa980dc7b5.r2.dev/system-media/1780822168245-13b3a163-download__4_.mp4",
+      "progress": 0,
+      "name": "1780822168245-13b3a163-download__4_.mp4",
+      "type": "video"
+    },
+    {
+      "src": "https://r2-cors-proxy.na73438.workers.dev/system-media/1782226349737-a82e66d8-___________.mp4",
+      "progress": 0,
+      "name": "1782226349737-a82e66d8-___________.mp4",
+      "type": "video"
+    },
+    {
+      "src": "https://r2-cors-proxy.na73438.workers.dev/system-media/1782226343827-631d5399-___________________.mp3",
+      "progress": 0,
+      "name": "1782226343827-631d5399-___________________.mp3",
+      "type": "audio"
+    }
+  ],
+  "room": null
+}

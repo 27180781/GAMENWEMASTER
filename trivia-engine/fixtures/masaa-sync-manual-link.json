@@ -1,0 +1,4303 @@
+{
+  "name": "סינק יצירת קישור ידנית_72",
+  "questions": [
+    {
+      "question": {
+        "que": "image_URL\nhttps://masaa.clicker.co.il/images/license-status/{{GAMA_ID}}.png",
+        "scoreForQue": "",
+        "timeForQue": "",
+        "answers": [],
+        "src": ""
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "subject",
+      "id": 1
+    },
+    {
+      "question": {
+        "que": "",
+        "scoreForQue": "",
+        "timeForQue": "",
+        "answers": [],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/0Xfhz0fGnvQ"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "media",
+      "id": 2
+    },
+    {
+      "question": {
+        "que": "",
+        "scoreForQue": "",
+        "timeForQue": "",
+        "answers": [],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/BGUT1qn4gfg"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "media",
+      "id": 3
+    },
+    {
+      "question": {
+        "que": "",
+        "scoreForQue": "",
+        "timeForQue": "",
+        "answers": [],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/U1cbY9BrTKU"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "media",
+      "id": 4
+    },
+    {
+      "question": {
+        "que": "",
+        "scoreForQue": "",
+        "timeForQue": "",
+        "answers": [],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/4wr2xcM0Fbo"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "media",
+      "id": 5
+    },
+    {
+      "question": {
+        "que": "",
+        "scoreForQue": "",
+        "timeForQue": "",
+        "answers": [],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/Vt5rVemmvSM"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "media",
+      "id": 6
+    },
+    {
+      "question": {
+        "que": "אתה עומד במסדרון עם 4 דלתות. לאיזו דלת תיכנס?",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914806886-9f4ac56d-gemini_generated_image_8j3wlk8j3wlk8j3w-min_optimized_320x320.jpg",
+            "correct": true,
+            "id": 1
+          },
+          {
+            "ans": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914806865-bbf2caa9-gemini_generated_image_p6kokfp6kokfp6ko-min_optimized_320x320.jpg",
+            "correct": true,
+            "id": 2
+          },
+          {
+            "ans": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914808205-92b197cd-23232323658-min_optimized_320x320.jpg",
+            "correct": true,
+            "id": 3
+          },
+          {
+            "ans": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914808298-5c0f97d6-________-min_optimized_301x320.jpg",
+            "correct": true,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/gE2KPiDAfLw"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "ans_images",
+      "id": 7
+    },
+    {
+      "question": {
+        "que": "צריך לנטרל את הפצצה! יש ארבעה חוטים:  איזה חוט אתה חותך?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "את האדום! זה הכי דרמטי, כמו בסיפורים! ",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "אף אחד. אני מחפש את התרשים הטכני. חיתוך בלי מידע הוא לא הגיוני. ",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "אני שואל את הסובבים מה הם חושבים. ונחליט ביחד.",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "אני עוקב אחר החוט מהשעון למטען הראשי כדי לזהות את החוט המדויק. ",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/rPzBrl3BhZc"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 8
+    },
+    {
+      "question": {
+        "que": "תור ארוך במכולת, ומישהו עוקף אותך. מה תעשה?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "אעיר לו בקול רם ודרמטי מול כולם, \"סליחה, יש כאן תור!\". ",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "אגיד לו בשקט אך בתקיפות, \"אני הייתי כאן לפניך, התור מתחיל מאחוריי\". ",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "לא אגיד כלום. אולי הוא ממהר , אני לא רוצה ליצור אי נעימות. ",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "אם זה פריט אחד, אוותר. אם הרבה, אעיר לו. ",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914809739-20cdf3ba-_____-___-2025-08-01-015730_optimized_320x298.jpg"
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/HCEx3v0KQQk"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914809739-20cdf3ba-_____-___-2025-08-01-015730_optimized_320x298.jpg"
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 9
+    },
+    {
+      "question": {
+        "que": "השלם את הסדרה: 2,4,8,16",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "32 ",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "1000 ",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "2 ",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "∞ ",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 10
+    },
+    {
+      "question": {
+        "que": "לאיזה צליל הכי התחברתם?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "לתרועת החצוצרה ",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "לתיקתוק מדויק של השעון השוויצרי ",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "לטפטוף המים",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "לרחש של הגלים ",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/2c1SXLhp5Y8"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 11
+    },
+    {
+      "question": {
+        "que": "ספינה עתיקה שכל חלקיה הוחלפו עם הזמן. האם זו עדיין אותה הספינה?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "כן, כל עוד הסיפור שלה נשמר",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "לא, כי המבנה המקורי שלה השתנה לחלוטין. ",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "השאלה היא לוגית ולא פיזית. העיקרון של \"הספינה\" נשמר. ",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "כן, כי ה\"נשמה\" של הספינה והחיבור הרגשי אליה נשאר.",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/ufESNVr7bI0"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 12
+    },
+    {
+      "question": {
+        "que": "כשאתה לבד במעלית מה אתה עושה",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "פרצופים במראה",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "מסתדר",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "חושב על משהו מועיל",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "מחכה בקוצר רוח",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 13
+    },
+    {
+      "question": {
+        "que": "נשארה חתיכת קוגל אחרונה על המגש בקידוש. מה עובר לך בראש?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "אחתוך אותה למספר חלקים, ואטול חתיכה אחת. ",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "אני בוחן אותה מכל הזוויות, לוודא שהחתיכה משובחת, ורק אז אטול. ",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "בטח יש מישהו אחר שרוצה אותה יותר ממני,  לא נעים. ",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "אקח אותה בהחלטיות \"מי שרוצה, שיתמודד מולי!\". ",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914811327-e8b0acd2-_____-___-2025-08-01-015617_optimized_320x270.jpg"
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914811327-e8b0acd2-_____-___-2025-08-01-015617_optimized_320x270.jpg"
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 14
+    },
+    {
+      "question": {
+        "que": "",
+        "scoreForQue": "",
+        "timeForQue": "",
+        "answers": [],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/grSxjadnGGI"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "media",
+      "id": 15
+    },
+    {
+      "question": {
+        "que": "ביקשת מנה, והמלצר מביא לך מנה אחרת לגמרי. מה תעשה?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "אקרא למנהל ואסביר לו שהייתה טעות ושהצדק דורש שיחליפו לי. ",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "כנראה שאוכל את המנה שהביאו, כדי לא לעשות בעיות למלצר.",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "אבדוק שוב כדי לוודא שאני זוכר במדויק מה הזמנתי לפני שאני קורא למלצר. ",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "אקרא למלצר בקוליות, ואסביר לו בדרמטיות איך הטעות הזו הרסה לי את כל החוויה. ",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/Vy-UqW2kuO4"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 16
+    },
+    {
+      "question": {
+        "que": "איזה עוגת יומולדת היית רוצה?",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914812787-60f62795-gemini_generated_image_dek8yrdek8yrdek8_optimized_320x320.jpg",
+            "correct": true,
+            "id": 1
+          },
+          {
+            "ans": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914812749-83e1a050-gemini_generated_image_dek8yrdek8yrdek8-_1__optimized_320x320.jpg",
+            "correct": true,
+            "id": 2
+          },
+          {
+            "ans": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914812677-97490989-gemini_generated_image_dek8yrdek8yrdek8-_2__optimized_320x320.jpg",
+            "correct": true,
+            "id": 3
+          },
+          {
+            "ans": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914814103-bdc0f56f-gemini_generated_image_dek8yrdek8yrdek8-_3__optimized_320x320.jpg",
+            "correct": true,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "ans_images",
+      "id": 17
+    },
+    {
+      "question": {
+        "que": "אתה עומד בכניסה למבוך. מהי האסטרטגיה שלך כדי לצאת?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "אניח יד על הקיר הימני ואלך בעקביות, כי זו שיטה שתמיד עובדת. ",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "אטפס על החומות כדי לקבל מבט מלמעלה על כל המבוך. ",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "אלך בעקבות האינטואיציה שלי.",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "אסמן כל פנייה וכל מסדרון שכבר הייתי בו, כדי לא לחזור על טעויות. ",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/r1pf54ECEY4"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 18
+    },
+    {
+      "question": {
+        "que": "מה אתם רואים בכתם הדיו הזה?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "פרצוף של אדם עם הבעה רגשית כלשהי.",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "תוכנית אדריכלית של מבנה מורכב. ",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "סמל של כוח ועוצמה, כמו נשר או אריה.",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "מפה טופוגרפית מדויקת של אזור לא מוכר.",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914814014-0bbe9b50-gemini_generated_image_h05cc5h05cc5h05c-min_optimized_320x320.jpg"
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914814014-0bbe9b50-gemini_generated_image_h05cc5h05cc5h05c-min_optimized_320x320.jpg"
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 19
+    },
+    {
+      "question": {
+        "que": "איזו צורה ממשיכה את הרצף  △, □, ⬠, ??",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "☆",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "⬡",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "🌀 ",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": " ◬  ",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 20
+    },
+    {
+      "question": {
+        "que": "מהו מוסר ההשכל החשוב ביותר ממשל הצב והארנב? ",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "הצלחה היא תוצאה של תהליך מדויק, צעד אחר צעד, ",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "יהירות מפרידה אותנו מאחרים -ענווה והתחשבות מחברים.",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "כישרון זה לא הכל, התשוקה הבוערת היא הקובעת",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "עקביות ושיטתיות מנצחות כל אתגר, זו אמת מוכחת. ",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/-KeUtaqQWOE"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 21
+    },
+    {
+      "question": {
+        "que": "מישהו נותן לך מחמאה גדולה. מה התגובה הראשונה שלך?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "אומר \"תודה רבה\"",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "מרגיש מבוכה ",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "מספר עוד סיפור ..",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "בוחן את העובדות אם המחמאה מגיעה לי",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/s3BwLJgIAHA"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 22
+    },
+    {
+      "question": {
+        "que": "אתה ממציא משחק קופסה. מבמה תשקיע ביותר להצלחתו?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "משחק של אסטרטגיה עמוקה ותכנון לטווח ארוך, ללא מזל.",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "חוקים מאוזנים ומושלמים,שהכל עובד בדיוק כמו שצריך.",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "משחק שיתופי, שבו כל המשתתפים מנצחים או מפסידים יחד כקבוצה.",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "משחק של טריקים ופסיכולוגיה, שבו אתה יכול להשפיע על שחקנים אחרים.",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 23
+    },
+    {
+      "question": {
+        "que": "בחרו את השמש שלכם",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914815525-1df59be5-_________-min_optimized_320x243.jpg",
+            "correct": true,
+            "id": 1
+          },
+          {
+            "ans": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914815524-6ad85e46-_________-min_optimized_320x243.jpg",
+            "correct": true,
+            "id": 2
+          },
+          {
+            "ans": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914815496-0f993eae-_________-min_optimized_320x243.jpg",
+            "correct": true,
+            "id": 3
+          },
+          {
+            "ans": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914817309-151f839e-________-min_optimized_320x243.jpg",
+            "correct": true,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "ans_images",
+      "id": 24
+    },
+    {
+      "question": {
+        "que": "",
+        "scoreForQue": "",
+        "timeForQue": "",
+        "answers": [],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/lEOWPN-eSvE"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "media",
+      "id": 25
+    },
+    {
+      "question": {
+        "que": "בספריית הזיכרונות שלך, איזה פרק הוא המשמעותי ביותר?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "פרק 'הניצחון הגדול' - הרגע בו עמדתי על במה, זכיתי, והשפעתי על רבים. ",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "פרק 'הדילמה המוסרית' - הרגע בו עמדתי על העקרונות שלי, גם כשזה היה קשה.",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "פרק 'הפרויקט המושלם' - הרגע בו עבודה קשה הניבה תוצאה מדויקת ומושלמת. ",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "פרק 'השיחה הגורלית' הרגע ששוחחתי שיחה ששינתה את ההסתכלות על החיים",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/U4Mtaxqce4s"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 26
+    },
+    {
+      "question": {
+        "que": "הספה נתקעה בדלת. מה הפתרון?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "להזמין חברים, ובכוח של הרבה אנשים וצעקות \"קדימה!\" להכניס אותה.",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "למדוד את הספה ואת הדלת עם סרט מדידה,  ולמצוא את הזווית המדויקת להכניס אותה. ",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "לפרק את רגלי הספה או את דלת חדר, כי זה הפתרון ההגיוני היחיד. ",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "לוותר בינתיים, להכין קפה, ולשאול את השכנים אם יש להם רעיון.",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/iwbQE9B0RBw"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 27
+    },
+    {
+      "question": {
+        "que": "השלם את המשפט: \"החוכמה הכי גדולה שלמדתי בחיים היא...\"",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "\"...שצריך להעיז ולקחת סיכונים כדי להצליח במשימה.\"",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "\"...שהקשבה אמיתית לרגשות של אחרים היא המפתח להצלחה.\" ",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "\"...שעקרונות והיגיון הם המצפן היציב ביותר במצבי אי ודאות.\" ",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "\"...ששליטה בפרטים הקטנים היא המפתח לשליטה בתוצאה הגדולה.\" ",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 28
+    },
+    {
+      "question": {
+        "que": "מהי הסיבה המרכזית לתופעת הנדידה המופלאה של הציפורים?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "אינסטינקט הישרדותי להוביל את הלהקה למקום טוב יותר.",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "התנהגות קהילתית ורגשית, שנועדה לחזק את הקשרים בלהקה. ",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "מנגנון ביולוגי-גנטי, המונחה על ידי השדה המגנטי של כדור הארץ. ",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "יכולת ניווט מדויקת, המבוססת על מיקום הכוכבים וחישוב זוויות. ",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/hKutkQRmaF4"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 29
+    },
+    {
+      "question": {
+        "que": "אתה והוויז, חברים?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "אני סומך על המערכת, היא מבוססת על נתונים הגיוניים",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "אני המנהיג, הוויז הוא רק יועץ. בדרך כלל אני יודע יותר טוב ממנו. ",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "אני בודק את המסלול שלו מראש, ודואג לדווח על כל מפגע בכביש בדייקנות.",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "זה מסובך. לפעמים אני מרגיש שהוא לא מבין אותי ולוקח אותי למקומות לא נעימים",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/JSOxiyTWNoI"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 30
+    },
+    {
+      "question": {
+        "que": "איזה עונה אתה הכי אוהב?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "קיץ",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "חורף",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "אביב",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "סתיו",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914818596-b533567b-gemini_generated_image_mn5lwmn5lwmn5lwm-min_optimized_320x320.jpg"
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914818596-b533567b-gemini_generated_image_mn5lwmn5lwmn5lwm-min_optimized_320x320.jpg"
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 31
+    },
+    {
+      "question": {
+        "que": "אתה מארגן אירוע גדול וחשוב. מה הדבר שהכי חשוב לך?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "שהכל יהיה מאורגן למופת, עם לו\"ז  ואוכל שמספיק בדיוק לכולם.",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "שאכין נאום מרגש ודרמטי שיגרום לכולם להזיל דמעה מהתרגשויות. ",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "שאצלם את כל האירוע ואכין מצגת תמונות מדויקת למזכרת.",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "שכל האורחים ירגישו בנוח אחד עם השני",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/qMakyo5nJ-Y"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 32
+    },
+    {
+      "question": {
+        "que": "החתול באוויר! איך לדעתך זה ייגמר?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "הוא ינחת על הרגליים בנחיתה מושלמת ומדויקת, כאילו תכנן כל תנועה.",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "הוא ינחת ברעש גדול, יפיל כמה דברים בדרך, ויעשה הרבה בלאגן ",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "הוא יבין באמצע שזה לא הגיוני, ינסה לתפוס משהו וייפול בצורה מצחיקה.",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "הוא ייפול, ומיד יבואו הבעלים שלו להרים אותו, ולנקות אותו",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/oiyP6TmLeZI"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 33
+    },
+    {
+      "question": {
+        "que": "הביטו בתמונה. מה הדבר הראשון שקפץ לכם לעין?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "שני אנשים שעומדים להתחיל שיחה עמוקה. ",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "גביע ניצחון דרמטי שעומד במרכז הבמה.",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "האגרטל עצמו, תוך בחינה של הצורה המדויקת שלו. ",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "ניגוד הצבעים בין הרקע השחור לצורה הלבנה.",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914820330-96a88971-face_or_vase_ata_01_optimized.svg-min_243x320.jpg"
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914820330-96a88971-face_or_vase_ata_01_optimized.svg-min_243x320.jpg"
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 34
+    },
+    {
+      "question": {
+        "que": "",
+        "scoreForQue": "",
+        "timeForQue": "",
+        "answers": [],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/ALUReIUBhas"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "media",
+      "id": 35
+    },
+    {
+      "question": {
+        "que": "מהו הסיפור של העץ הבודד הזה?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "העץ מסמל את הכמיהה לחיבור והעצב שבלהיות לבד מול העולם. ",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "הוא צמח שם כי זה המקום היחיד שבו תנאי הקרקע והאור היו הגיוניים לצמיחה.",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "זהו עץ מורד, שנלחם ברוחות ובסלעים והפך לסמל של הישרדות.",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "הוא שרד בזכות מערכת השורשים המדויקת שלו, שמצאה כל טיפת מים בסלע. ",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914821833-68b4a553-_______-min_optimized_320x320.jpg"
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914821833-68b4a553-_______-min_optimized_320x320.jpg"
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 36
+    },
+    {
+      "question": {
+        "que": "אתה ראש העיר ויש הפסקת חשמל כללית. מהי ההודעה הראשונה שתוציא לתושבים?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "\"אני יודע שזהו ערב מלחיץ, ליבי איתכם. אנא דאגו למשפחותיכם ולקשישים.\"",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "\"התקלה אותרה במקטע 7ב'. זמן משוער לתיקון: 3 שעות. עדכונים כל שעה עגולה.\"",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "\"תושבים יקרים! זהו מבחן לכוחנו! הדליקו נרות, עזרו לשכנים, והפכו את הלילה ללילה של גבורה!\" ",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "\"אנו פועלים לפי נוהל מסודר. אנא הישארו בבתים. כוחות הביטחון שומרים על הסדר.\"",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/nuyFOL7i7-g"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 37
+    },
+    {
+      "question": {
+        "que": "בלי לחשוב, איזו מילת שאלה מייצגת אותך?",
+        "scoreForQue": 7,
+        "timeForQue": 7,
+        "answers": [
+          {
+            "ans": "קדימה! ",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "איך? ",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "מי?",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "למה?",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 38
+    },
+    {
+      "question": {
+        "que": "חברך הטוב ביותר מעתיק במבחן שיקבע את עתידו. מה תעשה?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "אני אדבר איתו אחרי המבחן ואסביר לו כמה אני מאוכזב מהחוסר ביושרה.",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "אני אסיח את דעת המורה ברגע הנכון כדי שלא ייתפס, כי חברות קודמת לכל. ",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "אני אעודד אותו להודות בטעות, ואציע לעזור לו ללמוד למבחן החוזר. ",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "אני לא אתערב, אבל אתעד בזיכרון את פרטי המקרה במדויק. ",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/5DU1UDdd6G0"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 39
+    },
+    {
+      "question": {
+        "que": "בחר צורה גיאומטרית",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914823643-d6c0e1a1-gemini_generated_image_y3ky14y3ky14y3ky_optimized_320x320.jpg",
+            "correct": true,
+            "id": 1
+          },
+          {
+            "ans": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914824897-b1ca3247-gemini_generated_image_y3ky14y3ky14y3ky-_1__optimized_320x320.jpg",
+            "correct": true,
+            "id": 2
+          },
+          {
+            "ans": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914824841-1d615016-gemini_generated_image_y3ky14y3ky14y3ky-_2__optimized_320x320.jpg",
+            "correct": true,
+            "id": 3
+          },
+          {
+            "ans": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914825018-eb48db1c-gemini_generated_image_y3ky14y3ky14y3ky-_3__optimized_320x320.jpg",
+            "correct": true,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "ans_images",
+      "id": 40
+    },
+    {
+      "question": {
+        "que": "השף איבד שליטה על החביתה. מה יקרה בשנייה הבאה?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "היא תיפול על הרצפה. זה חוקי הפיזיקה, אי אפשר להתווכח.",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "היא תיפול על הראש שלו, וכולם יצחקו יחד איתו.",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "הוא יתפוס אותה מאחורי הגב בתנועה דרמטית, והקהל יריע. ",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "היא תנחת בדיוק, אבל בדיוק, בחזרה על המחבת.",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/EXvKGnIR_Dw"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 41
+    },
+    {
+      "question": {
+        "que": "מהו המשאב היקר ביותר לאדם?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "חכמה ",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "השפעה",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "רגש",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "זמן",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914826408-1d62a2f0-gemini_generated_image_yujitqyujitqyuji_optimized_320x320.jpg"
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914826408-1d62a2f0-gemini_generated_image_yujitqyujitqyuji_optimized_320x320.jpg"
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 42
+    },
+    {
+      "question": {
+        "que": "הנואם נחנק. מה יקרה עכשיו?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "הוא יסתובב ויסדיר את נשימתו, וימשיך בדיוק מאותה מילה שהפסיק.",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "הוא יהפוך את זה לחלק מההצגה וישתמש בזה כדי להעביר את המסר בעוצמה.",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "אנשים מהקהל יקומו מיד וימהרו להציע לו עזרה ודאגה.",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "מישהו בעל הכשרה רפואית יקפוץ לבמה ויבצע עליו תמרון היימליך לפי הספר. ",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/yX5pJViFBZw"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 43
+    },
+    {
+      "question": {
+        "que": "קיבלתם קופסה ענקית של לגו. מה תבנו?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "עיר שלמה, עם כבישים, בתים ובית כנסת, הכל לפי תכנון.",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "בית פתוח עם הרבה חדרים, שכל המשפחה תוכל לגור בו יחד.",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "דגם מדויק של מטוס או חללית, עם כל הפרטים הקטנים",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "טירה ענקית ומרשימה, הכי גבוהה  שאפשר. ",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/qlTClnizCVE"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 44
+    },
+    {
+      "question": {
+        "que": "",
+        "scoreForQue": "",
+        "timeForQue": "",
+        "answers": [],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/CFNJQTbKmws"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "media",
+      "id": 45
+    },
+    {
+      "question": {
+        "que": "אתה מגיע לחניון ורואה רכב שתופס שתי חניות, ולידו המקום הפנוי האחרון.",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "אני מצפצף בצפצוף ארוך כדי להביע את דעתי על הנהג. ",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "אנסה להכניס את הרכב שלי לחצי המקום הפנוי, תוך חישוב מדויק של כל סנטימטר. ",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "אחפש חניה אחרת. חבל על העצבים, אני לא רוצה להתחיל את היום בריב. ",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "אצלם את הרכב ואשלח תלונה לעירייה. יש חוקים וצריך לאכוף אותם. ",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/Hw24QyB1So0"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 46
+    },
+    {
+      "question": {
+        "que": "מה המילה 'גשר' מסמלת עבורך יותר מכל?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "חיבור (בין אנשים ולבבות) ",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "הזדמנות (מעבר למקום חדש ומרגש) ",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "פתרון (דרך הגיונית להתגבר על מכשול) ",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "תכנון (מבנה הנדסי מדויק ויציב) ",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 47
+    },
+    {
+      "question": {
+        "que": "אתה עומד בתור לרב. הדלת פתוחה ואתה שומע את חברך מתייעץ. מה תעשה?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "אתרחק מהדלת. האזנה היא איסור הלכתי ועניין של יושר ועקרונות.",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "אקח צעד אחורה כדי לתת לחברי את מלוא הפרטיות  שלו. ",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "אקשיב, אולי אוכל אחר כך לתת לו עצה טובה או לעזור לו ",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "אסגור את הדלת בעדינות ובדייקנות, זה הסדר הנכון",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/EpklpUYBW9A"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 48
+    },
+    {
+      "question": {
+        "que": "שאלה: \"ירשתם מפת אוצר עתיקה. מה הדבר הראשון שמושך את תשומת לבכם?\"",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "הסיפור המרתק וההרפתקה המסעירה שמאחורי המפה.",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "הסמלים והצפנים המורכבים שצריך לפענח בהיגיון.",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "האגדה על הקללה שרובצת על מי שמחפש את האוצר לבדו.",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "הסימון המדויק של המיקום וחישוב המרחק והציוד הדרוש. ",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/WyXcu8pbeCU"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 49
+    },
+    {
+      "question": {
+        "que": "נותנים לכם קופסה נעולה ואומרים 'אסור לפתוח'. מה תעשו?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "אנסה לפתוח אותה מיד, אני לא יעמוד בסקרנות.",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "אנתח את הקופסה, אנסה לנחש מה יש בפנים לפי המשקל והצליל. ",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "אשאל מי נתן לי אותה ולמה, ואנסה להבין את הרגשות מאחורי האיסור.",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "אכבד את הבקשה ואשים את הקופסה במקום בטוח, כפי שהתבקשתי. ",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/U5mkIt2bV8o"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 50
+    },
+    {
+      "question": {
+        "que": "בחר נוף:",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779915495948-c3b22874-gemini_generated_image_q777sjq777sjq777_optimized_800x800.jpg",
+            "correct": true,
+            "id": 1
+          },
+          {
+            "ans": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779915495988-025638be-gemini_generated_image_q777sjq777sjq777-_1__optimized_800x800.jpg",
+            "correct": true,
+            "id": 2
+          },
+          {
+            "ans": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779915498050-91c05299-gemini_generated_image_q777sjq777sjq777-_2__optimized_800x800.jpg",
+            "correct": true,
+            "id": 3
+          },
+          {
+            "ans": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779915498255-7c297b71-gemini_generated_image_q777sjq777sjq777-_3__optimized_800x800.jpg",
+            "correct": true,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "ans_images",
+      "id": 51
+    },
+    {
+      "question": {
+        "que": "יום שישי, שעתיים לפני שבת והכל בלחץ. מה התפקיד המרכזי שלך בבית?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "אני \"המנצח על התזמורת\" - נותן הוראות לכולם כדי להספיק הכל בזמן.",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "אני אחראי על המשימות הדורשות דיוק: סידור הצלחות, עריכת הסכו\"ם. ",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "אני דואג להרגיע את האווירה, שם מוזיקה ומוודא שאף אחד לא נלחץ.",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "אני מוודא ששום דבר עקרוני לא נשכח, כמו שעון שבת או פלטה. ",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/AeKJRxqoeMI"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 52
+    },
+    {
+      "question": {
+        "que": "בחר חפץ:",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779915499976-b5707f17-gemini_generated_image_u5h2elu5h2elu5h2_optimized_800x800.jpg",
+            "correct": true,
+            "id": 1
+          },
+          {
+            "ans": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779915500075-add867c4-gemini_generated_image_u5h2elu5h2elu5h2-_1__optimized_800x800.jpg",
+            "correct": true,
+            "id": 2
+          },
+          {
+            "ans": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779915500092-3b446542-gemini_generated_image_u5h2elu5h2elu5h2-_2__optimized_800x800.jpg",
+            "correct": true,
+            "id": 3
+          },
+          {
+            "ans": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779915502199-e632286a-gemini_generated_image_u5h2elu5h2elu5h2-_3__optimized_800x800.jpg",
+            "correct": true,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "ans_images",
+      "id": 53
+    },
+    {
+      "question": {
+        "que": "אתה צריך לבחור מתנה למלך של מדינה זרה. מה תביא לו?\"",
+        "scoreForQue": 3,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "שעון יוקרתי ומורכב, יצירת מופת של הנדסה ודיוק. ",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "מהדורה נדירה של ספר חוקים עתיק, כסמל לצדק ולחכמה.",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "אלבום תמונות המראה פרויקט משותף של שתי המדינות, כסמל לחיבור.",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "פסל מרשים של אמן מפורסם, שיפגין עוצמה ויוקרה. ",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 54
+    },
+    {
+      "question": {
+        "que": "לאיזה יסוד מיסודי הבריאה אתה חושב שאתה משתייך?",
+        "scoreForQue": 7,
+        "timeForQue": 15,
+        "answers": [
+          {
+            "ans": "אש",
+            "correct": false,
+            "id": 1
+          },
+          {
+            "ans": "רוח",
+            "correct": false,
+            "id": 2
+          },
+          {
+            "ans": "מים",
+            "correct": false,
+            "id": 3
+          },
+          {
+            "ans": "עפר",
+            "correct": false,
+            "id": 4
+          }
+        ],
+        "src": ""
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "survey",
+      "id": 55
+    },
+    {
+      "question": {
+        "que": "",
+        "scoreForQue": "",
+        "timeForQue": "",
+        "answers": [],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/-HLXMc2AO94"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "media",
+      "id": 56
+    },
+    {
+      "question": {
+        "que": "",
+        "scoreForQue": "",
+        "timeForQue": "",
+        "answers": [],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/r3cioJwGrJA"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "media",
+      "id": 57
+    },
+    {
+      "question": {
+        "que": "",
+        "scoreForQue": "",
+        "timeForQue": "",
+        "answers": [],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/YB1-qEMnUyE"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "media",
+      "id": 58
+    },
+    {
+      "question": {
+        "que": "Send_data",
+        "scoreForQue": "",
+        "timeForQue": "",
+        "answers": [],
+        "src": ""
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "subject",
+      "id": 59
+    },
+    {
+      "question": {
+        "que": "",
+        "scoreForQue": "",
+        "timeForQue": "",
+        "answers": [],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/nPPrpqV3O-o"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "media",
+      "id": 60
+    },
+    {
+      "question": {
+        "que": "",
+        "scoreForQue": "",
+        "timeForQue": "",
+        "answers": [],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://www.youtube.com/embed/1Ub-X8BZ0HU"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "media",
+      "id": 61
+    },
+    {
+      "question": {
+        "que": "image_URL\nhttps://masaa.clicker.co.il/images/game-summary/{{GAMA_ID}}.png",
+        "scoreForQue": "",
+        "timeForQue": "",
+        "answers": [],
+        "src": ""
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "subject",
+      "id": 62
+    },
+    {
+      "question": {
+        "que": "image_URL\nhttps://masaa.clicker.co.il/images/participant-list/{{GAMA_ID}}.png",
+        "scoreForQue": "",
+        "timeForQue": "",
+        "answers": [],
+        "src": ""
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "subject",
+      "id": 63
+    },
+    {
+      "question": {
+        "que": "image_URL\nhttps://masaa.clicker.co.il/images/group-breakdown/{{GAMA_ID}}.png",
+        "scoreForQue": "",
+        "timeForQue": "",
+        "answers": [],
+        "src": ""
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "subject",
+      "id": 64
+    },
+    {
+      "question": {
+        "que": "",
+        "scoreForQue": "",
+        "timeForQue": "",
+        "answers": [],
+        "src": ""
+      },
+      "openMedia": {
+        "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779915505038-c5f9bd8c-qr_optimized_1024x576.jpg"
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "media",
+      "id": 65
+    },
+    {
+      "question": {
+        "que": "המשחק הסתיים שלום ותודה- יש לסגור את החלון ע\"מ שתוצאות המסע ישמרו במערכת כמו שצריך",
+        "scoreForQue": "",
+        "timeForQue": "",
+        "answers": [],
+        "src": ""
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "subject",
+      "id": 66
+    },
+    {
+      "question": {
+        "que": "יש לסגור את כרטיסיית המשחק כעת\nשימו לב נסיון הפעלת משחק נוסף מביא מיד למחיקת הנתונים",
+        "scoreForQue": "",
+        "timeForQue": "",
+        "answers": [],
+        "src": ""
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "subject",
+      "id": 67
+    },
+    {
+      "question": {
+        "que": "סגרו את הכרטיסיה כעת",
+        "scoreForQue": "",
+        "timeForQue": "",
+        "answers": [],
+        "src": ""
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "subject",
+      "id": 68
+    },
+    {
+      "question": {
+        "que": "המשך משקופית זו מביא למחיקת הנתונים מיידית\nסגרו את כרטיסיית המשחק!",
+        "scoreForQue": "",
+        "timeForQue": "",
+        "answers": [],
+        "src": ""
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "subject",
+      "id": 69
+    },
+    {
+      "question": {
+        "que": "סגרו את הכרטיסיה כעת",
+        "scoreForQue": "",
+        "timeForQue": "",
+        "answers": [],
+        "src": ""
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "subject",
+      "id": 70
+    },
+    {
+      "question": {
+        "que": "נתוני המשחק נמחקים בתוך 5 שניות ממעבר לשקופית זו לעצירה יש לסגור את הכרטסיה",
+        "scoreForQue": "",
+        "timeForQue": "",
+        "answers": [],
+        "src": ""
+      },
+      "openMedia": {
+        "src": ""
+      },
+      "endMedia": {
+        "src": ""
+      },
+      "backgroundMedia": {
+        "src": ""
+      },
+      "setting": {
+        "allowChangeVote": false,
+        "slideStartVoting": true,
+        "playAfterClicking": false,
+        "exitGame": false,
+        "correctlyAnsweredBefore": false,
+        "firstClicker": false,
+        "answerIsSequenceClicks": false,
+        "fullscreen": false,
+        "scoringReduction": {
+          "active": false,
+          "seconds": "",
+          "score": ""
+        },
+        "slidBackgroundMedia": {
+          "src": ""
+        },
+        "automaticSkip": {
+          "active": false,
+          "seconds": ""
+        },
+        "showInLoop": false
+      },
+      "type": "subject",
+      "id": 71
+    }
+  ],
+  "createdAt": "2026-06-10T08:32:40.956335+00:00",
+  "cloudinaryFolder": "na73438@gmail.com",
+  "setting": {
+    "titleThroughoutGame": "",
+    "ansIsNumber": true,
+    "multiWinners": 1,
+    "showWinnersListAfter": null,
+    "mainColor": "#FECC39FF",
+    "secondaryColor": "#031051D9",
+    "gameMedia": {
+      "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914798476-4df14a52-______________optimized.jpg"
+    },
+    "logo": {
+      "src": ""
+    },
+    "triviaMedia": {
+      "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914798476-4df14a52-______________optimized.jpg"
+    },
+    "winnersListMedia": {
+      "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914798476-4df14a52-______________optimized.jpg"
+    },
+    "winnersMedia": {
+      "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914798476-4df14a52-______________optimized.jpg"
+    },
+    "sound": {
+      "playersConnectingMediaSound": {
+        "src": null
+      },
+      "showQuestionMediaSound": {
+        "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914801848-240e7858-_________.mp3"
+      },
+      "winnersMediaSound": {
+        "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914802377-651859d8-_________________.mp3"
+      },
+      "winnersListMediaSound": {
+        "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914804115-cab3da88-_____________.mp3"
+      },
+      "genericMediaSound": {
+        "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914803559-ff749449-_________.mp3"
+      },
+      "timerMediaSound": {
+        "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914803788-f5e4b34c-____________.mp3"
+      },
+      "inShowAnsMediaSound": {
+        "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914805901-e7d3501c-___________.mp3"
+      }
+    },
+    "limit": {
+      "type": "phones"
+    }
+  },
+  "credit": null,
+  "users": "{}",
+  "id": "d729e580-db67-4462-a3b7-58ae7ad7e8e3",
+  "cloudinaryAbsolutePathImage": "",
+  "cloudinaryAbsolutePathVideo": "",
+  "baseUrl": "",
+  "assets": [
+    {
+      "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914798476-4df14a52-______________optimized.jpg",
+      "progress": 0,
+      "name": "1779914798476-4df14a52-______________optimized.jpg",
+      "type": "image"
+    },
+    {
+      "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914801848-240e7858-_________.mp3",
+      "progress": 0,
+      "name": "1779914801848-240e7858-_________.mp3",
+      "type": "audio"
+    },
+    {
+      "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914802377-651859d8-_________________.mp3",
+      "progress": 0,
+      "name": "1779914802377-651859d8-_________________.mp3",
+      "type": "audio"
+    },
+    {
+      "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914804115-cab3da88-_____________.mp3",
+      "progress": 0,
+      "name": "1779914804115-cab3da88-_____________.mp3",
+      "type": "audio"
+    },
+    {
+      "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914803559-ff749449-_________.mp3",
+      "progress": 0,
+      "name": "1779914803559-ff749449-_________.mp3",
+      "type": "audio"
+    },
+    {
+      "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914803788-f5e4b34c-____________.mp3",
+      "progress": 0,
+      "name": "1779914803788-f5e4b34c-____________.mp3",
+      "type": "audio"
+    },
+    {
+      "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914805901-e7d3501c-___________.mp3",
+      "progress": 0,
+      "name": "1779914805901-e7d3501c-___________.mp3",
+      "type": "audio"
+    },
+    {
+      "src": "https://www.youtube.com/embed/gE2KPiDAfLw",
+      "progress": 0,
+      "name": "gE2KPiDAfLw",
+      "type": "image"
+    },
+    {
+      "src": "https://www.youtube.com/embed/rPzBrl3BhZc",
+      "progress": 0,
+      "name": "rPzBrl3BhZc",
+      "type": "image"
+    },
+    {
+      "src": "https://www.youtube.com/embed/HCEx3v0KQQk",
+      "progress": 0,
+      "name": "HCEx3v0KQQk",
+      "type": "image"
+    },
+    {
+      "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914809739-20cdf3ba-_____-___-2025-08-01-015730_optimized_320x298.jpg",
+      "progress": 0,
+      "name": "1779914809739-20cdf3ba-_____-___-2025-08-01-015730_optimized_320x298.jpg",
+      "type": "image"
+    },
+    {
+      "src": "https://www.youtube.com/embed/2c1SXLhp5Y8",
+      "progress": 0,
+      "name": "2c1SXLhp5Y8",
+      "type": "image"
+    },
+    {
+      "src": "https://www.youtube.com/embed/ufESNVr7bI0",
+      "progress": 0,
+      "name": "ufESNVr7bI0",
+      "type": "image"
+    },
+    {
+      "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914811327-e8b0acd2-_____-___-2025-08-01-015617_optimized_320x270.jpg",
+      "progress": 0,
+      "name": "1779914811327-e8b0acd2-_____-___-2025-08-01-015617_optimized_320x270.jpg",
+      "type": "image"
+    },
+    {
+      "src": "https://www.youtube.com/embed/Vy-UqW2kuO4",
+      "progress": 0,
+      "name": "Vy-UqW2kuO4",
+      "type": "image"
+    },
+    {
+      "src": "https://www.youtube.com/embed/r1pf54ECEY4",
+      "progress": 0,
+      "name": "r1pf54ECEY4",
+      "type": "image"
+    },
+    {
+      "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914814014-0bbe9b50-gemini_generated_image_h05cc5h05cc5h05c-min_optimized_320x320.jpg",
+      "progress": 0,
+      "name": "1779914814014-0bbe9b50-gemini_generated_image_h05cc5h05cc5h05c-min_optimized_320x320.jpg",
+      "type": "image"
+    },
+    {
+      "src": "https://www.youtube.com/embed/-KeUtaqQWOE",
+      "progress": 0,
+      "name": "-KeUtaqQWOE",
+      "type": "image"
+    },
+    {
+      "src": "https://www.youtube.com/embed/s3BwLJgIAHA",
+      "progress": 0,
+      "name": "s3BwLJgIAHA",
+      "type": "image"
+    },
+    {
+      "src": "https://www.youtube.com/embed/U4Mtaxqce4s",
+      "progress": 0,
+      "name": "U4Mtaxqce4s",
+      "type": "image"
+    },
+    {
+      "src": "https://www.youtube.com/embed/iwbQE9B0RBw",
+      "progress": 0,
+      "name": "iwbQE9B0RBw",
+      "type": "image"
+    },
+    {
+      "src": "https://www.youtube.com/embed/hKutkQRmaF4",
+      "progress": 0,
+      "name": "hKutkQRmaF4",
+      "type": "image"
+    },
+    {
+      "src": "https://www.youtube.com/embed/JSOxiyTWNoI",
+      "progress": 0,
+      "name": "JSOxiyTWNoI",
+      "type": "image"
+    },
+    {
+      "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914818596-b533567b-gemini_generated_image_mn5lwmn5lwmn5lwm-min_optimized_320x320.jpg",
+      "progress": 0,
+      "name": "1779914818596-b533567b-gemini_generated_image_mn5lwmn5lwmn5lwm-min_optimized_320x320.jpg",
+      "type": "image"
+    },
+    {
+      "src": "https://www.youtube.com/embed/qMakyo5nJ-Y",
+      "progress": 0,
+      "name": "qMakyo5nJ-Y",
+      "type": "image"
+    },
+    {
+      "src": "https://www.youtube.com/embed/oiyP6TmLeZI",
+      "progress": 0,
+      "name": "oiyP6TmLeZI",
+      "type": "image"
+    },
+    {
+      "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914820330-96a88971-face_or_vase_ata_01_optimized.svg-min_243x320.jpg",
+      "progress": 0,
+      "name": "1779914820330-96a88971-face_or_vase_ata_01_optimized.svg-min_243x320.jpg",
+      "type": "image"
+    },
+    {
+      "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914821833-68b4a553-_______-min_optimized_320x320.jpg",
+      "progress": 0,
+      "name": "1779914821833-68b4a553-_______-min_optimized_320x320.jpg",
+      "type": "image"
+    },
+    {
+      "src": "https://www.youtube.com/embed/nuyFOL7i7-g",
+      "progress": 0,
+      "name": "nuyFOL7i7-g",
+      "type": "image"
+    },
+    {
+      "src": "https://www.youtube.com/embed/5DU1UDdd6G0",
+      "progress": 0,
+      "name": "5DU1UDdd6G0",
+      "type": "image"
+    },
+    {
+      "src": "https://www.youtube.com/embed/EXvKGnIR_Dw",
+      "progress": 0,
+      "name": "EXvKGnIR_Dw",
+      "type": "image"
+    },
+    {
+      "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779914826408-1d62a2f0-gemini_generated_image_yujitqyujitqyuji_optimized_320x320.jpg",
+      "progress": 0,
+      "name": "1779914826408-1d62a2f0-gemini_generated_image_yujitqyujitqyuji_optimized_320x320.jpg",
+      "type": "image"
+    },
+    {
+      "src": "https://www.youtube.com/embed/yX5pJViFBZw",
+      "progress": 0,
+      "name": "yX5pJViFBZw",
+      "type": "image"
+    },
+    {
+      "src": "https://www.youtube.com/embed/qlTClnizCVE",
+      "progress": 0,
+      "name": "qlTClnizCVE",
+      "type": "image"
+    },
+    {
+      "src": "https://www.youtube.com/embed/Hw24QyB1So0",
+      "progress": 0,
+      "name": "Hw24QyB1So0",
+      "type": "image"
+    },
+    {
+      "src": "https://www.youtube.com/embed/EpklpUYBW9A",
+      "progress": 0,
+      "name": "EpklpUYBW9A",
+      "type": "image"
+    },
+    {
+      "src": "https://www.youtube.com/embed/WyXcu8pbeCU",
+      "progress": 0,
+      "name": "WyXcu8pbeCU",
+      "type": "image"
+    },
+    {
+      "src": "https://www.youtube.com/embed/U5mkIt2bV8o",
+      "progress": 0,
+      "name": "U5mkIt2bV8o",
+      "type": "image"
+    },
+    {
+      "src": "https://www.youtube.com/embed/AeKJRxqoeMI",
+      "progress": 0,
+      "name": "AeKJRxqoeMI",
+      "type": "image"
+    },
+    {
+      "src": "https://r2-cors-proxy.na73438.workers.dev/legacy-import/1779915505038-c5f9bd8c-qr_optimized_1024x576.jpg",
+      "progress": 0,
+      "name": "1779915505038-c5f9bd8c-qr_optimized_1024x576.jpg",
+      "type": "image"
+    }
+  ],
+  "room": null
+}
