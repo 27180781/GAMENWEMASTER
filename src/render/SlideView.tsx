@@ -51,12 +51,10 @@ export function SlideView({ engine, state, timer, reveal }: SlideViewProps) {
         {slide.type === 'subject' ? (
           <SubjectSlide slide={slide} command={state.subjectCommand} />
         ) : slide.type === 'media' ? (
-          <div className="subject-slide">
-            <p className="subject-text subject-text--muted">
-              {/* מדיה שהסתיימה/דולגה — ממתין למפעיל */}
-              ⏸ ממתין להמשך...
-            </p>
-          </div>
+          /* הקהל רואה רקע נקי; רמז עדין למפעיל בלבד בתחתית */
+          <p className="media-standby-hint">
+            {state.openMediaPlayed ? 'רווח — לשקופית הבאה' : 'רווח — ניגון המדיה'}
+          </p>
         ) : (
           <QuestionSlide
             slide={slide}
