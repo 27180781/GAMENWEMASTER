@@ -454,17 +454,9 @@ export function GameHost({ game, demo = null }: GameHostProps) {
     else void document.documentElement.requestFullscreen().catch(() => {});
   }, []);
 
-  const handleClick = (event: React.MouseEvent) => {
-    if (menuOpen) return;
-    const target = event.target as HTMLElement;
-    if (target.closest('button, input, select, textarea, a')) return;
-    if (stage === 'opening') setStage('playing');
-    else if (stage === 'playing' && !leadersOverlay) advanceStep();
-    else if (stage === 'winners') setStage('winnersList');
-  };
-
+  // קליק עכבר אינו מקדם שלבים — קידום רק ברווח/0 (בקשת המנחה)
   return (
-    <div className="game-root" dir="rtl" style={themeStyle(setting)} onClick={handleClick}>
+    <div className="game-root" dir="rtl" style={themeStyle(setting)}>
       <Stage>
         {stage === 'opening' && <OpeningScreen engine={engine} />}
         {stage === 'playing' && (
