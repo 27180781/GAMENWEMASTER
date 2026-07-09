@@ -1,4 +1,11 @@
-/* עיצוב המשחק — RTL, טיפוגרפיה גדולה למסך מרוחק, צבעים מ-CSS variables */
+/*
+ * עיצוב המשחק — RTL, מותאם למסך גדול.
+ *
+ * כל התוכן חי על "במה" לוגית קבועה של 1920×1080 (16:9). המידות בקובץ הזה
+ * הן פיקסלים ביחס ל-1080p; הבמה כולה מוקטנת/מוגדלת ב-transform: scale כך
+ * שהיא תמיד נכנסת במסך במלואה — אף פעם אין גלילה, ומסך שאינו 16:9 מקבל
+ * פסים שחורים.
+ */
 
 * {
   box-sizing: border-box;
@@ -14,16 +21,40 @@ body,
 
 body {
   font-family: 'Heebo', 'Assistant', 'Rubik', 'Segoe UI', system-ui, sans-serif;
-  background: #0b0e1a;
+  background: #000;
   color: #fff;
   overflow: hidden;
 }
 
+/* ---- הבמה (16:9 קבוע) ---- */
+
 .game-root {
-  position: relative;
-  height: 100%;
-  background: var(--main-color, #222b45);
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #000; /* הפסים סביב הבמה */
   user-select: none;
+}
+
+.stage {
+  position: absolute;
+  /* מיקום פיזי (לא לוגי-RTL) — ה-transform מהקומפוננטה ממרכז בפיקסלים */
+  top: 0;
+  left: 0;
+  transform-origin: top left;
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  background: var(--main-color, #222b45);
+}
+
+/* מסך הדיבאג (כלי פיתוח) — כן נגלל, מחוץ לבמה */
+.debug-root {
+  position: fixed;
+  inset: 0;
+  overflow: auto;
+  background: #fff;
+  color: #111;
 }
 
 /* ---- מסכים ---- */
@@ -67,28 +98,33 @@ body {
 .screen-content {
   position: relative;
   z-index: 1;
-  width: min(92vw, 1600px);
-  max-height: 94vh;
+  width: 1760px;
+  height: 100%;
+  padding: 40px 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3vh;
+  justify-content: center;
+  gap: 32px;
+  overflow: hidden;
 }
 
 /* ---- מסך פתיחה ---- */
 
-.opening-logo { max-height: 22vh; }
+.opening-logo { max-height: 240px; max-width: 640px; }
 
 .opening-title {
-  font-size: clamp(40px, 6vw, 96px);
+  font-size: 88px;
   font-weight: 800;
   color: var(--secondary-color, #fff);
   text-align: center;
   text-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  max-height: 240px;
+  overflow: hidden;
 }
 
 .opening-hint {
-  font-size: clamp(18px, 2vw, 28px);
+  font-size: 26px;
   opacity: 0.85;
   animation: hint-pulse 2s infinite;
 }
@@ -101,30 +137,44 @@ body {
 
 .question-slide {
   width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 3vh;
+  gap: 28px;
   align-items: center;
+  justify-content: center;
 }
 
 .question-text {
-  font-size: clamp(48px, 4.5vw, 72px); /* ≥48px לפי המפרט */
+  font-size: 60px; /* ≥48px לפי המפרט */
   font-weight: 800;
   line-height: 1.25;
   text-align: center;
   color: var(--secondary-color, #fff);
   text-shadow: 0 3px 16px rgba(0, 0, 0, 0.45);
   white-space: pre-wrap;
+  max-height: 300px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
 }
 
-.question-image { max-height: 30vh; border-radius: 12px; }
+.question-image {
+  max-height: 260px;
+  max-width: 700px;
+  border-radius: 12px;
+  object-fit: contain;
+}
 
 .answers {
   list-style: none;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2vh 2vw;
+  gap: 24px 32px;
   width: 100%;
+  flex: 0 1 auto;
+  min-height: 0;
 }
 
 .answers--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -134,14 +184,15 @@ body {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 20px;
   background: rgba(0, 0, 0, 0.35);
   border: 2px solid rgba(var(--secondary-rgb, 255, 255, 255), 0.35);
   border-radius: 14px;
-  padding: 2vh 1.5vw;
-  font-size: clamp(24px, 2.2vw, 40px);
+  padding: 26px 28px 30px;
+  font-size: 34px;
   transition: border-color 0.3s, box-shadow 0.3s, opacity 0.3s, transform 0.3s;
   overflow: hidden;
+  min-height: 110px;
 }
 
 .answer--correct {
@@ -157,16 +208,23 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.2em;
-  height: 2.2em;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   background: var(--secondary-color, #fff);
   color: #111;
   font-weight: 800;
-  font-size: 0.9em;
+  font-size: 30px;
 }
 
-.answer-text { position: relative; z-index: 1; }
+.answer-text {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
 
 .answer-bar-wrap {
   position: absolute;
@@ -185,42 +243,42 @@ body {
 
 .answer-percent {
   position: absolute;
-  bottom: 12px;
-  inset-inline-end: 12px;
-  font-size: 0.65em;
+  bottom: 14px;
+  inset-inline-end: 14px;
+  font-size: 22px;
   opacity: 0.9;
 }
 
 /* גריד תמונות (ans_images) */
 
-.answers--images .answer { flex-direction: column; padding: 0; }
+.answers--images .answer { flex-direction: column; padding: 0; min-height: 0; }
 .answers--images.answers--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 .answer-image {
   width: 100%;
-  height: 32vh;
+  height: 320px;
   object-fit: cover;
 }
 
 .answers--images .answer-number {
   position: absolute;
-  top: 10px;
-  inset-inline-start: 10px;
+  top: 12px;
+  inset-inline-start: 12px;
   z-index: 2;
-  font-size: clamp(22px, 2vw, 34px);
 }
 
 .votes-total {
-  font-size: clamp(18px, 1.6vw, 26px);
+  font-size: 26px;
   opacity: 0.8;
+  flex: none;
 }
 
 /* ---- טיימר ---- */
 
 .timer-ring {
-  position: fixed;
-  top: 3vh;
-  inset-inline-start: 3vw;
+  position: absolute;
+  top: 32px;
+  inset-inline-start: 48px;
   width: 128px;
   height: 128px;
   z-index: 5;
@@ -271,13 +329,13 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2vh;
+  gap: 28px;
   width: 100%;
   height: 100%;
-  font-size: clamp(20px, 2vw, 32px);
+  font-size: 30px;
 }
 
-.media-audio-icon { font-size: 12vh; animation: hint-pulse 1.6s infinite; }
+.media-audio-icon { font-size: 140px; animation: hint-pulse 1.6s infinite; }
 
 /* ---- subject ---- */
 
@@ -286,26 +344,32 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3vh;
+  gap: 32px;
   width: 100%;
+  height: 100%;
 }
 
 .subject-text {
-  font-size: clamp(40px, 4vw, 68px);
+  font-size: 56px;
   font-weight: 700;
   line-height: 1.35;
   text-align: center;
   color: var(--secondary-color, #fff);
   white-space: pre-wrap;
   text-shadow: 0 3px 16px rgba(0, 0, 0, 0.45);
+  max-height: 840px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 10;
+  -webkit-box-orient: vertical;
 }
 
-.subject-text--muted { opacity: 0.55; font-size: clamp(24px, 2.4vw, 40px); }
+.subject-text--muted { opacity: 0.55; font-size: 36px; }
 
 .subject-slide--image { position: absolute; inset: 0; }
 
 .subject-waiting,
-.subject-url { font-size: clamp(18px, 1.8vw, 26px); opacity: 0.85; }
+.subject-url { font-size: 24px; opacity: 0.85; }
 
 .spinner {
   width: 72px;
@@ -321,32 +385,34 @@ body {
 /* ---- זוכים ---- */
 
 .winners-title {
-  font-size: clamp(44px, 5vw, 84px);
+  font-size: 76px;
   font-weight: 800;
   color: var(--secondary-color, #fff);
   text-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  flex: none;
 }
 
 .winners-podium {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 1.6vh;
-  width: min(80vw, 900px);
+  gap: 18px;
+  width: 900px;
+  overflow: hidden;
 }
 
 .winner {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 24px;
   background: rgba(0, 0, 0, 0.4);
   border-radius: 14px;
-  padding: 1.8vh 2vw;
-  font-size: clamp(24px, 2.4vw, 42px);
+  padding: 20px 32px;
+  font-size: 38px;
   animation: winner-in 0.5s ease backwards;
 }
 
-.winner:nth-child(1) { animation-delay: 0.1s; border: 2px solid #facc15; font-size: clamp(30px, 3vw, 52px); }
+.winner:nth-child(1) { animation-delay: 0.1s; border: 2px solid #facc15; font-size: 48px; }
 .winner:nth-child(2) { animation-delay: 0.25s; border: 2px solid #cbd5e1; }
 .winner:nth-child(3) { animation-delay: 0.4s; border: 2px solid #d97706; }
 
@@ -354,24 +420,29 @@ body {
   from { opacity: 0; transform: translateY(24px); }
 }
 
-.winner-rank { font-weight: 800; min-width: 1.6em; }
-.winner-name { flex: 1; }
+.winner-rank { font-weight: 800; min-width: 56px; }
+.winner-name {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 .winner-score { font-weight: 700; }
 
 .winners-list {
   list-style: none;
   columns: 2;
-  column-gap: 4vw;
-  width: min(86vw, 1200px);
-  max-height: 70vh;
-  overflow-y: auto;
-  font-size: clamp(18px, 1.7vw, 28px);
+  column-gap: 80px;
+  width: 1400px;
+  max-height: 760px;
+  overflow: hidden;
+  font-size: 30px;
 }
 
 .winners-list li {
   display: flex;
-  gap: 12px;
-  padding: 0.7vh 0;
+  gap: 16px;
+  padding: 9px 0;
   break-inside: avoid;
 }
 
@@ -380,7 +451,7 @@ body {
 /* ---- תפריט מפעיל ---- */
 
 .operator-menu {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 50;
   background: rgba(0, 0, 0, 0.65);
@@ -393,27 +464,29 @@ body {
   background: #151a2e;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 14px;
-  width: min(92vw, 760px);
-  max-height: 86vh;
-  overflow-y: auto;
-  padding: 24px;
+  width: 900px;
+  max-height: 940px;
+  overflow: hidden;
+  padding: 28px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  font-size: 16px;
+  gap: 20px;
+  font-size: 20px;
 }
 
 .operator-menu-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex: none;
 }
 
 .operator-controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 14px;
   align-items: center;
+  flex: none;
 }
 
 .operator-menu button {
@@ -421,21 +494,30 @@ body {
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 8px;
-  padding: 8px 14px;
-  font-size: 15px;
+  padding: 10px 16px;
+  font-size: 19px;
   cursor: pointer;
 }
 
 .operator-menu button:hover { background: #34406a; }
 .operator-menu button.current { border-color: #4ade80; }
 
-.operator-status { width: 100%; opacity: 0.7; font-size: 13px; }
+.operator-status { width: 100%; opacity: 0.7; font-size: 16px; }
 
+.operator-slides {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* רשימת השקופיות — הגלילה היחידה, פנימית לפאנל המפעיל (לא של העמוד) */
 .operator-slides ul {
   list-style: none;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .operator-slides button { width: 100%; text-align: start; }
@@ -445,8 +527,9 @@ body {
 .picker-buttons {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px;
+  gap: 18px;
   justify-content: center;
+  max-width: 1400px;
 }
 
 .picker-button {
@@ -454,8 +537,8 @@ body {
   color: #fff;
   border: 2px solid rgba(255, 255, 255, 0.35);
   border-radius: 12px;
-  padding: 16px 26px;
-  font-size: clamp(18px, 1.8vw, 26px);
+  padding: 20px 32px;
+  font-size: 28px;
   cursor: pointer;
   transition: background 0.2s;
 }
@@ -463,38 +546,40 @@ body {
 .picker-button:hover { background: rgba(255, 255, 255, 0.25); }
 
 .picker-error {
-  max-width: 80vw;
+  max-width: 1400px;
+  max-height: 300px;
+  overflow: hidden;
   color: #f87171;
-  font-size: 16px;
+  font-size: 22px;
   text-align: right;
 }
 
 /* ---- מצב דמו ---- */
 
 .demo-checkbox {
-  font-size: clamp(16px, 1.5vw, 22px);
+  font-size: 24px;
   opacity: 0.9;
   cursor: pointer;
 }
 
-.demo-game-name { font-size: clamp(18px, 1.8vw, 26px); opacity: 0.9; }
+.demo-game-name { font-size: 28px; opacity: 0.9; }
 
 .demo-form {
   display: flex;
   flex-direction: column;
-  gap: 22px;
-  width: min(88vw, 620px);
+  gap: 26px;
+  width: 700px;
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 14px;
-  padding: 26px;
+  padding: 32px;
 }
 
 .demo-field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  font-size: clamp(16px, 1.5vw, 22px);
+  gap: 10px;
+  font-size: 24px;
 }
 
 .demo-field input[type='number'],
@@ -503,9 +588,9 @@ body {
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 16px;
-  max-width: 300px;
+  padding: 10px 14px;
+  font-size: 20px;
+  max-width: 340px;
 }
 
 .demo-field input[type='range'] { accent-color: #4ade80; }
@@ -513,26 +598,26 @@ body {
 .demo-start { font-weight: 700; }
 
 .demo-badge {
-  position: fixed;
-  bottom: 10px;
-  inset-inline-end: 12px;
+  position: absolute;
+  bottom: 14px;
+  inset-inline-end: 18px;
   z-index: 40;
   background: rgba(0, 0, 0, 0.55);
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 999px;
-  padding: 4px 14px;
-  font-size: 13px;
+  padding: 6px 18px;
+  font-size: 18px;
   opacity: 0.85;
 }
 
 /* נורית סטטוס חיבור (SPEC סעיף 6 — יוצג בעיקר מ-M3) */
 
 .status-dot {
-  position: fixed;
-  bottom: 12px;
-  inset-inline-start: 12px;
-  width: 14px;
-  height: 14px;
+  position: absolute;
+  bottom: 18px;
+  inset-inline-start: 18px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   z-index: 40;
 }

@@ -53,7 +53,8 @@ export function WinnersScreen({ engine }: { engine: GameEngine }) {
 
 export function WinnersListScreen({ engine }: { engine: GameEngine }) {
   const setting = engine.getGame().setting;
-  const winners = engine.getWinners(50);
+  // 20 שורות בשתי עמודות — נכנס בבמה הקבועה בלי גלילה
+  const winners = engine.getWinners(20);
   return (
     <div className="screen winners-screen">
       {setting.winnersListMedia.src !== '' && (

@@ -10,12 +10,22 @@
  * ניתוב מינימלי לפי hash: ‎#debug פותח את מסך הדיבאג של M1.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { parseGameFile, type GameFile } from '../engine/index.ts';
 import { DebugApp } from '../debug/DebugApp.tsx';
 import { DemoSettingsScreen } from '../render/DemoSettingsScreen.tsx';
+import { Stage } from '../render/Stage.tsx';
 import { GameHost } from './GameHost.tsx';
 import { parseAppParams, type DemoConfig } from './urlParams.ts';
+
+/** מעטפת במה 16:9 למסכים שמחוץ למשחק עצמו (בחירה, הגדרות דמו, טעינה). */
+function Shell({ children }: { children: ReactNode }) {
+  return (
+    <div className="game-root" dir="rtl">
+      <Stage>{children}</Stage>
+    </div>
+  );
+}
 
 import hadassah from '../../fixtures/hadassah-ozen.json';
 import masaa from '../../fixtures/masaa-sync-manual-link.json';
@@ -90,26 +100,28 @@ export function App() {
 
   if (pendingGame !== null) {
     return (
-      <DemoSettingsScreen
-        game={pendingGame}
-        onStart={(config) => {
-          setDemoConfig(config);
-          setGame(pendingGame);
-        }}
-      />
+      <Shell>
+        <DemoSettingsScreen
+          game={pendingGame}
+          onStart={(config) => {
+            setDemoConfig(config);
+            setGame(pendingGame);
+          }}
+        />
+      </Shell>
     );
   }
 
   if (remoteLoading) {
     return (
-      <div className="game-root" dir="rtl">
+      <Shell>
         <div className="screen">
           <div className="screen-content">
             <div className="spinner" />
             <p className="opening-hint">טוען קובץ משחק מהכתובת...</p>
           </div>
         </div>
-      </div>
+      </Shell>
     );
   }
 
@@ -123,7 +135,7 @@ export function App() {
   };
 
   return (
-    <div className="game-root" dir="rtl">
+    <Shell>
       <div className="screen">
         <div className="screen-content">
           <h1 className="opening-title">Trivia Engine</h1>
@@ -169,6 +181,6 @@ export function App() {
           </p>
         </div>
       </div>
-    </div>
+    </Shell>
   );
 }

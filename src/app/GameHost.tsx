@@ -14,6 +14,7 @@ import {
 import { OpeningScreen, WinnersListScreen, WinnersScreen } from '../render/screens.tsx';
 import { OperatorMenu } from '../render/OperatorMenu.tsx';
 import { SlideView } from '../render/SlideView.tsx';
+import { Stage } from '../render/Stage.tsx';
 import { themeStyle } from '../render/theme.ts';
 import { AudioManager } from './AudioManager.ts';
 import { planCrowdVotes, snapshotAt } from './syntheticVotes.ts';
@@ -206,36 +207,40 @@ export function GameHost({ game, demo = null }: GameHostProps) {
 
   return (
     <div className="game-root" dir="rtl" style={themeStyle(setting)} onClick={handleClick}>
-      {stage === 'opening' && <OpeningScreen engine={engine} />}
-      {stage === 'playing' && <SlideView engine={engine} state={state} timer={timer} />}
-      {stage === 'winners' && <WinnersScreen engine={engine} />}
-      {stage === 'winnersList' && <WinnersListScreen engine={engine} />}
+      <Stage>
+        {stage === 'opening' && <OpeningScreen engine={engine} />}
+        {stage === 'playing' && <SlideView engine={engine} state={state} timer={timer} />}
+        {stage === 'winners' && <WinnersScreen engine={engine} />}
+        {stage === 'winnersList' && <WinnersListScreen engine={engine} />}
 
-      <span
-        className="status-dot status-dot--connected"
-        title={
-          demo !== null
-            ? `מצב דמו: ${crowdConfig.voterCount} שחקני דמה`
-            : 'מקור הצבעות: Replay (סוקט יגיע ב-M3)'
-        }
-      />
-      {demo !== null && <span className="demo-badge">דמו · {crowdConfig.voterCount.toLocaleString()} שחקנים</span>}
-
-      {menuOpen && (
-        <OperatorMenu
-          engine={engine}
-          state={state}
-          volume={volume}
-          onVolumeChange={setVolume}
-          syntheticCrowd={syntheticCrowd}
-          onSyntheticCrowdChange={setSyntheticCrowd}
-          onEndGame={() => {
-            setStage('winners');
-            setMenuOpen(false);
-          }}
-          onClose={() => setMenuOpen(false)}
+        <span
+          className="status-dot status-dot--connected"
+          title={
+            demo !== null
+              ? `מצב דמו: ${crowdConfig.voterCount} שחקני דמה`
+              : 'מקור הצבעות: Replay (סוקט יגיע ב-M3)'
+          }
         />
-      )}
+        {demo !== null && (
+          <span className="demo-badge">דמו · {crowdConfig.voterCount.toLocaleString()} שחקנים</span>
+        )}
+
+        {menuOpen && (
+          <OperatorMenu
+            engine={engine}
+            state={state}
+            volume={volume}
+            onVolumeChange={setVolume}
+            syntheticCrowd={syntheticCrowd}
+            onSyntheticCrowdChange={setSyntheticCrowd}
+            onEndGame={() => {
+              setStage('winners');
+              setMenuOpen(false);
+            }}
+            onClose={() => setMenuOpen(false)}
+          />
+        )}
+      </Stage>
     </div>
   );
 }
