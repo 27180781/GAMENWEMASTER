@@ -160,10 +160,39 @@ body {
   -webkit-box-orient: vertical;
 }
 
+/* כותרת השאלה: כברירת מחדל טקסט בלבד; עם תמונה — טקסט ותמונה זה לצד זה */
+.question-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+}
+
+.question-header--with-image {
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: 40px;
+}
+
+.question-header--with-image .question-text {
+  max-width: 1100px;
+  flex: 0 1 auto;
+}
+
+/* תמונה בתוך השאלה — ריבוע תחום בצד, לא רקע */
+.question-image-box {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .question-image {
-  max-height: 260px;
-  max-width: 700px;
-  border-radius: 12px;
+  max-height: 420px;
+  max-width: 520px;
+  border-radius: 16px;
   object-fit: contain;
 }
 
@@ -257,10 +286,12 @@ body {
 .answers--images .answer { flex-direction: column; padding: 0; min-height: 0; }
 .answers--images.answers--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
+/* תמונת תשובה — מוצגת במלואה (contain), לא חתוכה; רקע כהה למילוי השוליים */
 .answer-image {
   width: 100%;
   height: 320px;
-  object-fit: cover;
+  object-fit: contain;
+  background: rgba(0, 0, 0, 0.4);
 }
 
 .answers--images .answer-number {
