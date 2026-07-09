@@ -37,11 +37,12 @@ describe('פורמט אופליין דק (data.json ב-ZIP)', () => {
     expect(game.questions).toHaveLength(1);
   });
 
-  it('limit עם שדה number עודף (clickers) — נסבל, השדות הנדרשים נשמרים', () => {
+  it('limit: סוג המשחק ומגבלת המשתתפים (רישיון) נשמרים', () => {
     const raw = slimOfflineGame();
     (raw.setting as { limit: unknown }).limit = { type: 'clickers', number: 99999 };
     const game = parseGameFile(raw);
     expect(game.setting.limit.type).toBe('clickers');
+    expect(game.setting.limit.number).toBe(99999); // מגבלת הרישיון נשמרת
   });
 
   it('נתיבי מדיה יחסיים (Assets/...) נשמרים כמו שהם עד למיפוי ה-ZIP', () => {
