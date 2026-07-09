@@ -113,18 +113,37 @@ function YouTubeEmbed({
   }, [src, onEnded]);
 
   const separator = src.includes('?') ? '&' : '?';
-  const url = `${src}${separator}enablejsapi=1&autoplay=1&rel=0`;
+  // ניגון אוטומטי בלבד, בלי שום פקד אינטראקטיבי:
+  // controls=0 (בלי פס בקרה), disablekb=1 (בלי מקלדת), fs=0 (בלי מסך מלא),
+  // modestbranding=1, iv_load_policy=3 (בלי הערות), rel=0, playsinline=1.
+  const params = [
+    'enablejsapi=1',
+    'autoplay=1',
+    'controls=0',
+    'disablekb=1',
+    'fs=0',
+    'modestbranding=1',
+    'iv_load_policy=3',
+    'rel=0',
+    'playsinline=1',
+  ].join('&');
+  const url = `${src}${separator}${params}`;
 
   return (
-    <iframe
-      ref={iframeRef}
-      key={src}
-      className={className ?? 'media-fill'}
-      src={url}
-      title="YouTube"
-      allow="autoplay; encrypted-media"
-      allowFullScreen
-      style={{ border: 0 }}
-    />
+    // עטיפה עם שכבת חסימה שקופה מעל ה-iframe — בולעת כל קליק כדי שלא ניתן
+    // יהיה לגעת בסרטון עצמו (קליק על גוף הסרטון עוצר אותו).
+    <div className={`youtube-wrap ${className ?? 'media-fill'}`}>
+      <iframe
+        ref={iframeRef}
+        key={src}
+        className="youtube-frame"
+        src={url}
+        title="YouTube"
+        allow="autoplay; encrypted-media"
+        tabIndex={-1}
+        style={{ border: 0 }}
+      />
+      <div className="youtube-blocker" aria-hidden="true" />
+    </div>
   );
 }
