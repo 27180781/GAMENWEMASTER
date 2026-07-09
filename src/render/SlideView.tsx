@@ -17,11 +17,21 @@ interface SlideViewProps {
   reveal: RevealState;
 }
 
-function backgroundSrc(slide: Slide, engine: GameEngine): string {
-  if (slide.backgroundMedia.src !== '') return slide.backgroundMedia.src;
-  if (slide.setting.slidBackgroundMedia.src !== '') return slide.setting.slidBackgroundMedia.src;
+/**
+ * רקע השקופית. תמונת השאלה (question.src) אינה רקע — בחלק מהקבצים
+ * backgroundMedia מצביע לאותה תמונה; במקרה כזה מתעלמים ממנה ונופלים
+ * לרקע הרגיל (triviaMedia). רקע ספציפי אמיתי הוא ערך שונה מתמונת השאלה.
+ */
+export function slideBackgroundSrc(slide: Slide, triviaMedia: string): string {
+  const questionImage = slide.question.src;
+  const isNotQuestionImage = (src: string) => src !== '' && src !== questionImage;
+
+  if (isNotQuestionImage(slide.backgroundMedia.src)) return slide.backgroundMedia.src;
+  if (isNotQuestionImage(slide.setting.slidBackgroundMedia.src)) {
+    return slide.setting.slidBackgroundMedia.src;
+  }
   const votable = slide.type === 'trivia' || slide.type === 'survey' || slide.type === 'ans_images';
-  if (votable) return engine.getGame().setting.triviaMedia.src;
+  if (votable) return triviaMedia;
   return '';
 }
 
@@ -39,7 +49,7 @@ export function SlideView({ engine, state, timer, reveal }: SlideViewProps) {
     );
   }
 
-  const background = backgroundSrc(slide, engine);
+  const background = slideBackgroundSrc(slide, engine.getGame().setting.triviaMedia.src);
 
   return (
     <div className="screen slide-screen">
