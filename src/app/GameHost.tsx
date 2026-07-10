@@ -563,6 +563,9 @@ export function GameHost({ game, settings, onSettingsChange, onRequestRefresh }:
           <button title="הגדרות" onClick={() => setSettingsOpen((open) => !open)}>
             ⚙
           </button>
+          <button title="שמות וקבוצות" onClick={() => setRosterOpen((open) => !open)}>
+            👥
+          </button>
         </div>
 
         {rosterOpen && (
