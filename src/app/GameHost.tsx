@@ -23,6 +23,7 @@ import {
 import { OpeningScreen, WinnersListScreen, WinnersScreen } from '../render/screens.tsx';
 import { OperatorMenu } from '../render/OperatorMenu.tsx';
 import type { RevealState } from '../render/QuestionSlide.tsx';
+import { RosterPanel } from '../render/RosterPanel.tsx';
 import { SlideView } from '../render/SlideView.tsx';
 import { Stage } from '../render/Stage.tsx';
 import { themeStyle } from '../render/theme.ts';
@@ -30,6 +31,7 @@ import type { TimerView } from '../render/TimerRing.tsx';
 import { SettingsScreen } from '../render/SettingsScreen.tsx';
 import { AudioManager } from './AudioManager.ts';
 import { extractHostVote } from './hostRemote.ts';
+import { displayName, loadRoster, saveRoster, type RosterData } from './roster.ts';
 import { planCrowdVotes, snapshotAt } from './syntheticVotes.ts';
 import type { GameSettings } from './urlParams.ts';
 import { useEngineState } from './useEngineState.ts';
@@ -63,6 +65,18 @@ export function GameHost({ game, settings, onSettingsChange, onRequestRefresh }:
   const [menuOpen, setMenuOpen] = useState(false);
   /** מסך ההגדרות באמצע משחק (כפתור ⚙) — שכבה מעל; מצב המשחק נשמר. */
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /** לשונית "שמות וקבוצות" — מרשם השחקנים, נגיש לכל אורך המשחק. */
+  const [rosterOpen, setRosterOpen] = useState(false);
+  const [roster, setRoster] = useState<RosterData>(() => loadRoster(game.id));
+  const updateRoster = useCallback(
+    (next: RosterData) => {
+      setRoster(next);
+      saveRoster(game.id, next);
+    },
+    [game.id],
+  );
+  /** השם להצגה עבור voterId (שם השחקן אם הוגדר, אחרת המספר). */
+  const nameOf = useCallback((voterId: string) => displayName(roster, voterId), [roster]);
   const [volume, setVolume] = useState(1);
   const syntheticCrowd = settings.crowdEnabled;
   /** מסך מובילים באמצע משחק (פקודת מנחה 1) — שכבה מעל, המשחק ממשיך מתחת. */
@@ -461,11 +475,12 @@ export function GameHost({ game, settings, onSettingsChange, onRequestRefresh }:
       const target = event.target as HTMLElement | null;
       if (target?.closest('input, select, textarea')) return; // הקלדה בטפסים
       if (event.key === 'Escape') {
-        if (settingsOpen) setSettingsOpen(false);
+        if (rosterOpen) setRosterOpen(false);
+        else if (settingsOpen) setSettingsOpen(false);
         else setMenuOpen((open) => !open);
         return;
       }
-      if (menuOpen || settingsOpen) return;
+      if (menuOpen || settingsOpen || rosterOpen) return;
       if (event.key >= '0' && event.key <= '6') {
         if (event.key === '0' && stage !== 'playing') advance();
         else runHostCommandRef.current(Number(event.key));
@@ -492,7 +507,7 @@ export function GameHost({ game, settings, onSettingsChange, onRequestRefresh }:
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [stage, menuOpen, settingsOpen, engine, advanceStep, stepBack, onRequestRefresh]);
+  }, [stage, menuOpen, settingsOpen, rosterOpen, engine, advanceStep, stepBack, onRequestRefresh]);
 
   // מסך מלא — כפתור בפינה (window resize מעדכן את סקייל הבמה אוטומטית)
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
@@ -520,11 +535,22 @@ export function GameHost({ game, settings, onSettingsChange, onRequestRefresh }:
             </span>
           </>
         )}
-        {stage === 'winners' && <WinnersScreen engine={engine} />}
-        {stage === 'winnersList' && <WinnersListScreen engine={engine} />}
+        {stage === 'winners' && <WinnersScreen engine={engine} nameOf={nameOf} />}
+        {stage === 'winnersList' && <WinnersListScreen engine={engine} nameOf={nameOf} />}
 
         {/* מסך מובילים באמצע משחק (פקודת מנחה 1) — שכבה מעל, המשחק ממשיך מתחת */}
-        {stage === 'playing' && leadersOverlay && <WinnersListScreen engine={engine} />}
+        {stage === 'playing' && leadersOverlay && (
+          <WinnersListScreen engine={engine} nameOf={nameOf} />
+        )}
+
+        {/* לשונית "שמות וקבוצות" — נגישה לכל אורך המשחק */}
+        <button
+          className="roster-tab"
+          title="שמות וקבוצות"
+          onClick={() => setRosterOpen((open) => !open)}
+        >
+          👥 שמות וקבוצות
+        </button>
 
         {/* כפתורי פינה: מסך מלא + הגדרות (תפריט המפעיל) */}
         <div className="corner-buttons">
@@ -538,6 +564,14 @@ export function GameHost({ game, settings, onSettingsChange, onRequestRefresh }:
             ⚙
           </button>
         </div>
+
+        {rosterOpen && (
+          <RosterPanel
+            roster={roster}
+            onChange={updateRoster}
+            onClose={() => setRosterOpen(false)}
+          />
+        )}
 
         <span
           className="status-dot status-dot--connected"

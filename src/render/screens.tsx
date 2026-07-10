@@ -5,6 +5,10 @@
 import type { GameEngine } from '../engine/index.ts';
 import { MediaPlayer } from './MediaPlayer.tsx';
 
+/** ברירת מחדל: אם לא סופק מרשם שמות — מציגים את המספר עצמו. */
+type NameResolver = (voterId: string) => string;
+const identityName: NameResolver = (voterId) => voterId;
+
 export function OpeningScreen({ engine }: { engine: GameEngine }) {
   const setting = engine.getGame().setting;
   return (
@@ -23,7 +27,13 @@ export function OpeningScreen({ engine }: { engine: GameEngine }) {
   );
 }
 
-export function WinnersScreen({ engine }: { engine: GameEngine }) {
+export function WinnersScreen({
+  engine,
+  nameOf = identityName,
+}: {
+  engine: GameEngine;
+  nameOf?: NameResolver;
+}) {
   const setting = engine.getGame().setting;
   const winners = engine.getWinners();
   return (
@@ -39,7 +49,7 @@ export function WinnersScreen({ engine }: { engine: GameEngine }) {
           {winners.map((winner, index) => (
             <li key={winner.voterId} className={`winner winner--${index + 1}`}>
               <span className="winner-rank">{index + 1}</span>
-              <span className="winner-name">{winner.voterId}</span>
+              <span className="winner-name">{nameOf(winner.voterId)}</span>
               <span className="winner-score">{winner.score} נק׳</span>
             </li>
           ))}
@@ -51,7 +61,13 @@ export function WinnersScreen({ engine }: { engine: GameEngine }) {
   );
 }
 
-export function WinnersListScreen({ engine }: { engine: GameEngine }) {
+export function WinnersListScreen({
+  engine,
+  nameOf = identityName,
+}: {
+  engine: GameEngine;
+  nameOf?: NameResolver;
+}) {
   const setting = engine.getGame().setting;
   // 20 שורות בשתי עמודות — נכנס בבמה הקבועה בלי גלילה
   const winners = engine.getWinners(20);
@@ -68,7 +84,7 @@ export function WinnersListScreen({ engine }: { engine: GameEngine }) {
           {winners.map((winner, index) => (
             <li key={winner.voterId}>
               <span className="winner-rank">{index + 1}.</span>
-              <span className="winner-name">{winner.voterId}</span>
+              <span className="winner-name">{nameOf(winner.voterId)}</span>
               <span className="winner-score">{winner.score}</span>
             </li>
           ))}
