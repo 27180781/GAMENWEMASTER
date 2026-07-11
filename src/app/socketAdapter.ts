@@ -75,6 +75,7 @@ export class SocketVoteAdapter implements VoteAdapter {
   private snapshotListener: ((snapshot: VoteSnapshot) => void) | null = null;
   private statusListener: ((status: Status) => void) | null = null;
   private identifyListener: ((phone: string, name: string) => void) | null = null;
+  private joinedListener: ((phone: string, name?: string) => void) | null = null;
   private window: VoteWindow | null = null;
   private roomId = '';
 
@@ -96,7 +97,7 @@ export class SocketVoteAdapter implements VoteAdapter {
     });
     socket.on('room/joined', () => this.statusListener?.('connected'));
     socket.on('voting', (data: RawVote) => this.handleVote(data));
-    socket.on('player/joined', (data: RawVote) => this.identify(data));
+    socket.on('player/joined', (data: RawVote) => this.report(data));
     socket.on('disconnect', () => this.statusListener?.('reconnecting'));
     socket.io.on('reconnect', () => socket.emit('join/room', { gameId: roomId }));
     socket.io.on('reconnect_attempt', () => this.statusListener?.('reconnecting'));
@@ -104,16 +105,19 @@ export class SocketVoteAdapter implements VoteAdapter {
     return Promise.resolve();
   }
 
-  private identify(data: RawVote): void {
+  /** מדווח על שחקן שנראה (הצטרפות/הצבעה): שם למיפוי, וחיבור למסך הלובי. */
+  private report(data: RawVote): void {
     const phone = String(data?.phone ?? '').trim();
+    if (phone === '') return;
     const name = String(data?.playerName ?? '').trim();
-    if (phone !== '' && name !== '') this.identifyListener?.(phone, name);
+    if (name !== '') this.identifyListener?.(phone, name);
+    this.joinedListener?.(phone, name === '' ? undefined : name);
   }
 
   private handleVote(data: RawVote): void {
     // רק החדר שלנו (השרת אמור לשלוח רק אותו, אבל מסננים ליתר ביטחון)
     if (data.gameId !== undefined && String(data.gameId) !== this.roomId) return;
-    this.identify(data); // שם השחקן מהטלפון → מיפוי אוטומטי לשם
+    this.report(data); // חיבור + שם השחקן מהטלפון
     if (this.window === null) return; // אין חלון הצבעה פתוח — מתעלמים
     const snapshot = this.window.add(data);
     if (snapshot !== null) this.snapshotListener?.(snapshot);
@@ -135,6 +139,11 @@ export class SocketVoteAdapter implements VoteAdapter {
   /** התראה על זיהוי שחקן (טלפון → שם) מהשרת — למיפוי שמות אוטומטי. */
   onPlayerIdentified(cb: (phone: string, name: string) => void): void {
     this.identifyListener = cb;
+  }
+
+  /** התראה על שחקן שהתחבר (לחץ מקש כלשהו) — למסך הלובי. */
+  onPlayerJoined(cb: (phone: string, name?: string) => void): void {
+    this.joinedListener = cb;
   }
 
   requestFullState(): Promise<VoteSnapshot> {

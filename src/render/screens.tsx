@@ -4,10 +4,58 @@
 
 import type { GameEngine } from '../engine/index.ts';
 import { MediaPlayer } from './MediaPlayer.tsx';
+import type { RailPlayer } from './QuestionSlide.tsx';
 
 /** ברירת מחדל: אם לא סופק מרשם שמות — מציגים את המספר עצמו. */
 type NameResolver = (voterId: string) => string;
 const identityName: NameResolver = (voterId) => voterId;
+
+/** כמה שחקנים מוצגים במסך הלובי לכל היותר (השאר נספרים כ"+N"). */
+const LOBBY_MAX_SHOWN = 60;
+
+/**
+ * מסך התחברות שחקנים (לובי) — המסך הראשון אחרי ההגדרות. מציג בזמן אמת את כל
+ * מי שהתחבר למשחק (לחץ מקש כלשהו) — באונליין (סוקט) ובדמו. רווח מתחיל.
+ */
+export function LobbyScreen({ engine, players }: { engine: GameEngine; players: RailPlayer[] }) {
+  const setting = engine.getGame().setting;
+  const shown = players.slice(0, LOBBY_MAX_SHOWN);
+  const extra = players.length - shown.length;
+  return (
+    <div className="screen lobby-screen">
+      {setting.gameMedia.src !== '' && (
+        <div className="screen-background">
+          <MediaPlayer src={setting.gameMedia.src} asBackground />
+        </div>
+      )}
+      <div className="screen-content lobby-content">
+        {setting.logo.src !== '' && <img className="opening-logo lobby-logo" src={setting.logo.src} alt="" />}
+        <h1 className="opening-title lobby-title">
+          {setting.titleThroughoutGame || engine.getGame().name}
+        </h1>
+        <div className="lobby-count">
+          <span className="lobby-count-dot" />
+          <span className="lobby-count-num">{players.length}</span> מחוברים
+        </div>
+        <div className="lobby-grid">
+          {shown.map((player) => (
+            <div key={player.id} className="lobby-chip">
+              <span className="lobby-avatar" style={{ background: player.color }}>
+                {player.initial}
+              </span>
+              <span className="lobby-name">{player.name}</span>
+            </div>
+          ))}
+          {extra > 0 && <div className="lobby-chip lobby-chip--more">+{extra}</div>}
+          {players.length === 0 && (
+            <div className="lobby-empty">ממתינים לשחקנים… לחצו מקש כלשהו במכשיר כדי להתחבר</div>
+          )}
+        </div>
+        <p className="opening-hint">לחצו רווח כדי להתחיל</p>
+      </div>
+    </div>
+  );
+}
 
 export function OpeningScreen({ engine }: { engine: GameEngine }) {
   const setting = engine.getGame().setting;

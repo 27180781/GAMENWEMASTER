@@ -22,7 +22,7 @@ import {
   type VoteAdapter,
 } from '../engine/index.ts';
 import { SocketVoteAdapter } from './socketAdapter.ts';
-import { OpeningScreen, WinnersListScreen, WinnersScreen } from '../render/screens.tsx';
+import { LobbyScreen, WinnersListScreen, WinnersScreen } from '../render/screens.tsx';
 import { OperatorMenu } from '../render/OperatorMenu.tsx';
 import type { RailPlayer, RevealState } from '../render/QuestionSlide.tsx';
 import { RosterPanel } from '../render/RosterPanel.tsx';
@@ -150,6 +150,22 @@ export function GameHost({
         return { id, name, initial: railInitial(name), color: RAIL_COLORS[hashId(id) % RAIL_COLORS.length]! };
       }),
     [answerers, nameOf],
+  );
+  /** כל מי שהתחבר למשחק (לחץ מקש) — למסך הלובי. סדר הצטרפות. */
+  const [connectedIds, setConnectedIds] = useState<string[]>([]);
+  const addConnected = useCallback((id: string, name?: string) => {
+    if (name !== undefined && name !== '') {
+      setServerNames((prev) => (prev[id] === name ? prev : { ...prev, [id]: name }));
+    }
+    setConnectedIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+  }, []);
+  const connectedPlayers = useMemo<RailPlayer[]>(
+    () =>
+      connectedIds.map((id) => {
+        const name = nameOf(id);
+        return { id, name, initial: railInitial(name), color: RAIL_COLORS[hashId(id) % RAIL_COLORS.length]! };
+      }),
+    [connectedIds, nameOf],
   );
 
   const crowdConfig = settings;
@@ -465,18 +481,19 @@ export function GameHost({
       }
     });
     if (adapter instanceof SocketVoteAdapter) {
-      // שרת אמיתי: סטטוס חיבור + מיפוי אוטומטי של שם השחקן מהטלפון
+      // שרת אמיתי: סטטוס חיבור + מיפוי אוטומטי של שם השחקן מהטלפון + לובי
       adapter.onStatusChange(setVoteStatus);
       adapter.onPlayerIdentified((phone, name) =>
         setServerNames((prev) => (prev[phone] === name ? prev : { ...prev, [phone]: name })),
       );
+      adapter.onPlayerJoined((phone, name) => addConnected(phone, name));
       void adapter.connect(roomId);
     } else {
       setVoteStatus('connected');
       void adapter.connect('replay');
     }
     return () => adapter.disconnect();
-  }, [adapter, engine, roomId]);
+  }, [adapter, engine, roomId, addConnected]);
 
   // ווליום
   useEffect(() => audio.setVolume(volume), [audio, volume]);
@@ -515,6 +532,23 @@ export function GameHost({
     if (!(adapter instanceof SocketVoteAdapter)) return;
     adapter.setActiveSlide(votingActive ? slide.id : null);
   }, [adapter, votingActive, slide.id]);
+
+  // לובי בדמו: מדמה שחקנים שמתחברים בזמן מסך ההתחברות (באונליין ההתחברות
+  // אמיתית דרך player/joined מהסוקט).
+  useEffect(() => {
+    if (stage !== 'opening' || !syntheticCrowd) return;
+    const max = Math.min(crowdConfig.voterCount, 80);
+    let i = 0;
+    const interval = window.setInterval(() => {
+      i += 1;
+      if (i > max) {
+        window.clearInterval(interval);
+        return;
+      }
+      addConnected(`משתתף ${i}`);
+    }, 140);
+    return () => window.clearInterval(interval);
+  }, [stage, syntheticCrowd, crowdConfig.voterCount, addConnected]);
 
   // automaticSkip: מעבר אוטומטי אחרי X שניות כשאין מדיה פעילה
   useEffect(() => {
@@ -622,7 +656,7 @@ export function GameHost({
   return (
     <div className="game-root" dir="rtl" style={themeStyle(setting)}>
       <Stage>
-        {stage === 'opening' && <OpeningScreen engine={engine} />}
+        {stage === 'opening' && <LobbyScreen engine={engine} players={connectedPlayers} />}
         {stage === 'playing' && (
           <>
             <SlideView engine={engine} state={state} timer={timer} reveal={reveal} players={players} />

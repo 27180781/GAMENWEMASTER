@@ -130,6 +130,88 @@ body {
   50% { opacity: 0.4; }
 }
 
+/* ---- מסך התחברות שחקנים (לובי) ---- */
+
+.lobby-content { gap: 22px; justify-content: center; }
+.lobby-logo { max-height: 150px; }
+.lobby-title { font-size: 60px; max-height: 150px; }
+
+.lobby-count {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 30px;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.34);
+  border: 2px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  padding: 10px 26px;
+}
+.lobby-count-num {
+  font-size: 40px;
+  font-weight: 900;
+  color: var(--accent, #34d399);
+  font-variant-numeric: tabular-nums;
+}
+.lobby-count-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 14px #34d399;
+  animation: pulseDot 1.1s ease-in-out infinite;
+}
+
+.lobby-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: flex-start;
+  gap: 14px;
+  width: 100%;
+  max-height: 620px;
+  overflow: hidden;
+  padding: 4px;
+}
+
+.lobby-chip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 8px 20px 8px 8px;
+  max-width: 320px;
+  animation: dropIn 0.5s cubic-bezier(0.2, 1.2, 0.4, 1) both;
+}
+.lobby-chip--more {
+  padding: 12px 24px;
+  font-size: 26px;
+  font-weight: 800;
+  opacity: 0.8;
+}
+.lobby-avatar {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  font-weight: 900;
+  font-size: 20px;
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+}
+.lobby-name {
+  font-weight: 700;
+  font-size: 24px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lobby-empty { font-size: 28px; opacity: 0.6; padding: 40px; }
+
 /* ---- שקופית שאלה (עיצוב מסך הטריוויה החי) ---- */
 
 /* טוקני העיצוב: הרקע/הטקסט של התיבות מגיעים מקובץ המשחק (main/secondary);
