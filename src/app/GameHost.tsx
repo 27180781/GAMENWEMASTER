@@ -22,7 +22,7 @@ import {
 } from '../engine/index.ts';
 import { OpeningScreen, WinnersListScreen, WinnersScreen } from '../render/screens.tsx';
 import { OperatorMenu } from '../render/OperatorMenu.tsx';
-import type { RevealState } from '../render/QuestionSlide.tsx';
+import type { RailPlayer, RevealState } from '../render/QuestionSlide.tsx';
 import { RosterPanel } from '../render/RosterPanel.tsx';
 import { SlideView } from '../render/SlideView.tsx';
 import { Stage } from '../render/Stage.tsx';
@@ -39,6 +39,33 @@ import { useEngineState } from './useEngineState.ts';
 type HostStage = 'opening' | 'playing' | 'winners' | 'winnersList';
 
 const NO_REVEAL: RevealState = { questionShown: false, answersShown: 0, revealCorrect: false };
+
+/** מספר המצטרפים המרבי שמוצג במסילה בכל רגע. */
+const RAIL_MAX = 9;
+/** פלטת צבעים לאווטרים במסילת המצטרפים (מהעיצוב). */
+const RAIL_COLORS = [
+  '#FF6B6B',
+  '#4ECDC4',
+  '#FFD93D',
+  '#6BCB77',
+  '#A66CFF',
+  '#FF9F45',
+  '#4D96FF',
+  '#FF6FB5',
+  '#22D3EE',
+];
+
+function hashId(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+/** האות הראשונה להצגה באווטר (מהשם, אחרת '?'). */
+function railInitial(name: string): string {
+  const trimmed = name.trim();
+  return trimmed === '' ? '?' : [...trimmed][0]!;
+}
 
 interface GameHostProps {
   game: GameFile;
@@ -84,6 +111,16 @@ export function GameHost({ game, settings, onSettingsChange, onRequestRefresh }:
   const [timer, setTimer] = useState<TimerView | null>(null);
   /** שלבי החשיפה של השקופית הנוכחית (שאלה / תשובות / תשובה נכונה). */
   const [reveal, setReveal] = useState<RevealState>(NO_REVEAL);
+  /** מזהי המצביעים האחרונים בשקופית הנוכחית (החדש ראשון) — למסילת המצטרפים. */
+  const [answerers, setAnswerers] = useState<string[]>([]);
+  const players = useMemo<RailPlayer[]>(
+    () =>
+      answerers.map((id) => {
+        const name = displayName(roster, id);
+        return { id, name, initial: railInitial(name), color: RAIL_COLORS[hashId(id) % RAIL_COLORS.length]! };
+      }),
+    [answerers, roster],
+  );
 
   const crowdConfig = settings;
   const hostVoterId = settings.hostVoterId.trim();
@@ -97,9 +134,10 @@ export function GameHost({ game, settings, onSettingsChange, onRequestRefresh }:
   const revealRef = useRef<RevealState>(reveal);
   revealRef.current = reveal;
 
-  // איפוס שלבי חשיפה + זיהוי הקשת שלט המנחה, במעבר שקופית
+  // איפוס שלבי חשיפה + מסילת המצטרפים + זיהוי הקשת שלט המנחה, במעבר שקופית
   useEffect(() => {
     setReveal(NO_REVEAL);
+    setAnswerers([]);
     lastHostAnswerRef.current = null;
   }, [state.currentSlideId]);
 
@@ -385,6 +423,16 @@ export function GameHost({ game, settings, onSettingsChange, onRequestRefresh }:
       // בזמן עצירה (פקודה 6) אין קליטת הצבעות
       if (pausedRef.current) return;
       engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot, at: Date.now() });
+      // עדכון מסילת המצטרפים — מזהים חדשים בראש הרשימה
+      const voters = snapshot.voters;
+      if (voters) {
+        setAnswerers((prev) => {
+          const seen = new Set(prev);
+          const additions = Object.keys(voters).filter((id) => !seen.has(id));
+          if (additions.length === 0) return prev;
+          return [...additions.reverse(), ...prev].slice(0, RAIL_MAX);
+        });
+      }
     });
     void adapter.connect('replay');
     return () => adapter.disconnect();
@@ -528,7 +576,7 @@ export function GameHost({ game, settings, onSettingsChange, onRequestRefresh }:
         {stage === 'opening' && <OpeningScreen engine={engine} />}
         {stage === 'playing' && (
           <>
-            <SlideView engine={engine} state={state} timer={timer} reveal={reveal} />
+            <SlideView engine={engine} state={state} timer={timer} reveal={reveal} players={players} />
             {/* מיקום במשחק: שקופית נוכחית מתוך סה"כ */}
             <span className="slide-counter" dir="ltr">
               {state.currentSlideIndex + 1}/{engine.getGame().questions.length}

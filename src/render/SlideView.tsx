@@ -4,9 +4,9 @@
  * ותוכן לפי סוג השקופית.
  */
 
-import type { GameEngine, GameState, Slide } from '../engine/index.ts';
+import { isVotableSlide, type GameEngine, type GameState, type Slide } from '../engine/index.ts';
 import { MediaPlayer } from './MediaPlayer.tsx';
-import { QuestionSlide, type RevealState } from './QuestionSlide.tsx';
+import { QuestionSlide, type RailPlayer, type RevealState } from './QuestionSlide.tsx';
 import { SubjectSlide } from './SubjectSlide.tsx';
 import type { TimerView } from './TimerRing.tsx';
 
@@ -15,6 +15,8 @@ interface SlideViewProps {
   state: GameState;
   timer: TimerView | null;
   reveal: RevealState;
+  /** מסילת המצטרפים — עונים אחרונים (שכבר עברו רזולוציה לשם). */
+  players: RailPlayer[];
 }
 
 /**
@@ -35,7 +37,7 @@ export function slideBackgroundSrc(slide: Slide, triviaMedia: string): string {
   return '';
 }
 
-export function SlideView({ engine, state, timer, reveal }: SlideViewProps) {
+export function SlideView({ engine, state, timer, reveal, players }: SlideViewProps) {
   const slide = engine.getCurrentSlide();
 
   // מדיה חוסמת — מסך מלא. מנוגנת אוטומטית; המעבר ממנה הוא ידני (רווח/0),
@@ -50,6 +52,7 @@ export function SlideView({ engine, state, timer, reveal }: SlideViewProps) {
   }
 
   const background = slideBackgroundSrc(slide, engine.getGame().setting.triviaMedia.src);
+  const votableSlides = engine.getGame().questions.filter(isVotableSlide);
 
   return (
     <div className="screen slide-screen">
@@ -71,6 +74,9 @@ export function SlideView({ engine, state, timer, reveal }: SlideViewProps) {
             ansIsNumber={engine.getGame().setting.ansIsNumber}
             timer={timer}
             reveal={reveal}
+            questionNumber={votableSlides.findIndex((s) => s.id === slide.id) + 1}
+            questionTotal={votableSlides.length}
+            players={players}
           />
         )}
       </div>
