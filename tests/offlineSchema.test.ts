@@ -51,4 +51,18 @@ describe('פורמט אופליין דק (data.json ב-ZIP)', () => {
     const game = parseGameFile(raw);
     expect(game.setting.logo.src).toBe('Assets/logo.png');
   });
+
+  it('room מתקבל כמספר או כמחרוזת ומנורמל למחרוזת (GAME_ID לשרת ההצבעות)', () => {
+    const numeric = slimOfflineGame();
+    numeric.room = 2047;
+    expect(parseGameFile(numeric).room).toBe('2047');
+
+    const str = slimOfflineGame();
+    str.room = '5001';
+    expect(parseGameFile(str).room).toBe('5001');
+
+    const missing = slimOfflineGame();
+    delete missing.room;
+    expect(parseGameFile(missing).room).toBeNull();
+  });
 });

@@ -15,6 +15,8 @@ export interface AppParams {
   gameUrl: string | null;
   /** כתובת ערוץ הפוש (SSE/WebSocket) לרענון יזום, או null. */
   pushUrl: string | null;
+  /** עקיפת כתובת שרת ההצבעות (ברירת מחדל: השרת הרשמי), או null. */
+  voteServer: string | null;
   /** האם התבקש מצב דמו. */
   demo: boolean;
 }
@@ -27,9 +29,11 @@ export function parseAppParams(search: string): AppParams {
   const gameUrl = rawGame !== null && rawGame.trim() !== '' ? rawGame.trim() : null;
   const rawPush = params.get('push');
   const pushUrl = rawPush !== null && rawPush.trim() !== '' ? rawPush.trim() : null;
+  const rawServer = params.get('voteServer');
+  const voteServer = rawServer !== null && rawServer.trim() !== '' ? rawServer.trim() : null;
   const rawDemo = params.get('demo');
   const demo = rawDemo !== null && TRUTHY.has(rawDemo.trim().toLowerCase());
-  return { gameUrl, pushUrl, demo };
+  return { gameUrl, pushUrl, voteServer, demo };
 }
 
 /**

@@ -162,7 +162,13 @@ export const gameFileSchema = z.object({
   cloudinaryFolder: z.string().optional().default(''),
   credit: z.string().nullable().optional().default(null),
   users: z.string().optional().default('{}'),
-  room: z.string().nullable().optional().default(null),
+  // room (קוד החדר / קוד המשחק) יכול להגיע כמספר (למשל 2047) או כמחרוזת —
+  // מנרמלים למחרוזת (או null) לשימוש כ-GAME_ID מול שרת ההצבעות.
+  room: z
+    .union([z.string(), z.number()])
+    .nullable()
+    .optional()
+    .transform((value) => (value === null || value === undefined ? null : String(value))),
   baseUrl: z.string().optional().default(''),
   cloudinaryAbsolutePathImage: z.string().optional().default(''),
   cloudinaryAbsolutePathVideo: z.string().optional().default(''),

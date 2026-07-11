@@ -4,3 +4,6 @@ release
 *.local
 .DS_Store
 coverage
+
+# TypeScript incremental build cache
+*.tsbuildinfo
