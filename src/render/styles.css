@@ -1148,3 +1148,74 @@ body {
   padding-inline-start: 18px;
 }
 .roster-groups li { display: flex; gap: 10px; align-items: center; }
+
+/* ---- באנר הצטרפות + אזהרת רישיון ---- */
+
+.join-banner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 46;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 24px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.96), rgba(52, 211, 153, 0.92));
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+}
+.join-banner b { font-weight: 900; }
+.join-banner-code {
+  background: rgba(0, 0, 0, 0.38);
+  border-radius: 8px;
+  padding: 2px 16px;
+  font-size: 28px;
+  letter-spacing: 3px;
+}
+
+/* דחיפת הכרום והתוכן אל מתחת לבאנר */
+.has-banner .corner-buttons,
+.has-banner .slide-counter { top: 58px; }
+.has-banner .screen-content { padding-top: 84px; }
+
+.license-modal {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.license-modal-box {
+  background: #151a2e;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: 18px;
+  padding: 40px 48px;
+  max-width: 760px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+.license-modal-icon { font-size: 64px; }
+.license-modal-box h2 { font-size: 40px; font-weight: 900; color: #facc15; }
+.license-modal-box p { font-size: 28px; line-height: 1.4; opacity: 0.9; }
+.license-modal-box button {
+  margin-top: 8px;
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 14px 44px;
+  font-size: 26px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.license-modal-box button:hover { background: #2563eb; }
