@@ -57,6 +57,9 @@ describe('SocketVoteAdapter — אינטגרציה מול שרת Socket.IO', () 
         socket.join(data.gameId);
         socket.emit('room/joined', { gameId: data.gameId });
       });
+      socket.on('emit/joined', (data: { gameId: string; phone: string; playerName?: string }) => {
+        ioServer.to(data.gameId).emit('player/joined', data);
+      });
     });
     await new Promise<void>((resolve) => http.listen(0, resolve));
     const addr = http.address();
@@ -73,6 +76,7 @@ describe('SocketVoteAdapter — אינטגרציה מול שרת Socket.IO', () 
     const adapter = new SocketVoteAdapter(url);
     const snapshots: VoteSnapshot[] = [];
     const names: Record<string, string> = {};
+    const joined: string[] = [];
     let connected = false;
 
     adapter.onVoteSnapshot((s) => snapshots.push(s));
@@ -80,10 +84,14 @@ describe('SocketVoteAdapter — אינטגרציה מול שרת Socket.IO', () 
       if (st === 'connected') connected = true;
     });
     adapter.onPlayerIdentified((phone, name) => (names[phone] = name));
+    adapter.onPlayerJoined((phone) => joined.push(phone));
 
     await adapter.connect('5001');
     // ממתינים ל-room/joined
     await waitFor(() => connected);
+
+    // התחברות שחקן (לחיצת מקש) לפני ההצבעה — למסך הלובי
+    ioServer.sockets.sockets.forEach((s) => s.emit('player/joined', { phone: '0500000000', gameId: '5001' }));
 
     adapter.setActiveSlide(3); // חלון הצבעה פתוח לשקופית 3
 
@@ -97,6 +105,9 @@ describe('SocketVoteAdapter — אינטגרציה מול שרת Socket.IO', () 
     expect(last.total).toBe(3);
     expect(last.counts).toEqual({ '2': 2, '1': 1 });
     expect(names['0501111111']).toBe('דנה'); // שם השחקן מהטלפון מופה אוטומטית
+    // התחברות (לובי) נקלטה — גם מ-player/joined וגם מהמצביעים
+    expect(joined).toContain('0500000000');
+    expect(joined).toContain('0501111111');
 
     adapter.disconnect();
   });
