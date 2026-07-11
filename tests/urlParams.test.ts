@@ -8,6 +8,7 @@ describe('parseAppParams — פרמטרים בכתובת', () => {
     expect(parseAppParams('?game=https://example.com/game.json')).toEqual({
       gameUrl: 'https://example.com/game.json',
       pushUrl: null,
+      voteServer: null,
       demo: false,
     });
   });
@@ -16,6 +17,7 @@ describe('parseAppParams — פרמטרים בכתובת', () => {
     expect(parseAppParams('?game=https://x.dev/g.json&demo=1')).toEqual({
       gameUrl: 'https://x.dev/g.json',
       pushUrl: null,
+      voteServer: null,
       demo: true,
     });
     expect(parseAppParams('?demo').demo).toBe(true);
@@ -32,8 +34,13 @@ describe('parseAppParams — פרמטרים בכתובת', () => {
   });
 
   it('בלי פרמטרים — ברירות מחדל', () => {
-    expect(parseAppParams('')).toEqual({ gameUrl: null, pushUrl: null, demo: false });
-    expect(parseAppParams('?game=')).toEqual({ gameUrl: null, pushUrl: null, demo: false });
+    expect(parseAppParams('')).toEqual({ gameUrl: null, pushUrl: null, voteServer: null, demo: false });
+    expect(parseAppParams('?game=')).toEqual({
+      gameUrl: null,
+      pushUrl: null,
+      voteServer: null,
+      demo: false,
+    });
   });
 
   it('URL עם פרמטרים משלו (מקודד) נשמר במלואו', () => {

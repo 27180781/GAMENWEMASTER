@@ -19,7 +19,9 @@ import {
   ReplayAdapter,
   isVotableSlide,
   type GameFile,
+  type VoteAdapter,
 } from '../engine/index.ts';
+import { SocketVoteAdapter } from './socketAdapter.ts';
 import { OpeningScreen, WinnersListScreen, WinnersScreen } from '../render/screens.tsx';
 import { OperatorMenu } from '../render/OperatorMenu.tsx';
 import type { RailPlayer, RevealState } from '../render/QuestionSlide.tsx';
@@ -77,14 +79,29 @@ interface GameHostProps {
    * מוזרק מ-App; undefined כשאין מקור למשוך ממנו (אופליין/העלאה ידנית).
    */
   onRequestRefresh?: () => void;
+  /** כתובת שרת ההצבעות (ברירת מחדל מוזרקת מ-App). */
+  voteServerUrl: string;
 }
 
-export function GameHost({ game, settings, onSettingsChange, onRequestRefresh }: GameHostProps) {
+export function GameHost({
+  game,
+  settings,
+  onSettingsChange,
+  onRequestRefresh,
+  voteServerUrl,
+}: GameHostProps) {
   // המנוע נוצר פעם אחת; רענון תוכן מתבצע דרך engine.updateGame בלי remount,
   // כדי לשמר את מהלך המשחק (ניקוד/מיקום). ראו useEffect על שינוי game למטה.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const engine = useMemo(() => new GameEngine(game), []);
-  const adapter = useMemo(() => new ReplayAdapter(), []);
+  // מקור ההצבעות: שרת הסוקט האמיתי במשחק אונליין (יש קוד חדר ואין שחקני דמה),
+  // אחרת ReplayAdapter (דמו/סינתטי, וגם אופליין — בלי רשת).
+  const roomId = game.room ?? '';
+  const useSocket = !settings.crowdEnabled && roomId !== '';
+  const adapter = useMemo<VoteAdapter>(
+    () => (useSocket ? new SocketVoteAdapter(voteServerUrl) : new ReplayAdapter()),
+    [useSocket, voteServerUrl],
+  );
   const audio = useMemo(() => new AudioManager(), []);
   const state = useEngineState(engine);
 
@@ -102,8 +119,21 @@ export function GameHost({ game, settings, onSettingsChange, onRequestRefresh }:
     },
     [game.id],
   );
-  /** השם להצגה עבור voterId (שם השחקן אם הוגדר, אחרת המספר). */
-  const nameOf = useCallback((voterId: string) => displayName(roster, voterId), [roster]);
+  /** שמות שהגיעו מהשרת (טלפון → שם שחקן) — מיפוי אוטומטי במשחק טלפונים. */
+  const [serverNames, setServerNames] = useState<Record<string, string>>({});
+  /** סטטוס החיבור לשרת ההצבעות (רלוונטי רק במשחק אונליין אמיתי). */
+  const [voteStatus, setVoteStatus] = useState<'connected' | 'reconnecting' | 'offline'>(
+    'offline',
+  );
+  /** השם להצגה: מרשם ידני, אחרת שם מהשרת, אחרת המספר עצמו. */
+  const nameOf = useCallback(
+    (voterId: string) => {
+      const fromRoster = displayName(roster, voterId);
+      if (fromRoster !== voterId) return fromRoster;
+      return serverNames[voterId] ?? voterId;
+    },
+    [roster, serverNames],
+  );
   const [volume, setVolume] = useState(1);
   const syntheticCrowd = settings.crowdEnabled;
   /** מסך מובילים באמצע משחק (פקודת מנחה 1) — שכבה מעל, המשחק ממשיך מתחת. */
@@ -116,10 +146,10 @@ export function GameHost({ game, settings, onSettingsChange, onRequestRefresh }:
   const players = useMemo<RailPlayer[]>(
     () =>
       answerers.map((id) => {
-        const name = displayName(roster, id);
+        const name = nameOf(id);
         return { id, name, initial: railInitial(name), color: RAIL_COLORS[hashId(id) % RAIL_COLORS.length]! };
       }),
-    [answerers, roster],
+    [answerers, nameOf],
   );
 
   const crowdConfig = settings;
@@ -434,9 +464,19 @@ export function GameHost({ game, settings, onSettingsChange, onRequestRefresh }:
         });
       }
     });
-    void adapter.connect('replay');
+    if (adapter instanceof SocketVoteAdapter) {
+      // שרת אמיתי: סטטוס חיבור + מיפוי אוטומטי של שם השחקן מהטלפון
+      adapter.onStatusChange(setVoteStatus);
+      adapter.onPlayerIdentified((phone, name) =>
+        setServerNames((prev) => (prev[phone] === name ? prev : { ...prev, [phone]: name })),
+      );
+      void adapter.connect(roomId);
+    } else {
+      setVoteStatus('connected');
+      void adapter.connect('replay');
+    }
     return () => adapter.disconnect();
-  }, [adapter, engine]);
+  }, [adapter, engine, roomId]);
 
   // ווליום
   useEffect(() => audio.setVolume(volume), [audio, volume]);
@@ -452,6 +492,8 @@ export function GameHost({ game, settings, onSettingsChange, onRequestRefresh }:
   // קהל סינתטי: מזרים snapshots מצטברים בזמן הצבעה, לפי קונפיגורציית הדמו
   useEffect(() => {
     if (!votingActive || !syntheticCrowd) return;
+    if (!(adapter instanceof ReplayAdapter)) return; // רק במצב דמו
+    const replay = adapter;
     const plan = planCrowdVotes(slide, {
       voterCount: crowdConfig.voterCount,
       speedFactor: crowdConfig.speedFactor,
@@ -462,10 +504,17 @@ export function GameHost({ game, settings, onSettingsChange, onRequestRefresh }:
     const interval = window.setInterval(() => {
       if (pausedRef.current) return; // הזמן קפוא בעצירה
       const elapsed = Date.now() - openedAt - pausedAccumMsRef.current;
-      adapter.emit(snapshotAt(plan, slide.id, elapsed, ++seq));
+      replay.emit(snapshotAt(plan, slide.id, elapsed, ++seq));
     }, crowdConfig.intervalMs);
     return () => window.clearInterval(interval);
   }, [votingActive, state.currentSlideId, syntheticCrowd, adapter, slide, crowdConfig]);
+
+  // שרת אמיתי (סוקט): פותח חלון הצבעה בדיוק בגבולות ההצבעה של השקופית, וסוגר
+  // בסיומה — כך נספרות רק ההצבעות של השקופית הנוכחית בזמן שהחלון פתוח.
+  useEffect(() => {
+    if (!(adapter instanceof SocketVoteAdapter)) return;
+    adapter.setActiveSlide(votingActive ? slide.id : null);
+  }, [adapter, votingActive, slide.id]);
 
   // automaticSkip: מעבר אוטומטי אחרי X שניות כשאין מדיה פעילה
   useEffect(() => {
@@ -625,11 +674,19 @@ export function GameHost({ game, settings, onSettingsChange, onRequestRefresh }:
         )}
 
         <span
-          className="status-dot status-dot--connected"
+          className={`status-dot status-dot--${useSocket ? voteStatus : 'connected'}`}
           title={
             syntheticCrowd
               ? `מצב דמו: ${crowdConfig.voterCount} שחקני דמה`
-              : 'מקור הצבעות: סוקט (M3)'
+              : useSocket
+                ? `שרת הצבעות · חדר ${roomId} · ${
+                    voteStatus === 'connected'
+                      ? 'מחובר'
+                      : voteStatus === 'reconnecting'
+                        ? 'מתחבר מחדש…'
+                        : 'מנותק'
+                  }`
+                : 'אין מקור הצבעות (אין קוד חדר במשחק)'
           }
         />
         {syntheticCrowd && (

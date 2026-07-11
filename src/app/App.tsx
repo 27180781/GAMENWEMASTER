@@ -16,6 +16,7 @@ import { SettingsScreen } from '../render/SettingsScreen.tsx';
 import { Stage } from '../render/Stage.tsx';
 import { GameHost } from './GameHost.tsx';
 import { openPushChannel } from './pushChannel.ts';
+import { VOTE_SERVER_URL } from './socketAdapter.ts';
 import { DEFAULT_GAME_SETTINGS, parseAppParams, type GameSettings } from './urlParams.ts';
 import { loadGameFromZip } from './zipLoader.ts';
 
@@ -152,6 +153,7 @@ export function App() {
         settings={settings}
         onSettingsChange={setSettings}
         onRequestRefresh={() => void refetchGame()}
+        voteServerUrl={params.voteServer ?? VOTE_SERVER_URL}
       />
     );
   }
