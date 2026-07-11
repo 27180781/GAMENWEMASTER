@@ -151,7 +151,7 @@ export function App() {
         game={game}
         settings={settings}
         onSettingsChange={setSettings}
-        onRequestRefresh={params.gameUrl !== null ? () => void refetchGame() : undefined}
+        onRequestRefresh={() => void refetchGame()}
       />
     );
   }
