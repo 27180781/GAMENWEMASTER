@@ -58,6 +58,8 @@ export function App() {
   /** משחק שנטען וממתין למסך ההגדרות (המסך הראשון תמיד). */
   const [pendingGame, setPendingGame] = useState<GameFile | null>(null);
   const [game, setGame] = useState<GameFile | null>(null);
+  /** האם המשחק נטען כמשחק אופליין (ZIP) — משפיע על באנר/רישיון במשחק. */
+  const [offline, setOffline] = useState(false);
   const [settings, setSettings] = useState<GameSettings>({
     ...DEFAULT_GAME_SETTINGS,
     crowdEnabled: params.demo || DEFAULT_GAME_SETTINGS.crowdEnabled,
@@ -78,6 +80,7 @@ export function App() {
         const raw: unknown = await response.json();
         const loaded = parseGameFile(raw);
         if (!cancelled) {
+          setOffline(false); // ‏?game=URL — משחק אונליין
           setPendingGame(loaded);
           setRemoteLoading(false);
         }
@@ -154,6 +157,7 @@ export function App() {
         onSettingsChange={setSettings}
         onRequestRefresh={() => void refetchGame()}
         voteServerUrl={params.voteServer ?? VOTE_SERVER_URL}
+        offline={offline}
       />
     );
   }
@@ -190,6 +194,7 @@ export function App() {
 
   const loadRaw = (raw: unknown) => {
     try {
+      setOffline(false); // בחירת fixture / העלאת JSON — משחק אונליין
       setPendingGame(parseGameFile(raw));
       setError(null);
     } catch (e) {
@@ -202,6 +207,7 @@ export function App() {
       .arrayBuffer()
       .then((buffer) => loadGameFromZip(buffer))
       .then(({ game }) => {
+        setOffline(true); // ZIP — משחק אופליין
         setPendingGame(game);
         setError(null);
       })

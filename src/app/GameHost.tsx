@@ -81,7 +81,12 @@ interface GameHostProps {
   onRequestRefresh?: () => void;
   /** כתובת שרת ההצבעות (ברירת מחדל מוזרקת מ-App). */
   voteServerUrl: string;
+  /** המשחק נטען כאופליין (ZIP) — פטור מבאנר ההצטרפות ומבדיקת הרישיון. */
+  offline: boolean;
 }
+
+/** מספר החיוג להצטרפות למשחקי טלפונים. */
+const JOIN_DIAL_NUMBER = '033064361';
 
 export function GameHost({
   game,
@@ -89,6 +94,7 @@ export function GameHost({
   onSettingsChange,
   onRequestRefresh,
   voteServerUrl,
+  offline,
 }: GameHostProps) {
   // המנוע נוצר פעם אחת; רענון תוכן מתבצע דרך engine.updateGame בלי remount,
   // כדי לשמר את מהלך המשחק (ניקוד/מיקום). ראו useEffect על שינוי game למטה.
@@ -97,7 +103,11 @@ export function GameHost({
   // מקור ההצבעות: שרת הסוקט האמיתי במשחק אונליין (יש קוד חדר ואין שחקני דמה),
   // אחרת ReplayAdapter (דמו/סינתטי, וגם אופליין — בלי רשת).
   const roomId = game.room ?? '';
+  const hasRoom = roomId !== '';
   const useSocket = !settings.crowdEnabled && roomId !== '';
+  // באנר הצטרפות: משחק אונליין עם קוד חדר. אזהרת רישיון: אונליין בלי קוד חדר.
+  const showJoinBanner = !offline && hasRoom;
+  const showLicenseWarning = !offline && !hasRoom;
   const adapter = useMemo<VoteAdapter>(
     () => (useSocket ? new SocketVoteAdapter(voteServerUrl) : new ReplayAdapter()),
     [useSocket, voteServerUrl],
@@ -111,6 +121,8 @@ export function GameHost({
   const [settingsOpen, setSettingsOpen] = useState(false);
   /** לשונית "שמות וקבוצות" — מרשם השחקנים, נגיש לכל אורך המשחק. */
   const [rosterOpen, setRosterOpen] = useState(false);
+  /** אישור אזהרת הרישיון (משחק בלי קוד חדר) — נסגר בלחיצה. */
+  const [licenseAck, setLicenseAck] = useState(false);
   const [roster, setRoster] = useState<RosterData>(() => loadRoster(game.id));
   const updateRoster = useCallback(
     (next: RosterData) => {
@@ -654,8 +666,19 @@ export function GameHost({
 
   // קליק עכבר אינו מקדם שלבים — קידום רק ברווח/0 (בקשת המנחה)
   return (
-    <div className="game-root" dir="rtl" style={themeStyle(setting)}>
+    <div
+      className={`game-root${showJoinBanner ? ' has-banner' : ''}`}
+      dir="rtl"
+      style={themeStyle(setting)}
+    >
       <Stage>
+        {/* באנר הצטרפות עליון — משחק אונליין עם קוד חדר, לכל אורך המשחק */}
+        {showJoinBanner && (
+          <div className="join-banner">
+            📞 להצטרפות למשחק חייגו <b>{JOIN_DIAL_NUMBER}</b> והקישו את קוד המשחק:{' '}
+            <b className="join-banner-code">{roomId}</b>
+          </div>
+        )}
         {stage === 'opening' && <LobbyScreen engine={engine} players={connectedPlayers} />}
         {stage === 'playing' && (
           <>
@@ -705,6 +728,18 @@ export function GameHost({
             onChange={updateRoster}
             onClose={() => setRosterOpen(false)}
           />
+        )}
+
+        {/* אזהרת רישיון — משחק אונליין בלי קוד חדר: אפשר להריץ רק עם שחקני דמה */}
+        {showLicenseWarning && !licenseAck && (
+          <div className="license-modal">
+            <div className="license-modal-box">
+              <div className="license-modal-icon">🔒</div>
+              <h2>אין רישיון פעיל</h2>
+              <p>למשחק זה אין קוד חדר — ניתן להפעיל אותו רק עם שחקני דמה.</p>
+              <button onClick={() => setLicenseAck(true)}>הבנתי</button>
+            </div>
+          </div>
         )}
 
         <span
