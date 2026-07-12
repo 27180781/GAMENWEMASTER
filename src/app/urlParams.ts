@@ -36,6 +36,18 @@ export function parseAppParams(search: string): AppParams {
   return { gameUrl, pushUrl, voteServer, demo };
 }
 
+/** מעברים אוטומטיים — ברירת מחדל מה-JSON, ניתן לדריסה בהגדרות ולשמירה. */
+export interface AutoTransition {
+  /** הצגת התשובות אוטומטית לאחר הצגת השאלה. */
+  showAnswersAfterQuestion: boolean;
+  /** התחלת הטיימר אוטומטית לאחר הצגת התשובה האחרונה. */
+  startTimerAfterLastAnswer: boolean;
+  /** הצגת התשובה הנכונה אוטומטית לאחר סיום הטיימר. */
+  showCorrectAnswerAfterTimer: boolean;
+  /** מעבר אוטומטי לשקופית הבאה לאחר X שניות. */
+  nextSlide: { active: boolean; seconds: number };
+}
+
 /**
  * הגדרות המשחק — נקבעות במסך ההגדרות (המסך הראשון, וגם נגיש בכפתור ⚙
  * בכל שלב במשחק).
@@ -59,7 +71,16 @@ export interface GameSettings {
    * ולא הצבעות — הוא לא משתתף במשחק. ריק = אין שלט מנחה.
    */
   hostVoterId: string;
+  /** מעברים אוטומטיים (ברירת מחדל מה-JSON, ניתן לדריסה ולשמירה ב-localStorage). */
+  autoTransition: AutoTransition;
 }
+
+export const DEFAULT_AUTO_TRANSITION: AutoTransition = {
+  showAnswersAfterQuestion: false,
+  startTimerAfterLastAnswer: false,
+  showCorrectAnswerAfterTimer: false,
+  nextSlide: { active: false, seconds: 6 },
+};
 
 export const DEFAULT_GAME_SETTINGS: GameSettings = {
   crowdEnabled: true,
@@ -68,4 +89,38 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   correctBias: 0.55,
   intervalMs: 300,
   hostVoterId: '',
+  autoTransition: DEFAULT_AUTO_TRANSITION,
 };
+
+/**
+ * דריסת המעברים האוטומטיים נשמרת ב-localStorage לפי מזהה המשחק — כך שהעדפת
+ * המפעיל נשמרת בין רענונים, ומשחק חדש (id אחר) חוזר לברירת המחדל שלו מה-JSON.
+ */
+const AUTO_TRANSITION_KEY = (gameId: string) => `trivia:autoTransition:${gameId}`;
+
+export function loadAutoTransition(gameId: string): AutoTransition | null {
+  try {
+    const raw = localStorage.getItem(AUTO_TRANSITION_KEY(gameId));
+    if (raw === null) return null;
+    const parsed = JSON.parse(raw) as Partial<AutoTransition>;
+    return {
+      showAnswersAfterQuestion: Boolean(parsed.showAnswersAfterQuestion),
+      startTimerAfterLastAnswer: Boolean(parsed.startTimerAfterLastAnswer),
+      showCorrectAnswerAfterTimer: Boolean(parsed.showCorrectAnswerAfterTimer),
+      nextSlide: {
+        active: Boolean(parsed.nextSlide?.active),
+        seconds: Number(parsed.nextSlide?.seconds) || 6,
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function saveAutoTransition(gameId: string, value: AutoTransition): void {
+  try {
+    localStorage.setItem(AUTO_TRANSITION_KEY(gameId), JSON.stringify(value));
+  } catch {
+    /* localStorage לא זמין — מתעלמים */
+  }
+}

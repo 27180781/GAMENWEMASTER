@@ -19,7 +19,13 @@ import { GameHost } from './GameHost.tsx';
 import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.ts';
 import { openPushChannel } from './pushChannel.ts';
 import { VOTE_SERVER_URL } from './socketAdapter.ts';
-import { DEFAULT_GAME_SETTINGS, parseAppParams, type GameSettings } from './urlParams.ts';
+import {
+  DEFAULT_GAME_SETTINGS,
+  loadAutoTransition,
+  parseAppParams,
+  saveAutoTransition,
+  type GameSettings,
+} from './urlParams.ts';
 import { loadGameFromZip } from './zipLoader.ts';
 
 import hadassah from '../../fixtures/hadassah-ozen.json';
@@ -105,6 +111,25 @@ export function App() {
   });
   const [remoteLoading, setRemoteLoading] = useState(params.gameUrl !== null);
   const [error, setError] = useState<string | null>(null);
+
+  // בטעינת משחק — טוענים את המעברים האוטומטיים מברירת המחדל שב-JSON, אלא אם
+  // נשמרה דריסה ב-localStorage למשחק הזה (id). כך ההעדפה נשמרת בין רענונים,
+  // ומשחק חדש חוזר לברירת המחדל שלו.
+  useEffect(() => {
+    if (pendingGame === null) return;
+    const at = loadAutoTransition(pendingGame.id) ?? pendingGame.setting.autoTransition;
+    setSettings((prev) => ({ ...prev, autoTransition: at }));
+  }, [pendingGame]);
+
+  /** עדכון הגדרות + שמירת דריסת המעברים האוטומטיים ל-localStorage (פעולת מפעיל). */
+  const persistAndSetSettings = useCallback(
+    (next: GameSettings) => {
+      const id = game?.id ?? pendingGame?.id;
+      if (id !== undefined) saveAutoTransition(id, next.autoTransition);
+      setSettings(next);
+    },
+    [game, pendingGame],
+  );
 
   // טעינת משחק מכתובת חיצונית (?game=URL)
   useEffect(() => {
@@ -210,7 +235,7 @@ export function App() {
         key={game.id}
         game={game}
         settings={settings}
-        onSettingsChange={setSettings}
+        onSettingsChange={persistAndSetSettings}
         onRequestRefresh={() => void refetchGame()}
         voteServerUrl={params.voteServer ?? VOTE_SERVER_URL}
         offline={offline}
@@ -227,7 +252,7 @@ export function App() {
           initial={settings}
           mode="start"
           onSave={(saved) => {
-            setSettings(saved);
+            persistAndSetSettings(saved);
             setGame(pendingGame);
           }}
         />

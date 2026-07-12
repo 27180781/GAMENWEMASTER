@@ -44,6 +44,33 @@ describe('טעינה וולידציה של 4 קבצי המשחק האמיתיי�
   });
 });
 
+describe('autoTransition — ברירת מחדל ותקינות', () => {
+  it('קובץ בלי autoTransition — מקבל ברירת מחדל (הכל כבוי, nextSlide 6 שניות)', () => {
+    const game = makeGame([rawSlide({ id: 1, type: 'trivia', answers: fourAnswers(1) })]);
+    expect(game.setting.autoTransition).toEqual({
+      showAnswersAfterQuestion: false,
+      startTimerAfterLastAnswer: false,
+      showCorrectAnswerAfterTimer: false,
+      nextSlide: { active: false, seconds: 6 },
+    });
+  });
+
+  it('autoTransition מהקובץ נשמר כמו שהוא', () => {
+    const raw = rawGame([rawSlide({ id: 1, type: 'trivia', answers: fourAnswers(1) })], {});
+    (raw.setting as Record<string, unknown>).autoTransition = {
+      showAnswersAfterQuestion: true,
+      startTimerAfterLastAnswer: true,
+      showCorrectAnswerAfterTimer: false,
+      nextSlide: { active: true, seconds: 8 },
+    };
+    const game = parseGameFile(raw);
+    expect(game.setting.autoTransition.showAnswersAfterQuestion).toBe(true);
+    expect(game.setting.autoTransition.startTimerAfterLastAnswer).toBe(true);
+    expect(game.setting.autoTransition.showCorrectAnswerAfterTimer).toBe(false);
+    expect(game.setting.autoTransition.nextSlide).toEqual({ active: true, seconds: 8 });
+  });
+});
+
 describe('שגיאות ולידציה בעברית עם מיקום מדויק', () => {
   it('שדה מספרי פגום בשקופית — הודעה עם מספר שקופית ו-id', () => {
     const raw = loadFixtureRaw('hadassah-ozen.json') as {

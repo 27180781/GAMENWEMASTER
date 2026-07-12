@@ -4,9 +4,9 @@
  * ושלט המנחה.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { GameFile } from '../engine/index.ts';
-import type { GameSettings } from '../app/urlParams.ts';
+import type { AutoTransition, GameSettings } from '../app/urlParams.ts';
 
 const SPEED_PRESETS: { label: string; value: number }[] = [
   { label: 'איטי — מפוזר על כל חלון ההצבעה', value: 1 },
@@ -30,8 +30,16 @@ export function SettingsScreen({ game, initial, mode, onSave }: SettingsScreenPr
   const [correctPercent, setCorrectPercent] = useState(Math.round(initial.correctBias * 100));
   const [intervalMs, setIntervalMs] = useState(initial.intervalMs);
   const [hostVoterId, setHostVoterId] = useState(initial.hostVoterId);
+  const [autoTransition, setAutoTransition] = useState<AutoTransition>(initial.autoTransition);
+  // ברירת המחדל של המעברים נטענת אסינכרונית (מה-JSON/‏localStorage) אחרי טעינת
+  // המשחק — מסתנכרנים איתה כשהיא מתעדכנת, לפני שהמפעיל עורך ידנית.
+  useEffect(() => {
+    setAutoTransition(initial.autoTransition);
+  }, [initial.autoTransition]);
 
   const clampedVoters = Math.min(5000, Math.max(1, Math.floor(voterCount) || 1));
+  const patchAuto = (patch: Partial<AutoTransition>) =>
+    setAutoTransition((a) => ({ ...a, ...patch }));
 
   return (
     <div className="screen settings-screen">
@@ -117,6 +125,57 @@ export function SettingsScreen({ game, initial, mode, onSave }: SettingsScreenPr
               ההקשות שלו הן פקודות מנחה (0 קדימה, 2 אחורה, 1 מובילים...) — הוא לא משתתף בהצבעות
             </span>
           </label>
+
+          <div className="demo-auto-title">מעברים אוטומטיים</div>
+          <label className="demo-field demo-field--row">
+            <input
+              type="checkbox"
+              checked={autoTransition.showAnswersAfterQuestion}
+              onChange={(e) => patchAuto({ showAnswersAfterQuestion: e.target.checked })}
+            />
+            <span>הצגת התשובות אוטומטית לאחר הצגת השאלה</span>
+          </label>
+          <label className="demo-field demo-field--row">
+            <input
+              type="checkbox"
+              checked={autoTransition.startTimerAfterLastAnswer}
+              onChange={(e) => patchAuto({ startTimerAfterLastAnswer: e.target.checked })}
+            />
+            <span>התחלת הטיימר אוטומטית לאחר התשובה האחרונה</span>
+          </label>
+          <label className="demo-field demo-field--row">
+            <input
+              type="checkbox"
+              checked={autoTransition.showCorrectAnswerAfterTimer}
+              onChange={(e) => patchAuto({ showCorrectAnswerAfterTimer: e.target.checked })}
+            />
+            <span>הצגת התשובה הנכונה אוטומטית לאחר סיום הטיימר</span>
+          </label>
+          <label className="demo-field demo-field--row demo-field--auto-next">
+            <input
+              type="checkbox"
+              checked={autoTransition.nextSlide.active}
+              onChange={(e) =>
+                patchAuto({ nextSlide: { ...autoTransition.nextSlide, active: e.target.checked } })
+              }
+            />
+            <span>מעבר אוטומטי לשקופית הבאה — לאחר</span>
+            <input
+              type="number"
+              min="1"
+              max="120"
+              value={autoTransition.nextSlide.seconds}
+              onChange={(e) =>
+                patchAuto({
+                  nextSlide: {
+                    ...autoTransition.nextSlide,
+                    seconds: Math.max(1, Math.min(120, Number(e.target.value) || 6)),
+                  },
+                })
+              }
+            />
+            <span>שניות</span>
+          </label>
         </div>
 
         <button
@@ -129,6 +188,7 @@ export function SettingsScreen({ game, initial, mode, onSave }: SettingsScreenPr
               correctBias: correctPercent / 100,
               intervalMs: Math.min(2000, Math.max(50, intervalMs || 300)),
               hostVoterId: hostVoterId.trim(),
+              autoTransition,
             })
           }
         >

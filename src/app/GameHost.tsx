@@ -53,6 +53,8 @@ const RAIL_MAX = 9;
  * (‏~7 עדכונים/שנייה) כדי למנוע סופת רינדור. ההצבעות מצטברות — לא הולך לאיבוד.
  */
 const VOTE_THROTTLE_MS = 140;
+/** השהיה בין שלבי מעבר אוטומטי (הצגת שאלה/תשובה · פתיחת הצבעה · חשיפת תשובה). */
+const AUTO_STEP_MS = 1000;
 /** פלטת צבעים לאווטרים במסילת המצטרפים (מהעיצוב). */
 const RAIL_COLORS = [
   '#FF6B6B',
@@ -715,6 +717,55 @@ export function GameHost({
     );
     return () => window.clearTimeout(timeout);
   }, [stage, state.phase, state.activeMedia, state.currentSlideId, engine, slide]);
+
+  // -------------------------------------------------------------------------
+  // מעברים אוטומטיים (autoTransition) — מבצע אוטומטית את השלב הבא לפי הדגלים:
+  // הצגת השאלה+תשובות · פתיחת הטיימר · חשיפת התשובה הנכונה · מעבר לשקופית הבאה.
+  // בכל רגע נבחרת פעולה אחת; לחיצת מפעיל ידנית פשוט מקדימה את אותה פעולה.
+  // -------------------------------------------------------------------------
+  const autoT = settings.autoTransition;
+  useEffect(() => {
+    if (stage !== 'playing' || state.activeMedia !== null) return;
+    const s = engine.getCurrentSlide();
+    const votable = isVotableSlide(s);
+    const totalAnswers = s.question.answers.length;
+
+    let action: (() => void) | null = null;
+    let delayMs = AUTO_STEP_MS;
+
+    if (state.phase === 'showing' && votable) {
+      if (autoT.showAnswersAfterQuestion && !reveal.questionShown) {
+        action = () => {
+          setReveal((r) => ({ ...r, questionShown: true }));
+          audio.play('showQuestion', sounds.showQuestionMediaSound.src);
+        };
+      } else if (autoT.showAnswersAfterQuestion && reveal.questionShown && reveal.answersShown < totalAnswers) {
+        action = () => setReveal((r) => ({ ...r, answersShown: r.answersShown + 1 }));
+      } else if (autoT.startTimerAfterLastAnswer && reveal.questionShown && reveal.answersShown >= totalAnswers) {
+        action = () => engine.dispatch({ type: 'OPEN_VOTING', at: Date.now() });
+      }
+    } else if (state.phase === 'showing' && !votable) {
+      if (autoT.nextSlide.active) {
+        action = () => engine.dispatch({ type: 'ADVANCE', at: Date.now() });
+        delayMs = Math.max(1, autoT.nextSlide.seconds) * 1000;
+      }
+    } else if (state.phase === 'results') {
+      const isTrivia = s.type === 'trivia';
+      if (autoT.showCorrectAnswerAfterTimer && isTrivia && !reveal.revealCorrect) {
+        action = () => {
+          setReveal((r) => ({ ...r, revealCorrect: true }));
+          audio.play('inShowAns', sounds.inShowAnsMediaSound.src);
+        };
+      } else if (autoT.nextSlide.active && (!isTrivia || reveal.revealCorrect)) {
+        action = () => engine.dispatch({ type: 'ADVANCE', at: Date.now() });
+        delayMs = Math.max(1, autoT.nextSlide.seconds) * 1000;
+      }
+    }
+
+    if (action === null) return;
+    const timeout = window.setTimeout(action, delayMs);
+    return () => window.clearTimeout(timeout);
+  }, [stage, state.phase, state.currentSlideId, state.activeMedia, reveal, autoT, engine, audio, sounds]);
 
   // -------------------------------------------------------------------------
   // סאונד לפי מצב (SPEC סעיף 9): התחברות / מנצחים / רשימת זוכים / מובילים
