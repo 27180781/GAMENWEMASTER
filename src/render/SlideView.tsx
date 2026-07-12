@@ -15,8 +15,12 @@ interface SlideViewProps {
   state: GameState;
   timer: TimerView | null;
   reveal: RevealState;
-  /** מסילת המצטרפים — עונים אחרונים (שכבר עברו רזולוציה לשם). */
+  /** עונים אחרונים (שכבר עברו רזולוציה לשם) — לאווטרים המתעופפים. */
   players: RailPlayer[];
+  /** חמשת הראשונים שענו נכונה על השקופית — לפס המובילים בחשיפה. */
+  leaders: RailPlayer[];
+  /** כמות המחוברים למשחק — יעד לבר "כמה ענו". */
+  connectedCount: number;
 }
 
 /**
@@ -37,7 +41,15 @@ export function slideBackgroundSrc(slide: Slide, triviaMedia: string): string {
   return '';
 }
 
-export function SlideView({ engine, state, timer, reveal, players }: SlideViewProps) {
+export function SlideView({
+  engine,
+  state,
+  timer,
+  reveal,
+  players,
+  leaders,
+  connectedCount,
+}: SlideViewProps) {
   const slide = engine.getCurrentSlide();
 
   // מדיה חוסמת — מסך מלא. מנוגנת אוטומטית; המעבר ממנה הוא ידני (רווח/0),
@@ -77,6 +89,10 @@ export function SlideView({ engine, state, timer, reveal, players }: SlideViewPr
             questionNumber={votableSlides.findIndex((s) => s.id === slide.id) + 1}
             questionTotal={votableSlides.length}
             players={players}
+            leaders={leaders}
+            connectedCount={connectedCount}
+            title={engine.getGame().setting.titleThroughoutGame}
+            logo={engine.getGame().setting.logo.src}
           />
         )}
       </div>

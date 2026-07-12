@@ -165,7 +165,7 @@ export function GameHost({
   const [timer, setTimer] = useState<TimerView | null>(null);
   /** שלבי החשיפה של השקופית הנוכחית (שאלה / תשובות / תשובה נכונה). */
   const [reveal, setReveal] = useState<RevealState>(NO_REVEAL);
-  /** מזהי המצביעים האחרונים בשקופית הנוכחית (החדש ראשון) — למסילת המצטרפים. */
+  /** מזהי המצביעים האחרונים בשקופית הנוכחית (החדש ראשון) — לאווטרים המתעופפים. */
   const [answerers, setAnswerers] = useState<string[]>([]);
   const players = useMemo<RailPlayer[]>(
     () =>
@@ -174,6 +174,16 @@ export function GameHost({
         return { id, name, initial: railInitial(name), color: RAIL_COLORS[hashId(id) % RAIL_COLORS.length]! };
       }),
     [answerers, nameOf],
+  );
+  /** מי שענה נכונה על השקופית הנוכחית, לפי סדר הגעה (המהיר ראשון) — לפס המובילים. */
+  const [correctAnswerers, setCorrectAnswerers] = useState<string[]>([]);
+  const leaders = useMemo<RailPlayer[]>(
+    () =>
+      correctAnswerers.slice(0, 5).map((id) => {
+        const name = nameOf(id);
+        return { id, name, initial: railInitial(name), color: RAIL_COLORS[hashId(id) % RAIL_COLORS.length]! };
+      }),
+    [correctAnswerers, nameOf],
   );
   /** כל מי שהתחבר למשחק (לחץ מקש) — למסך הלובי. סדר הצטרפות. */
   const [connectedIds, setConnectedIds] = useState<string[]>([]);
@@ -208,6 +218,7 @@ export function GameHost({
   useEffect(() => {
     setReveal(NO_REVEAL);
     setAnswerers([]);
+    setCorrectAnswerers([]);
     lastHostAnswerRef.current = null;
   }, [state.currentSlideId]);
 
@@ -275,6 +286,23 @@ export function GameHost({
         if (additions.length === 0) return prev;
         return [...additions.reverse(), ...prev].slice(0, RAIL_MAX);
       });
+      // מובילים: מזהי מי שענה נכונה, לפי סדר הגעה (המהיר ראשון)
+      const correctIds = new Set(
+        engine.getCurrentSlide().question.answers.filter((a) => a.correct).map((a) => a.id),
+      );
+      if (correctIds.size > 0) {
+        setCorrectAnswerers((prev) => {
+          const seen = new Set(prev);
+          const additions: string[] = [];
+          for (const [voterId, answerId] of Object.entries(voters)) {
+            if (!seen.has(voterId) && correctIds.has(answerId)) {
+              seen.add(voterId);
+              additions.push(voterId);
+            }
+          }
+          return additions.length === 0 ? prev : [...prev, ...additions];
+        });
+      }
     }
   }, [engine]);
   const flushVotesRef = useRef(flushPendingVotes);
@@ -768,7 +796,15 @@ export function GameHost({
         {stage === 'opening' && <LobbyScreen engine={engine} players={connectedPlayers} />}
         {stage === 'playing' && (
           <>
-            <SlideView engine={engine} state={state} timer={timer} reveal={reveal} players={players} />
+            <SlideView
+              engine={engine}
+              state={state}
+              timer={timer}
+              reveal={reveal}
+              players={players}
+              leaders={leaders}
+              connectedCount={connectedIds.length}
+            />
             {/* מיקום במשחק: שקופית נוכחית מתוך סה"כ */}
             <span className="slide-counter" dir="ltr">
               {state.currentSlideIndex + 1}/{engine.getGame().questions.length}
