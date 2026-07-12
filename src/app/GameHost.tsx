@@ -803,7 +803,6 @@ export function GameHost({
               reveal={reveal}
               players={players}
               leaders={leaders}
-              connectedCount={connectedIds.length}
             />
             {/* מיקום במשחק: שקופית נוכחית מתוך סה"כ */}
             <span className="slide-counter" dir="ltr">

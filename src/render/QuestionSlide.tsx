@@ -63,8 +63,6 @@ interface QuestionSlideProps {
   players: RailPlayer[];
   /** חמשת הראשונים שענו נכונה על השקופית (המהיר ראשון) — לפס המובילים בחשיפה. */
   leaders: RailPlayer[];
-  /** כמות המחוברים למשחק — יעד לבר "כמה ענו". */
-  connectedCount: number;
   /** שם המשחק לכל אורכו (setting.titleThroughoutGame). */
   title: string;
   /** לוגו המשחק (setting.logo) — עיגול בכותרת; ריק ⇐ מוסתר. */
@@ -155,7 +153,6 @@ export function QuestionSlide({
   questionTotal,
   players,
   leaders,
-  connectedCount,
   title,
   logo,
 }: QuestionSlideProps) {
@@ -174,11 +171,14 @@ export function QuestionSlide({
 
   const hasImage = slide.question.src !== '';
   const low = timer !== null && !timer.paused && timer.remaining <= 5;
+  // שבר הטיימר — נותר/סה"כ, מדויק לפי השניות (מתעדכן כל 200ms מ-GameHost).
   const timerFrac = timer && timer.total > 0 ? Math.max(0, timer.remaining / timer.total) : 1;
 
-  // בר "כמה ענו" (לבן) בתוך בלוק הספירה-לאחור — יעד = כמות המחוברים.
-  const answeredTarget = connectedCount > 0 ? connectedCount : Math.max(total, 1);
-  const answeredFrac = Math.min(1, total / answeredTarget);
+  // אחוז שענו נכון (מתוך מי שענה) — לפס הירוק/אדום החי בתחתית, בזמן ההצבעה.
+  const correctCount = answers
+    .filter((a) => a.correct)
+    .reduce((sum, a) => sum + (counts[String(a.id)] ?? 0), 0);
+  const correctPct = total > 0 ? Math.round((correctCount / total) * 100) : 0;
 
   return (
     <div className="q-screen">
@@ -213,14 +213,15 @@ export function QuestionSlide({
 
         {/* אזור ראשי */}
         <div className="q-main">
-          {/* ספירה לאחור — רק בזמן ההצבעה (הטיימר רץ) */}
+          {/* ספירה לאחור — רק בזמן ההצבעה: עיגול השניות + פס הטיימר שאוזל
+              במדויק לפי הזמן שנותר (צבע ראשי/משני). */}
           {isVoting && (
             <div className="q-countdown">
               <div className={`q-count-num${low ? ' q-count-num--low' : ''}`}>
                 {timer?.paused ? '⏸' : Math.max(0, Math.ceil(timer?.remaining ?? 0))}
               </div>
-              <div className="q-count-track">
-                <div className="q-count-fill" style={{ width: `${answeredFrac * 100}%` }} />
+              <div className={`q-count-track${low ? ' q-count-track--low' : ''}`}>
+                <div className="q-count-fill" style={{ width: `${timerFrac * 100}%` }} />
               </div>
             </div>
           )}
@@ -265,17 +266,25 @@ export function QuestionSlide({
           </ul>
         </div>
 
-        {/* כותרת תחתית — טיימר בזמן ההצבעה, מובילים בחשיפה */}
+        {/* כותרת תחתית — פס צדקו/טעו (ירוק/אדום קבוע) חי בזמן ההצבעה, מובילים בחשיפה */}
         <div className={`q-footer${showBoard ? ' q-footer--board' : ''}`}>
           {showBoard ? (
             <Leaderboard leaders={leaders} />
-          ) : (
-            <div className="q-timer-wrap">
-              <div className={`q-timer${low ? ' q-timer--low' : ''}`}>
-                <div className="q-timer-fill" style={{ width: `${timerFrac * 100}%` }} />
-              </div>
+          ) : isVoting && isTrivia ? (
+            <div className="q-splitbar">
+              {total > 0 ? (
+                <>
+                  <div className="q-splitbar-correct" style={{ width: `${correctPct}%` }} />
+                  <div className="q-splitbar-text">
+                    <span>{correctPct}% צדקו</span>
+                    <span>{100 - correctPct}% טעו</span>
+                  </div>
+                </>
+              ) : (
+                <div className="q-splitbar-text q-splitbar-text--center">ממתינים לתשובות…</div>
+              )}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
 
