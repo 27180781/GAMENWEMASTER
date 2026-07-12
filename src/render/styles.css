@@ -507,7 +507,13 @@ body {
   background: rgba(255, 90, 95, 0.85);
 }
 .q-split--waiting .q-split-bar { background: var(--panel2); }
-.q-split-correct { position: absolute; inset-block: 0; inset-inline-start: 0; background: var(--correct); }
+.q-split-correct {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  background: var(--correct);
+  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
 .q-split-text {
   position: absolute;
   inset: 0;

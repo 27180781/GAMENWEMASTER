@@ -5,8 +5,11 @@
  * גריד תשובות · פס "צדקו/טעו") ולצדה מסילת שחקנים ("מצטרפים").
  *
  * הזרימה נשארת בשליטת המנחה (SPEC): השאלה נחשפת, אחר כך התשובות אחת-אחת,
- * ההצבעה נפתחת עם הטיימר, והתשובה הנכונה + האחוזים נחשפים בלחיצה נפרדת —
- * אחוזים מוצגים רק בחשיפה. הצבעים (רקע התיבות + הטקסט) מגיעים מקובץ המשחק.
+ * ההצבעה נפתחת עם הטיימר, והתשובה הנכונה + אחוזי התשובות נחשפים בלחיצה נפרדת —
+ * אחוזי-התשובות מוצגים רק בחשיפה. הצבעים (רקע התיבות + הטקסט) מגיעים מקובץ המשחק.
+ *
+ * פס "צדקו/טעו" (אדום/לבן) מופיע רק בזמן ההצבעה (כל עוד הטיימר רץ) וזז בלייב
+ * ככל שמגיעות תשובות; עם חשיפת התשובה הנכונה הוא נעלם.
  */
 
 import type { GameState, Slide } from '../engine/index.ts';
@@ -55,6 +58,8 @@ export function QuestionSlide({
   players,
 }: QuestionSlideProps) {
   const isResults = state.phase === 'results';
+  /** ההצבעה פתוחה והטיימר רץ — רק אז מוצג פס "צדקו/טעו" החי. */
+  const votingLive = state.phase === 'voting';
   const isTrivia = slide.type === 'trivia';
   const isImages = slide.type === 'ans_images';
   const answers = slide.question.answers;
@@ -155,28 +160,31 @@ export function QuestionSlide({
           })}
         </ul>
 
-        {/* פס צדקו/טעו — trivia בלבד */}
+        {/* פס צדקו/טעו — trivia בלבד: מופיע וזז בלייב בזמן ההצבעה, ונעלם בחשיפת
+            התשובה. המעטפת נשארת תמיד (שומרת גובה) כדי שהגריד לא יקפוץ. */}
         {isTrivia && (
-          <div className={`q-split${reveal.revealCorrect ? '' : ' q-split--waiting'}`}>
-            <span className="q-split-label">
-              <span className="q-split-label-dot" />
-              {reveal.revealCorrect ? 'תוצאה סופית' : 'בזמן אמת'}
-            </span>
-            <div className="q-split-bar">
-              {reveal.revealCorrect ? (
-                <>
-                  <div className="q-split-correct" style={{ width: `${correctPct}%` }} />
-                  <div className="q-split-text">
-                    <span>{correctPct}% צדקו</span>
-                    <span>{100 - correctPct}% טעו</span>
-                  </div>
-                </>
-              ) : (
-                <div className="q-split-text q-split-text--center">
-                  {total > 0 ? `${total} ענו` : 'ממתינים לתשובות…'}
+          <div className={`q-split${votingLive && total === 0 ? ' q-split--waiting' : ''}`}>
+            {votingLive && (
+              <>
+                <span className="q-split-label">
+                  <span className="q-split-label-dot" />
+                  בזמן אמת
+                </span>
+                <div className="q-split-bar">
+                  {total > 0 ? (
+                    <>
+                      <div className="q-split-correct" style={{ width: `${correctPct}%` }} />
+                      <div className="q-split-text">
+                        <span>{correctPct}% צדקו</span>
+                        <span>{100 - correctPct}% טעו</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="q-split-text q-split-text--center">ממתינים לתשובות…</div>
+                  )}
                 </div>
-              )}
-            </div>
+              </>
+            )}
           </div>
         )}
       </div>
