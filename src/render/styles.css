@@ -7,6 +7,29 @@
  * פסים שחורים.
  */
 
+/* גופני המשחק — Kanuba (עברית + לטינית + ספרות), מוטמעים בבנייה. */
+@font-face {
+  font-family: 'Kanuba';
+  src: url('./fonts/kanuba-light.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Kanuba';
+  src: url('./fonts/kanuba-regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Kanuba';
+  src: url('./fonts/kanuba-bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -20,7 +43,7 @@ body,
 }
 
 body {
-  font-family: 'Heebo', 'Assistant', 'Rubik', 'Segoe UI', system-ui, sans-serif;
+  font-family: 'Kanuba', 'Heebo', 'Assistant', 'Rubik', 'Segoe UI', system-ui, sans-serif;
   background: #000;
   color: #fff;
   overflow: hidden;
@@ -507,7 +530,13 @@ body {
   background: rgba(255, 90, 95, 0.85);
 }
 .q-split--waiting .q-split-bar { background: var(--panel2); }
-.q-split-correct { position: absolute; inset-block: 0; inset-inline-start: 0; background: var(--correct); }
+.q-split-correct {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  background: var(--correct);
+  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
 .q-split-text {
   position: absolute;
   inset: 0;
