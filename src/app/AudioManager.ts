@@ -1,6 +1,7 @@
 /**
  * AudioManager אחד לכל ערוצי הסאונד (SPEC סעיף 9):
- * - סאונד חדש עוצר את הקודם באותו ערוץ.
+ * - **סאונד חדש עוצר את כל הסאונדים הקודמים** (בכל הערוצים, וגם מחיאות
+ *   הכפיים) — לעולם לא מתנגנים כמה במקביל, כדי שלא יתערבבו.
  * - ווליום מפעיל גלובלי.
  * - autoplay נפתח רק אחרי אינטראקציה ראשונה (מגבלת דפדפן) — עד אז ניסיונות
  *   ניגון נכשלים בשקט ומנוגנים שוב ברגע שהמשתמש מבצע אינטראקציה.
@@ -27,17 +28,19 @@ export class AudioManager {
   private unlocked = false;
   private context: AudioContext | null = null;
   private applauseBuffer: AudioBuffer | null = null;
+  private applauseSource: AudioBufferSourceNode | null = null;
 
   constructor() {
     const unlock = () => {
       this.unlocked = true;
       window.removeEventListener('pointerdown', unlock);
       window.removeEventListener('keydown', unlock);
-      // ניגון כל מה שחיכה לאינטראקציה הראשונה
-      for (const [channel, play] of this.pending) {
+      // ניגון מה שחיכה לאינטראקציה הראשונה (play אקסקלוסיבי — נשאר האחרון)
+      const queued = [...this.pending.entries()];
+      this.pending.clear();
+      for (const [channel, play] of queued) {
         this.play(channel, play.src, { loop: play.loop });
       }
-      this.pending.clear();
     };
     window.addEventListener('pointerdown', unlock);
     window.addEventListener('keydown', unlock);
@@ -52,9 +55,11 @@ export class AudioManager {
     return this.volume;
   }
 
-  /** מנגן src בערוץ נתון; עוצר את הסאונד הקודם באותו ערוץ. src ריק/null עוצר בלבד. */
+  /** מנגן src בערוץ נתון; קודם עוצר כל סאונד אחר שמתנגן. src ריק/null עוצר בלבד. */
   play(channel: SoundChannel, src: string | null, { loop = false } = {}): void {
-    this.stop(channel);
+    // סאונד חדש עוצר את כל הקודמים (כל הערוצים + מחיאות כפיים) — בלי ערבוב
+    this.stopActiveSounds();
+    this.pending.clear();
     if (!src) return;
     if (!this.unlocked) {
       this.pending.set(channel, { src, loop });
@@ -85,8 +90,25 @@ export class AudioManager {
     }
   }
 
+  /** עוצר כל סאונד שמתנגן כרגע (ערוצים + מחיאות כפיים) בלי לגעת ב-pending. */
+  private stopActiveSounds(): void {
+    for (const audio of this.active.values()) {
+      audio.pause();
+      audio.src = '';
+    }
+    this.active.clear();
+    if (this.applauseSource) {
+      try {
+        this.applauseSource.stop();
+      } catch {
+        /* כבר הסתיים */
+      }
+      this.applauseSource = null;
+    }
+  }
+
   stopAll(): void {
-    for (const channel of [...this.active.keys()]) this.stop(channel);
+    this.stopActiveSounds();
     this.pending.clear();
   }
 
@@ -101,12 +123,18 @@ export class AudioManager {
       if (ctx.state === 'suspended') void ctx.resume();
       this.applauseBuffer ??= buildApplauseBuffer(ctx);
 
+      // גם מחיאות הכפיים עוצרות את הסאונד הקודם — בלי ערבוב
+      this.stopActiveSounds();
       const source = ctx.createBufferSource();
       source.buffer = this.applauseBuffer;
       const gain = ctx.createGain();
       gain.gain.value = this.volume;
       source.connect(gain);
       gain.connect(ctx.destination);
+      source.onended = () => {
+        if (this.applauseSource === source) this.applauseSource = null;
+      };
+      this.applauseSource = source;
       source.start();
     } catch {
       // סביבה בלי אודיו — מתעלמים בשקט
