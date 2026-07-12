@@ -385,18 +385,18 @@ body {
   height: 112px;
   border-radius: 50%;
   background: var(--pill);
-  border: 3px solid rgba(255, 255, 255, 0.28);
+  border: 3px solid color-mix(in srgb, var(--text) 42%, transparent);
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4);
   font-weight: 900;
   font-size: 54px;
   line-height: 1;
-  color: #fff;
+  color: var(--text);
   margin-bottom: -28px;
   z-index: 2;
   font-variant-numeric: tabular-nums;
   animation: numPulse 1s ease-in-out infinite;
 }
-.q-count-num--low { color: #ff6b6f; }
+.q-count-num--low { animation-duration: 0.5s; }
 .q-count-track {
   position: relative;
   width: 100%;
@@ -519,12 +519,13 @@ body {
 /* ---------- כותרת תחתית: טיימר / מובילים ---------- */
 .q-footer { flex: 0 0 auto; min-height: 92px; display: flex; align-items: center; }
 .q-timer-wrap { width: 100%; padding: 0 4px; }
+/* פס הטיימר — היפוך צבע ראשי/משני: הנותר (משני) על גבי המסלול (ראשי) */
 .q-timer {
   position: relative;
   height: 42px;
   border-radius: 999px;
-  border: 6px solid color-mix(in srgb, var(--pill) 70%, #fff 30%);
-  background: #e5342f;
+  border: 6px solid color-mix(in srgb, var(--pill) 62%, #000 38%);
+  background: var(--pill);
   overflow: hidden;
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.32), inset 0 2px 8px rgba(0, 0, 0, 0.4);
 }
@@ -534,8 +535,8 @@ body {
   inset-block: 0;
   inset-inline-start: 0;
   border-radius: 999px;
-  background: #2ec94f;
-  box-shadow: 0 0 20px rgba(57, 212, 90, 0.55);
+  background: var(--text);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--text) 45%, transparent);
   transition: width 0.15s linear;
 }
 
