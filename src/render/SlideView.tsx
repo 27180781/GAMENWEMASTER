@@ -19,8 +19,6 @@ interface SlideViewProps {
   players: RailPlayer[];
   /** חמשת הראשונים שענו נכונה על השקופית — לפס המובילים בחשיפה. */
   leaders: RailPlayer[];
-  /** כמות המחוברים למשחק — יעד לבר "כמה ענו". */
-  connectedCount: number;
 }
 
 /**
@@ -48,7 +46,6 @@ export function SlideView({
   reveal,
   players,
   leaders,
-  connectedCount,
 }: SlideViewProps) {
   const slide = engine.getCurrentSlide();
 
@@ -90,7 +87,6 @@ export function SlideView({
             questionTotal={votableSlides.length}
             players={players}
             leaders={leaders}
-            connectedCount={connectedCount}
             title={engine.getGame().setting.titleThroughoutGame}
             logo={engine.getGame().setting.logo.src}
           />
