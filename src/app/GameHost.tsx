@@ -782,12 +782,13 @@ export function GameHost({
         if (stage === 'playing' && window.confirm('לחזור שקופית שלמה אחורה?')) {
           engine.dispatch({ type: 'BACK', at: Date.now() });
         }
-      } else if (event.key === 'r' || event.key === 'R') {
+      } else if (event.code === 'KeyR' || event.key === 'r' || event.key === 'R') {
         // רענון יזום של קובץ המשחק מהשרת (בלי לאבד ניקוד/מיקום)
         event.preventDefault();
         onRequestRefresh?.();
-      } else if (event.key === 'w' || event.key === 'W') {
-        // תצוגה מקדימה של מסך המנצחים הסופי — ובלחיצה נוספת חזרה למיקום במשחק
+      } else if (event.code === 'KeyW' || event.key === 'w' || event.key === 'W') {
+        // תצוגה מקדימה של מסך המנצחים הסופי — ובלחיצה נוספת חזרה למיקום במשחק.
+        // לפי event.code (מיקום פיזי) כדי שיעבוד גם בפריסת מקלדת עברית.
         event.preventDefault();
         if (winnersPreviewRef.current !== null) {
           setStage(winnersPreviewRef.current);
@@ -797,8 +798,8 @@ export function GameHost({
           setLeadersOverlay(false);
           setStage('winners');
         }
-      } else if (event.key === 'n' || event.key === 'N') {
-        // הרצה מהירה — כל לחיצה מדלגת לשקופית הבאה, חשופה במלואה
+      } else if (event.code === 'KeyN' || event.key === 'n' || event.key === 'N') {
+        // הרצה מהירה — כל לחיצה מדלגת לשקופית הבאה, חשופה במלואה (מיקום פיזי)
         event.preventDefault();
         if (stage === 'playing') fastNextSlideRef.current();
       }
