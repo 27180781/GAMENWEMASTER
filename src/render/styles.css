@@ -470,7 +470,8 @@ body {
   animation: qpop 0.4s ease both;
   transition: background 0.45s ease, border-color 0.45s ease, opacity 0.45s ease;
 }
-.q-card--correct { background: #fff; border-color: #fff; }
+/* התשובה הנכונה — היפוך צבע ראשי/משני (מתאים לכל בחירת צבעים) */
+.q-card--correct { background: var(--text); border-color: var(--text); }
 .q-card--dim { opacity: 0.82; }
 .q-coin {
   flex: 0 0 auto;
@@ -489,7 +490,7 @@ body {
   animation: coinIn 0.5s ease both;
 }
 .q-coin--reveal { font-size: 25px; }
-.q-card--correct .q-coin { box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.6), 0 6px 16px rgba(0, 0, 0, 0.4); }
+.q-card--correct .q-coin { box-shadow: 0 0 0 4px color-mix(in srgb, var(--text) 55%, transparent), 0 6px 16px rgba(0, 0, 0, 0.4); }
 .q-card-text {
   flex: 1 1 auto;
   text-align: center;
@@ -503,7 +504,7 @@ body {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
-.q-card--correct .q-card-text { color: #241a6b; }
+.q-card--correct .q-card-text { color: var(--pill); }
 
 /* גריד תמונות (ans_images) */
 .q-answers--images .q-card { flex-direction: column; border-radius: 26px; gap: 10px; padding: 14px; }
