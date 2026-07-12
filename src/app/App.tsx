@@ -251,6 +251,7 @@ export function App() {
           game={pendingGame}
           initial={settings}
           mode="start"
+          qrAvailable={!offline && (pendingGame.room ?? '') !== ''}
           onSave={(saved) => {
             persistAndSetSettings(saved);
             setGame(pendingGame);

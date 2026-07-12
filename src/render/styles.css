@@ -1083,64 +1083,98 @@ body {
       color-mix(in srgb, rgb(var(--main-rgb, 34, 43, 69)) 60%, #000)
     );
 }
-.demo-settings { gap: 22px; }
-.demo-settings .opening-title { font-size: 76px; }
-
-.demo-checkbox {
-  font-size: 24px;
-  opacity: 0.9;
-  cursor: pointer;
-}
-
-.demo-game-name { font-size: 28px; opacity: 0.9; }
-
-.demo-form {
+/* פריסת מסך שלם: כותרת, שתי עמודות הגדרות, וכפתור התחלה תמיד גלוי בתחתית. */
+.demo-settings {
   display: flex;
   flex-direction: column;
-  gap: 26px;
-  width: 860px;
-  max-width: 92%;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  height: 100%;
+}
+
+.demo-title {
+  font-size: 60px;
+  font-weight: 900;
+  line-height: 1;
+  margin: 0;
+  text-align: center;
+}
+
+.demo-game-name { font-size: 24px; opacity: 0.9; margin: 0; }
+
+/* שתי עמודות בפריסה שממלאת את רוחב הבמה בלי לגלוש */
+.demo-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+  width: 1560px;
+  max-width: 96%;
+  align-items: start;
+}
+
+.demo-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   background: rgba(0, 0, 0, 0.32);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 18px;
-  padding: 38px 44px;
+  padding: 22px 30px;
+}
+
+.demo-col-title {
+  font-weight: 900;
+  font-size: 26px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+}
+/* כותרת-משנה בתוך עמודה (למשל אזור ה-QR) */
+.demo-col-title--sub {
+  font-size: 22px;
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  border-bottom: none;
+  padding-bottom: 0;
 }
 
 .demo-field {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  font-size: 24px;
+  gap: 8px;
+  font-size: 21px;
 }
 
 .demo-field input[type='number'],
+.demo-field input[type='text'],
 .demo-field select {
   background: #1d2440;
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 20px;
-  max-width: 340px;
+  padding: 8px 12px;
+  font-size: 19px;
+  max-width: 360px;
 }
 
 .demo-field input[type='range'] { accent-color: #4ade80; }
 
+/* שורת סליידר + תיבת מספר */
+.demo-field-inline { display: flex; align-items: center; gap: 12px; }
+.demo-field-inline input[type='range'] { flex: 1; }
+.demo-field-inline input[type='number'] { width: 96px; max-width: 96px; }
+
+.demo-hint { font-size: 16px; opacity: 0.72; line-height: 1.3; }
+
 /* שדה בשורה (צ׳קבוקס + טקסט) */
-.demo-field--row { flex-direction: row; align-items: center; gap: 14px; flex-wrap: wrap; }
-.demo-field--row input[type='checkbox'] { width: 26px; height: 26px; flex: 0 0 auto; accent-color: #4ade80; }
+.demo-field--row { flex-direction: row; align-items: center; gap: 12px; flex-wrap: wrap; }
+.demo-field--row input[type='checkbox'] { width: 24px; height: 24px; flex: 0 0 auto; accent-color: #4ade80; }
+.demo-field--row > span { flex: 1; min-width: 0; }
 
-/* מקטע מעברים אוטומטיים */
-.demo-auto-title {
-  font-weight: 800;
-  font-size: 24px;
-  margin-top: 10px;
-  padding-top: 22px;
-  border-top: 1px solid rgba(255, 255, 255, 0.18);
-}
-.demo-field--auto-next input[type='number'] { width: 90px; max-width: 90px; }
+.demo-field--auto-next input[type='number'] { width: 78px; max-width: 78px; flex: 0 0 auto; }
 
-.demo-start { font-weight: 700; }
+.demo-start { font-weight: 700; font-size: 32px; padding: 16px 56px; margin-top: 4px; }
 
 .demo-badge {
   position: absolute;
@@ -1327,6 +1361,45 @@ body {
   font-size: 28px;
   letter-spacing: 3px;
 }
+
+/* ---- קודי QR להתחברות מהטלפון ---- */
+
+/* תיבה לבנה שה-SVG של הקוד ממלא — כדי שיהיה ניתן לסריקה בכל רקע */
+.qr-code {
+  background: #fff;
+  padding: 6px;
+  border-radius: 8px;
+  box-sizing: border-box;
+  line-height: 0;
+}
+.qr-code svg { width: 100%; height: 100%; display: block; }
+
+/* QR קטן בקצה הבאנר העליון — ליד מספר החיוג, קטן שלא יפריע */
+.qr-banner {
+  position: absolute;
+  inset-inline-end: 8px;
+  top: 2px;
+  padding: 3px;
+  border-radius: 6px;
+}
+
+/* QR גדול בצד מסך הלובי (עמוד ההתחברות) */
+.lobby-qr {
+  position: absolute;
+  inset-inline-end: 56px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  background: rgba(0, 0, 0, 0.44);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 20px;
+  padding: 24px;
+}
+.lobby-qr-caption { font-size: 22px; font-weight: 700; color: #fff; text-align: center; }
 
 /* דחיפת הכרום והתוכן אל מתחת לבאנר */
 .has-banner .corner-buttons,

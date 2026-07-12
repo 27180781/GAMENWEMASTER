@@ -38,7 +38,8 @@ import { MediaPreloader, slidePreloadUrls } from './mediaPreloader.ts';
 import { displayName, loadRoster, saveRoster, type RosterData } from './roster.ts';
 import { useConnectionHealth } from './useConnectionHealth.ts';
 import { planCrowdVotes, snapshotAt } from './syntheticVotes.ts';
-import type { GameSettings } from './urlParams.ts';
+import { joinQrUrl, type GameSettings } from './urlParams.ts';
+import { QrCode } from '../render/QrCode.tsx';
 import { useEngineState } from './useEngineState.ts';
 
 type HostStage = 'opening' | 'playing' | 'winners' | 'winnersList';
@@ -119,6 +120,11 @@ export function GameHost({
   // באנר הצטרפות: משחק אונליין עם קוד חדר. אזהרת רישיון: אונליין בלי קוד חדר.
   const showJoinBanner = !offline && hasRoom;
   const showLicenseWarning = !offline && !hasRoom;
+  // QR להתחברות מהטלפון — רק במשחק אונליין מורשה (קוד חדר) ושאינו דמו, וכשסומן
+  // בהגדרות. הקוד מוביל ל-clicker.clicker.co.il/?game=<קוד המשחק>.
+  const qrAvailable = showJoinBanner;
+  const showQrCode = settings.showQr && qrAvailable && !settings.crowdEnabled;
+  const qrUrl = joinQrUrl(roomId);
   const adapter = useMemo<VoteAdapter>(
     () => (useSocket ? new SocketVoteAdapter(voteServerUrl) : new ReplayAdapter()),
     [useSocket, voteServerUrl],
@@ -884,6 +890,7 @@ export function GameHost({
           <div className="join-banner">
             📞 להצטרפות למשחק חייגו <b>{JOIN_DIAL_NUMBER}</b> והקישו את קוד המשחק:{' '}
             <b className="join-banner-code">{roomId}</b>
+            {showQrCode && <QrCode value={qrUrl} size={40} className="qr-banner" />}
           </div>
         )}
 
@@ -897,7 +904,13 @@ export function GameHost({
             ))}
           </div>
         )}
-        {stage === 'opening' && <LobbyScreen engine={engine} players={connectedPlayers} />}
+        {stage === 'opening' && (
+          <LobbyScreen
+            engine={engine}
+            players={connectedPlayers}
+            {...(showQrCode ? { qrUrl } : {})}
+          />
+        )}
         {stage === 'playing' && (
           <>
             <SlideView
@@ -988,6 +1001,7 @@ export function GameHost({
             game={game}
             initial={settings}
             mode="ingame"
+            qrAvailable={qrAvailable}
             onSave={(saved) => {
               onSettingsChange(saved);
               setSettingsOpen(false);

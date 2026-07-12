@@ -73,6 +73,13 @@ export interface GameSettings {
   hostVoterId: string;
   /** מעברים אוטומטיים (ברירת מחדל מה-JSON, ניתן לדריסה ולשמירה ב-localStorage). */
   autoTransition: AutoTransition;
+  /** הצגת QR להתחברות מטלפונים (רק במשחק אונליין עם רישיון, לא דמו). */
+  showQr: boolean;
+}
+
+/** כתובת ההתחברות מהטלפון עבור קוד QR — לפי קוד המשחק (room). */
+export function joinQrUrl(room: string): string {
+  return `https://clicker.clicker.co.il/?game=${encodeURIComponent(room)}`;
 }
 
 export const DEFAULT_AUTO_TRANSITION: AutoTransition = {
@@ -90,6 +97,7 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   intervalMs: 300,
   hostVoterId: '',
   autoTransition: DEFAULT_AUTO_TRANSITION,
+  showQr: false,
 };
 
 /**
