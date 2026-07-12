@@ -32,7 +32,8 @@ export interface RailPlayer {
   color: string;
 }
 
-const HEB_LETTERS = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח'];
+/** תגי התשובות כשאינן מספרים — אותיות לטיניות A, B, C, D… (לפי ansIsNumber ב-JSON). */
+const ANSWER_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 
 interface QuestionSlideProps {
   slide: Slide;
@@ -133,7 +134,7 @@ export function QuestionSlide({
             const highlight = isResults && reveal.revealCorrect && answer.correct;
             const dimmed =
               isResults && reveal.revealCorrect && isTrivia && !answer.correct;
-            const badge = ansIsNumber ? answer.id : HEB_LETTERS[index] ?? answer.id;
+            const badge = ansIsNumber ? answer.id : ANSWER_LETTERS[index] ?? answer.id;
             return (
               <li
                 key={answer.id}
