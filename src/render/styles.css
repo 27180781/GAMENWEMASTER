@@ -458,6 +458,12 @@ body {
   width: 100%;
   align-self: center;
 }
+/* מספר אי-זוגי של תשובות — האחרונה ממורכזת ברוחב עמודה (מראה סימטרי) */
+.q-answers > .q-card:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+  justify-self: center;
+  width: calc(50% - 10px);
+}
 .q-card {
   position: relative;
   overflow: hidden;
@@ -562,7 +568,7 @@ body {
 .q-board-stars svg:nth-child(2) { margin-bottom: 6px; }
 .q-board-name {
   background: var(--pill);
-  color: #fff;
+  color: var(--text);
   border-radius: 16px;
   min-width: 118px;
   max-width: 240px;
