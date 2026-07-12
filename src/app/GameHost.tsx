@@ -813,21 +813,14 @@ export function GameHost({
         {stage === 'winners' && <WinnersScreen engine={engine} nameOf={nameOf} />}
         {stage === 'winnersList' && <WinnersListScreen engine={engine} nameOf={nameOf} />}
 
-        {/* מסך מובילים באמצע משחק (פקודת מנחה 1) — שכבה מעל, המשחק ממשיך מתחת */}
+        {/* טבלת הניקוד באמצע משחק (פקודת מנחה 1) — מסך נפרד מלא מעל כל התצוגה */}
         {stage === 'playing' && leadersOverlay && (
-          <WinnersListScreen engine={engine} nameOf={nameOf} />
+          <div className="leaders-overlay">
+            <WinnersListScreen engine={engine} nameOf={nameOf} />
+          </div>
         )}
 
-        {/* לשונית "שמות וקבוצות" — נגישה לכל אורך המשחק */}
-        <button
-          className="roster-tab"
-          title="שמות וקבוצות"
-          onClick={() => setRosterOpen((open) => !open)}
-        >
-          👥 שמות וקבוצות
-        </button>
-
-        {/* כפתורי פינה: מסך מלא + הגדרות (תפריט המפעיל) */}
+        {/* כפתורי פינה: מסך מלא + הגדרות + שמות וקבוצות */}
         <div className="corner-buttons">
           <button
             title={isFullscreen ? 'יציאה ממסך מלא' : 'מסך מלא'}

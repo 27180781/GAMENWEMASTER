@@ -97,6 +97,23 @@ body {
   to   { opacity: 1; transform: scale(1); }
 }
 
+/* טבלת הניקוד (מקש 1) — מסך נפרד מלא מעל התצוגה. הרקע מגיע מה-JSON
+   (winnersListMedia שבתוך WinnersListScreen); כאן רקע-גיבוי אטום בצבע המשחק
+   כדי לכסות את השאלות גם כשאין מדיה. z-index מעל השקופית, מתחת לתפריט המפעיל. */
+.leaders-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 48;
+  background:
+    radial-gradient(ellipse at 50% -12%, rgba(255, 255, 255, 0.08), transparent 55%),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, rgb(var(--main-rgb, 34, 43, 69)) 80%, #000),
+      color-mix(in srgb, rgb(var(--main-rgb, 34, 43, 69)) 42%, #07030f),
+      color-mix(in srgb, rgb(var(--main-rgb, 34, 43, 69)) 60%, #000)
+    );
+}
+
 .screen-background {
   position: absolute;
   inset: 0;
@@ -1047,30 +1064,7 @@ body {
 .status-dot--reconnecting { background: #facc15; }
 .status-dot--offline { background: #f87171; }
 
-/* ---- לשונית "שמות וקבוצות" ---- */
-
-.roster-tab {
-  position: absolute;
-  top: 50%;
-  inset-inline-start: 0;
-  transform: translateY(-50%);
-  z-index: 45;
-  background: linear-gradient(180deg, #3b82f6, #2563eb);
-  color: #fff;
-  border: 2px solid rgba(255, 255, 255, 0.55);
-  border-inline-start: none;
-  border-radius: 0 14px 14px 0;
-  padding: 22px 16px;
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  cursor: pointer;
-  opacity: 0.97;
-  writing-mode: vertical-rl;
-  box-shadow: 3px 0 16px rgba(0, 0, 0, 0.5);
-  transition: filter 0.2s, padding 0.2s;
-}
-.roster-tab:hover { filter: brightness(1.15); padding-inline-end: 22px; }
+/* ---- פאנל "שמות וקבוצות" (נפתח מכפתור הפינה 👥) ---- */
 
 .roster-panel {
   position: absolute;
