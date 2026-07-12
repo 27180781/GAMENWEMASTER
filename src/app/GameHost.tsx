@@ -34,6 +34,7 @@ import { SettingsScreen } from '../render/SettingsScreen.tsx';
 import { AudioManager } from './AudioManager.ts';
 import { extractHostVote } from './hostRemote.ts';
 import { displayName, loadRoster, saveRoster, type RosterData } from './roster.ts';
+import { useConnectionHealth } from './useConnectionHealth.ts';
 import { planCrowdVotes, snapshotAt } from './syntheticVotes.ts';
 import type { GameSettings } from './urlParams.ts';
 import { useEngineState } from './useEngineState.ts';
@@ -137,6 +138,8 @@ export function GameHost({
   const [voteStatus, setVoteStatus] = useState<'connected' | 'reconnecting' | 'offline'>(
     'offline',
   );
+  /** אזהרות איכות חיבור — רק כשהמשחק תלוי בסוקט (אונליין אמיתי). */
+  const connectionWarnings = useConnectionHealth({ enabled: useSocket, socketStatus: voteStatus });
   /** השם להצגה: מרשם ידני, אחרת שם מהשרת, אחרת המספר עצמו. */
   const nameOf = useCallback(
     (voterId: string) => {
@@ -677,6 +680,17 @@ export function GameHost({
           <div className="join-banner">
             📞 להצטרפות למשחק חייגו <b>{JOIN_DIAL_NUMBER}</b> והקישו את קוד המשחק:{' '}
             <b className="join-banner-code">{roomId}</b>
+          </div>
+        )}
+
+        {/* אזהרות איכות חיבור — מופיעות רק כשהחיבור באמת בעייתי */}
+        {connectionWarnings.length > 0 && (
+          <div className={`conn-warnings${showJoinBanner ? ' conn-warnings--below-banner' : ''}`}>
+            {connectionWarnings.map((warning) => (
+              <div key={warning.code} className={`conn-warning conn-warning--${warning.severity}`}>
+                {warning.severity === 'error' ? '⛔' : '⚠️'} {warning.message}
+              </div>
+            ))}
           </div>
         )}
         {stage === 'opening' && <LobbyScreen engine={engine} players={connectedPlayers} />}
