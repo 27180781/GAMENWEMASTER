@@ -212,6 +212,22 @@ body {
 }
 .lobby-empty { font-size: 28px; opacity: 0.6; padding: 40px; }
 
+/* צפיפות הלובי — מתכווץ ככל שיש יותר מחוברים (בלי גלילה) */
+.lobby-grid--md { gap: 10px; }
+.lobby-grid--md .lobby-chip { padding: 6px 14px 6px 6px; max-width: 240px; }
+.lobby-grid--md .lobby-avatar { width: 36px; height: 36px; font-size: 17px; }
+.lobby-grid--md .lobby-name { font-size: 19px; }
+
+/* מ-sm ומעלה — אווטרים בלבד (בלי שם) כדי להכניס הרבה */
+.lobby-grid--sm, .lobby-grid--xs { gap: 8px; }
+.lobby-grid--sm .lobby-chip,
+.lobby-grid--xs .lobby-chip { background: transparent; border: none; padding: 0; max-width: none; }
+.lobby-grid--sm .lobby-name,
+.lobby-grid--xs .lobby-name { display: none; }
+.lobby-grid--sm .lobby-avatar { width: 42px; height: 42px; font-size: 18px; }
+.lobby-grid--xs { gap: 6px; }
+.lobby-grid--xs .lobby-avatar { width: 30px; height: 30px; font-size: 14px; border-width: 1px; }
+
 /* ---- שקופית שאלה (עיצוב מסך הטריוויה החי) ---- */
 
 /* טוקני העיצוב: הרקע/הטקסט של התיבות מגיעים מקובץ המשחק (main/secondary);

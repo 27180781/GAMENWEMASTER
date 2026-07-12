@@ -10,17 +10,25 @@ import type { RailPlayer } from './QuestionSlide.tsx';
 type NameResolver = (voterId: string) => string;
 const identityName: NameResolver = (voterId) => voterId;
 
-/** כמה שחקנים מוצגים במסך הלובי לכל היותר (השאר נספרים כ"+N"). */
-const LOBBY_MAX_SHOWN = 60;
+/**
+ * רמת צפיפות מסך הלובי לפי מספר המחוברים — הצ׳יפים מתכווצים ככל שמתחברים יותר,
+ * כדי להציג את כולם בלי גלילה (בכמויות גדולות מציגים אווטרים בלבד).
+ */
+function lobbyDensity(count: number): 'lg' | 'md' | 'sm' | 'xs' {
+  if (count <= 60) return 'lg';
+  if (count <= 150) return 'md';
+  if (count <= 400) return 'sm';
+  return 'xs';
+}
 
 /**
  * מסך התחברות שחקנים (לובי) — המסך הראשון אחרי ההגדרות. מציג בזמן אמת את כל
  * מי שהתחבר למשחק (לחץ מקש כלשהו) — באונליין (סוקט) ובדמו. רווח מתחיל.
+ * מציג את כולם בלי הגבלה; הכרטיסים מתכווצים לפי כמות המחוברים.
  */
 export function LobbyScreen({ engine, players }: { engine: GameEngine; players: RailPlayer[] }) {
   const setting = engine.getGame().setting;
-  const shown = players.slice(0, LOBBY_MAX_SHOWN);
-  const extra = players.length - shown.length;
+  const density = lobbyDensity(players.length);
   return (
     <div className="screen lobby-screen">
       {setting.gameMedia.src !== '' && (
@@ -37,16 +45,15 @@ export function LobbyScreen({ engine, players }: { engine: GameEngine; players: 
           <span className="lobby-count-dot" />
           <span className="lobby-count-num">{players.length}</span> מחוברים
         </div>
-        <div className="lobby-grid">
-          {shown.map((player) => (
-            <div key={player.id} className="lobby-chip">
+        <div className={`lobby-grid lobby-grid--${density}`}>
+          {players.map((player) => (
+            <div key={player.id} className="lobby-chip" title={player.name}>
               <span className="lobby-avatar" style={{ background: player.color }}>
                 {player.initial}
               </span>
               <span className="lobby-name">{player.name}</span>
             </div>
           ))}
-          {extra > 0 && <div className="lobby-chip lobby-chip--more">+{extra}</div>}
           {players.length === 0 && (
             <div className="lobby-empty">ממתינים לשחקנים… לחצו מקש כלשהו במכשיר כדי להתחבר</div>
           )}
