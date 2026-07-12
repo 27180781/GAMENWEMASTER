@@ -1268,3 +1268,86 @@ body {
 @keyframes conn-warn-in {
   from { opacity: 0; transform: translateY(-8px); }
 }
+
+/* ---- התראת בעיות מדיה בטעינה ---- */
+
+.media-alert {
+  position: absolute;
+  inset: 0;
+  z-index: 75;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.media-alert-box {
+  background: #151a2e;
+  border: 2px solid rgba(245, 158, 11, 0.6);
+  border-radius: 18px;
+  padding: 30px 36px;
+  width: 1200px;
+  max-width: 92%;
+  max-height: 880px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.media-alert-icon { font-size: 52px; }
+.media-alert-box h2 { font-size: 34px; font-weight: 900; color: #facc15; }
+.media-alert-sub { font-size: 24px; opacity: 0.85; }
+
+.media-alert-list {
+  list-style: none;
+  width: 100%;
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0;
+  text-align: start;
+}
+.media-alert-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 19px;
+}
+.media-alert-tag {
+  flex: 0 0 auto;
+  border-radius: 6px;
+  padding: 3px 12px;
+  font-size: 17px;
+  font-weight: 800;
+  color: #fff;
+}
+.media-alert-tag--missing { background: #b45309; }
+.media-alert-tag--broken { background: #b91c1c; }
+.media-alert-ctx { flex: 0 0 auto; font-weight: 700; min-width: 220px; }
+.media-alert-src {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.7;
+  font-size: 16px;
+}
+.media-alert-more { opacity: 0.7; padding: 6px 14px; }
+
+.media-alert-box button {
+  margin-top: 6px;
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 40px;
+  font-size: 24px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.media-alert-box button:hover { background: #2563eb; }

@@ -73,12 +73,21 @@ describe('loadGameFromZip', () => {
     );
   });
 
-  it('נכס חסר ב-ZIP — הנתיב היחסי נשאר, בלי לקרוס', async () => {
+  it('נכס חסר ב-ZIP — הנתיב היחסי נשאר, בלי לקרוס, ומדווח כחסר', async () => {
     const slim = rawGame([rawSlide({ id: 1, type: 'trivia', answers: fourAnswers(2), scoreForQue: 3 })]);
     (slim.setting as { logo: { src: string } }).logo = { src: 'Assets/missing.png' };
     const zip = new JSZip();
     zip.file('data.json', JSON.stringify(slim));
-    const { game } = await loadGameFromZip(await zip.generateAsync({ type: 'uint8array' }));
+    const { game, missing } = await loadGameFromZip(await zip.generateAsync({ type: 'uint8array' }));
     expect(game.setting.logo.src).toBe('Assets/missing.png');
+    expect(missing).toHaveLength(1);
+    expect(missing[0]!.src).toBe('Assets/missing.png');
+    expect(missing[0]!.reason).toBe('missing');
+    expect(missing[0]!.context).toBe('לוגו');
+  });
+
+  it('כל הנכסים קיימים — אין דיווח על חסרים', async () => {
+    const { missing } = await loadGameFromZip(await buildZip());
+    expect(missing).toEqual([]);
   });
 });

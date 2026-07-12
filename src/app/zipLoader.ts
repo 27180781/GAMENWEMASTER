@@ -13,11 +13,14 @@ import {
   type GameFile,
   type Slide,
 } from '../engine/index.ts';
+import type { MediaIssue } from './mediaCheck.ts';
 
 export interface LoadedZipGame {
   game: GameFile;
   /** משחרר את כל ה-Blob URLs שנוצרו (לקריאה כשעוזבים את המשחק). */
   revoke: () => void;
+  /** נכסים שהוזכרו ב-data.json אך חסרים בתוך ה-ZIP. */
+  missing: MediaIssue[];
 }
 
 /** האם ה-src הוא נתיב יחסי לנכס בתוך ה-ZIP (ולא URL מוחלט / youtube / blob). */
@@ -33,35 +36,44 @@ export function isRelativeAsset(src: string): boolean {
  * מחזיר accessors לכל שדות המדיה במשחק (קריאה + כתיבה), כדי למפות נתיבים
  * יחסיים בלי לשכפל את מבנה המשחק.
  */
-function mediaAccessors(game: GameFile): { get: () => string; set: (v: string) => void }[] {
-  const acc: { get: () => string; set: (v: string) => void }[] = [];
-  const s = game.setting;
-  const push = (obj: { src: string }) => acc.push({ get: () => obj.src, set: (v) => (obj.src = v) });
+interface MediaAccessor {
+  get: () => string;
+  set: (v: string) => void;
+  /** תיאור היכן המדיה משמשת — לדיווח על נכס חסר. */
+  label: string;
+}
 
-  push(s.gameMedia);
-  push(s.logo);
-  push(s.triviaMedia);
-  push(s.winnersMedia);
-  push(s.winnersListMedia);
-  for (const channel of Object.values(s.sound)) {
+function mediaAccessors(game: GameFile): MediaAccessor[] {
+  const acc: MediaAccessor[] = [];
+  const s = game.setting;
+  const push = (obj: { src: string }, label: string) =>
+    acc.push({ get: () => obj.src, set: (v) => (obj.src = v), label });
+
+  push(s.gameMedia, 'מדיית פתיחה');
+  push(s.logo, 'לוגו');
+  push(s.triviaMedia, 'רקע שאלות');
+  push(s.winnersMedia, 'רקע זוכים');
+  push(s.winnersListMedia, 'רקע טבלת זוכים');
+  for (const [key, channel] of Object.entries(s.sound)) {
     if (channel.src !== null) {
-      acc.push({ get: () => channel.src ?? '', set: (v) => (channel.src = v) });
+      acc.push({ get: () => channel.src ?? '', set: (v) => (channel.src = v), label: `סאונד (${key})` });
     }
   }
 
-  for (const slide of game.questions) {
-    push(slide.openMedia);
-    push(slide.endMedia);
-    push(slide.backgroundMedia);
-    push(slide.setting.slidBackgroundMedia);
-    acc.push({ get: () => slide.question.src, set: (v) => (slide.question.src = v) });
+  game.questions.forEach((slide, i) => {
+    const n = `שקופית ${i + 1}`;
+    push(slide.openMedia, `${n} · מדיית פתיחה`);
+    push(slide.endMedia, `${n} · מדיית סיום`);
+    push(slide.backgroundMedia, `${n} · רקע`);
+    push(slide.setting.slidBackgroundMedia, `${n} · רקע שקופית`);
+    acc.push({ get: () => slide.question.src, set: (v) => (slide.question.src = v), label: `${n} · תמונת שאלה` });
     // ans_images: כל תשובה היא נתיב תמונה
     if (slide.type === 'ans_images') {
-      for (const answer of slide.question.answers) {
-        acc.push({ get: () => answer.ans, set: (v) => (answer.ans = v) });
-      }
+      slide.question.answers.forEach((answer, j) => {
+        acc.push({ get: () => answer.ans, set: (v) => (answer.ans = v), label: `${n} · תמונת תשובה ${j + 1}` });
+      });
     }
-  }
+  });
   return acc;
 }
 
@@ -153,12 +165,14 @@ export async function loadGameFromZip(input: ArrayBuffer | Uint8Array | Blob): P
     return url;
   };
 
+  const missing: MediaIssue[] = [];
   for (const field of mediaAccessors(game)) {
     const src = field.get();
     if (!isRelativeAsset(src)) continue;
     const url = await resolve(src);
     if (url !== null) field.set(url);
-    // אם הנכס חסר ב-ZIP — משאירים את הנתיב היחסי (המדיה פשוט לא תיטען)
+    // אם הנכס חסר ב-ZIP — משאירים את הנתיב היחסי ומדווחים עליו כחסר
+    else missing.push({ src, context: field.label, reason: 'missing' });
   }
 
   return {
@@ -166,6 +180,7 @@ export async function loadGameFromZip(input: ArrayBuffer | Uint8Array | Blob): P
     revoke: () => {
       for (const url of created) URL.revokeObjectURL(url);
     },
+    missing,
   };
 }
 
