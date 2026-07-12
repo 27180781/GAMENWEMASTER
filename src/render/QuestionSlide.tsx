@@ -143,6 +143,61 @@ function Leaderboard({ leaders }: { leaders: RailPlayer[] }) {
   );
 }
 
+/** סימון קטן של עוגת סקר (תלת-מימדי) — ליד השאלה בשקופית סקר. */
+function SurveyIcon() {
+  return <span className="q-survey-icon" title="שאלת סקר" aria-label="סקר" />;
+}
+
+/** פילוח סקר בחשיפה — עוגה צבועה לפי צבעי התשובות + מקראה עם מספר העונים. */
+function SurveyPie({
+  answers,
+  counts,
+  total,
+}: {
+  answers: Slide['question']['answers'];
+  counts: Record<string, number>;
+  total: number;
+}) {
+  let acc = 0;
+  const segments = answers.map((answer, index) => {
+    const value = counts[String(answer.id)] ?? 0;
+    const pct = total > 0 ? (value / total) * 100 : 0;
+    const from = acc;
+    acc += pct;
+    return {
+      id: answer.id,
+      text: answer.ans,
+      color: COIN_COLORS[index % COIN_COLORS.length]!.bg,
+      value,
+      pct: Math.round(pct),
+      from,
+      to: acc,
+    };
+  });
+  const gradient =
+    total > 0
+      ? `conic-gradient(${segments.map((s) => `${s.color} ${s.from}% ${s.to}%`).join(', ')})`
+      : 'conic-gradient(rgba(255, 255, 255, 0.18) 0% 100%)';
+  return (
+    <div className="q-survey">
+      <div className="q-survey-pie-wrap">
+        <div className="q-survey-pie" style={{ background: gradient }} />
+      </div>
+      <ul className="q-survey-legend">
+        {segments.map((s) => (
+          <li key={s.id} className="q-survey-legend-item">
+            <span className="q-survey-swatch" style={{ background: s.color }} />
+            <span className="q-survey-ans">{s.text}</span>
+            <span className="q-survey-val">
+              {s.pct}% · {s.value}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function QuestionSlide({
   slide,
   state,
@@ -160,6 +215,7 @@ export function QuestionSlide({
   const isVoting = state.phase === 'voting';
   const isTrivia = slide.type === 'trivia';
   const isImages = slide.type === 'ans_images';
+  const isSurvey = slide.type === 'survey';
   const answers = slide.question.answers;
   const counts = state.liveVotes?.counts ?? {};
   const total = state.liveVotes?.total ?? 0;
@@ -227,7 +283,10 @@ export function QuestionSlide({
           )}
 
           <div className={`q-question${reveal.questionShown ? '' : ' reveal-hidden'}`}>
-            <h1>{slide.question.que}</h1>
+            <div className="q-question-row">
+              {isSurvey && <SurveyIcon />}
+              <h1>{slide.question.que}</h1>
+            </div>
             {hasImage && (
               <div className="q-question-image">
                 <img src={slide.question.src} alt="" />
@@ -235,6 +294,9 @@ export function QuestionSlide({
             )}
           </div>
 
+          {isSurvey && revealed ? (
+            <SurveyPie answers={answers} counts={counts} total={total} />
+          ) : (
           <ul className={`q-answers${isImages ? ' q-answers--images' : ''}`}>
             {answers.map((answer, index) => {
               const shown = index < reveal.answersShown;
@@ -264,6 +326,7 @@ export function QuestionSlide({
               );
             })}
           </ul>
+          )}
         </div>
 
         {/* כותרת תחתית — פס צדקו/טעו (ירוק/אדום קבוע) חי בזמן ההצבעה, מובילים בחשיפה */}
