@@ -1126,6 +1126,20 @@ body {
 
 .demo-field input[type='range'] { accent-color: #4ade80; }
 
+/* שדה בשורה (צ׳קבוקס + טקסט) */
+.demo-field--row { flex-direction: row; align-items: center; gap: 14px; flex-wrap: wrap; }
+.demo-field--row input[type='checkbox'] { width: 26px; height: 26px; flex: 0 0 auto; accent-color: #4ade80; }
+
+/* מקטע מעברים אוטומטיים */
+.demo-auto-title {
+  font-weight: 800;
+  font-size: 24px;
+  margin-top: 10px;
+  padding-top: 22px;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+}
+.demo-field--auto-next input[type='number'] { width: 90px; max-width: 90px; }
+
 .demo-start { font-weight: 700; }
 
 .demo-badge {

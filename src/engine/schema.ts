@@ -106,6 +106,30 @@ export const slideSchema = z
 // הגדרות גלובליות (SPEC 3.4)
 // ---------------------------------------------------------------------------
 
+/**
+ * מעברים אוטומטיים — ברירת מחדל למשחק (מגיע מה-JSON, ניתן לדריסה בהגדרות).
+ * כל השדות אופציונליים עם ברירת מחדל, כדי שקבצים ישנים (בלי autoTransition)
+ * ייטענו כרגיל.
+ */
+const autoTransitionSchema = z
+  .object({
+    showAnswersAfterQuestion: z.boolean().default(false),
+    startTimerAfterLastAnswer: z.boolean().default(false),
+    showCorrectAnswerAfterTimer: z.boolean().default(false),
+    nextSlide: z
+      .object({
+        active: z.boolean().default(false),
+        seconds: z.number().default(6),
+      })
+      .default({ active: false, seconds: 6 }),
+  })
+  .default({
+    showAnswersAfterQuestion: false,
+    startTimerAfterLastAnswer: false,
+    showCorrectAnswerAfterTimer: false,
+    nextSlide: { active: false, seconds: 6 },
+  });
+
 export const globalSettingsSchema = z.object({
   titleThroughoutGame: z.string(),
   ansIsNumber: z.boolean(),
@@ -133,7 +157,11 @@ export const globalSettingsSchema = z.object({
     type: z.string(),
     number: emptyableNumber(Number.MAX_SAFE_INTEGER).optional(),
   }),
+  // מעברים אוטומטיים — ברירת מחדל למשחק (ניתן לדריסה בהגדרות ולשמירה ב-localStorage)
+  autoTransition: autoTransitionSchema,
 });
+
+export type AutoTransition = z.infer<typeof autoTransitionSchema>;
 
 // ---------------------------------------------------------------------------
 // Manifest נכסים — type לא אמין, נשמר כמו שהוא לתיעוד בלבד
