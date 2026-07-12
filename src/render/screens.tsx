@@ -4,6 +4,7 @@
 
 import type { GameEngine } from '../engine/index.ts';
 import { MediaPlayer } from './MediaPlayer.tsx';
+import { QrCode } from './QrCode.tsx';
 import type { RailPlayer } from './QuestionSlide.tsx';
 
 /** ברירת מחדל: אם לא סופק מרשם שמות — מציגים את המספר עצמו. */
@@ -26,7 +27,16 @@ function lobbyDensity(count: number): 'lg' | 'md' | 'sm' | 'xs' {
  * מי שהתחבר למשחק (לחץ מקש כלשהו) — באונליין (סוקט) ובדמו. רווח מתחיל.
  * מציג את כולם בלי הגבלה; הכרטיסים מתכווצים לפי כמות המחוברים.
  */
-export function LobbyScreen({ engine, players }: { engine: GameEngine; players: RailPlayer[] }) {
+export function LobbyScreen({
+  engine,
+  players,
+  qrUrl,
+}: {
+  engine: GameEngine;
+  players: RailPlayer[];
+  /** כשמוגדר — מציג קוד QR גדול בצד הלובי להתחברות מהטלפון. */
+  qrUrl?: string;
+}) {
   const setting = engine.getGame().setting;
   const density = lobbyDensity(players.length);
   return (
@@ -35,6 +45,12 @@ export function LobbyScreen({ engine, players }: { engine: GameEngine; players: 
         <div className="screen-background">
           <MediaPlayer src={setting.gameMedia.src} asBackground />
         </div>
+      )}
+      {qrUrl !== undefined && qrUrl !== '' && (
+        <aside className="lobby-qr">
+          <QrCode value={qrUrl} size={300} />
+          <div className="lobby-qr-caption">סרקו להצטרפות מהטלפון 📱</div>
+        </aside>
       )}
       <div className="screen-content lobby-content">
         {setting.logo.src !== '' && <img className="opening-logo lobby-logo" src={setting.logo.src} alt="" />}
