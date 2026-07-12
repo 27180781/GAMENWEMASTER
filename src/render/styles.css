@@ -255,333 +255,317 @@ body {
 
 /* טוקני העיצוב: הרקע/הטקסט של התיבות מגיעים מקובץ המשחק (main/secondary);
    accent/correct הם צבעי הדגשה קבועים של העיצוב. */
+/* =========================================================================
+   מסך שאלה — עיצוב חי (triviascreen_1.html), צבוע לפי mainColor/secondaryColor
+   ========================================================================= */
+
+/* רקע הבמה — מדורג מצבע המשחק, מונפש. מדיית רקע (אם קיימת) מכסה אותו. */
+.slide-screen {
+  --q-main: rgb(var(--main-rgb, 139, 47, 201));
+  --q-pill: var(--q-main);
+  --q-correct: #35d45a;
+  background:
+    radial-gradient(ellipse at 50% -12%, rgba(255, 255, 255, 0.08), transparent 55%),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--q-main) 80%, #000),
+      color-mix(in srgb, var(--q-main) 42%, #07030f),
+      color-mix(in srgb, var(--q-main) 60%, #000)
+    );
+  background-size: 100% 100%, 280% 280%;
+  animation: qbgshift 22s ease infinite;
+}
+@keyframes qbgshift {
+  0% { background-position: 50% 0%, 0% 50%; }
+  50% { background-position: 50% 0%, 100% 50%; }
+  100% { background-position: 50% 0%, 0% 50%; }
+}
+
 .q-screen {
-  --panel: rgba(var(--main-rgb, 34, 43, 69), 0.82);
-  --panel2: rgba(var(--main-rgb, 34, 43, 69), 0.6);
-  --accent: #ffc93c;
-  --accent-ink: #241a6b;
-  --correct: #34d399;
+  --pill: var(--q-pill, rgb(var(--main-rgb, 139, 47, 201)));
+  --text: var(--secondary-color, #fff);
+  --correct: var(--q-correct, #35d45a);
+  position: relative;
   width: 100%;
   height: 100%;
-  display: flex;
-  flex-direction: row;
-  gap: 30px;
-  color: var(--secondary-color, #fff);
+  color: var(--text);
   text-align: start;
 }
 
-.q-main {
-  flex: 1 1 auto;
-  min-width: 0;
+.q-content {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
 }
 
-/* HUD */
-.q-hud {
+/* ---------- כותרת ---------- */
+.q-header { position: relative; flex: 0 0 auto; height: 132px; }
+.q-hud-left { position: absolute; top: 4px; inset-inline-start: 0; }
+.q-hud-right { position: absolute; top: 6px; inset-inline-end: 0; }
+.q-header-center {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 20px;
-  margin-bottom: 20px;
 }
+.q-logo {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #fff;
+  border: 3px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  flex: 0 0 auto;
+}
+.q-logo img { width: 100%; height: 100%; object-fit: cover; }
+.q-title-pill {
+  background: var(--pill);
+  color: var(--text);
+  font-weight: 900;
+  font-size: 30px;
+  letter-spacing: 0.5px;
+  padding: 14px 40px;
+  border-radius: 999px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.32);
+  white-space: nowrap;
+}
+.q-counter { font-weight: 900; font-size: 30px; font-variant-numeric: tabular-nums; }
+.q-counter-sep { opacity: 0.55; margin: 0 4px; }
 
-.q-pill {
+.q-answered-pill {
   display: flex;
   align-items: center;
-  gap: 12px;
-  background: var(--panel);
-  border: 2px solid rgba(255, 255, 255, 0.14);
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1.5px solid rgba(255, 255, 255, 0.14);
   border-radius: 999px;
-  padding: 11px 24px;
-  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.35);
+  padding: 9px 18px;
 }
-.q-pill--counter { padding-inline-start: 18px; }
-
-.q-pill-badge {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-weight: 900;
-  font-size: 22px;
-  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.18) inset;
-}
-.q-pill-text { font-weight: 800; font-size: 26px; letter-spacing: 0.5px; }
-.q-pill-text b { color: var(--accent); }
-
 .q-answered-dot {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: var(--correct);
-  box-shadow: 0 0 14px var(--correct);
+  box-shadow: 0 0 12px var(--correct);
   animation: pulseDot 1.1s ease-in-out infinite;
 }
-.q-answered-num { font-weight: 800; font-size: 26px; font-variant-numeric: tabular-nums; }
-.q-answered-label { font-weight: 600; font-size: 22px; color: rgba(255, 255, 255, 0.72); }
+.q-answered-num { font-weight: 800; font-size: 22px; font-variant-numeric: tabular-nums; }
+.q-answered-label { font-weight: 600; font-size: 18px; color: rgba(255, 255, 255, 0.7); }
 
-/* פס טיימר */
-.q-timer { display: flex; align-items: center; gap: 20px; margin-bottom: 26px; }
-.q-timer-track {
+/* ---------- אזור ראשי ---------- */
+.q-main {
   flex: 1 1 auto;
-  height: 26px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.34);
-  border: 2px solid rgba(255, 255, 255, 0.16);
-  overflow: hidden;
-  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.4);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 22px;
 }
-.q-timer-fill {
-  height: 100%;
-  border-radius: 999px;
-  transition: width 0.15s linear;
-  background: linear-gradient(90deg, #ffc93c, #ff9f45);
-  box-shadow: 0 0 22px rgba(255, 201, 60, 0.6);
+
+/* ספירה לאחור: עיגול מספר מעל בר "כמה ענו" לבן */
+.q-countdown {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(820px, 84%);
+  margin-bottom: -4px;
 }
-.q-timer-fill--low {
-  background: linear-gradient(90deg, #ff5a5f, #ff8a5b);
-  box-shadow: 0 0 22px rgba(255, 90, 95, 0.7);
-}
-.q-timer-readout {
+.q-count-num {
   display: grid;
   place-items: center;
-  min-width: 96px;
-  height: 56px;
-  padding: 0 14px;
-  border-radius: 16px;
-  background: var(--panel);
-  border: 2px solid rgba(255, 255, 255, 0.16);
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  background: var(--pill);
+  border: 3px solid rgba(255, 255, 255, 0.28);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4);
   font-weight: 900;
-  font-size: 34px;
+  font-size: 54px;
+  line-height: 1;
+  color: #fff;
+  margin-bottom: -28px;
+  z-index: 2;
   font-variant-numeric: tabular-nums;
+  animation: numPulse 1s ease-in-out infinite;
 }
-.q-timer-readout--low { animation: lowblink 0.6s ease-in-out infinite; }
+.q-count-num--low { color: #ff6b6f; }
+.q-count-track {
+  position: relative;
+  width: 100%;
+  height: 44px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.3);
+  overflow: hidden;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.25);
+  border: 2px solid rgba(255, 255, 255, 0.4);
+}
+.q-count-fill {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 0%;
+  background: #fff;
+  transition: width 0.4s ease;
+}
 
 /* כרטיס השאלה */
-.q-card {
+.q-question {
+  align-self: center;
+  max-width: 1180px;
+  background: var(--pill);
+  color: var(--text);
+  border-radius: 46px;
+  padding: 22px 54px;
+  box-shadow: 0 20px 54px rgba(0, 0, 0, 0.4);
   animation: qpop 0.5s ease both;
-  background: var(--panel);
-  border: 2px solid rgba(255, 255, 255, 0.16);
-  border-radius: 28px;
-  padding: 30px 40px;
-  margin-bottom: 26px;
-  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.4);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 34px;
+  gap: 18px;
 }
-.q-card--with-image { justify-content: space-between; }
-.q-card-text {
+.q-question h1 {
   font-weight: 900;
-  font-size: 48px;
+  font-size: 46px;
   line-height: 1.16;
   text-align: center;
   text-wrap: balance;
-  max-height: 208px;
+  max-height: 168px;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
 }
-.q-card--with-image .q-card-text { text-align: start; flex: 1 1 auto; }
-.q-card-image-box { flex: none; display: flex; align-items: center; }
-.q-card-image {
-  max-height: 300px;
-  max-width: 440px;
-  border-radius: 16px;
-  object-fit: contain;
-}
+.q-question-image img { max-height: 240px; max-width: 620px; border-radius: 16px; object-fit: contain; }
 
 /* גריד התשובות */
 .q-answers {
-  flex: 1 1 auto;
   list-style: none;
   display: grid;
-  gap: 18px;
-  align-content: stretch;
-  min-height: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  max-width: 1520px;
+  width: 100%;
+  align-self: center;
 }
-.q-answers--cols2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.q-answers--cols3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-
-.q-answer {
+.q-card {
   position: relative;
+  overflow: hidden;
+  border-radius: 999px;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  background: var(--pill);
   display: flex;
   align-items: center;
-  gap: 20px;
-  border-radius: 22px;
-  padding: 18px 24px;
-  overflow: hidden;
-  border: 3px solid rgba(255, 255, 255, 0.14);
-  background: var(--panel2);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.32);
-  transition: opacity 0.4s ease, border-color 0.4s ease;
+  gap: 16px;
+  padding: 12px 22px;
+  min-height: 92px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+  animation: qpop 0.4s ease both;
+  transition: background 0.45s ease, border-color 0.45s ease, opacity 0.45s ease;
 }
-.q-answer--correct { border-color: var(--correct); background: rgba(20, 60, 44, 0.86); }
-.q-answer--dim { opacity: 0.72; }
-
-.q-answer-fill {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  transition: width 1.1s cubic-bezier(0.16, 1, 0.3, 1);
-  background: rgba(255, 255, 255, 0.09);
-}
-.q-answer-fill--correct { background: rgba(52, 211, 153, 0.32); }
-
-.q-answer-badge {
-  position: relative;
-  z-index: 1;
+.q-card--correct { background: #fff; border-color: #fff; }
+.q-card--dim { opacity: 0.82; }
+.q-coin {
+  flex: 0 0 auto;
   display: grid;
   place-items: center;
-  flex: 0 0 auto;
-  width: 60px;
-  height: 60px;
-  border-radius: 18px;
-  font-weight: 900;
-  font-size: 32px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.18);
-  animation: badgeSpin 0.5s ease both;
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  font-weight: 800;
+  font-size: 40px;
+  line-height: 1;
+  border: 3px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.4);
+  font-variant-numeric: tabular-nums;
+  transition: font-size 0.35s ease;
+  animation: coinIn 0.5s ease both;
 }
-.q-answer--correct .q-answer-badge { background: var(--correct); }
-
-.q-answer-text {
-  position: relative;
-  z-index: 1;
+.q-coin--reveal { font-size: 25px; }
+.q-card--correct .q-coin { box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.6), 0 6px 16px rgba(0, 0, 0, 0.4); }
+.q-card-text {
   flex: 1 1 auto;
-  font-weight: 700;
-  font-size: 32px;
-  line-height: 1.14;
+  text-align: center;
+  font-weight: 800;
+  font-size: 34px;
+  line-height: 1.12;
+  color: var(--text);
+  transition: color 0.45s ease;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
+.q-card--correct .q-card-text { color: #241a6b; }
 
-.q-answer-pct {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-weight: 900;
-  font-size: 32px;
-  font-variant-numeric: tabular-nums;
-}
-.q-answer-check {
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  background: #fff;
-  color: var(--correct);
-  font-size: 26px;
-  animation: checkpop 0.5s ease both;
-}
-
-/* גריד תמונות (ans_images) — התמונה במלואה */
-.q-answers--images .q-answer { flex-direction: column; gap: 10px; padding: 12px; }
-.q-answer-image {
-  position: relative;
-  z-index: 1;
+/* גריד תמונות (ans_images) */
+.q-answers--images .q-card { flex-direction: column; border-radius: 26px; gap: 10px; padding: 14px; }
+.q-card-image {
   width: 100%;
-  height: 260px;
+  height: 240px;
   object-fit: contain;
   background: rgba(0, 0, 0, 0.4);
-  border-radius: 12px;
+  border-radius: 14px;
 }
-.q-answers--images .q-answer-badge { position: absolute; top: 14px; inset-inline-start: 14px; z-index: 2; }
 
-/* פס צדקו/טעו */
-.q-split { margin-top: 20px; display: flex; align-items: center; gap: 16px; height: 46px; }
-.q-split--waiting { opacity: 0.6; }
-.q-split-label {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 800;
-  font-size: 18px;
-  color: rgba(255, 255, 255, 0.7);
-}
-.q-split-label-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 10px var(--accent);
-}
-.q-split-bar {
-  flex: 1 1 auto;
+/* ---------- כותרת תחתית: טיימר / מובילים ---------- */
+.q-footer { flex: 0 0 auto; min-height: 92px; display: flex; align-items: center; }
+.q-timer-wrap { width: 100%; padding: 0 4px; }
+.q-timer {
   position: relative;
-  height: 44px;
+  height: 42px;
   border-radius: 999px;
+  border: 6px solid color-mix(in srgb, var(--pill) 70%, #fff 30%);
+  background: #e5342f;
   overflow: hidden;
-  border: 2px solid rgba(255, 255, 255, 0.16);
-  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.35);
-  background: rgba(255, 90, 95, 0.85);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.32), inset 0 2px 8px rgba(0, 0, 0, 0.4);
 }
-.q-split--waiting .q-split-bar { background: var(--panel2); }
-.q-split-correct {
+.q-timer--low { animation: lowblink 0.6s ease-in-out infinite; }
+.q-timer-fill {
   position: absolute;
   inset-block: 0;
   inset-inline-start: 0;
-  background: var(--correct);
-  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  border-radius: 999px;
+  background: #2ec94f;
+  box-shadow: 0 0 20px rgba(57, 212, 90, 0.55);
+  transition: width 0.15s linear;
 }
-.q-split-text {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 20px;
-  font-weight: 900;
-  font-size: 22px;
-  white-space: nowrap;
-}
-.q-split-text--center { justify-content: center; font-size: 20px; color: rgba(255, 255, 255, 0.85); }
 
-/* מסילת המצטרפים */
-.q-rail {
-  flex: 0 0 210px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  background: rgba(0, 0, 0, 0.24);
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  border-radius: 26px;
-  padding: 22px 16px;
-}
-.q-rail-head { font-weight: 800; font-size: 19px; color: rgba(255, 255, 255, 0.72); letter-spacing: 0.5px; }
-.q-rail-divider { width: 100%; height: 2px; background: rgba(255, 255, 255, 0.12); border-radius: 2px; }
-.q-rail-list {
-  flex: 1 1 auto;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
+.q-board { width: 100%; display: flex; justify-content: center; align-items: flex-end; gap: 26px; }
+.q-board-item { display: flex; flex-direction: column; align-items: center; animation: boardIn 0.5s ease both; }
+.q-board-stars { display: flex; align-items: flex-end; gap: 2px; margin-bottom: -12px; z-index: 2; }
+.q-board-stars svg { animation: starPop 0.4s ease both; }
+.q-board-stars svg:nth-child(2) { margin-bottom: 6px; }
+.q-board-name {
+  background: var(--pill);
+  color: #fff;
+  border-radius: 16px;
+  min-width: 118px;
+  max-width: 240px;
+  padding: 16px 24px 10px;
+  text-align: center;
+  font-weight: 900;
+  font-size: 30px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.32);
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
-.q-rail-chip {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  animation: dropIn 0.5s cubic-bezier(0.2, 1.2, 0.4, 1) both;
-}
-.q-rail-avatar {
-  flex: 0 0 auto;
+
+/* ---------- אווטרים מתעופפים ---------- */
+.q-flyers { position: absolute; inset: 0 auto 0 0; width: 560px; height: 100%; z-index: 6; pointer-events: none; overflow: hidden; }
+.q-flyer { position: absolute; bottom: 140px; display: flex; align-items: center; gap: 10px; will-change: transform, opacity; }
+.q-flyer--0 { animation: flyUp0 2.85s ease-out forwards; }
+.q-flyer--1 { animation: flyUp1 2.85s ease-out forwards; }
+.q-flyer--2 { animation: flyUp2 2.85s ease-out forwards; }
+.q-flyer-av {
   display: grid;
   place-items: center;
   width: 48px;
@@ -590,24 +574,21 @@ body {
   font-weight: 900;
   font-size: 22px;
   color: #fff;
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
 }
-.q-rail-name {
-  flex: 1 1 auto;
-  font-weight: 700;
-  font-size: 19px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+.q-flyer-nm { font-weight: 800; font-size: 19px; color: #fff; white-space: nowrap; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7); }
 
 @keyframes pulseDot { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(0.55); opacity: 0.5; } }
-@keyframes qpop { 0% { transform: translateY(18px) scale(0.97); opacity: 0; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
-@keyframes badgeSpin { 0% { transform: rotate(-8deg) scale(0.8); opacity: 0; } 100% { transform: rotate(0) scale(1); opacity: 1; } }
-@keyframes lowblink { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
-@keyframes checkpop { 0% { transform: scale(0) rotate(-30deg); } 70% { transform: scale(1.25) rotate(6deg); } 100% { transform: scale(1) rotate(0); } }
-@keyframes dropIn { 0% { transform: translateY(-46px) scale(0.4); opacity: 0; } 60% { transform: translateY(4px) scale(1.08); opacity: 1; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
+@keyframes qpop { 0% { transform: translateY(16px) scale(0.98); opacity: 0; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
+@keyframes coinIn { 0% { transform: scale(0.4) rotate(-14deg); opacity: 0; } 65% { transform: scale(1.12) rotate(5deg); } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+@keyframes lowblink { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+@keyframes numPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+@keyframes boardIn { 0% { transform: translateY(26px) scale(0.8); opacity: 0; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
+@keyframes starPop { 0% { transform: scale(0) rotate(-40deg); } 70% { transform: scale(1.2); } 100% { transform: scale(1) rotate(0); } }
+@keyframes flyUp0 { 0% { transform: translate(0, 34px) scale(0.5); opacity: 0; } 12% { transform: translate(0, 0) scale(1.08); opacity: 1; } 24% { transform: translate(0, -8px) scale(1); opacity: 1; } 82% { opacity: 1; } 100% { transform: translate(-46px, -640px) scale(0.82); opacity: 0; } }
+@keyframes flyUp1 { 0% { transform: translate(0, 34px) scale(0.5); opacity: 0; } 12% { transform: translate(0, 0) scale(1.08); opacity: 1; } 24% { transform: translate(0, -8px) scale(1); opacity: 1; } 82% { opacity: 1; } 100% { transform: translate(38px, -690px) scale(0.82); opacity: 0; } }
+@keyframes flyUp2 { 0% { transform: translate(0, 34px) scale(0.5); opacity: 0; } 12% { transform: translate(0, 0) scale(1.08); opacity: 1; } 24% { transform: translate(0, -8px) scale(1); opacity: 1; } 82% { opacity: 1; } 100% { transform: translate(-8px, -600px) scale(0.82); opacity: 0; } }
 
 /* מונה שקופיות — פינה ימנית עליונה, לבן עם מתאר שחור (קריא על כל צבע).
    מיקום פיזי (right) ולא לוגי — כי dir="ltr" של המספר הופך inline-start */
