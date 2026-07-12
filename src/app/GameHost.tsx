@@ -20,6 +20,7 @@ import {
   isVotableSlide,
   type GameFile,
   type VoteAdapter,
+  type VoteSnapshot,
 } from '../engine/index.ts';
 import { SocketVoteAdapter } from './socketAdapter.ts';
 import { LobbyScreen, WinnersListScreen, WinnersScreen } from '../render/screens.tsx';
@@ -46,6 +47,12 @@ const NO_REVEAL: RevealState = { questionShown: false, answersShown: 0, revealCo
 
 /** מספר המצטרפים המרבי שמוצג במסילה בכל רגע. */
 const RAIL_MAX = 9;
+/**
+ * קצב עדכון ה-UI מהצבעות אמת (ms) — השרת שולח כל הצבעה בנפרד, ובהמון גדול
+ * זה מאות אירועים בשנייה. צוברים ומעדכנים לכל היותר פעם ב-VOTE_THROTTLE_MS
+ * (‏~7 עדכונים/שנייה) כדי למנוע סופת רינדור. ההצבעות מצטברות — לא הולך לאיבוד.
+ */
+const VOTE_THROTTLE_MS = 140;
 /** פלטת צבעים לאווטרים במסילת המצטרפים (מהעיצוב). */
 const RAIL_COLORS = [
   '#FF6B6B',
@@ -248,11 +255,61 @@ export function GameHost({
 
   const votingActive = stage === 'playing' && state.phase === 'voting';
 
+  // -------------------------------------------------------------------------
+  // Throttle להצבעות אמת — צובר snapshot מצטבר ומעדכן את המנוע/UI בקצב מוגבל
+  // (leading + trailing), כדי שהמון גדול לא יגרום לסופת רינדור.
+  // -------------------------------------------------------------------------
+  const pendingVoteRef = useRef<VoteSnapshot | null>(null);
+  const voteFlushTimerRef = useRef<number | null>(null);
+
+  const flushPendingVotes = useCallback(() => {
+    const snapshot = pendingVoteRef.current;
+    if (snapshot === null) return;
+    pendingVoteRef.current = null;
+    engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot, at: Date.now() });
+    const voters = snapshot.voters;
+    if (voters) {
+      setAnswerers((prev) => {
+        const seen = new Set(prev);
+        const additions = Object.keys(voters).filter((id) => !seen.has(id));
+        if (additions.length === 0) return prev;
+        return [...additions.reverse(), ...prev].slice(0, RAIL_MAX);
+      });
+    }
+  }, [engine]);
+  const flushVotesRef = useRef(flushPendingVotes);
+  flushVotesRef.current = flushPendingVotes;
+
+  const scheduleVoteFlush = useCallback(() => {
+    if (voteFlushTimerRef.current !== null) return;
+    flushPendingVotes(); // leading — ההצבעה הראשונה בכל חלון throttle נשלחת מיד
+    voteFlushTimerRef.current = window.setTimeout(() => {
+      voteFlushTimerRef.current = null;
+      if (pendingVoteRef.current !== null) flushPendingVotes(); // trailing — האחרון שהצטבר
+    }, VOTE_THROTTLE_MS);
+  }, [flushPendingVotes]);
+  const scheduleVoteFlushRef = useRef(scheduleVoteFlush);
+  scheduleVoteFlushRef.current = scheduleVoteFlush;
+
+  // ניקוי טיימר ה-throttle בעזיבת הקומפוננטה
+  useEffect(
+    () => () => {
+      if (voteFlushTimerRef.current !== null) window.clearTimeout(voteFlushTimerRef.current);
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!votingActive) {
       setTimer(null);
       pausedRef.current = false;
       pausedRemainingMsRef.current = null;
+      // סגירת חלון ההצבעה — ניקוי ה-throttle (השאריות כבר נשלחו לפני הסגירה)
+      if (voteFlushTimerRef.current !== null) {
+        window.clearTimeout(voteFlushTimerRef.current);
+        voteFlushTimerRef.current = null;
+      }
+      pendingVoteRef.current = null;
       return;
     }
     const total = slide.question.timeForQue;
@@ -267,6 +324,7 @@ export function GameHost({
       if (pausedRef.current) return;
       const remainingMs = deadlineRef.current - Date.now();
       if (remainingMs <= 0) {
+        flushVotesRef.current(); // ההצבעות האחרונות שהצטברו נספרות לפני הסגירה
         engine.dispatch({ type: 'VOTING_TIMEOUT', at: Date.now() });
       } else {
         setTimer({ remaining: remainingMs / 1000, total, paused: false });
@@ -362,6 +420,7 @@ export function GameHost({
 
     if (current.phase === 'voting') {
       // עצירת הטיימר וסגירת ההצבעה (אם לא נגמר כבר לבד)
+      flushVotesRef.current(); // ההצבעות האחרונות שהצטברו נספרות לפני הסגירה
       engine.dispatch({ type: 'ADVANCE', at: now });
       return;
     }
@@ -504,17 +563,9 @@ export function GameHost({
       }
       // בזמן עצירה (פקודה 6) אין קליטת הצבעות
       if (pausedRef.current) return;
-      engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot, at: Date.now() });
-      // עדכון מסילת המצטרפים — מזהים חדשים בראש הרשימה
-      const voters = snapshot.voters;
-      if (voters) {
-        setAnswerers((prev) => {
-          const seen = new Set(prev);
-          const additions = Object.keys(voters).filter((id) => !seen.has(id));
-          if (additions.length === 0) return prev;
-          return [...additions.reverse(), ...prev].slice(0, RAIL_MAX);
-        });
-      }
+      // צובר את ה-snapshot המצטבר; העדכון למנוע/UI מוגבל בקצב (leading+trailing)
+      pendingVoteRef.current = snapshot;
+      scheduleVoteFlushRef.current();
     });
     if (adapter instanceof SocketVoteAdapter) {
       // שרת אמיתי: סטטוס חיבור + מיפוי אוטומטי של שם השחקן מהטלפון + לובי
