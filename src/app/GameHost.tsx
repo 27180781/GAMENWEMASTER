@@ -213,14 +213,29 @@ export function GameHost({
   stageRef.current = stage;
   const revealRef = useRef<RevealState>(reveal);
   revealRef.current = reveal;
+  /** תצוגה מקדימה של מסך המנצחים (מקש W): השלב לחזור אליו, או null אם לא פעיל. */
+  const winnersPreviewRef = useRef<HostStage | null>(null);
+  /** הרצה מהירה (מקש N): דגל שמורה ל-effect איפוס-השקופית לחשוף אותה במלואה. */
+  const fastRevealRef = useRef(false);
 
-  // איפוס שלבי חשיפה + מסילת המצטרפים + זיהוי הקשת שלט המנחה, במעבר שקופית
+  // איפוס שלבי חשיפה + מסילת המצטרפים + זיהוי הקשת שלט המנחה, במעבר שקופית.
+  // בהרצה מהירה (מקש N) חושפים את השקופית הבאה במלואה במקום לאפס.
   useEffect(() => {
-    setReveal(NO_REVEAL);
+    if (fastRevealRef.current) {
+      fastRevealRef.current = false;
+      const s = engine.getCurrentSlide();
+      setReveal(
+        isVotableSlide(s)
+          ? { questionShown: true, answersShown: s.question.answers.length, revealCorrect: false }
+          : NO_REVEAL,
+      );
+    } else {
+      setReveal(NO_REVEAL);
+    }
     setAnswerers([]);
     setCorrectAnswerers([]);
     lastHostAnswerRef.current = null;
-  }, [state.currentSlideId]);
+  }, [state.currentSlideId, engine]);
 
   // טעינה מוקדמת של המדיה של השקופיות הקרובות — מעבר מיידי בלי מסך שחור/השהיה
   useEffect(() => {
@@ -539,6 +554,28 @@ export function GameHost({
     engine.dispatch({ type: 'BACK', at: now });
   }, [engine, reenterAtAnswers]);
 
+  /**
+   * הרצה מהירה (מקש N): לחיצה אחת מדלגת לשקופית הבאה ומציגה אותה במלואה
+   * (שאלה + כל התשובות), בלי לעבור שלב-שלב. בשקופית האחרונה — סיום המשחק.
+   */
+  const fastNextSlide = useCallback(() => {
+    const now = Date.now();
+    const questions = engine.getGame().questions;
+    const nextIndex = engine.getState().currentSlideIndex + 1;
+    if (nextIndex >= questions.length) {
+      setStage('winners'); // אין שקופית הבאה — סיום
+      return;
+    }
+    // דגל שגורם ל-effect איפוס-השקופית לחשוף במלואה (במקום לאפס)
+    fastRevealRef.current = true;
+    engine.dispatch({ type: 'GOTO', slideId: questions[nextIndex]!.id, at: now });
+    if (engine.getState().activeMedia === 'open') {
+      engine.dispatch({ type: 'MEDIA_ENDED', at: now }); // דילוג על מדיית פתיחה
+    }
+  }, [engine]);
+  const fastNextSlideRef = useRef(fastNextSlide);
+  fastNextSlideRef.current = fastNextSlide;
+
   // -------------------------------------------------------------------------
   // פקודות מנחה (מקלדת + שלט מנחה): 0 קדימה · 1 מובילים · 2 אחורה ·
   // 3 כפיים · 4/5 ‎±10 שניות · 6 עצירה/המשך
@@ -749,6 +786,21 @@ export function GameHost({
         // רענון יזום של קובץ המשחק מהשרת (בלי לאבד ניקוד/מיקום)
         event.preventDefault();
         onRequestRefresh?.();
+      } else if (event.key === 'w' || event.key === 'W') {
+        // תצוגה מקדימה של מסך המנצחים הסופי — ובלחיצה נוספת חזרה למיקום במשחק
+        event.preventDefault();
+        if (winnersPreviewRef.current !== null) {
+          setStage(winnersPreviewRef.current);
+          winnersPreviewRef.current = null;
+        } else if (stage === 'playing') {
+          winnersPreviewRef.current = 'playing';
+          setLeadersOverlay(false);
+          setStage('winners');
+        }
+      } else if (event.key === 'n' || event.key === 'N') {
+        // הרצה מהירה — כל לחיצה מדלגת לשקופית הבאה, חשופה במלואה
+        event.preventDefault();
+        if (stage === 'playing') fastNextSlideRef.current();
       }
     };
     window.addEventListener('keydown', handleKey);
