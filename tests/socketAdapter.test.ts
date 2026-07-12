@@ -112,6 +112,36 @@ describe('SocketVoteAdapter — אינטגרציה מול שרת Socket.IO', () 
     adapter.disconnect();
   });
 
+  it('משחזר את עצמו אחרי נפילת חיבור — מצטרף מחדש וההצבעות ממשיכות', async () => {
+    const adapter = new SocketVoteAdapter(url);
+    const snapshots: VoteSnapshot[] = [];
+    let connectedCount = 0;
+    let reconnecting = false;
+    adapter.onVoteSnapshot((s) => snapshots.push(s));
+    adapter.onStatusChange((st) => {
+      if (st === 'connected') connectedCount += 1;
+      if (st === 'reconnecting') reconnecting = true;
+    });
+
+    await adapter.connect('5003');
+    await waitFor(() => connectedCount >= 1);
+
+    // מפילים את החיבור מצד השרת (סימולציית נפילת רשת)
+    ioServer.disconnectSockets(true);
+
+    // משחזר את עצמו: מצב "מתחבר מחדש" ואז חיבור מלא + הצטרפות מחדש לחדר
+    await waitFor(() => reconnecting);
+    await waitFor(() => connectedCount >= 2, 8000);
+
+    // ההצבעות ממשיכות לזרום כרגיל אחרי השחזור
+    adapter.setActiveSlide(9);
+    ioServer.to('5003').emit('voting', { vote: '1', phone: '0509999999', gameId: '5003' });
+    await waitFor(() => snapshots.length >= 1, 3000);
+    expect(snapshots[snapshots.length - 1]!.total).toBe(1);
+
+    adapter.disconnect();
+  });
+
   it('כשאין חלון הצבעה פעיל — voting אינו יוצר snapshot', async () => {
     const adapter = new SocketVoteAdapter(url);
     const snapshots: VoteSnapshot[] = [];

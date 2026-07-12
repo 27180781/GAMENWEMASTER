@@ -8,6 +8,11 @@
  * השרת שולח הצבעות בודדות; המנוע מצפה ל-VoteSnapshot מצטבר. לכן הצבירה
  * מתבצעת כאן ב-VoteWindow (חלון הצבעה לשקופית אחת), שה-host פותח וסוגר
  * דרך setActiveSlide — בדיוק בגבולות חלון ההצבעה של השקופית הנוכחית.
+ *
+ * עמידות: החיבור משחזר את עצמו לבד. Socket.IO מתחבר מחדש עם backoff מהיר,
+ * מצטרף מחדש לחדר בכל חיבור, מטפל גם בניתוק שיזם השרת, ומתחבר מיידית ברגע
+ * שהרשת/הטאב חוזרים (online/focus/visibility) — בלי להמתין למחזור ה-backoff.
+ * חלון ההצבעה והמצב במנוע נשמרים לאורך הנפילה, כך שהמשחק ממשיך חלק.
  */
 
 import { io, type Socket } from 'socket.io-client';
@@ -78,6 +83,7 @@ export class SocketVoteAdapter implements VoteAdapter {
   private joinedListener: ((phone: string, name?: string) => void) | null = null;
   private window: VoteWindow | null = null;
   private roomId = '';
+  private cleanupFns: (() => void)[] = [];
 
   constructor(private readonly serverUrl: string = VOTE_SERVER_URL) {}
 
@@ -87,22 +93,60 @@ export class SocketVoteAdapter implements VoteAdapter {
       transports: ['websocket'],
       reconnection: true,
       reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
+      reconnectionDelay: 500, // התחברות מחדש מהירה
+      reconnectionDelayMax: 4000,
+      randomizationFactor: 0.5,
+      timeout: 8000,
     });
     this.socket = socket;
 
-    socket.on('connect', () => {
-      // join/room חייב לרוץ מיד עם החיבור, לפני שמישהו מצביע
-      socket.emit('join/room', { gameId: roomId });
-    });
+    // join/room רץ בכל חיבור — כולל אחרי כל התחברות-מחדש — לפני הצבעות
+    socket.on('connect', () => socket.emit('join/room', { gameId: roomId }));
     socket.on('room/joined', () => this.statusListener?.('connected'));
     socket.on('voting', (data: RawVote) => this.handleVote(data));
     socket.on('player/joined', (data: RawVote) => this.report(data));
-    socket.on('disconnect', () => this.statusListener?.('reconnecting'));
-    socket.io.on('reconnect', () => socket.emit('join/room', { gameId: roomId }));
+    socket.on('disconnect', (reason: string) => {
+      this.statusListener?.('reconnecting');
+      // ניתוק ביוזמת השרת אינו מפעיל reconnect אוטומטי — יוזמים ידנית
+      if (reason === 'io server disconnect') socket.connect();
+    });
+    socket.on('connect_error', () => this.statusListener?.('reconnecting'));
     socket.io.on('reconnect_attempt', () => this.statusListener?.('reconnecting'));
 
+    this.installNetworkWatchers(socket);
     return Promise.resolve();
+  }
+
+  /**
+   * התחברות-מחדש מיידית כשהרשת חוזרת או שהטאב חוזר לפוקוס — בלי להמתין
+   * למחזור ה-backoff של Socket.IO. פועל רק בדפדפן (מוגן לסביבת בדיקות/Node).
+   */
+  private installNetworkWatchers(socket: Socket): void {
+    if (typeof window === 'undefined') return;
+    const reconnectNow = () => {
+      // אם החיבור עדיין חי (הבלִיפ היה קצר) — משחזרים את החיווי ל"מחובר".
+      // אחרת יוזמים חיבור מיידי בלי להמתין ל-backoff.
+      if (socket.connected) this.statusListener?.('connected');
+      else socket.connect();
+    };
+    const onOffline = () => this.statusListener?.('reconnecting');
+    const onVisible = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') reconnectNow();
+    };
+    window.addEventListener('online', reconnectNow);
+    window.addEventListener('offline', onOffline);
+    window.addEventListener('focus', reconnectNow);
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisible);
+    }
+    this.cleanupFns.push(() => {
+      window.removeEventListener('online', reconnectNow);
+      window.removeEventListener('offline', onOffline);
+      window.removeEventListener('focus', reconnectNow);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisible);
+      }
+    });
   }
 
   /** מדווח על שחקן שנראה (הצטרפות/הצבעה): שם למיפוי, וחיבור למסך הלובי. */
@@ -153,6 +197,8 @@ export class SocketVoteAdapter implements VoteAdapter {
   }
 
   disconnect(): void {
+    for (const cleanup of this.cleanupFns) cleanup();
+    this.cleanupFns = [];
     this.socket?.disconnect();
     this.socket = null;
     this.window = null;
