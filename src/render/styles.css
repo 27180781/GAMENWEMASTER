@@ -542,6 +542,83 @@ body {
   border-radius: 14px;
 }
 
+/* ---------- סקר: סימון + פילוח עוגה ---------- */
+.q-question-row { display: flex; align-items: center; justify-content: center; gap: 18px; }
+/* סימון עוגת סקר תלת-מימדי ליד השאלה */
+.q-survey-icon {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: conic-gradient(#38b24a 0 30%, #e23b3b 30% 55%, #f5c518 55% 78%, #3b82f6 78% 100%);
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  transform: perspective(220px) rotateX(32deg);
+  box-shadow: 0 10px 0 -3px rgba(0, 0, 0, 0.45), 0 14px 18px rgba(0, 0, 0, 0.5);
+}
+
+.q-survey {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 60px;
+  width: 100%;
+  max-width: 1400px;
+  animation: qpop 0.5s ease both;
+}
+.q-survey-pie-wrap { flex: 0 0 auto; perspective: 900px; }
+.q-survey-pie {
+  width: 380px;
+  height: 380px;
+  border-radius: 50%;
+  border: 5px solid rgba(255, 255, 255, 0.85);
+  transform: rotateX(26deg);
+  box-shadow: 0 40px 0 -8px rgba(0, 0, 0, 0.4), 0 46px 40px rgba(0, 0, 0, 0.5),
+    inset 0 0 40px rgba(0, 0, 0, 0.25);
+}
+.q-survey-legend {
+  flex: 0 1 auto;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.q-survey-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--pill);
+  border: 2px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  padding: 14px 22px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+}
+.q-survey-swatch {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+}
+.q-survey-ans {
+  flex: 1 1 auto;
+  font-weight: 800;
+  font-size: 30px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 620px;
+}
+.q-survey-val {
+  flex: 0 0 auto;
+  font-weight: 900;
+  font-size: 28px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------- כותרת תחתית: טיימר / מובילים ---------- */
 .q-footer { flex: 0 0 auto; min-height: 92px; display: flex; align-items: center; }
 
