@@ -14,6 +14,7 @@ import { parseGameFile, type GameFile } from '../engine/index.ts';
 import { DebugApp } from '../debug/DebugApp.tsx';
 import { SettingsScreen } from '../render/SettingsScreen.tsx';
 import { Stage } from '../render/Stage.tsx';
+import { themeStyle } from '../render/theme.ts';
 import { GameHost } from './GameHost.tsx';
 import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.ts';
 import { openPushChannel } from './pushChannel.ts';
@@ -44,9 +45,9 @@ function useHash(): string {
 }
 
 /** מעטפת במה 16:9 למסכים שמחוץ למשחק עצמו (בחירה, הגדרות, טעינה). */
-function Shell({ children }: { children: ReactNode }) {
+function Shell({ children, style }: { children: ReactNode; style?: Record<string, string> }) {
   return (
-    <div className="game-root" dir="rtl">
+    <div className="game-root" dir="rtl" style={style}>
       <Stage>{children}</Stage>
     </div>
   );
@@ -220,7 +221,7 @@ export function App() {
   // מסך ההגדרות — המסך הראשון אחרי טעינת משחק
   if (pendingGame !== null) {
     return (
-      <Shell>
+      <Shell style={themeStyle(pendingGame.setting)}>
         <SettingsScreen
           game={pendingGame}
           initial={settings}

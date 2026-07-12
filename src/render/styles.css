@@ -1069,7 +1069,22 @@ body {
   text-align: right;
 }
 
-/* ---- מצב דמו ---- */
+/* ---- מסך הגדרות (מסך מלא — ראשון וגם מכפתור ⚙ באמצע משחק) ---- */
+
+/* רקע אטום בצבע המשחק + z-index גבוה, כדי שיהיה מסך שלם ולא חלון מעל המשחק. */
+.settings-screen {
+  z-index: 60;
+  background:
+    radial-gradient(ellipse at 50% -12%, rgba(255, 255, 255, 0.08), transparent 55%),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, rgb(var(--main-rgb, 34, 43, 69)) 80%, #000),
+      color-mix(in srgb, rgb(var(--main-rgb, 34, 43, 69)) 42%, #07030f),
+      color-mix(in srgb, rgb(var(--main-rgb, 34, 43, 69)) 60%, #000)
+    );
+}
+.demo-settings { gap: 22px; }
+.demo-settings .opening-title { font-size: 76px; }
 
 .demo-checkbox {
   font-size: 24px;
@@ -1083,11 +1098,12 @@ body {
   display: flex;
   flex-direction: column;
   gap: 26px;
-  width: 700px;
-  background: rgba(0, 0, 0, 0.35);
+  width: 860px;
+  max-width: 92%;
+  background: rgba(0, 0, 0, 0.32);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 14px;
-  padding: 32px;
+  border-radius: 18px;
+  padding: 38px 44px;
 }
 
 .demo-field {
