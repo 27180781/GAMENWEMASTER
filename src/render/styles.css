@@ -1219,3 +1219,36 @@ body {
   cursor: pointer;
 }
 .license-modal-box button:hover { background: #2563eb; }
+
+/* ---- אזהרות איכות חיבור ---- */
+
+.conn-warnings {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 62;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+.conn-warnings--below-banner { top: 56px; }
+
+.conn-warning {
+  padding: 10px 24px;
+  border-radius: 999px;
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+  animation: conn-warn-in 0.3s ease both;
+}
+.conn-warning--error { background: #b91c1c; border: 2px solid #ef4444; }
+.conn-warning--warn { background: #b45309; border: 2px solid #f59e0b; }
+
+@keyframes conn-warn-in {
+  from { opacity: 0; transform: translateY(-8px); }
+}
