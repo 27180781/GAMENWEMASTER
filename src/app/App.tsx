@@ -15,6 +15,7 @@ import { DebugApp } from '../debug/DebugApp.tsx';
 import { SettingsScreen } from '../render/SettingsScreen.tsx';
 import { Stage } from '../render/Stage.tsx';
 import { GameHost } from './GameHost.tsx';
+import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.ts';
 import { openPushChannel } from './pushChannel.ts';
 import { VOTE_SERVER_URL } from './socketAdapter.ts';
 import { DEFAULT_GAME_SETTINGS, parseAppParams, type GameSettings } from './urlParams.ts';
@@ -51,6 +52,40 @@ function Shell({ children }: { children: ReactNode }) {
   );
 }
 
+/** התראת בעיות מדיה בטעינה — קישורים שבורים (אונליין) / נכסים חסרים (אופליין). */
+function MediaIssuesAlert({ issues, onClose }: { issues: MediaIssue[]; onClose: () => void }) {
+  const missing = issues.filter((i) => i.reason === 'missing').length;
+  const broken = issues.length - missing;
+  return (
+    <div className="media-alert">
+      <div className="media-alert-box">
+        <div className="media-alert-icon">⚠️</div>
+        <h2>נמצאו בעיות מדיה ({issues.length})</h2>
+        <p className="media-alert-sub">
+          {missing > 0 && `${missing} נכסים חסרים`}
+          {missing > 0 && broken > 0 && ' · '}
+          {broken > 0 && `${broken} קישורים שבורים`}
+        </p>
+        <ul className="media-alert-list">
+          {issues.slice(0, 40).map((issue, idx) => (
+            <li key={`${issue.reason}-${issue.src}-${idx}`}>
+              <span className={`media-alert-tag media-alert-tag--${issue.reason}`}>
+                {issue.reason === 'missing' ? 'חסר' : 'שבור'}
+              </span>
+              <span className="media-alert-ctx">{issue.context}</span>
+              <span className="media-alert-src" dir="ltr">
+                {issue.src}
+              </span>
+            </li>
+          ))}
+          {issues.length > 40 && <li className="media-alert-more">…ועוד {issues.length - 40}</li>}
+        </ul>
+        <button onClick={onClose}>המשך בכל זאת</button>
+      </div>
+    </div>
+  );
+}
+
 export function App() {
   const hash = useHash();
   const params = useMemo(() => parseAppParams(window.location.search), []);
@@ -60,6 +95,9 @@ export function App() {
   const [game, setGame] = useState<GameFile | null>(null);
   /** האם המשחק נטען כמשחק אופליין (ZIP) — משפיע על באנר/רישיון במשחק. */
   const [offline, setOffline] = useState(false);
+  /** בעיות מדיה שזוהו בטעינה (קישורים שבורים / נכסים חסרים). */
+  const [mediaIssues, setMediaIssues] = useState<MediaIssue[]>([]);
+  const [mediaAlertDismissed, setMediaAlertDismissed] = useState(false);
   const [settings, setSettings] = useState<GameSettings>({
     ...DEFAULT_GAME_SETTINGS,
     crowdEnabled: params.demo || DEFAULT_GAME_SETTINGS.crowdEnabled,
@@ -81,6 +119,8 @@ export function App() {
         const loaded = parseGameFile(raw);
         if (!cancelled) {
           setOffline(false); // ‏?game=URL — משחק אונליין
+          setMediaIssues([]);
+          setMediaAlertDismissed(false);
           setPendingGame(loaded);
           setRemoteLoading(false);
         }
@@ -95,6 +135,21 @@ export function App() {
       cancelled = true;
     };
   }, [params]);
+
+  // בדיקת מדיה למשחק אונליין — מזהה קישורים שבורים (אופליין נבדק ב-zipLoader)
+  useEffect(() => {
+    if (pendingGame === null || offline) return;
+    let cancelled = false;
+    void probeMediaRefs(collectMediaRefs(pendingGame)).then((issues) => {
+      if (!cancelled && issues.length > 0) {
+        setMediaIssues(issues);
+        setMediaAlertDismissed(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [pendingGame, offline]);
 
   // -------------------------------------------------------------------------
   // רענון יזום ("פוש") למשחק אונליין — התוכן מתעדכן רק כשמגיע אות רענון,
@@ -175,6 +230,9 @@ export function App() {
             setGame(pendingGame);
           }}
         />
+        {mediaIssues.length > 0 && !mediaAlertDismissed && (
+          <MediaIssuesAlert issues={mediaIssues} onClose={() => setMediaAlertDismissed(true)} />
+        )}
       </Shell>
     );
   }
@@ -195,6 +253,8 @@ export function App() {
   const loadRaw = (raw: unknown) => {
     try {
       setOffline(false); // בחירת fixture / העלאת JSON — משחק אונליין
+      setMediaIssues([]);
+      setMediaAlertDismissed(false);
       setPendingGame(parseGameFile(raw));
       setError(null);
     } catch (e) {
@@ -206,8 +266,10 @@ export function App() {
     file
       .arrayBuffer()
       .then((buffer) => loadGameFromZip(buffer))
-      .then(({ game }) => {
+      .then(({ game, missing }) => {
         setOffline(true); // ZIP — משחק אופליין
+        setMediaIssues(missing); // נכסים חסרים בתיקיית ה-ZIP
+        setMediaAlertDismissed(false);
         setPendingGame(game);
         setError(null);
       })
