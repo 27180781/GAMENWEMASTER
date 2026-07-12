@@ -33,6 +33,7 @@ import type { TimerView } from '../render/TimerRing.tsx';
 import { SettingsScreen } from '../render/SettingsScreen.tsx';
 import { AudioManager } from './AudioManager.ts';
 import { extractHostVote } from './hostRemote.ts';
+import { MediaPreloader, slidePreloadUrls } from './mediaPreloader.ts';
 import { displayName, loadRoster, saveRoster, type RosterData } from './roster.ts';
 import { useConnectionHealth } from './useConnectionHealth.ts';
 import { planCrowdVotes, snapshotAt } from './syntheticVotes.ts';
@@ -114,6 +115,7 @@ export function GameHost({
     [useSocket, voteServerUrl],
   );
   const audio = useMemo(() => new AudioManager(), []);
+  const preloader = useMemo(() => new MediaPreloader(), []);
   const state = useEngineState(engine);
 
   const [stage, setStage] = useState<HostStage>('opening');
@@ -201,6 +203,25 @@ export function GameHost({
     setAnswerers([]);
     lastHostAnswerRef.current = null;
   }, [state.currentSlideId]);
+
+  // טעינה מוקדמת של המדיה של השקופיות הקרובות — מעבר מיידי בלי מסך שחור/השהיה
+  useEffect(() => {
+    const questions = game.questions;
+    const triviaSrc = game.setting.triviaMedia.src;
+    const urls: string[] = [];
+    for (let i = state.currentSlideIndex; i <= state.currentSlideIndex + 2 && i < questions.length; i++) {
+      urls.push(...slidePreloadUrls(questions[i]!, triviaSrc));
+    }
+    // קרוב לסוף — גם מדיית מסכי הזוכים
+    if (state.currentSlideIndex >= questions.length - 2) {
+      for (const src of [game.setting.winnersMedia.src, game.setting.winnersListMedia.src]) {
+        if (src.trim() !== '' && !src.startsWith('blob:')) urls.push(src);
+      }
+    }
+    preloader.prefetch(urls);
+  }, [state.currentSlideIndex, game, preloader]);
+
+  useEffect(() => () => preloader.dispose(), [preloader]);
 
   // רענון תוכן חם ("פוש"): כשמגיע אובייקט game חדש — מחליפים את התוכן במנוע
   // בלי remount, כדי לשמר ניקוד/מיקום. שלבי החשיפה של השקופית הנוכחית נשמרים;
