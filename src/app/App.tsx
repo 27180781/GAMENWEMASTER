@@ -263,7 +263,7 @@ export function App() {
           game={pendingGame}
           initial={settings}
           mode="start"
-          allowDemo={params.demo}
+          allowDemo={params.demo || offline}
           qrAvailable={!offline && (pendingGame.room ?? '') !== ''}
           onSave={(saved) => {
             persistAndSetSettings(saved);
@@ -308,6 +308,8 @@ export function App() {
       .then((buffer) => loadGameFromZip(buffer))
       .then(({ game, missing }) => {
         setOffline(true); // ZIP — משחק אופליין
+        // באופליין אין סוקט — מקור ההצבעות היחיד הוא קהל הדמה, לכן מדליקים אותו.
+        setSettings((prev) => ({ ...prev, crowdEnabled: true }));
         setMediaIssues(missing); // נכסים חסרים בתיקיית ה-ZIP
         setMediaAlertDismissed(false);
         setPendingGame(game);

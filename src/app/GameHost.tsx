@@ -327,11 +327,12 @@ export function GameHost({
     const value = new URLSearchParams(window.location.search).get('backupUrl');
     return value !== null && value.trim() !== '' ? value.trim() : null;
   }, []);
-  // אופציית שחקני הדמה זמינה רק כשהקישור כולל ‎?demo=1‎
+  // אופציית שחקני הדמה זמינה עם ‎?demo=1‎, וגם באופליין (אין סוקט — הדמה הכרחי).
   const allowDemo = useMemo(() => {
+    if (offline) return true;
     const value = new URLSearchParams(window.location.search).get('demo');
     return value !== null && ['', '1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
-  }, []);
+  }, [offline]);
   const backupCfg = useMemo<BackupConfig | null>(() => {
     if (offline || game.id === '') return null;
     if (backupUrlOverride !== null) {
