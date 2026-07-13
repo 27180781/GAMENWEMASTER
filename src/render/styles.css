@@ -1216,29 +1216,35 @@ body {
 
 /* ---- פאנל "שמות וקבוצות" (נפתח מכפתור הפינה 👥) ---- */
 
+/* חלונית "שמות וקבוצות" — מגירה בצד המסך (לא חלון ממורכז) */
 .roster-panel {
   position: absolute;
   inset: 0;
   z-index: 55;
-  background: rgba(0, 0, 0, 0.65);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
 }
 
 .roster-panel-box {
+  position: absolute;
+  top: 0;
+  left: 0; /* מגירה בצד שמאל, כמו בדוגמה */
+  height: 100%;
+  width: 560px;
+  max-width: 92%;
   background: #151a2e;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 14px;
-  width: 1500px;
-  max-width: 94%;
-  max-height: 960px;
-  padding: 26px 30px;
+  border-inline-end: 2px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 14px 0 44px rgba(0, 0, 0, 0.55);
+  padding: 22px 26px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
   color: #fff;
   font-size: 22px;
+  animation: roster-slide 0.28s ease;
+}
+@keyframes roster-slide {
+  from { transform: translateX(-40px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
 
 .roster-panel-header {
@@ -1248,18 +1254,31 @@ body {
   flex: none;
 }
 
-.roster-tabs { display: flex; gap: 12px; }
-.roster-tabs button,
-.roster-close {
+.roster-tabs { display: flex; gap: 10px; }
+.roster-tabs button {
   background: #26304f;
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 8px;
-  padding: 10px 20px;
+  border-radius: 999px;
+  padding: 10px 22px;
   font-size: 20px;
+  font-weight: 700;
   cursor: pointer;
 }
 .roster-tabs button.active { background: #3b82f6; border-color: #60a5fa; }
+.roster-close {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 10px;
+  width: 42px;
+  height: 42px;
+  font-size: 20px;
+  cursor: pointer;
+}
+.roster-close:hover { background: rgba(255, 255, 255, 0.22); }
+
+.roster-heading { font-size: 24px; font-weight: 800; text-align: center; margin: 0; flex: none; }
 
 /* הגלילה היחידה — פנימית לפאנל, לא של הבמה */
 .roster-scroll {
@@ -1267,18 +1286,9 @@ body {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
-.roster-table { border-collapse: collapse; width: 100%; }
-.roster-table th,
-.roster-table td {
-  padding: 6px 10px;
-  text-align: start;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  white-space: nowrap;
-}
-.roster-table th { font-size: 18px; opacity: 0.75; font-weight: 600; }
 .roster-empty { opacity: 0.6; text-align: center; padding: 24px; }
 
 .roster-panel input,
@@ -1286,61 +1296,191 @@ body {
   background: #0f1424;
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 7px;
-  padding: 8px 10px;
+  border-radius: 9px;
+  padding: 10px 12px;
   font-size: 19px;
-  min-width: 120px;
+  min-width: 0;
 }
-.roster-panel input.roster-num { min-width: 90px; width: 110px; }
+.roster-panel input.roster-num { flex: none; width: 92px; text-align: center; }
+
+/* רשימת שמות — שורות מרווחות עם מחיקה + עריכה מוטמעת */
+.roster-names { list-style: none; display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; }
+.roster-name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 8px 12px;
+}
+.roster-name-input { flex: 1; }
 
 .roster-del {
   background: transparent;
   color: #f87171;
-  border: 1px solid rgba(248, 113, 113, 0.5);
-  border-radius: 7px;
-  padding: 4px 10px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  border-radius: 9px;
+  padding: 6px 10px;
   font-size: 18px;
   cursor: pointer;
+  flex: none;
 }
 .roster-del:hover { background: rgba(248, 113, 113, 0.15); }
 
-.roster-add {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
-  flex: none;
+.roster-add { display: flex; gap: 10px; align-items: center; flex: none; }
+.roster-add--sticky {
+  position: sticky;
+  bottom: 0;
+  background: #151a2e;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
-.roster-add button {
+.roster-add-btn {
   background: #16a34a;
   color: #fff;
   border: none;
-  border-radius: 8px;
-  padding: 9px 18px;
-  font-size: 19px;
+  border-radius: 10px;
+  width: 50px;
+  height: 50px;
+  font-size: 26px;
+  line-height: 1;
   cursor: pointer;
+  flex: none;
 }
-.roster-add--group button { background: #2563eb; }
 
 .roster-category {
   border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-.roster-category-head { display: flex; gap: 12px; align-items: center; }
+.roster-category-head { display: flex; gap: 10px; align-items: center; }
 .roster-category-head .roster-cat-name { flex: 1; font-weight: 700; }
+.roster-cat-count { font-size: 15px; opacity: 0.75; white-space: nowrap; }
 
-.roster-groups {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-inline-start: 18px;
-}
+.roster-groups { list-style: none; display: flex; flex-direction: column; gap: 8px; padding: 0; margin: 0; }
 .roster-groups li { display: flex; gap: 10px; align-items: center; }
+.roster-groups li input { flex: 1; }
+.roster-group-num {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #3b82f6;
+  color: #fff;
+  font-weight: 800;
+  font-size: 17px;
+}
+.roster-group-count { flex: none; min-width: 30px; text-align: center; opacity: 0.85; font-weight: 700; }
+
+.roster-cat-actions { display: flex; gap: 10px; margin-top: 4px; }
+.roster-connect-btn {
+  flex: 1;
+  background: #7c3aed;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 11px;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.roster-connect-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.roster-reset-btn {
+  flex: 1;
+  background: transparent;
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.5);
+  border-radius: 10px;
+  padding: 11px;
+  font-size: 18px;
+  cursor: pointer;
+}
+.roster-reset-btn:hover { background: rgba(251, 191, 36, 0.12); }
+
+/* ---- מסך התחברות לקבוצות (מסך מלא) ---- */
+.gconn-screen {
+  z-index: 58;
+  background:
+    radial-gradient(ellipse at 50% -12%, rgba(255, 255, 255, 0.08), transparent 55%),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, rgb(var(--main-rgb, 139, 47, 201)) 80%, #000),
+      color-mix(in srgb, rgb(var(--main-rgb, 139, 47, 201)) 42%, #07030f),
+      color-mix(in srgb, rgb(var(--main-rgb, 139, 47, 201)) 60%, #000)
+    );
+}
+.gconn-content { gap: 24px; justify-content: center; position: relative; }
+.gconn-close {
+  position: absolute;
+  top: 8px;
+  inset-inline-end: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  width: 48px;
+  height: 48px;
+  font-size: 22px;
+  cursor: pointer;
+}
+.gconn-title { font-size: 60px; font-weight: 900; text-align: center; margin: 0; color: var(--secondary-color, #fff); }
+.gconn-sub { font-size: 26px; opacity: 0.85; text-align: center; margin: 0; }
+.gconn-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 22px;
+  width: 100%;
+  max-width: 1500px;
+}
+.gconn-card {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: rgba(0, 0, 0, 0.34);
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  border-radius: 18px;
+  padding: 20px 26px;
+}
+.gconn-num {
+  flex: none;
+  width: 76px;
+  height: 76px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 40px;
+  font-weight: 900;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+.gconn-name { flex: 1; font-size: 34px; font-weight: 800; }
+.gconn-count {
+  flex: none;
+  font-size: 44px;
+  font-weight: 900;
+  min-width: 60px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.gconn-empty { opacity: 0.7; font-size: 28px; }
+.gconn-footer { display: flex; align-items: center; gap: 24px; }
+.gconn-total { font-size: 30px; }
+.gconn-reset {
+  background: transparent;
+  color: #fbbf24;
+  border: 2px solid rgba(251, 191, 36, 0.6);
+  border-radius: 12px;
+  padding: 12px 28px;
+  font-size: 24px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.gconn-reset:hover { background: rgba(251, 191, 36, 0.14); }
 
 /* ---- באנר הצטרפות + אזהרת רישיון ---- */
 

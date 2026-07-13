@@ -9,13 +9,17 @@ import {
   addCategory,
   addGroup,
   assignGroup,
+  assignGroupByNumber,
+  categoryMemberTotal,
   changePlayerId,
   displayName,
+  groupCounts,
   groupOf,
   normalizeRoster,
   removeCategory,
   removeGroup,
   removePlayer,
+  resetCategoryMemberships,
   upsertPlayer,
   type RosterData,
 } from '../src/app/roster.ts';
@@ -111,6 +115,64 @@ describe('קטגוריות וקבוצות', () => {
     expect(r.categories).toHaveLength(1);
     expect(groupOf(r, '1', 'cat1')).toBe('');
     expect(groupOf(r, '1', 'cat2')).toBe('g3');
+  });
+});
+
+describe('התחברות לקבוצות לפי מספר', () => {
+  function twoGroups(): RosterData {
+    let r = addCategory(EMPTY_ROSTER, 'עיר', 'cat1');
+    r = addGroup(r, 'cat1', 'ירושלים', 'g1'); // מספר 1
+    r = addGroup(r, 'cat1', 'תל אביב', 'g2'); // מספר 2
+    return r;
+  }
+
+  it('assignGroupByNumber משייך לפי סדר הקבוצה (1-based)', () => {
+    let r = twoGroups();
+    r = assignGroupByNumber(r, '5', 'cat1', 1);
+    r = assignGroupByNumber(r, '6', 'cat1', 2);
+    expect(groupOf(r, '5', 'cat1')).toBe('g1');
+    expect(groupOf(r, '6', 'cat1')).toBe('g2');
+  });
+
+  it('לחיצה אחרונה קובעת — מספר חדש מחליף את הקודם', () => {
+    let r = twoGroups();
+    r = assignGroupByNumber(r, '5', 'cat1', 1);
+    r = assignGroupByNumber(r, '5', 'cat1', 2); // תיקון
+    expect(groupOf(r, '5', 'cat1')).toBe('g2');
+  });
+
+  it('מספר מחוץ לטווח — אין שינוי, ומחזיר את אותו האובייקט', () => {
+    const r = twoGroups();
+    expect(assignGroupByNumber(r, '5', 'cat1', 3)).toBe(r);
+    expect(assignGroupByNumber(r, '5', 'cat1', 0)).toBe(r);
+    expect(assignGroupByNumber(r, '5', 'nope', 1)).toBe(r);
+  });
+
+  it('שיוך חוזר לאותה קבוצה — no-op (אותו אובייקט, בלי רינדור/שמירה)', () => {
+    let r = twoGroups();
+    r = assignGroupByNumber(r, '5', 'cat1', 1);
+    expect(assignGroupByNumber(r, '5', 'cat1', 1)).toBe(r);
+  });
+
+  it('groupCounts ו-categoryMemberTotal סופרים את המחוברים', () => {
+    let r = twoGroups();
+    r = assignGroupByNumber(r, '1', 'cat1', 1);
+    r = assignGroupByNumber(r, '2', 'cat1', 1);
+    r = assignGroupByNumber(r, '3', 'cat1', 2);
+    expect(groupCounts(r, 'cat1')).toEqual({ g1: 2, g2: 1 });
+    expect(categoryMemberTotal(r, 'cat1')).toBe(3);
+  });
+
+  it('resetCategoryMemberships מנקה רק את הקטגוריה הנתונה', () => {
+    let r = twoGroups();
+    r = addCategory(r, 'משקפיים', 'cat2');
+    r = addGroup(r, 'cat2', 'מרכיב', 'g3');
+    r = assignGroupByNumber(r, '1', 'cat1', 1);
+    r = assignGroupByNumber(r, '1', 'cat2', 1);
+    r = resetCategoryMemberships(r, 'cat1');
+    expect(groupOf(r, '1', 'cat1')).toBe(''); // אופס
+    expect(groupOf(r, '1', 'cat2')).toBe('g3'); // הקטגוריה השנייה נשמרה
+    expect(categoryMemberTotal(r, 'cat1')).toBe(0);
   });
 });
 
