@@ -44,9 +44,4 @@ export class ReplayAdapter implements VoteAdapter {
     this.lastSnapshot = snapshot;
     if (this.connected) this.snapshotListener?.(snapshot);
   }
-
-  /** הזרמת רצף snapshots לפי הסדר. */
-  emitAll(snapshots: Iterable<VoteSnapshot>): void {
-    for (const snapshot of snapshots) this.emit(snapshot);
-  }
 }

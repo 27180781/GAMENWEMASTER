@@ -61,10 +61,6 @@ export class AudioManager {
     for (const audio of this.active.values()) audio.volume = this.volume;
   }
 
-  getVolume(): number {
-    return this.volume;
-  }
-
   /** מנגן src בערוץ נתון; קודם עוצר כל סאונד אחר שמתנגן. src ריק/null עוצר בלבד. */
   play(channel: SoundChannel, src: string | null, { loop = false } = {}): void {
     // סאונד חדש עוצר את כל הקודמים (כל הערוצים + מחיאות כפיים) — בלי ערבוב
