@@ -35,7 +35,17 @@ import { SettingsScreen } from '../render/SettingsScreen.tsx';
 import { AudioManager } from './AudioManager.ts';
 import { extractHostVote } from './hostRemote.ts';
 import { MediaPreloader, slidePreloadUrls } from './mediaPreloader.ts';
-import { displayName, loadRoster, saveRoster, type RosterData } from './roster.ts';
+import {
+  assignGroupByNumber,
+  categoryMemberTotal,
+  displayName,
+  groupCounts,
+  loadRoster,
+  resetCategoryMemberships,
+  saveRoster,
+  type RosterData,
+} from './roster.ts';
+import { GroupConnectScreen } from '../render/GroupConnectScreen.tsx';
 import { useConnectionHealth } from './useConnectionHealth.ts';
 import { planCrowdVotes, snapshotAt } from './syntheticVotes.ts';
 import { joinQrUrl, type GameSettings } from './urlParams.ts';
@@ -151,6 +161,28 @@ export function GameHost({
     },
     [game.id],
   );
+  /** מסך התחברות לקבוצות פעיל — מזהה הקטגוריה, או null. */
+  const [connectCategory, setConnectCategory] = useState<string | null>(null);
+  const connectCategoryRef = useRef<string | null>(null);
+  connectCategoryRef.current = connectCategory;
+  /** מחיל הקשות של שחקנים כשיוך לקבוצה לפי מספר (לחיצה אחרונה קובעת), ושומר. */
+  const applyGroupPresses = useCallback(
+    (categoryId: string, voters: Record<string, number>) => {
+      setRoster((prev) => {
+        let next = prev;
+        for (const [voterId, num] of Object.entries(voters)) {
+          next = assignGroupByNumber(next, voterId, categoryId, Number(num));
+        }
+        if (next !== prev) saveRoster(game.id, next);
+        return next;
+      });
+    },
+    [game.id],
+  );
+  const applyGroupPressesRef = useRef(applyGroupPresses);
+  applyGroupPressesRef.current = applyGroupPresses;
+  const rosterRef = useRef(roster);
+  rosterRef.current = roster;
   /** שמות שהגיעו מהשרת (טלפון → שם שחקן) — מיפוי אוטומטי במשחק טלפונים. */
   const [serverNames, setServerNames] = useState<Record<string, string>>({});
   /** סטטוס החיבור לשרת ההצבעות (רלוונטי רק במשחק אונליין אמיתי). */
@@ -675,6 +707,12 @@ export function GameHost({
           runHostCommandRef.current(extraction.hostAnswer);
         }
       }
+      // מסך התחברות לקבוצות פעיל: ההקשות הן שיוך לקבוצה לפי מספר, לא הצבעה לשאלה
+      const connectCat = connectCategoryRef.current;
+      if (connectCat !== null) {
+        if (snapshot.voters) applyGroupPressesRef.current(connectCat, snapshot.voters);
+        return;
+      }
       // בזמן עצירה (פקודה 6) אין קליטת הצבעות
       if (pausedRef.current) return;
       // צובר את ה-snapshot המצטבר; העדכון למנוע/UI מוגבל בקצב (leading+trailing)
@@ -853,6 +891,25 @@ export function GameHost({
     return () => audio.stop('winnersList');
   }, [leadersOverlay, audio, sounds]);
 
+  // דמו: במסך התחברות קבוצות מדמים הצטרפויות אקראיות (בלי קליקר אמיתי) כדי
+  // שאפשר יהיה להדגים ולבדוק את המסך. במשחק אמיתי ההקשות מגיעות מהסוקט.
+  useEffect(() => {
+    if (connectCategory === null || !syntheticCrowd) return;
+    const timer = window.setInterval(() => {
+      const cat = rosterRef.current.categories.find((c) => c.id === connectCategory);
+      const groupCount = cat?.groups.length ?? 0;
+      if (groupCount === 0) return;
+      const voters: Record<string, number> = {};
+      const batch = 3 + Math.floor(Math.random() * 6);
+      for (let i = 0; i < batch; i++) {
+        const voterId = String(1 + Math.floor(Math.random() * crowdConfig.voterCount));
+        voters[voterId] = 1 + Math.floor(Math.random() * groupCount);
+      }
+      applyGroupPresses(connectCategory, voters);
+    }, 500);
+    return () => window.clearInterval(timer);
+  }, [connectCategory, syntheticCrowd, crowdConfig.voterCount, applyGroupPresses]);
+
   // -------------------------------------------------------------------------
   // שליטת מפעיל: רווח/0 = השלב הבא, 2 = שלב אחורה, ספרות = פקודות מנחה,
   // Backspace = שקופית שלמה אחורה (עם אישור), ESC = תפריט
@@ -892,6 +949,11 @@ export function GameHost({
       // צירופים עם Ctrl/Cmd/Alt שייכים לדפדפן (Ctrl+R לרענון, DevTools וכו') —
       // לא חוטפים אותם כדי שלא נחסום פעולות דפדפן בזמן המשחק.
       if (event.ctrlKey || event.metaKey || event.altKey) return;
+      // מסך התחברות קבוצות פתוח — חוסם שליטת מקלדת במשחק; Escape סוגר אותו
+      if (connectCategory !== null) {
+        if (event.key === 'Escape') setConnectCategory(null);
+        return;
+      }
       if (event.key === 'Escape') {
         if (rosterOpen) setRosterOpen(false);
         else if (settingsOpen) setSettingsOpen(false);
@@ -950,7 +1012,7 @@ export function GameHost({
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [stage, menuOpen, settingsOpen, rosterOpen, leadersOverlay, engine, advanceStep, stepBack, onRequestRefresh]);
+  }, [stage, menuOpen, settingsOpen, rosterOpen, leadersOverlay, connectCategory, engine, advanceStep, stepBack, onRequestRefresh]);
 
   // מסך מלא — כפתור בפינה (window resize מעדכן את סקייל הבמה אוטומטית)
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
@@ -1045,8 +1107,29 @@ export function GameHost({
             roster={roster}
             onChange={updateRoster}
             onClose={() => setRosterOpen(false)}
+            onOpenConnect={(categoryId) => {
+              setConnectCategory(categoryId);
+              setRosterOpen(false);
+            }}
           />
         )}
+
+        {/* מסך התחברות לקבוצות — מסך מלא; ההקשות מצרפות שחקנים לקבוצה לפי מספר */}
+        {connectCategory !== null &&
+          (() => {
+            const cat = roster.categories.find((c) => c.id === connectCategory);
+            if (!cat) return null;
+            return (
+              <GroupConnectScreen
+                categoryName={cat.name || 'קטגוריה'}
+                groups={cat.groups}
+                counts={groupCounts(roster, connectCategory)}
+                total={categoryMemberTotal(roster, connectCategory)}
+                onReset={() => updateRoster(resetCategoryMemberships(roster, connectCategory))}
+                onClose={() => setConnectCategory(null)}
+              />
+            );
+          })()}
 
         {/* אזהרת רישיון — משחק אונליין בלי קוד חדר: אפשר להריץ רק עם שחקני דמה */}
         {showLicenseWarning && !licenseAck && (

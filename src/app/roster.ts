@@ -181,6 +181,56 @@ export function groupOf(roster: RosterData, playerId: string, categoryId: string
   return roster.memberships[playerId]?.[categoryId] ?? '';
 }
 
+/**
+ * שיוך שחקן לקבוצה לפי *מספר* הקבוצה (1-based, לפי הסדר בקטגוריה) — כך שחקן
+ * שמקיש ספרה במסך ההתחברות מצטרף לקבוצה המתאימה. "לחיצה אחרונה קובעת": קריאה
+ * חוזרת עם מספר אחר פשוט מחליפה. מספר מחוץ לטווח → אין שינוי. אם השחקן כבר
+ * משויך לאותה קבוצה — מחזיר את אותו האובייקט (בלי רינדור/שמירה מיותרים).
+ */
+export function assignGroupByNumber(
+  roster: RosterData,
+  playerId: string,
+  categoryId: string,
+  number: number,
+): RosterData {
+  const category = roster.categories.find((c) => c.id === categoryId);
+  if (!category) return roster;
+  const group = category.groups[number - 1];
+  if (!group) return roster; // מספר מחוץ לטווח הקבוצות
+  if (groupOf(roster, playerId, categoryId) === group.id) return roster; // כבר משויך
+  return assignGroup(roster, playerId, categoryId, group.id);
+}
+
+/** איפוס כל המחוברים לקטגוריה (מנקה שיוכים) — הקטגוריה והקבוצות נשמרות. */
+export function resetCategoryMemberships(roster: RosterData, categoryId: string): RosterData {
+  const memberships: RosterData['memberships'] = {};
+  for (const [playerId, byCat] of Object.entries(roster.memberships)) {
+    const rest = { ...byCat };
+    delete rest[categoryId];
+    if (Object.keys(rest).length > 0) memberships[playerId] = rest;
+  }
+  return { ...roster, memberships };
+}
+
+/** כמה שחקנים משויכים לכל קבוצה בקטגוריה: groupId → מספר. */
+export function groupCounts(roster: RosterData, categoryId: string): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const byCat of Object.values(roster.memberships)) {
+    const groupId = byCat[categoryId];
+    if (groupId !== undefined) counts[groupId] = (counts[groupId] ?? 0) + 1;
+  }
+  return counts;
+}
+
+/** סך המשויכים בקטגוריה (מספר השחקנים שהצטרפו לאיזושהי קבוצה בה). */
+export function categoryMemberTotal(roster: RosterData, categoryId: string): number {
+  let total = 0;
+  for (const byCat of Object.values(roster.memberships)) {
+    if (byCat[categoryId] !== undefined) total += 1;
+  }
+  return total;
+}
+
 // ---------------------------------------------------------------------------
 // ולידציה + persistence
 // ---------------------------------------------------------------------------
