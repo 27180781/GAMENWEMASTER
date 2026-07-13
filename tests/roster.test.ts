@@ -15,7 +15,9 @@ import {
   displayName,
   groupCounts,
   groupOf,
+  mergeGameUsers,
   normalizeRoster,
+  parseGameUsers,
   removeCategory,
   removeGroup,
   removePlayer,
@@ -173,6 +175,59 @@ describe('התחברות לקבוצות לפי מספר', () => {
     expect(groupOf(r, '1', 'cat1')).toBe(''); // אופס
     expect(groupOf(r, '1', 'cat2')).toBe('g3'); // הקטגוריה השנייה נשמרה
     expect(categoryMemberTotal(r, 'cat1')).toBe(0);
+  });
+});
+
+describe('ייבוא שמות/קבוצות מקובץ המשחק (users)', () => {
+  const USERS_JSON =
+    '{"0501234567":{"remoteId":"0501234567","name":"ישראל ישראלי","groupName":"קבוצה אדומה"},' +
+    '"0527654321":{"remoteId":"0527654321","name":"שרה כהן","groupName":"קבוצה כחולה"},' +
+    '"0538889999":{"remoteId":"0538889999","name":"דוד לוי","groupName":"קבוצה אדומה"},' +
+    '"0541112222":{"remoteId":"0541112222","name":"רחל מזרחי"}}';
+
+  it('parseGameUsers מפענח מחרוזת JSON לרשימת משתמשים', () => {
+    const users = parseGameUsers(USERS_JSON);
+    expect(users).toHaveLength(4);
+    expect(users[0]).toEqual({ remoteId: '0501234567', name: 'ישראל ישראלי', groupName: 'קבוצה אדומה' });
+    expect(users[3]!.groupName).toBe(''); // רחל בלי קבוצה
+  });
+
+  it('parseGameUsers: מחרוזת ריקה/{} → רשימה ריקה', () => {
+    expect(parseGameUsers('{}')).toEqual([]);
+    expect(parseGameUsers('')).toEqual([]);
+    expect(parseGameUsers(undefined)).toEqual([]);
+    expect(parseGameUsers('לא JSON')).toEqual([]);
+  });
+
+  it('mergeGameUsers: שמות ללשונית + קטגוריה אחת עם קבוצות לפי groupName', () => {
+    const users = parseGameUsers(USERS_JSON);
+    const r = mergeGameUsers(EMPTY_ROSTER, users, 'משחק לדוגמה');
+    // שמות
+    expect(r.players).toHaveLength(4);
+    expect(displayName(r, '0501234567')).toBe('ישראל ישראלי');
+    // קטגוריה אחת בשם המשחק
+    expect(r.categories).toHaveLength(1);
+    expect(r.categories[0]!.name).toBe('משחק לדוגמה');
+    // שתי קבוצות (אדומה/כחולה) — רחל בלי קבוצה לא יוצרת קבוצה
+    const groups = r.categories[0]!.groups;
+    expect(groups.map((g) => g.name).sort()).toEqual(['קבוצה אדומה', 'קבוצה כחולה']);
+    // שיוכים: ישראל+דוד לאדומה, שרה לכחולה, רחל לא משויכת
+    const red = groups.find((g) => g.name === 'קבוצה אדומה')!.id;
+    const blue = groups.find((g) => g.name === 'קבוצה כחולה')!.id;
+    const catId = r.categories[0]!.id;
+    expect(groupOf(r, '0501234567', catId)).toBe(red);
+    expect(groupOf(r, '0538889999', catId)).toBe(red);
+    expect(groupOf(r, '0527654321', catId)).toBe(blue);
+    expect(groupOf(r, '0541112222', catId)).toBe('');
+  });
+
+  it('mergeGameUsers אידמפוטנטי — ריצה חוזרת לא מכפילה קטגוריות/קבוצות', () => {
+    const users = parseGameUsers(USERS_JSON);
+    let r = mergeGameUsers(EMPTY_ROSTER, users, 'משחק לדוגמה');
+    r = mergeGameUsers(r, users, 'משחק לדוגמה');
+    expect(r.categories).toHaveLength(1);
+    expect(r.categories[0]!.groups).toHaveLength(2);
+    expect(r.players).toHaveLength(4);
   });
 });
 

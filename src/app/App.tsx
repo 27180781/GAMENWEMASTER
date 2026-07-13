@@ -18,6 +18,7 @@ import { themeStyle } from '../render/theme.ts';
 import { GameHost } from './GameHost.tsx';
 import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.ts';
 import { openPushChannel } from './pushChannel.ts';
+import { loadRoster, mergeGameUsers, parseGameUsers, saveRoster } from './roster.ts';
 import { VOTE_SERVER_URL } from './socketAdapter.ts';
 import {
   DEFAULT_GAME_SETTINGS,
@@ -120,6 +121,16 @@ export function App() {
     if (pendingGame === null) return;
     const at = loadAutoTransition(pendingGame.id) ?? pendingGame.setting.autoTransition;
     setSettings((prev) => ({ ...prev, autoTransition: at }));
+  }, [pendingGame]);
+
+  // ייבוא שמות/קבוצות מקובץ המשחק (שדה users) למרשם: השמות ללשונית השמות,
+  // והשיוך לקבוצות תחת קטגוריה בשם המשחק (השיוך בגייסון מגיע בלי קטגוריה).
+  useEffect(() => {
+    if (pendingGame === null) return;
+    const users = parseGameUsers(pendingGame.users);
+    if (users.length === 0) return;
+    const categoryName = pendingGame.name.trim() !== '' ? pendingGame.name.trim() : 'קבוצות המשחק';
+    saveRoster(pendingGame.id, mergeGameUsers(loadRoster(pendingGame.id), users, categoryName));
   }, [pendingGame]);
 
   /** עדכון הגדרות + שמירת דריסת המעברים האוטומטיים ל-localStorage (פעולת מפעיל). */
