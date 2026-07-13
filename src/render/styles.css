@@ -858,15 +858,19 @@ body {
   height: 100%;
 }
 
+/* בועת הטקסט — כמו בועת השאלה: רקע בצבע הראשי, טקסט בצבע המשני, מעל רקע המדיה */
 .subject-text {
   font-size: 56px;
-  font-weight: 700;
-  line-height: 1.4;
+  font-weight: 800;
+  line-height: 1.35;
   text-align: center;
+  text-wrap: balance;
   color: var(--secondary-color, #fff);
   background: var(--main-color, #222b45);
-  padding: 32px 48px;
-  border-radius: 18px;
+  padding: 36px 60px;
+  border-radius: 46px;
+  box-shadow: 0 20px 54px rgba(0, 0, 0, 0.4);
+  max-width: 1400px;
   white-space: pre-wrap;
   max-height: 840px;
   overflow: hidden;
