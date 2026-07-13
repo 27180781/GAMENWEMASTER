@@ -369,6 +369,8 @@ export function GameHost({
     let cancelled = false;
     void fetchBackup(backupCfg, game.id).then((data) => {
       if (cancelled || data === null) return;
+      // משחק שכבר הסתיים (game-over) — לא מציעים המשך; מתחילים חדש.
+      if (data.completed) return;
       const hasProgress = Object.keys(data.users).length > 0 || data.meta.currentQueId !== null;
       if (hasProgress) setResumePrompt(data);
     });
@@ -400,6 +402,9 @@ export function GameHost({
   // שמירה אוטומטית מדורגת (debounce ~1.5s) בשינויים משמעותיים במצב המשחק
   useEffect(() => {
     if (backupCfg === null || resumePrompt !== null) return;
+    // אחרי game-over הגיבוי ננעל — שמירה נוספת (completed:false) הייתה "פותחת"
+    // אותו מחדש בשרת וגורמת להצעת המשך במשחק שכבר הסתיים. לכן לא שומרים יותר.
+    if (gameEndedRef.current) return;
     if (stage !== 'playing' && stage !== 'winners' && stage !== 'winnersList') return;
     if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = window.setTimeout(() => {

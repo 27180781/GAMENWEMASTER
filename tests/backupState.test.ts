@@ -91,6 +91,34 @@ describe('backupToSnapshot + שחזור למנוע', () => {
     expect(winners.map((w) => w.voterId).sort()).toEqual(['a', 'c']);
     expect(winners[0]!.score).toBe(10);
   });
+
+  it('מסיק את המיקום מדגלי display כשה-meta הושמט בשרת', () => {
+    const game = makeGame([
+      rawSlide({ id: 1, type: 'trivia', que: 'ש1', answers: fourAnswers(2), scoreForQue: 10, timeForQue: 15 }),
+      rawSlide({ id: 2, type: 'trivia', que: 'ש2', answers: fourAnswers(1), scoreForQue: 10, timeForQue: 15 }),
+      rawSlide({ id: 3, type: 'trivia', que: 'ש3', answers: fourAnswers(3), scoreForQue: 10, timeForQue: 15 }),
+    ]);
+    // שרת שהשמיט את meta: currentQueId=null, אך שאלות 1–2 סומנו כמוצגות
+    const data: BackupData = {
+      id: 'g',
+      users: { a: { name: 'a', score: 10, groupId: null, numAnswers: 1, numCorrect: 1, details: { lastQue: 2, lastVote: 1 } } },
+      questions: {
+        '1': { queId: 1, type: 'trivia', display: true, numVotes: 1, correctVotes: 1, answers: { '2': 1 } },
+        '2': { queId: 2, type: 'trivia', display: true, numVotes: 1, correctVotes: 1, answers: { '1': 1 } },
+        '3': { queId: 3, type: 'trivia', display: false, numVotes: 0, correctVotes: 0, answers: {} },
+      },
+      groups: [],
+      meta: { currentQueId: null, phase: 'showing', startedAt: 0 },
+      completed: false,
+    };
+    const snap = backupToSnapshot(game, data);
+    expect(snap.currentSlideId).toBe(2); // השקופית המתקדמת ביותר שהוצגה
+    expect(snap.slidesCompleted).toEqual([1]);
+    // שחזור למנוע ממקם באמת בשקופית 2 (ולא חוזר לראשונה)
+    const restored = new GameEngine(game);
+    restored.restore(snap);
+    expect(restored.getState().currentSlideId).toBe(2);
+  });
 });
 
 describe('rosterFromBackup', () => {

@@ -122,16 +122,34 @@ function mapPhase(phase: string): GamePhase {
  * בונה GameSnapshot של המנוע מגיבוי — לשחזור. הניקוד והמיקום משוחזרים במלואם;
  * votesBySlide אינו ניתן לשחזור מדויק (הפורמט מצטבר) ולכן ריק — חזרה אחורה
  * לשקופית שכבר נוקדה תחשב אותה מחדש (מגבלה מתועדת, כמו בשחזור snapshot רגיל).
+ *
+ * המיקום (`currentQueId`) נלקח קודם מ-meta; אך שרת הגיבוי ממזג רק שדות מוכרים
+ * (id/users/questions/groups/completed) ועלול להשמיט את שדות ה-meta, ואז נחזור
+ * לשאלה הראשונה. לכן, אם אין meta תקין, מסיקים את המיקום מדגלי ה-display של
+ * השאלות (שכן הם נשמרים בתוך מחרוזת ה-JSON של questions ותמיד חוזרים): השקופית
+ * המתקדמת ביותר שסומנה כמוצגת היא המקום שבו המשחק נעצר.
  */
 export function backupToSnapshot(game: GameFile, backup: BackupData): GameSnapshot {
   const scores: Record<string, number> = {};
   for (const [voterId, user] of Object.entries(backup.users)) {
     if (user.score !== 0) scores[voterId] = user.score;
   }
-  const currentSlideId = backup.meta.currentQueId ?? game.questions[0]?.id ?? 0;
-  const slidesCompleted = Object.values(backup.questions)
-    .filter((q) => q.display && q.queId !== currentSlideId)
+  const orderIndex = new Map(game.questions.map((s, i) => [s.id, i]));
+  const displayedIds = Object.values(backup.questions)
+    .filter((q) => q.display && orderIndex.has(q.queId))
     .map((q) => q.queId);
+  let currentSlideId: number;
+  if (backup.meta.currentQueId !== null && orderIndex.has(backup.meta.currentQueId)) {
+    currentSlideId = backup.meta.currentQueId; // meta תקין — המיקום המדויק
+  } else if (displayedIds.length > 0) {
+    // אין meta — השקופית המתקדמת ביותר מבין המוצגות (לפי סדר המשחק)
+    currentSlideId = displayedIds.reduce((best, id) =>
+      (orderIndex.get(id) ?? -1) > (orderIndex.get(best) ?? -1) ? id : best,
+    );
+  } else {
+    currentSlideId = game.questions[0]?.id ?? 0;
+  }
+  const slidesCompleted = displayedIds.filter((id) => id !== currentSlideId);
   return {
     version: 1,
     gameId: game.id,
