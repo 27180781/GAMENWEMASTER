@@ -803,9 +803,12 @@ export function GameHost({
     }
     // דגל שגורם ל-effect איפוס-השקופית לחשוף במלואה (במקום לאפס)
     fastRevealRef.current = true;
-    engine.dispatch({ type: 'GOTO', slideId: questions[nextIndex]!.id, at: now });
-    if (engine.getState().activeMedia === 'open') {
-      engine.dispatch({ type: 'MEDIA_ENDED', at: now }); // דילוג על מדיית פתיחה
+    const target = questions[nextIndex]!;
+    engine.dispatch({ type: 'GOTO', slideId: target.id, at: now });
+    // מדלגים על מדיית הפתיחה רק בשקופית הצבעה (כדי להגיע לשאלה החשופה). בשקופית
+    // מדיה/טקסט המדיה עצמה היא התוכן — נותנים לה להתנגן, לא מדלגים למסך ריק.
+    if (engine.getState().activeMedia === 'open' && isVotableSlide(target)) {
+      engine.dispatch({ type: 'MEDIA_ENDED', at: now });
     }
   }, [engine]);
   const fastNextSlideRef = useRef(fastNextSlide);

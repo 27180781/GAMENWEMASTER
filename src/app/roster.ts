@@ -232,6 +232,83 @@ export function categoryMemberTotal(roster: RosterData, categoryId: string): num
 }
 
 // ---------------------------------------------------------------------------
+// ייבוא שמות/קבוצות מקובץ המשחק (שדה users ב-JSON)
+// ---------------------------------------------------------------------------
+
+/** משתמש שמגיע מקובץ המשחק: מספר (remoteId) → שם, ואופציונלית שם קבוצה. */
+export interface GameUser {
+  remoteId: string;
+  name: string;
+  groupName: string;
+}
+
+/**
+ * פענוח שדה users מקובץ המשחק (מחרוזת JSON או אובייקט) לרשימת משתמשים.
+ * מבנה: { "<remoteId>": { remoteId, name, groupName? }, ... }.
+ */
+export function parseGameUsers(raw: unknown): GameUser[] {
+  let obj: unknown = raw;
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (trimmed === '' || trimmed === '{}') return [];
+    try {
+      obj = JSON.parse(trimmed);
+    } catch {
+      return [];
+    }
+  }
+  if (obj === null || typeof obj !== 'object') return [];
+  const users: GameUser[] = [];
+  for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+    if (value === null || typeof value !== 'object') continue;
+    const v = value as Record<string, unknown>;
+    const remoteId = String(v.remoteId ?? key).trim();
+    if (remoteId === '') continue;
+    users.push({
+      remoteId,
+      name: String(v.name ?? '').trim(),
+      groupName: String(v.groupName ?? '').trim(),
+    });
+  }
+  return users;
+}
+
+/**
+ * מיזוג משתמשי קובץ המשחק למרשם: השמות נכנסים ללשונית השמות, והשיוך לקבוצות
+ * (שמגיע בלי קטגוריה) נכנס תחת קטגוריה אחת בשם categoryName — הקבוצות נוצרות
+ * לפי groupName הייחודיים. אימיוטבילי ואידמפוטנטי (ריצה חוזרת = אותה תוצאה).
+ */
+export function mergeGameUsers(roster: RosterData, users: GameUser[], categoryName: string): RosterData {
+  let r = roster;
+  for (const u of users) r = upsertPlayer(r, u.remoteId, u.name);
+
+  const grouped = users.filter((u) => u.groupName !== '');
+  if (grouped.length === 0) return r;
+
+  // קטגוריה אחת (לפי השם) — נוצרת אם אינה קיימת
+  const existingCat = r.categories.find((c) => c.name === categoryName);
+  const catId = existingCat?.id ?? uid('cat');
+  if (existingCat === undefined) r = addCategory(r, categoryName, catId);
+
+  // קבוצות לפי groupName ייחודי (נוצרות אם אינן קיימות)
+  const category = r.categories.find((c) => c.id === catId)!;
+  const nameToGroupId = new Map<string, string>(category.groups.map((g) => [g.name, g.id]));
+  for (const groupName of new Set(grouped.map((u) => u.groupName))) {
+    if (!nameToGroupId.has(groupName)) {
+      const groupId = uid('grp');
+      r = addGroup(r, catId, groupName, groupId);
+      nameToGroupId.set(groupName, groupId);
+    }
+  }
+
+  for (const u of grouped) {
+    const groupId = nameToGroupId.get(u.groupName);
+    if (groupId !== undefined) r = assignGroup(r, u.remoteId, catId, groupId);
+  }
+  return r;
+}
+
+// ---------------------------------------------------------------------------
 // ולידציה + persistence
 // ---------------------------------------------------------------------------
 
