@@ -19,6 +19,29 @@ interface SlideViewProps {
   players: RailPlayer[];
   /** חמשת הראשונים שענו נכונה על השקופית — לפס המובילים בחשיפה. */
   leaders: RailPlayer[];
+  /** מצב שליחת שקופית "פונקציה" ל-API (רלוונטי רק ל-type: "function"). */
+  functionStatus?: 'idle' | 'sending' | 'sent' | 'error';
+}
+
+/** מסך שקופית "פונקציה" — פעולת מערכת (שליחת נתונים ל-API) עם חיווי מצב. */
+function FunctionScreen({ status }: { status: 'idle' | 'sending' | 'sent' | 'error' }) {
+  const text =
+    status === 'sent'
+      ? '✓ הנתונים נשלחו'
+      : status === 'error'
+        ? '⚠ השליחה נכשלה'
+        : 'שולח נתונים…';
+  return (
+    <div className="screen slide-screen function-screen">
+      <div className="screen-content">
+        <div className={`function-card function-card--${status}`}>
+          <div className="function-icon">⚡</div>
+          <p className="function-text">{text}</p>
+          {status === 'sending' && <div className="spinner" />}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -46,8 +69,14 @@ export function SlideView({
   reveal,
   players,
   leaders,
+  functionStatus = 'idle',
 }: SlideViewProps) {
   const slide = engine.getCurrentSlide();
+
+  // שקופית "פונקציה" — פעולת מערכת (שליחת נתונים ל-API), מסך חיווי נפרד.
+  if (slide.type === 'function') {
+    return <FunctionScreen status={functionStatus} />;
+  }
 
   // מדיה חוסמת — מסך מלא. מנוגנת אוטומטית; המעבר ממנה הוא ידני (רווח/0),
   // ולכן אין onEnded שמדלג אוטומטית ומשאיר מסך ריק.
