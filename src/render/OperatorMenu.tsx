@@ -68,7 +68,7 @@ export function OperatorMenu({
             קהל סינתטי (Replay)
           </label>
           <p className="operator-status">
-            מקור הצבעות: ReplayAdapter — ללא שרת (M3) · הורדות ומטמון: M4
+            מקור הצבעות: {syntheticCrowd ? 'קהל סינתטי (דמו)' : 'שרת ההצבעות'}
             {hostVoterId !== '' && ` · שלט מנחה: ${hostVoterId}`}
           </p>
           <p className="operator-status">

@@ -197,6 +197,15 @@ export function App() {
   const gameStartedRef = useRef(false);
   gameStartedRef.current = game !== null;
 
+  // שחרור ה-Blob URLs של משחק אופליין (ZIP) בעת החלפתו במשחק אחר או בעזיבה,
+  // כדי לא לדלוף זיכרון. משחררים תמיד רק את הקודם — לעולם לא את הפעיל.
+  const zipRevokeRef = useRef<(() => void) | null>(null);
+  const revokeZip = useCallback(() => {
+    zipRevokeRef.current?.();
+    zipRevokeRef.current = null;
+  }, []);
+  useEffect(() => revokeZip, [revokeZip]);
+
   /** החלת קובץ משחק מעודכן: רענון חם באמצע משחק, או עדכון התצוגה לפני התחלה. */
   const applyGame = useCallback((loaded: GameFile) => {
     setError(null);
@@ -292,6 +301,7 @@ export function App() {
 
   const loadRaw = (raw: unknown) => {
     try {
+      revokeZip(); // עוזבים אופליין (אם היה) — משחררים את ה-Blob URLs שלו
       setOffline(false); // בחירת fixture / העלאת JSON — משחק אונליין
       setMediaIssues([]);
       setMediaAlertDismissed(false);
@@ -306,7 +316,9 @@ export function App() {
     file
       .arrayBuffer()
       .then((buffer) => loadGameFromZip(buffer))
-      .then(({ game, missing }) => {
+      .then(({ game, missing, revoke }) => {
+        zipRevokeRef.current?.(); // שחרור משחק אופליין קודם (אם נטען אחד)
+        zipRevokeRef.current = revoke;
         setOffline(true); // ZIP — משחק אופליין
         // באופליין אין סוקט — מקור ההצבעות היחיד הוא קהל הדמה, לכן מדליקים אותו.
         setSettings((prev) => ({ ...prev, crowdEnabled: true }));

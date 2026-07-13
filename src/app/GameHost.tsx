@@ -1094,7 +1094,9 @@ export function GameHost({
       const voters: Record<string, number> = {};
       const batch = 3 + Math.floor(Math.random() * 6);
       for (let i = 0; i < batch; i++) {
-        const voterId = String(1 + Math.floor(Math.random() * crowdConfig.voterCount));
+        // אותו מרחב מזהים כמו קהל ההצבעה בדמו (‏syntheticVotes: "משתתף N"),
+        // כדי שהשיוך לקבוצות בדמו יתאים לניקוד ודירוג הקבוצות יעבוד גם בדמו.
+        const voterId = `משתתף ${1 + Math.floor(Math.random() * crowdConfig.voterCount)}`;
         voters[voterId] = 1 + Math.floor(Math.random() * groupCount);
       }
       applyGroupPresses(connectCategory, voters);

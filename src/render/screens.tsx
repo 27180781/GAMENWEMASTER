@@ -83,24 +83,6 @@ export function LobbyScreen({
   );
 }
 
-export function OpeningScreen({ engine }: { engine: GameEngine }) {
-  const setting = engine.getGame().setting;
-  return (
-    <div className="screen opening-screen">
-      {setting.gameMedia.src !== '' && (
-        <div className="screen-background">
-          <MediaPlayer src={setting.gameMedia.src} asBackground />
-        </div>
-      )}
-      <div className="screen-content">
-        {setting.logo.src !== '' && <img className="opening-logo" src={setting.logo.src} alt="" />}
-        <h1 className="opening-title">{setting.titleThroughoutGame || engine.getGame().name}</h1>
-        <p className="opening-hint">לחצו על רווח כדי להתחיל</p>
-      </div>
-    </div>
-  );
-}
-
 export function WinnersScreen({
   engine,
   nameOf = identityName,
