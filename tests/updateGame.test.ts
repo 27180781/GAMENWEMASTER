@@ -24,6 +24,32 @@ function playFirstSlideThenLandOnSecond(engine: GameEngine): void {
   engine.dispatch({ type: 'ADVANCE', at: 2500 }); // → שקופית 2, showing
 }
 
+describe('GameEngine.reset — התחלת משחק מחדש', () => {
+  it('מאפס ניקוד/הצבעות/מיקום לשקופית הראשונה', () => {
+    const engine = new GameEngine(triviaGame());
+    playFirstSlideThenLandOnSecond(engine);
+    // מצב לפני איפוס: יש ניקוד, יש הצבעות, ואנחנו בשקופית 2
+    expect(engine.getState().scores).toEqual({ alice: 3 });
+    expect(engine.getState().currentSlideId).toBe(2);
+
+    engine.reset();
+
+    const s = engine.getState();
+    expect(s.currentSlideId).toBe(1);
+    expect(s.currentSlideIndex).toBe(0);
+    expect(s.phase).toBe('showing');
+    expect(s.scores).toEqual({});
+    expect(s.votesBySlide).toEqual({});
+    expect(s.slidesCompleted).toEqual([]);
+    expect(s.answerTimes).toEqual({});
+    // אפשר לשחק שוב מההתחלה, והניקוד נצבר מאפס
+    engine.dispatch({ type: 'ADVANCE', at: 10 });
+    engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(1, 1, { bob: 1 }), at: 20 });
+    engine.dispatch({ type: 'VOTING_TIMEOUT', at: 30 });
+    expect(engine.getState().scores).toEqual({ bob: 3 });
+  });
+});
+
 describe('GameEngine.updateGame — רענון תוכן חם', () => {
   it('החלפת תוכן שומרת ניקוד, הצבעות ומיקום (לפי id)', () => {
     const engine = new GameEngine(triviaGame());
