@@ -23,10 +23,20 @@ interface SettingsScreenProps {
   onSave: (settings: GameSettings) => void;
   /** משחק אונליין עם רישיון פעיל (קוד חדר) ולא אופליין — מאפשר סימון QR. */
   qrAvailable?: boolean;
+  /** אופציית שחקני הדמה זמינה רק כשהקישור כולל ‎?demo=1‎; אחרת משחק אונליין רגיל. */
+  allowDemo?: boolean;
 }
 
-export function SettingsScreen({ game, initial, mode, onSave, qrAvailable = false }: SettingsScreenProps) {
-  const [crowdEnabled, setCrowdEnabled] = useState(initial.crowdEnabled);
+export function SettingsScreen({
+  game,
+  initial,
+  mode,
+  onSave,
+  qrAvailable = false,
+  allowDemo = false,
+}: SettingsScreenProps) {
+  // בלי ‎?demo=1‎ אין שחקני דמה — המשחק אונליין רגיל.
+  const [crowdEnabled, setCrowdEnabled] = useState(allowDemo && initial.crowdEnabled);
   const [voterCount, setVoterCount] = useState(initial.voterCount);
   const [speedFactor, setSpeedFactor] = useState(initial.speedFactor);
   const [correctPercent, setCorrectPercent] = useState(Math.round(initial.correctBias * 100));
@@ -59,57 +69,63 @@ export function SettingsScreen({ game, initial, mode, onSave, qrAvailable = fals
           <section className="demo-form demo-col">
             <div className="demo-col-title">שחקנים והצבעה</div>
 
-            <label className="demo-field demo-field--row">
-              <input
-                type="checkbox"
-                checked={crowdEnabled}
-                onChange={(e) => setCrowdEnabled(e.target.checked)}
-              />
-              <span>שחקני דמה (מצב דמו) — הצבעות מקהל מדומה במקום מהסוקט</span>
-            </label>
+            {allowDemo ? (
+              <>
+                <label className="demo-field demo-field--row">
+                  <input
+                    type="checkbox"
+                    checked={crowdEnabled}
+                    onChange={(e) => setCrowdEnabled(e.target.checked)}
+                  />
+                  <span>שחקני דמה (מצב דמו) — הצבעות מקהל מדומה במקום מהסוקט</span>
+                </label>
 
-            <label className="demo-field">
-              <span>כמות שחקני דמה: {clampedVoters.toLocaleString()}</span>
-              <div className="demo-field-inline">
-                <input
-                  type="range"
-                  min="1"
-                  max="5000"
-                  step="1"
-                  value={clampedVoters}
-                  onChange={(e) => setVoterCount(Number(e.target.value))}
-                />
-                <input
-                  type="number"
-                  min="1"
-                  max="5000"
-                  value={clampedVoters}
-                  onChange={(e) => setVoterCount(Number(e.target.value))}
-                />
-              </div>
-            </label>
+                <label className="demo-field">
+                  <span>כמות שחקני דמה: {clampedVoters.toLocaleString()}</span>
+                  <div className="demo-field-inline">
+                    <input
+                      type="range"
+                      min="1"
+                      max="5000"
+                      step="1"
+                      value={clampedVoters}
+                      onChange={(e) => setVoterCount(Number(e.target.value))}
+                    />
+                    <input
+                      type="number"
+                      min="1"
+                      max="5000"
+                      value={clampedVoters}
+                      onChange={(e) => setVoterCount(Number(e.target.value))}
+                    />
+                  </div>
+                </label>
 
-            <label className="demo-field">
-              <span>מהירות הצבעה</span>
-              <select value={speedFactor} onChange={(e) => setSpeedFactor(Number(e.target.value))}>
-                {SPEED_PRESETS.map((preset) => (
-                  <option key={preset.value} value={preset.value}>
-                    {preset.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <label className="demo-field">
+                  <span>מהירות הצבעה</span>
+                  <select value={speedFactor} onChange={(e) => setSpeedFactor(Number(e.target.value))}>
+                    {SPEED_PRESETS.map((preset) => (
+                      <option key={preset.value} value={preset.value}>
+                        {preset.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-            <label className="demo-field">
-              <span>אחוז עונים נכון (בשאלות trivia): {correctPercent}%</span>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={correctPercent}
-                onChange={(e) => setCorrectPercent(Number(e.target.value))}
-              />
-            </label>
+                <label className="demo-field">
+                  <span>אחוז עונים נכון (בשאלות trivia): {correctPercent}%</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={correctPercent}
+                    onChange={(e) => setCorrectPercent(Number(e.target.value))}
+                  />
+                </label>
+              </>
+            ) : (
+              <p className="demo-hint">משחק אונליין — השחקנים מצביעים מהטלפון/קליקר האמיתי.</p>
+            )}
 
             <label className="demo-field">
               <span>קצב עדכוני הצבעות (ms; השרת האמיתי ≈250)</span>
