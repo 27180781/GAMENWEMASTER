@@ -677,7 +677,11 @@ body {
 }
 
 /* ---------- אווטרים מתעופפים ---------- */
-.q-flyers { position: absolute; inset: 0 auto 0 0; width: 560px; height: 100%; z-index: 6; pointer-events: none; overflow: hidden; }
+/* z-index 1: מעל רקע הבמה אך מתחת ל-q-content (z-index 2) — כך המספרים והשמות
+   העולים בהצבעה נראים ברקע אך מוסתרים מאחורי השאלות והתשובות ואינם מפריעים לקריאה. */
+/* overflow: visible — כדי שהשמות הארוכים לא ייחתכו בקצה; ממילא z-index 1 מסתיר
+   כל חריגה מאחורי כרטיסי השאלה/התשובות, אז אין הפרעה לקריאה. */
+.q-flyers { position: absolute; inset: 0 auto 0 0; width: 560px; height: 100%; z-index: 1; pointer-events: none; overflow: visible; }
 .q-flyer { position: absolute; bottom: 140px; display: flex; align-items: center; gap: 10px; will-change: transform, opacity; }
 .q-flyer--0 { animation: flyUp0 2.85s ease-out forwards; }
 .q-flyer--1 { animation: flyUp1 2.85s ease-out forwards; }

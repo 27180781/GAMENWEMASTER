@@ -96,7 +96,8 @@ function Flyers({ players }: { players: RailPlayer[] }) {
       name: p.name,
       initial: p.initial,
       color: p.color,
-      left: 14 + Math.floor(Math.random() * 430),
+      // מרוכזים בפס השמאלי; השמות נפתחים לתוך שטח פנוי (overflow גלוי) בלי חיתוך
+      left: 14 + Math.floor(Math.random() * 260),
       variant: Math.floor(Math.random() * 3),
     }));
     setFlyers((prev) => [...prev, ...additions]);
