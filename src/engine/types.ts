@@ -86,6 +86,12 @@ export interface GameState {
   liveVotes: { counts: Record<string, number>; total: number } | null;
   /** ניקוד מצטבר: voterId → נקודות. */
   scores: Record<string, number>;
+  /**
+   * זמני תגובה מצטברים: voterId → סך זמן התגובה (ms) ומספר התשובות. הממוצע
+   * (totalMs/count) משמש כשובר-שוויון — מהיר יותר עדיף כשהניקוד זהה. מהיר =
+   * ממוצע נמוך. נצבר בסגירת כל שקופית הצבעה (הפיך בחזרה לשקופית).
+   */
+  answerTimes: Record<string, { totalMs: number; count: number }>;
   /** slideId → voterId → answerId (הצבעות סופיות של שקופיות שנסגרו + הנוכחית). */
   votesBySlide: Record<number, Record<string, number>>;
   /** id-ים של שקופיות שהושלמו (עברנו מהן הלאה). */
