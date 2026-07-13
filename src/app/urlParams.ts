@@ -75,12 +75,18 @@ export interface GameSettings {
   autoTransition: AutoTransition;
   /** הצגת QR להתחברות מטלפונים (רק במשחק אונליין עם רישיון, לא דמו). */
   showQr: boolean;
+  /** הצגת פס הנחיות (חיוג + קוד) בתחתית המסך לאורך המשחק. */
+  showBottomInstructions: boolean;
 }
 
 /** כתובת ההתחברות מהטלפון עבור קוד QR — לפי קוד המשחק (room). */
 export function joinQrUrl(room: string): string {
   return `https://clicker.clicker.co.il/?game=${encodeURIComponent(room)}`;
 }
+
+/** מספר החיוג להצטרפות למשחקי טלפונים — גולמי (לחיוג) ותצוגה (מקובץ לקריאוּת). */
+export const JOIN_DIAL_NUMBER = '033064361';
+export const JOIN_DIAL_DISPLAY = '03-306-4361';
 
 export const DEFAULT_AUTO_TRANSITION: AutoTransition = {
   showAnswersAfterQuestion: false,
@@ -100,6 +106,7 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   hostVoterId: '',
   autoTransition: DEFAULT_AUTO_TRANSITION,
   showQr: false,
+  showBottomInstructions: false,
 };
 
 /**

@@ -59,7 +59,7 @@ import { downloadGameReport } from './gameReport.ts';
 import { buildFunctionPayload, sendFunctionApi } from './functionApi.ts';
 import { useConnectionHealth } from './useConnectionHealth.ts';
 import { planCrowdVotes, snapshotAt } from './syntheticVotes.ts';
-import { joinQrUrl, type GameSettings } from './urlParams.ts';
+import { joinQrUrl, JOIN_DIAL_DISPLAY, type GameSettings } from './urlParams.ts';
 import { QrCode } from '../render/QrCode.tsx';
 import { DebugOverlay } from '../render/DebugOverlay.tsx';
 import { debugLog } from './debugLog.ts';
@@ -119,9 +119,6 @@ interface GameHostProps {
   /** המשחק נטען כאופליין (ZIP) — פטור מבאנר ההצטרפות ומבדיקת הרישיון. */
   offline: boolean;
 }
-
-/** מספר החיוג להצטרפות למשחקי טלפונים. */
-const JOIN_DIAL_NUMBER = '033064361';
 
 export function GameHost({
   game,
@@ -1273,9 +1270,16 @@ export function GameHost({
         {/* באנר הצטרפות עליון — משחק אונליין עם קוד חדר, לכל אורך המשחק */}
         {showJoinBanner && (
           <div className="join-banner">
-            📞 להצטרפות למשחק חייגו <b>{JOIN_DIAL_NUMBER}</b> והקישו את קוד המשחק:{' '}
+            📞 להצטרפות למשחק חייגו <b>{JOIN_DIAL_DISPLAY}</b> והקישו את קוד המשחק:{' '}
             <b className="join-banner-code">{roomId}</b>
             {showQrCode && <QrCode value={qrUrl} size={40} className="qr-banner" />}
+          </div>
+        )}
+
+        {/* פס הנחיות תחתון — חיוג + קוד, לכל אורך המשחק (אם סומן בהגדרות) */}
+        {settings.showBottomInstructions && showJoinBanner && (stage === 'playing' || stage === 'opening') && (
+          <div className="bottom-instructions">
+            📞 חייגו <b>{JOIN_DIAL_DISPLAY}</b> · קוד <b dir="ltr">{roomId}</b> · רווח להמשך
           </div>
         )}
 
@@ -1428,6 +1432,7 @@ export function GameHost({
             initial={settings}
             mode="ingame"
             allowDemo={allowDemo}
+            offline={offline}
             qrAvailable={qrAvailable}
             onSave={(saved) => {
               onSettingsChange(saved);
