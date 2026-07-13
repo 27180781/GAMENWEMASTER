@@ -55,6 +55,7 @@ import {
   type BackupData,
 } from './backup.ts';
 import { backupToSnapshot, buildBackupPayload, rosterFromBackup } from './backupState.ts';
+import { downloadGameReport } from './gameReport.ts';
 import { useConnectionHealth } from './useConnectionHealth.ts';
 import { planCrowdVotes, snapshotAt } from './syntheticVotes.ts';
 import { joinQrUrl, type GameSettings } from './urlParams.ts';
@@ -346,6 +347,7 @@ export function GameHost({
   const startedAtRef = useRef<number>(Date.now());
   const saveTimerRef = useRef<number | null>(null);
   const gameEndedRef = useRef(false);
+  const reportDownloadedRef = useRef(false);
 
   /** בונה ושומר את מצב המשחק הנוכחי לגיבוי (זורק כדי שהקורא יידע אם הצליח). */
   const saveBackupNow = useCallback(async () => {
@@ -432,6 +434,17 @@ export function GameHost({
       }
     })();
   }, [backupCfg, stage, game.id]);
+
+  // סוף משחק אונליין → הורדה אוטומטית של קובץ אקסל סיכום (משתתפים/שאלות/קבוצות).
+  // פעם אחת בלבד, ורק במסך המנצחים האמיתי (לא תצוגה מקדימה של W). לא באופליין.
+  useEffect(() => {
+    if (offline || stage !== 'winners' || winnersPreviewRef.current !== null) return;
+    if (reportDownloadedRef.current) return;
+    reportDownloadedRef.current = true;
+    void downloadGameReport(engine.getGame(), engine.getState(), rosterRef.current, nameOf).catch(
+      (err) => debugLog('game', `יצירת קובץ סיכום נכשלה (${String(err)})`),
+    );
+  }, [offline, stage, engine, nameOf]);
 
   // איפוס שלבי חשיפה + מסילת המצטרפים + זיהוי הקשת שלט המנחה, במעבר שקופית.
   // בהרצה מהירה (מקש N) חושפים את השקופית הבאה במלואה במקום לאפס.
