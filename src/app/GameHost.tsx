@@ -46,6 +46,15 @@ import {
   type RosterData,
 } from './roster.ts';
 import { GroupConnectScreen } from '../render/GroupConnectScreen.tsx';
+import {
+  DEFAULT_BACKUP_CONFIG,
+  endGame,
+  fetchBackup,
+  saveBackup,
+  type BackupConfig,
+  type BackupData,
+} from './backup.ts';
+import { backupToSnapshot, buildBackupPayload, rosterFromBackup } from './backupState.ts';
 import { useConnectionHealth } from './useConnectionHealth.ts';
 import { planCrowdVotes, snapshotAt } from './syntheticVotes.ts';
 import { joinQrUrl, type GameSettings } from './urlParams.ts';
@@ -309,6 +318,114 @@ export function GameHost({
   const winnersPreviewRef = useRef<HostStage | null>(null);
   /** הרצה מהירה (מקש N): דגל שמורה ל-effect איפוס-השקופית לחשוף אותה במלואה. */
   const fastRevealRef = useRef(false);
+
+  // -------------------------------------------------------------------------
+  // גיבוי ותוצאות מול Supabase (מסמך האינטגרציה). פעיל במשחק אונליין מורשה
+  // שאינו דמו; ניתן לעקוף כתובת לבדיקות דרך ‎?backupUrl=‎.
+  // -------------------------------------------------------------------------
+  const backupUrlOverride = useMemo(() => {
+    const value = new URLSearchParams(window.location.search).get('backupUrl');
+    return value !== null && value.trim() !== '' ? value.trim() : null;
+  }, []);
+  // אופציית שחקני הדמה זמינה רק כשהקישור כולל ‎?demo=1‎
+  const allowDemo = useMemo(() => {
+    const value = new URLSearchParams(window.location.search).get('demo');
+    return value !== null && ['', '1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
+  }, []);
+  const backupCfg = useMemo<BackupConfig | null>(() => {
+    if (offline || game.id === '') return null;
+    if (backupUrlOverride !== null) {
+      return { baseUrl: backupUrlOverride, anonKey: DEFAULT_BACKUP_CONFIG.anonKey };
+    }
+    return hasRoom && !syntheticCrowd ? DEFAULT_BACKUP_CONFIG : null;
+  }, [offline, backupUrlOverride, hasRoom, syntheticCrowd, game.id]);
+
+  /** גיבוי חי שנמצא בטעינה — מציג חלונית "להמשיך מאותה נקודה?". */
+  const [resumePrompt, setResumePrompt] = useState<BackupData | null>(null);
+  const startedAtRef = useRef<number>(Date.now());
+  const saveTimerRef = useRef<number | null>(null);
+  const gameEndedRef = useRef(false);
+
+  /** בונה ושומר את מצב המשחק הנוכחי לגיבוי (זורק כדי שהקורא יידע אם הצליח). */
+  const saveBackupNow = useCallback(async () => {
+    if (backupCfg === null) return;
+    const payload = buildBackupPayload(
+      engine.getGame(),
+      engine.getState(),
+      rosterRef.current,
+      nameOf,
+      startedAtRef.current,
+    );
+    await saveBackup(backupCfg, engine.getGame().id, payload);
+    debugLog('game', 'גיבוי נשמר', { phase: payload.meta.phase, currentQueId: payload.meta.currentQueId });
+  }, [backupCfg, engine, nameOf]);
+  const saveBackupNowRef = useRef(saveBackupNow);
+  saveBackupNowRef.current = saveBackupNow;
+
+  // טעינה: בדיקת גיבוי חי קיים למשחק (התאוששות מקריסה/רענון)
+  useEffect(() => {
+    if (backupCfg === null) return;
+    let cancelled = false;
+    void fetchBackup(backupCfg, game.id).then((data) => {
+      if (cancelled || data === null) return;
+      const hasProgress = Object.keys(data.users).length > 0 || data.meta.currentQueId !== null;
+      if (hasProgress) setResumePrompt(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [backupCfg, game.id]);
+
+  /** שחזור מגיבוי: הניקוד והמיקום למנוע, ומרשם מגיבוי אם אין מקומי. */
+  const resumeFromBackup = useCallback(
+    (data: BackupData) => {
+      try {
+        engine.restore(backupToSnapshot(game, data));
+        startedAtRef.current = data.meta.startedAt || Date.now();
+        if (rosterRef.current.categories.length === 0 && rosterRef.current.players.length === 0) {
+          const restored = rosterFromBackup(data);
+          if (restored.players.length > 0 || restored.categories.length > 0) updateRoster(restored);
+        }
+        setStage(data.meta.phase === 'ended' ? 'winners' : 'playing');
+        debugLog('game', 'שוחזר מגיבוי', { phase: data.meta.phase, currentQueId: data.meta.currentQueId });
+      } catch (err) {
+        debugLog('game', `שחזור מגיבוי נכשל (${String(err)})`);
+      }
+      setResumePrompt(null);
+    },
+    [engine, game, updateRoster],
+  );
+
+  // שמירה אוטומטית מדורגת (debounce ~1.5s) בשינויים משמעותיים במצב המשחק
+  useEffect(() => {
+    if (backupCfg === null || resumePrompt !== null) return;
+    if (stage !== 'playing' && stage !== 'winners' && stage !== 'winnersList') return;
+    if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = window.setTimeout(() => {
+      void saveBackupNowRef.current().catch((err) => debugLog('game', `שמירת גיבוי נכשלה (${String(err)})`));
+    }, 1500);
+    return () => {
+      if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
+    };
+  }, [backupCfg, resumePrompt, stage, state.scores, state.phase, state.currentSlideId, state.votesBySlide, state.slidesCompleted]);
+
+  // סיום משחק: הגענו למסך המנצחים באמת (לא תצוגה מקדימה של W) → שמירה אחרונה
+  // ואז נעילת הגיבוי והעברתו לתוצאות.
+  useEffect(() => {
+    if (backupCfg === null || stage !== 'winners' || winnersPreviewRef.current !== null) return;
+    if (gameEndedRef.current) return;
+    gameEndedRef.current = true;
+    void (async () => {
+      try {
+        if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
+        await saveBackupNowRef.current(); // מוודאים שהניקוד הסופי נשמר לפני game-over
+        await endGame(backupCfg, game.id);
+        debugLog('game', 'המשחק הסתיים — הגיבוי ננעל והועבר לתוצאות');
+      } catch (err) {
+        debugLog('game', `סיום משחק (game-over) נכשל (${String(err)})`);
+      }
+    })();
+  }, [backupCfg, stage, game.id]);
 
   // איפוס שלבי חשיפה + מסילת המצטרפים + זיהוי הקשת שלט המנחה, במעבר שקופית.
   // בהרצה מהירה (מקש N) חושפים את השקופית הבאה במלואה במקום לאפס.
@@ -1196,6 +1313,23 @@ export function GameHost({
           </div>
         )}
 
+        {/* גיבוי חי נמצא — התאוששות מקריסה/רענון */}
+        {resumePrompt !== null && (
+          <div className="license-modal">
+            <div className="license-modal-box">
+              <div className="license-modal-icon">💾</div>
+              <h2>נמצא משחק פעיל</h2>
+              <p>קיים גיבוי של המשחק. להמשיך מהנקודה שנשמרה, או להתחיל משחק חדש?</p>
+              <div className="resume-actions">
+                <button onClick={() => resumeFromBackup(resumePrompt)}>▶ המשך מהנקודה</button>
+                <button className="resume-new" onClick={() => setResumePrompt(null)}>
+                  משחק חדש
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <span
           className={`status-dot status-dot--${useSocket ? voteStatus : 'connected'}`}
           title={
@@ -1224,6 +1358,7 @@ export function GameHost({
             game={game}
             initial={settings}
             mode="ingame"
+            allowDemo={allowDemo}
             qrAvailable={qrAvailable}
             onSave={(saved) => {
               onSettingsChange(saved);

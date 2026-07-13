@@ -107,7 +107,8 @@ export function App() {
   const [mediaAlertDismissed, setMediaAlertDismissed] = useState(false);
   const [settings, setSettings] = useState<GameSettings>({
     ...DEFAULT_GAME_SETTINGS,
-    crowdEnabled: params.demo || DEFAULT_GAME_SETTINGS.crowdEnabled,
+    // שחקני דמה נדלקים רק כשהקישור כולל ‎?demo=1‎; אחרת משחק אונליין רגיל.
+    crowdEnabled: params.demo,
   });
   const [remoteLoading, setRemoteLoading] = useState(params.gameUrl !== null);
   const [error, setError] = useState<string | null>(null);
@@ -251,6 +252,7 @@ export function App() {
           game={pendingGame}
           initial={settings}
           mode="start"
+          allowDemo={params.demo}
           qrAvailable={!offline && (pendingGame.room ?? '') !== ''}
           onSave={(saved) => {
             persistAndSetSettings(saved);

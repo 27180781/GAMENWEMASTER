@@ -1,0 +1,167 @@
+/**
+ * גיבוי ותוצאות מול Supabase Edge Functions (מסמך האינטגרציה).
+ *
+ * שלושה endpoints:
+ *   GET  /save-backup/<gameId>   — שליפת גיבוי חי (null = אין).
+ *   POST /save-backup            — שמירת מצב (users/questions/groups כמחרוזות
+ *                                  JSON; השרת ממזג רק את מה שנשלח).
+ *   POST /save-backup/game-over  — נעילת הגיבוי והעברתו לארכיון התוצאות.
+ *
+ * מפתח ה-anon של Supabase הוא ציבורי מעצם הגדרתו (מוגן ב-RLS בצד השרת) —
+ * לכן מותר להטמיעו בלקוח. ניתן לעקוף בזמן build דרך משתני סביבה, או בזמן ריצה
+ * דרך פרמטר הכתובת ‎?backupUrl=‎ (לבדיקות מול שרת מקומי).
+ */
+
+import { debugLog } from './debugLog.ts';
+
+const DEFAULT_BASE_URL = 'https://oousxptmdrrkybadikec.supabase.co/functions/v1';
+const DEFAULT_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9vdXN4cHRtZHJya3liYWRpa2VjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMDc3NzcsImV4cCI6MjA5Mjc4Mzc3N30.9Qb5TZeI-yn3ueuTXh6-XDoFA31FV7EvKGYMu_1QY8c';
+
+/** קריאת ברירת המחדל ממשתני סביבה של Vite (אם הוגדרו), אחרת מהקבועים לעיל. */
+function envOr(key: string, fallback: string): string {
+  const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
+  const value = env?.[key];
+  return value !== undefined && value !== '' ? value : fallback;
+}
+
+export interface BackupConfig {
+  baseUrl: string;
+  anonKey: string;
+}
+
+export const DEFAULT_BACKUP_CONFIG: BackupConfig = {
+  baseUrl: envOr('VITE_SUPABASE_BACKUP_URL', DEFAULT_BASE_URL),
+  anonKey: envOr('VITE_SUPABASE_ANON_KEY', DEFAULT_ANON_KEY),
+};
+
+export interface BackupUser {
+  name: string;
+  score: number;
+  groupId: string | null;
+  numAnswers: number;
+  numCorrect: number;
+  details: { lastQue: number | null; lastVote: number | null };
+}
+
+export interface BackupQuestion {
+  queId: number;
+  type: string;
+  display: boolean;
+  numVotes: number;
+  correctVotes: number;
+  answers: Record<string, number>;
+}
+
+export interface BackupGroup {
+  id: string;
+  name: string;
+  score: number;
+  memberIds: string[];
+}
+
+/** מטא-דאטה לשחזור מדויק (איפה המשחק אחז). */
+export interface BackupMeta {
+  currentQueId: number | null;
+  phase: string;
+  startedAt: number;
+}
+
+/** המטען שנשמר (POST /save-backup). האובייקטים ממורים ל-JSON לפני השליחה. */
+export interface BackupPayload {
+  users: Record<string, BackupUser>;
+  questions: Record<string, BackupQuestion>;
+  groups: BackupGroup[];
+  meta: BackupMeta;
+}
+
+/** הגיבוי כפי שנשלף (GET) — האובייקטים כבר מפוענחים ממחרוזות ה-JSON. */
+export interface BackupData extends BackupPayload {
+  id: string;
+  completed: boolean;
+}
+
+function headers(cfg: BackupConfig): Record<string, string> {
+  return {
+    'Content-Type': 'application/json',
+    apikey: cfg.anonKey,
+    Authorization: `Bearer ${cfg.anonKey}`,
+  };
+}
+
+/** פענוח שדה שעשוי להגיע כמחרוזת JSON או כאובייקט כבר-מפוענח. */
+function parseMaybeJson<T>(value: unknown, fallback: T): T {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'string') {
+    if (value.trim() === '') return fallback;
+    try {
+      return JSON.parse(value) as T;
+    } catch {
+      return fallback;
+    }
+  }
+  return value as T;
+}
+
+/**
+ * שליפת גיבוי חי למשחק. מחזיר null אם אין גיבוי (או בשגיאת רשת — לא מפילים
+ * את המשחק). מנרמל את השדות שעשויים להגיע כמחרוזות JSON.
+ */
+export async function fetchBackup(cfg: BackupConfig, gameId: string): Promise<BackupData | null> {
+  try {
+    const res = await fetch(`${cfg.baseUrl}/save-backup/${encodeURIComponent(gameId)}`, {
+      headers: headers(cfg),
+    });
+    if (!res.ok) return null;
+    const raw: unknown = await res.json();
+    if (raw === null || typeof raw !== 'object') return null;
+    const obj = raw as Record<string, unknown>;
+    // גוף ריק/‏null לוגי → אין גיבוי
+    if (Object.keys(obj).length === 0) return null;
+    const data: BackupData = {
+      id: String(obj.id ?? gameId),
+      users: parseMaybeJson(obj.users, {} as Record<string, BackupUser>),
+      questions: parseMaybeJson(obj.questions, {} as Record<string, BackupQuestion>),
+      groups: parseMaybeJson(obj.groups, [] as BackupGroup[]),
+      meta: parseMaybeJson(obj.meta, {
+        currentQueId: (obj.currentQueId as number | null) ?? null,
+        phase: String(obj.phase ?? 'showing'),
+        startedAt: Number(obj.startedAt) || Date.now(),
+      }),
+      completed: Boolean(obj.completed),
+    };
+    debugLog('game', `נמצא גיבוי חי למשחק ${gameId}`, {
+      phase: data.meta.phase,
+      currentQueId: data.meta.currentQueId,
+      users: Object.keys(data.users).length,
+    });
+    return data;
+  } catch (err) {
+    debugLog('game', `שליפת גיבוי נכשלה (${String(err)})`);
+    return null;
+  }
+}
+
+/** שמירת מצב חי. האובייקטים ממורים ל-JSON כנדרש. זורק בשגיאה כדי שהקורא יידע. */
+export async function saveBackup(cfg: BackupConfig, gameId: string, payload: BackupPayload): Promise<void> {
+  const body = JSON.stringify({
+    id: gameId,
+    users: JSON.stringify(payload.users),
+    questions: JSON.stringify(payload.questions),
+    groups: JSON.stringify(payload.groups),
+    meta: JSON.stringify(payload.meta),
+    completed: false,
+  });
+  const res = await fetch(`${cfg.baseUrl}/save-backup`, { method: 'POST', headers: headers(cfg), body });
+  if (!res.ok) throw new Error(`save-backup נכשל: HTTP ${res.status}`);
+}
+
+/** סיום משחק — נועל את הגיבוי ומעביר אותו לארכיון התוצאות. */
+export async function endGame(cfg: BackupConfig, gameId: string): Promise<void> {
+  const res = await fetch(`${cfg.baseUrl}/save-backup/game-over`, {
+    method: 'POST',
+    headers: headers(cfg),
+    body: JSON.stringify({ id: gameId }),
+  });
+  if (!res.ok) throw new Error(`game-over נכשל: HTTP ${res.status}`);
+}

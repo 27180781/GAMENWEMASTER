@@ -90,7 +90,9 @@ export const DEFAULT_AUTO_TRANSITION: AutoTransition = {
 };
 
 export const DEFAULT_GAME_SETTINGS: GameSettings = {
-  crowdEnabled: true,
+  // ברירת מחדל: משחק אונליין רגיל (שחקנים אמיתיים). שחקני דמה נדלקים רק
+  // כשהקישור כולל ‎?demo=1‎.
+  crowdEnabled: false,
   voterCount: 40,
   speedFactor: 0.6,
   correctBias: 0.55,
