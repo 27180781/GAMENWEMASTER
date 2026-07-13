@@ -937,12 +937,14 @@ export function GameHost({
     return () => window.clearInterval(interval);
   }, [votingActive, state.currentSlideId, syntheticCrowd, adapter, slide, crowdConfig]);
 
-  // שרת אמיתי (סוקט): פותח חלון הצבעה בדיוק בגבולות ההצבעה של השקופית, וסוגר
-  // בסיומה — כך נספרות רק ההצבעות של השקופית הנוכחית בזמן שהחלון פתוח.
+  // שרת אמיתי (סוקט): פותח חלון הצבעה בגבולות ההצבעה של השקופית, וגם בזמן מסך
+  // ההתחברות לקבוצות — כדי שהקשות השחקנים יתקבלו תמיד (גם בין שאלה לשאלה), לא
+  // רק בזמן הצבעה על שאלה. אחרת השרת שולח הקשות אך הן נזרקות (אין חלון פתוח).
   useEffect(() => {
     if (!(adapter instanceof SocketVoteAdapter)) return;
-    adapter.setActiveSlide(votingActive ? slide.id : null);
-  }, [adapter, votingActive, slide.id]);
+    const windowOpen = votingActive || connectCategory !== null;
+    adapter.setActiveSlide(windowOpen ? slide.id : null);
+  }, [adapter, votingActive, connectCategory, slide.id]);
 
   // לובי בדמו: מדמה שחקנים שמתחברים בזמן מסך ההתחברות (באונליין ההתחברות
   // אמיתית דרך player/joined מהסוקט).

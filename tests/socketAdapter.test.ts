@@ -158,6 +158,39 @@ describe('SocketVoteAdapter — אינטגרציה מול שרת Socket.IO', () 
     expect(snapshots).toHaveLength(0);
     adapter.disconnect();
   });
+
+  it('פתיחה חוזרת לאותה שקופית לא מאפסת את המונים; שקופית חדשה כן', async () => {
+    const adapter = new SocketVoteAdapter(url);
+    const snapshots: VoteSnapshot[] = [];
+    let connected = false;
+    adapter.onVoteSnapshot((s) => snapshots.push(s));
+    adapter.onStatusChange((st) => {
+      if (st === 'connected') connected = true;
+    });
+    await adapter.connect('5004');
+    await waitFor(() => connected);
+
+    adapter.setActiveSlide(11);
+    ioServer.to('5004').emit('voting', { vote: '1', phone: '0501', gameId: '5004' });
+    ioServer.to('5004').emit('voting', { vote: '2', phone: '0502', gameId: '5004' });
+    await waitFor(() => snapshots.length >= 2);
+
+    // פתיחה חוזרת לאותה שקופית (למשל בעקבות מסך התחברות שנפתח/נסגר) — לא מאפסת
+    adapter.setActiveSlide(11);
+    ioServer.to('5004').emit('voting', { vote: '3', phone: '0503', gameId: '5004' });
+    await waitFor(() => snapshots.length >= 3);
+    expect(snapshots[snapshots.length - 1]!.total).toBe(3);
+
+    // מעבר לשקופית חדשה — מאפס את הצבירה
+    adapter.setActiveSlide(12);
+    ioServer.to('5004').emit('voting', { vote: '1', phone: '0509', gameId: '5004' });
+    await waitFor(() => snapshots[snapshots.length - 1]!.slideId === 12);
+    const last = snapshots[snapshots.length - 1]!;
+    expect(last.slideId).toBe(12);
+    expect(last.total).toBe(1);
+
+    adapter.disconnect();
+  });
 });
 
 function delay(ms: number): Promise<void> {
