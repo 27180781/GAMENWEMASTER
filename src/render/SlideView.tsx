@@ -60,7 +60,12 @@ export function SlideView({
     );
   }
 
-  const background = slideBackgroundSrc(slide, engine.getGame().setting.triviaMedia.src);
+  let background = slideBackgroundSrc(slide, engine.getGame().setting.triviaMedia.src);
+  // שקופית טקסט (subject) — הרקע הוא מדיית המסך הראשי מהג'ייסון (gameMedia),
+  // אלא אם לשקופית יש רקע ייעודי משלה. מעליו בועת הצבע הראשי עם טקסט משני.
+  if (slide.type === 'subject' && background === '') {
+    background = engine.getGame().setting.gameMedia.src;
+  }
   const votableSlides = engine.getGame().questions.filter(isVotableSlide);
 
   return (

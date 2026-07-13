@@ -183,6 +183,38 @@ export function GameHost({
   applyGroupPressesRef.current = applyGroupPresses;
   const rosterRef = useRef(roster);
   rosterRef.current = roster;
+  // אם הקטגוריה של מסך ההתחברות נמחקה — סוגרים אותו (אחרת המקשים נחסמים בלי מסך נראה)
+  useEffect(() => {
+    if (connectCategory !== null && !roster.categories.some((c) => c.id === connectCategory)) {
+      setConnectCategory(null);
+    }
+  }, [connectCategory, roster.categories]);
+
+  // -------------------------------------------------------------------------
+  // אכיפת מגבלת הרישיון (setting.limit.number): רק N המשתתפים הראשונים —
+  // לפי סדר הופעתם (חיבור/הצבעה/הצטרפות לקבוצה) — מורשים; מעבר לכך מתעלמים
+  // מהם לגמרי, כדי שהמשחק ישמש רק כפי הרישיון. חסר/ריק = ללא הגבלה.
+  // -------------------------------------------------------------------------
+  const participantLimit = game.setting.limit.number ?? Number.MAX_SAFE_INTEGER;
+  const participantLimitRef = useRef(participantLimit);
+  participantLimitRef.current = participantLimit;
+  const admittedRef = useRef<Set<string>>(new Set());
+  // איפוס רשימת המורשים כשמתחלף המשחק (id אחר) — רישיון חדש
+  useEffect(() => {
+    admittedRef.current = new Set();
+  }, [game.id]);
+  const admit = useCallback((id: string): boolean => {
+    const admitted = admittedRef.current;
+    if (admitted.has(id)) return true;
+    if (admitted.size >= participantLimitRef.current) {
+      debugLog('socket', `מעל מגבלת הרישיון (${participantLimitRef.current}) — משתתף ${id} נדחה`);
+      return false;
+    }
+    admitted.add(id);
+    return true;
+  }, []);
+  const admitRef = useRef(admit);
+  admitRef.current = admit;
   /** שמות שהגיעו מהשרת (טלפון → שם שחקן) — מיפוי אוטומטי במשחק טלפונים. */
   const [serverNames, setServerNames] = useState<Record<string, string>>({});
   /** סטטוס החיבור לשרת ההצבעות (רלוונטי רק במשחק אונליין אמיתי). */
@@ -243,6 +275,7 @@ export function GameHost({
   /** כל מי שהתחבר למשחק (לחץ מקש) — למסך הלובי. סדר הצטרפות. */
   const [connectedIds, setConnectedIds] = useState<string[]>([]);
   const addConnected = useCallback((id: string, name?: string) => {
+    if (!admitRef.current(id)) return; // מעל מגבלת הרישיון — לא מצרפים ללובי
     if (name !== undefined && name !== '') {
       setServerNames((prev) => (prev[id] === name ? prev : { ...prev, [id]: name }));
     }
@@ -263,6 +296,10 @@ export function GameHost({
   const slide = engine.getCurrentSlide();
   const setting = engine.getGame().setting;
   const sounds = setting.sound;
+  // רפרנס ל-sounds כדי שאפקטים לא יהיו תלויים בזהותו (משתנה ברענון חם) — כך
+  // רענון תוכן באמצע שאלה לא מאפס בטעות את שלבי החשיפה.
+  const soundsRef = useRef(sounds);
+  soundsRef.current = sounds;
 
   const stageRef = useRef<HostStage>('opening');
   stageRef.current = stage;
@@ -288,14 +325,14 @@ export function GameHost({
       // הצגת השאלה מיד עם הכניסה לשקופית הצבעה — בלי "מסך רקע ריק" ולחיצה ראשונה.
       // (אם מתנגנת מדיית פתיחה חוסמת, השאלה מוצגת אחרי סיומה כרגיל.)
       setReveal({ questionShown: true, answersShown: 0, revealCorrect: false });
-      audio.play('showQuestion', sounds.showQuestionMediaSound.src);
+      audio.play('showQuestion', soundsRef.current.showQuestionMediaSound.src);
     } else {
       setReveal(NO_REVEAL);
     }
     setAnswerers([]);
     setCorrectAnswerers([]);
     lastHostAnswerRef.current = null;
-  }, [state.currentSlideId, engine, audio, sounds]);
+  }, [state.currentSlideId, engine, audio]);
 
   // דיבוג: רישום מעברי שלב/שקופית/מדיה
   useEffect(() => {
@@ -706,6 +743,20 @@ export function GameHost({
           lastHostAnswerRef.current = extraction.hostAnswer;
           runHostCommandRef.current(extraction.hostAnswer);
         }
+      }
+      // אכיפת מגבלת הרישיון: מסננים ל-N המשתתפים המורשים בלבד, ובונים מחדש את
+      // המונים/סה"כ מתוכם — כך שהצבעות מעבר לרישיון לא נספרות ולא משפיעות על הניקוד.
+      if (snapshot.voters) {
+        const voters: Record<string, number> = {};
+        const counts: Record<string, number> = {};
+        let total = 0;
+        for (const [voterId, answerId] of Object.entries(snapshot.voters)) {
+          if (!admitRef.current(voterId)) continue;
+          voters[voterId] = answerId;
+          counts[String(answerId)] = (counts[String(answerId)] ?? 0) + 1;
+          total += 1;
+        }
+        snapshot = { ...snapshot, voters, counts, total };
       }
       // מסך התחברות לקבוצות פעיל: ההקשות הן שיוך לקבוצה לפי מספר, לא הצבעה לשאלה
       const connectCat = connectCategoryRef.current;
