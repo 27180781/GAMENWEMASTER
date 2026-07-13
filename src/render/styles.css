@@ -1472,6 +1472,17 @@ body {
 .online-check input[type='checkbox'] { width: 24px; height: 24px; flex: 0 0 auto; }
 .online-actions { display: flex; justify-content: center; }
 
+/* כפתורי הגדרות באמצע משחק: "התחל מחדש" + "המשך משחק" */
+.settings-dual-actions {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+.settings-screen .settings-restart { background: #7c1d2b; border-color: #ff9db0; }
+
 /* פס הנחיות תחתון בזמן המשחק */
 .bottom-instructions {
   position: absolute;

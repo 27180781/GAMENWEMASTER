@@ -1259,6 +1259,21 @@ export function GameHost({
     else void document.documentElement.requestFullscreen().catch(() => {});
   }, []);
 
+  /** "התחלת המשחק מחדש" מתוך מסך ההגדרות — איפוס מלא וחזרה למסך הפתיחה. */
+  const restartGame = useCallback(() => {
+    engine.reset();
+    setStage('opening');
+    setReveal(NO_REVEAL);
+    setLeadersOverlay(false);
+    setAnswerers([]);
+    setCorrectAnswerers([]);
+    gameEndedRef.current = false;
+    reportDownloadedRef.current = false;
+    winnersPreviewRef.current = null;
+    setSettingsOpen(false);
+    debugLog('command', 'התחלת המשחק מחדש (מתוך ההגדרות)');
+  }, [engine]);
+
   // קליק עכבר אינו מקדם שלבים — קידום רק ברווח/0 (בקשת המנחה)
   return (
     <div
@@ -1437,6 +1452,10 @@ export function GameHost({
             onSave={(saved) => {
               onSettingsChange(saved);
               setSettingsOpen(false);
+            }}
+            onRestart={(saved) => {
+              onSettingsChange(saved);
+              restartGame();
             }}
           />
         )}

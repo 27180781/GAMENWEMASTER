@@ -23,7 +23,10 @@ interface SettingsScreenProps {
   initial: GameSettings;
   /** 'start' — לפני תחילת המשחק; 'ingame' — נפתח מכפתור ההגדרות בזמן משחק. */
   mode: 'start' | 'ingame';
+  /** החלת ההגדרות: במסך פתיחה מתחיל משחק; באמצע משחק "המשך משחק". */
   onSave: (settings: GameSettings) => void;
+  /** באמצע משחק בלבד — החלת ההגדרות והתחלת המשחק מחדש. */
+  onRestart?: (settings: GameSettings) => void;
   /** משחק אונליין עם רישיון פעיל (קוד חדר) ולא אופליין — מאפשר סימון QR. */
   qrAvailable?: boolean;
   /** אופציית שחקני הדמה זמינה רק כשהקישור כולל ‎?demo=1‎; אחרת משחק אונליין רגיל. */
@@ -37,6 +40,7 @@ export function SettingsScreen({
   initial,
   mode,
   onSave,
+  onRestart,
   qrAvailable = false,
   allowDemo = false,
   offline = false,
@@ -51,8 +55,8 @@ export function SettingsScreen({
   const [autoTransition, setAutoTransition] = useState<AutoTransition>(initial.autoTransition);
   const [showQr, setShowQr] = useState(initial.showQr);
   const [showBottomInstructions, setShowBottomInstructions] = useState(initial.showBottomInstructions);
-  /** מסך דמה: מציג את הגדרות הדמה המפורטות רק בלחיצה על "הגדרות מתקדמות". */
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  /** מסך דמה: הגדרות הדמה המפורטות. באמצע משחק פתוחות מיד (רוצים לערוך). */
+  const [showAdvanced, setShowAdvanced] = useState(mode === 'ingame');
   // ברירת המחדל של המעברים נטענת אסינכרונית (מה-JSON/‏localStorage) אחרי טעינת
   // המשחק — מסתנכרנים איתה כשהיא מתעדכנת, לפני שהמפעיל עורך ידנית.
   useEffect(() => {
@@ -64,24 +68,24 @@ export function SettingsScreen({
     setAutoTransition((a) => ({ ...a, ...patch }));
   // QR רלוונטי רק למשחק אונליין עם רישיון שאינו דמו
   const showQrOption = qrAvailable && !crowdEnabled;
-  // מסך אינטרו לדמה — רק במסך הפתיחה של משחק דמה אונליין (לא אופליין)
-  const demoIntro = mode === 'start' && allowDemo && !offline;
+  // הפריסה נקבעת לפי סוג המשחק — זהה במסך הפתיחה ובכפתור ההגדרות שבמשחק.
+  // אינטרו לדמה: משחק דמה אונליין (לא אופליין). כרטיסי טלפונים: אונליין עם קוד.
+  const demoIntro = allowDemo && !offline;
+  const onlinePhone = !allowDemo && qrAvailable;
 
-  const save = () =>
-    onSave({
-      crowdEnabled,
-      voterCount: clampedVoters,
-      speedFactor,
-      correctBias: correctPercent / 100,
-      intervalMs: Math.min(2000, Math.max(50, intervalMs || 300)),
-      hostVoterId: hostVoterId.trim(),
-      autoTransition,
-      showQr: showQrOption ? showQr : false,
-      showBottomInstructions,
-    });
+  const buildSettings = (): GameSettings => ({
+    crowdEnabled,
+    voterCount: clampedVoters,
+    speedFactor,
+    correctBias: correctPercent / 100,
+    intervalMs: Math.min(2000, Math.max(50, intervalMs || 300)),
+    hostVoterId: hostVoterId.trim(),
+    autoTransition,
+    showQr: showQrOption ? showQr : false,
+    showBottomInstructions,
+  });
+  const save = () => onSave(buildSettings());
 
-  // מסך משחק אונליין (טלפונים) עם קוד משחק בתוקף — פריסת הכרטיסים הייעודית
-  const onlinePhone = mode === 'start' && !allowDemo && qrAvailable;
   const room = game.room ?? '';
   const limitNumber = game.setting.limit.number;
   const maxParticipants =
@@ -95,11 +99,25 @@ export function SettingsScreen({
     'התחילו לשחק!',
   ];
 
-  const startButton = (
-    <button className="picker-button demo-start" onClick={save}>
-      {mode === 'start' ? '▶ התחל משחק' : '💾 שמירה וחזרה למשחק'}
-    </button>
-  );
+  // כפתורי הפעולה: במסך פתיחה — "התחל משחק"; באמצע משחק — "התחל מחדש" + "המשך".
+  const actionButtons =
+    mode === 'ingame' ? (
+      <div className="settings-dual-actions">
+        <button
+          className="picker-button demo-start settings-restart"
+          onClick={() => onRestart?.(buildSettings())}
+        >
+          🔄 התחלת המשחק מחדש
+        </button>
+        <button className="picker-button demo-start" onClick={save}>
+          ▶ המשך משחק
+        </button>
+      </div>
+    ) : (
+      <button className="picker-button demo-start" onClick={save}>
+        ▶ התחל משחק
+      </button>
+    );
 
   // הטופס המפורט — שתי עמודות (שחקנים והצבעה · מעברים אוטומטיים והתחברות)
   const columns = (
@@ -279,7 +297,7 @@ export function SettingsScreen({
           </div>
 
           <div className="demo-intro-actions">
-            {startButton}
+            {actionButtons}
             <button
               className="demo-advanced-toggle"
               onClick={() => setShowAdvanced((v) => !v)}
@@ -363,7 +381,7 @@ export function SettingsScreen({
             </section>
           </div>
 
-          <div className="online-actions">{startButton}</div>
+          <div className="online-actions">{actionButtons}</div>
         </div>
       </div>
     );
@@ -378,7 +396,7 @@ export function SettingsScreen({
           משחק: <strong>{game.name}</strong> · {game.questions.length} שקופיות
         </p>
         {columns}
-        {startButton}
+        {actionButtons}
       </div>
     </div>
   );
