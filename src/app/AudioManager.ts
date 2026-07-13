@@ -7,6 +7,15 @@
  *   ניגון נכשלים בשקט ומנוגנים שוב ברגע שהמשתמש מבצע אינטראקציה.
  */
 
+import { debugLog } from './debugLog.ts';
+
+/** קיצור מקור סאונד לתצוגה בלוג (בלי query/base64 ארוך). */
+function shortSrc(src: string): string {
+  const clean = src.split('?')[0] ?? src;
+  const parts = clean.split('/');
+  return parts[parts.length - 1] || clean.slice(0, 40);
+}
+
 export type SoundChannel =
   | 'playersConnecting'
   | 'showQuestion'
@@ -38,6 +47,7 @@ export class AudioManager {
       // ניגון מה שחיכה לאינטראקציה הראשונה (play אקסקלוסיבי — נשאר האחרון)
       const queued = [...this.pending.entries()];
       this.pending.clear();
+      debugLog('audio', `אודיו נפתח באינטראקציה — מנגן ${queued.length} שהמתינו`);
       for (const [channel, play] of queued) {
         this.play(channel, play.src, { loop: play.loop });
       }
@@ -63,6 +73,7 @@ export class AudioManager {
     if (!src) return;
     if (!this.unlocked) {
       this.pending.set(channel, { src, loop });
+      debugLog('audio', `${channel} ממתין (אודיו עדיין נעול עד אינטראקציה)`, { src: shortSrc(src) });
       return;
     }
     const audio = new Audio(src);
@@ -72,11 +83,21 @@ export class AudioManager {
       if (this.active.get(channel) === audio) this.active.delete(channel);
     });
     this.active.set(channel, audio);
-    audio.play().catch(() => {
-      // הדפדפן חסם — נשמור לניסיון חוזר אחרי אינטראקציה
+    debugLog('audio', `${channel} מנגן`, { src: shortSrc(src), loop });
+    audio.play().catch((err: unknown) => {
+      const name = err instanceof DOMException ? err.name : String(err);
+      // AbortError = הניגון הופסק ע"י סאונד אקסקלוסיבי חדש/‏stop — לא חסימת דפדפן.
+      // אסור להתייחס אליו כאל חסימת autoplay (אחרת ננעל את המנהל בטעות ונשתיק
+      // את הסאונד הבא). מתעלמים בשקט.
+      if (name === 'AbortError') {
+        if (this.active.get(channel) === audio) this.active.delete(channel);
+        return;
+      }
+      // חסימת autoplay אמיתית (NotAllowedError וכו') — ננעל ונשמור לניסיון אחרי אינטראקציה
       this.unlocked = false;
       this.pending.set(channel, { src, loop });
-      this.active.delete(channel);
+      if (this.active.get(channel) === audio) this.active.delete(channel);
+      debugLog('audio', `${channel} נחסם (${name}) — יְנוגן אחרי האינטראקציה הבאה`, { src: shortSrc(src) });
     });
   }
 
@@ -136,6 +157,7 @@ export class AudioManager {
       };
       this.applauseSource = source;
       source.start();
+      debugLog('audio', 'מחיאות כפיים (WebAudio)');
     } catch {
       // סביבה בלי אודיו — מתעלמים בשקט
     }

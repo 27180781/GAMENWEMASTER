@@ -268,6 +268,14 @@ export function QuestionSlide({
           </div>
         </div>
 
+        {/* תמונת השאלה — כרטיס ממוסגר בצד המסך (מעוגן ל-q-content, לא לבועת
+            השאלה שיש לה transform). מוצגת יחד עם השאלה. */}
+        {hasImage && (
+          <div className={`q-question-image${reveal.questionShown ? '' : ' reveal-hidden'}`}>
+            <img src={slide.question.src} alt="" />
+          </div>
+        )}
+
         {/* אזור ראשי */}
         <div className="q-main">
           {/* ספירה לאחור — רק בזמן ההצבעה: עיגול השניות + פס הטיימר שאוזל
@@ -288,11 +296,6 @@ export function QuestionSlide({
               {isSurvey && <SurveyIcon />}
               <h1>{slide.question.que}</h1>
             </div>
-            {hasImage && (
-              <div className="q-question-image">
-                <img src={slide.question.src} alt="" />
-              </div>
-            )}
           </div>
 
           {isSurvey && revealed ? (

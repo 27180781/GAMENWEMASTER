@@ -40,6 +40,8 @@ import { useConnectionHealth } from './useConnectionHealth.ts';
 import { planCrowdVotes, snapshotAt } from './syntheticVotes.ts';
 import { joinQrUrl, type GameSettings } from './urlParams.ts';
 import { QrCode } from '../render/QrCode.tsx';
+import { DebugOverlay } from '../render/DebugOverlay.tsx';
+import { debugLog } from './debugLog.ts';
 import { useEngineState } from './useEngineState.ts';
 
 type HostStage = 'opening' | 'playing' | 'winners' | 'winnersList';
@@ -157,6 +159,15 @@ export function GameHost({
   );
   /** אזהרות איכות חיבור — רק כשהמשחק תלוי בסוקט (אונליין אמיתי). */
   const connectionWarnings = useConnectionHealth({ enabled: useSocket, socketStatus: voteStatus });
+  // דיבוג: סטטוס חיבור הסוקט (רק במשחק אונליין אמיתי) + אזהרות איכות
+  useEffect(() => {
+    if (useSocket) debugLog('socket', `סטטוס חיבור: ${voteStatus}`);
+  }, [voteStatus, useSocket]);
+  useEffect(() => {
+    for (const w of connectionWarnings) {
+      debugLog('socket', `אזהרת חיבור: ${w.message}`, { code: w.code, severity: w.severity });
+    }
+  }, [connectionWarnings]);
   /** השם להצגה: מרשם ידני, אחרת שם מהשרת, אחרת המספר עצמו. */
   const nameOf = useCallback(
     (voterId: string) => {
@@ -170,6 +181,10 @@ export function GameHost({
   const syntheticCrowd = settings.crowdEnabled;
   /** מסך מובילים באמצע משחק (פקודת מנחה 1) — שכבה מעל, המשחק ממשיך מתחת. */
   const [leadersOverlay, setLeadersOverlay] = useState(false);
+  /** חלונית דיבוג (F12) — מוצגת מעל הכל; ‏?debug=1 פותח אותה מראש. */
+  const [debugOpen, setDebugOpen] = useState(
+    () => new URLSearchParams(window.location.search).get('debug') === '1',
+  );
   const [timer, setTimer] = useState<TimerView | null>(null);
   /** שלבי החשיפה של השקופית הנוכחית (שאלה / תשובות / תשובה נכונה). */
   const [reveal, setReveal] = useState<RevealState>(NO_REVEAL);
@@ -229,21 +244,37 @@ export function GameHost({
   // איפוס שלבי חשיפה + מסילת המצטרפים + זיהוי הקשת שלט המנחה, במעבר שקופית.
   // בהרצה מהירה (מקש N) חושפים את השקופית הבאה במלואה במקום לאפס.
   useEffect(() => {
+    const s = engine.getCurrentSlide();
     if (fastRevealRef.current) {
       fastRevealRef.current = false;
-      const s = engine.getCurrentSlide();
       setReveal(
         isVotableSlide(s)
           ? { questionShown: true, answersShown: s.question.answers.length, revealCorrect: false }
           : NO_REVEAL,
       );
+    } else if (isVotableSlide(s) && engine.getState().activeMedia !== 'open') {
+      // הצגת השאלה מיד עם הכניסה לשקופית הצבעה — בלי "מסך רקע ריק" ולחיצה ראשונה.
+      // (אם מתנגנת מדיית פתיחה חוסמת, השאלה מוצגת אחרי סיומה כרגיל.)
+      setReveal({ questionShown: true, answersShown: 0, revealCorrect: false });
+      audio.play('showQuestion', sounds.showQuestionMediaSound.src);
     } else {
       setReveal(NO_REVEAL);
     }
     setAnswerers([]);
     setCorrectAnswerers([]);
     lastHostAnswerRef.current = null;
-  }, [state.currentSlideId, engine]);
+  }, [state.currentSlideId, engine, audio, sounds]);
+
+  // דיבוג: רישום מעברי שלב/שקופית/מדיה
+  useEffect(() => {
+    const total = engine.getGame().questions.length;
+    const s = engine.getCurrentSlide();
+    debugLog('phase', `${state.phase} · שקופית ${state.currentSlideIndex + 1}/${total}`, {
+      slideId: state.currentSlideId,
+      type: s.type,
+      activeMedia: state.activeMedia,
+    });
+  }, [state.phase, state.currentSlideId, state.activeMedia, state.currentSlideIndex, engine]);
 
   // טעינה מוקדמת של המדיה של השקופיות הקרובות — מעבר מיידי בלי מסך שחור/השהיה
   useEffect(() => {
@@ -295,12 +326,22 @@ export function GameHost({
   // -------------------------------------------------------------------------
   const pendingVoteRef = useRef<VoteSnapshot | null>(null);
   const voteFlushTimerRef = useRef<number | null>(null);
+  /** האטת רישום ההצבעות ללוג — לכל היותר פעם ב-500ms, שלא יציף. */
+  const lastVoteLogRef = useRef(0);
 
   const flushPendingVotes = useCallback(() => {
     const snapshot = pendingVoteRef.current;
     if (snapshot === null) return;
     pendingVoteRef.current = null;
     engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot, at: Date.now() });
+    const nowLog = Date.now();
+    if (nowLog - lastVoteLogRef.current >= 500) {
+      lastVoteLogRef.current = nowLog;
+      debugLog('vote', `נקלט snapshot · ${snapshot.total} הצביעו`, {
+        total: snapshot.total,
+        counts: snapshot.counts,
+      });
+    }
     const voters = snapshot.voters;
     if (voters) {
       setAnswerers((prev) => {
@@ -737,39 +778,51 @@ export function GameHost({
     const totalAnswers = s.question.answers.length;
 
     let action: (() => void) | null = null;
+    let label = '';
     let delayMs = AUTO_STEP_MS;
 
     if (state.phase === 'showing' && votable) {
       if (autoT.showAnswersAfterQuestion && !reveal.questionShown) {
+        label = 'הצגת השאלה';
         action = () => {
           setReveal((r) => ({ ...r, questionShown: true }));
           audio.play('showQuestion', sounds.showQuestionMediaSound.src);
         };
       } else if (autoT.showAnswersAfterQuestion && reveal.questionShown && reveal.answersShown < totalAnswers) {
+        label = 'חשיפת תשובה';
         action = () => setReveal((r) => ({ ...r, answersShown: r.answersShown + 1 }));
       } else if (autoT.startTimerAfterLastAnswer && reveal.questionShown && reveal.answersShown >= totalAnswers) {
+        label = 'פתיחת הצבעה + טיימר';
         action = () => engine.dispatch({ type: 'OPEN_VOTING', at: Date.now() });
       }
     } else if (state.phase === 'showing' && !votable) {
       if (autoT.nextSlide.active) {
+        label = 'שקופית הבאה';
         action = () => engine.dispatch({ type: 'ADVANCE', at: Date.now() });
         delayMs = Math.max(1, autoT.nextSlide.seconds) * 1000;
       }
     } else if (state.phase === 'results') {
       const isTrivia = s.type === 'trivia';
       if (autoT.showCorrectAnswerAfterTimer && isTrivia && !reveal.revealCorrect) {
+        label = 'חשיפת התשובה הנכונה';
         action = () => {
           setReveal((r) => ({ ...r, revealCorrect: true }));
           audio.play('inShowAns', sounds.inShowAnsMediaSound.src);
         };
       } else if (autoT.nextSlide.active && (!isTrivia || reveal.revealCorrect)) {
+        label = 'שקופית הבאה';
         action = () => engine.dispatch({ type: 'ADVANCE', at: Date.now() });
         delayMs = Math.max(1, autoT.nextSlide.seconds) * 1000;
       }
     }
 
     if (action === null) return;
-    const timeout = window.setTimeout(action, delayMs);
+    const fire = action;
+    const desc = label;
+    const timeout = window.setTimeout(() => {
+      debugLog('auto', `מעבר אוטומטי: ${desc}`, { delayMs });
+      fire();
+    }, delayMs);
     return () => window.clearTimeout(timeout);
   }, [stage, state.phase, state.currentSlideId, state.activeMedia, reveal, autoT, engine, audio, sounds]);
 
@@ -807,13 +860,38 @@ export function GameHost({
 
   useEffect(() => {
     const advance = () => {
+      // מסך המובילים (מקש 1) פתוח מעל המשחק — רווח/קדימה מסירים אותו (כמו לחיצה
+      // נוספת על 1) במקום לקדם את המשחק שמאחוריו.
+      if (leadersOverlay) {
+        setLeadersOverlay(false);
+        return;
+      }
       if (stage === 'opening') setStage('playing');
       else if (stage === 'playing') advanceStep();
       else if (stage === 'winners') setStage('winnersList');
     };
+    // חזרה שלב אחד אחורה — עובדת בכל מצב: בשקופית (stepBack), וגם במסכי הסיום
+    // (רשימת מובילים → מנצחים → חזרה למשחק).
+    const goBack = () => {
+      if (stage === 'playing') stepBack();
+      else if (stage === 'winners') setStage('playing');
+      else if (stage === 'winnersList') setStage('winners');
+    };
     const handleKey = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target?.closest('input, select, textarea')) return; // הקלדה בטפסים
+      const target = event.target;
+      // הקלדה בשדות טופס לא נחשבת פקודה. (בודקים instanceof Element כי מטרת
+      // אירוע מ-window יכולה להיות window עצמו — בלי closest.)
+      if (target instanceof Element && target.closest('input, select, textarea')) return;
+      // F12 — פתיחה/סגירה של חלונית הדיבוג (עובד תמיד, גם כשתפריט/הגדרות פתוחים)
+      if (event.key === 'F12' || event.code === 'F12') {
+        event.preventDefault();
+        debugLog('command', 'F12 — החלפת חלונית דיבוג');
+        setDebugOpen((open) => !open);
+        return;
+      }
+      // צירופים עם Ctrl/Cmd/Alt שייכים לדפדפן (Ctrl+R לרענון, DevTools וכו') —
+      // לא חוטפים אותם כדי שלא נחסום פעולות דפדפן בזמן המשחק.
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
       if (event.key === 'Escape') {
         if (rosterOpen) setRosterOpen(false);
         else if (settingsOpen) setSettingsOpen(false);
@@ -822,31 +900,39 @@ export function GameHost({
       }
       if (menuOpen || settingsOpen || rosterOpen) return;
       if (event.key >= '0' && event.key <= '6') {
-        if (event.key === '0' && stage !== 'playing') advance();
+        debugLog('command', `שלט: מקש ${event.key}`, { stage });
+        // מסך מובילים פתוח — קדימה (0) מסיר אותו במקום לקדם את המשחק שמאחוריו
+        if (leadersOverlay && event.key === '0') setLeadersOverlay(false);
+        else if (event.key === '0' && stage !== 'playing') advance();
+        // מקש 2 (אחורה) — עובד גם במסכי הזוכים/מובילים, לא רק בשקופית
+        else if (event.key === '2' && stage !== 'playing') goBack();
         else runHostCommandRef.current(Number(event.key));
         return;
       }
       if (event.key === ' ' || event.key === 'Enter' || event.key === 'ArrowLeft') {
         event.preventDefault();
+        debugLog('command', 'קדימה (רווח/Enter)', { stage });
         advance();
       } else if (event.key === 'ArrowRight') {
         event.preventDefault();
-        if (stage === 'playing') stepBack();
-        else if (stage === 'winners') setStage('playing');
-        else if (stage === 'winnersList') setStage('winners');
+        debugLog('command', 'אחורה (חץ)', { stage });
+        goBack();
       } else if (event.key === 'Backspace') {
         event.preventDefault();
         if (stage === 'playing' && window.confirm('לחזור שקופית שלמה אחורה?')) {
+          debugLog('command', 'BACK — שקופית שלמה אחורה');
           engine.dispatch({ type: 'BACK', at: Date.now() });
         }
       } else if (event.code === 'KeyR' || event.key === 'r' || event.key === 'R') {
         // רענון יזום של קובץ המשחק מהשרת (בלי לאבד ניקוד/מיקום)
         event.preventDefault();
+        debugLog('command', 'R — רענון קובץ המשחק');
         onRequestRefresh?.();
       } else if (event.code === 'KeyW' || event.key === 'w' || event.key === 'W') {
         // תצוגה מקדימה של מסך המנצחים הסופי — ובלחיצה נוספת חזרה למיקום במשחק.
         // לפי event.code (מיקום פיזי) כדי שיעבוד גם בפריסת מקלדת עברית.
         event.preventDefault();
+        debugLog('command', 'W — תצוגת מנצחים מקדימה');
         if (winnersPreviewRef.current !== null) {
           setStage(winnersPreviewRef.current);
           winnersPreviewRef.current = null;
@@ -858,12 +944,13 @@ export function GameHost({
       } else if (event.code === 'KeyN' || event.key === 'n' || event.key === 'N') {
         // הרצה מהירה — כל לחיצה מדלגת לשקופית הבאה, חשופה במלואה (מיקום פיזי)
         event.preventDefault();
+        debugLog('command', 'N — הרצה מהירה');
         if (stage === 'playing') fastNextSlideRef.current();
       }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [stage, menuOpen, settingsOpen, rosterOpen, engine, advanceStep, stepBack, onRequestRefresh]);
+  }, [stage, menuOpen, settingsOpen, rosterOpen, leadersOverlay, engine, advanceStep, stepBack, onRequestRefresh]);
 
   // מסך מלא — כפתור בפינה (window resize מעדכן את סקייל הבמה אוטומטית)
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
@@ -1024,6 +1111,39 @@ export function GameHost({
               setMenuOpen(false);
             }}
             onClose={() => setMenuOpen(false)}
+          />
+        )}
+
+        {debugOpen && (
+          <DebugOverlay
+            onClose={() => setDebugOpen(false)}
+            info={[
+              { label: 'מצב', value: `${stage} · ${state.phase}` },
+              {
+                label: 'שקופית',
+                value: `${state.currentSlideIndex + 1}/${engine.getGame().questions.length} · ${slide.type}`,
+              },
+              {
+                label: 'טיימר',
+                value: timer
+                  ? `${timer.remaining.toFixed(1)}ש׳ / ${timer.total}ש׳${timer.paused ? ' ⏸' : ''}`
+                  : '—',
+              },
+              { label: 'הצבעות', value: String(state.liveVotes?.total ?? 0) },
+              {
+                label: 'חשיפה',
+                value: `שאלה ${reveal.questionShown ? '✓' : '✗'} · תשובות ${reveal.answersShown} · נכונה ${reveal.revealCorrect ? '✓' : '✗'}`,
+              },
+              {
+                label: 'מקור הצבעות',
+                value: syntheticCrowd
+                  ? `דמו · ${crowdConfig.voterCount}`
+                  : hasRoom
+                    ? `אונליין · חדר ${roomId}`
+                    : 'אין',
+              },
+              { label: 'חיבור', value: useSocket ? voteStatus : syntheticCrowd ? 'דמו (מקומי)' : '—' },
+            ]}
           />
         )}
       </Stage>
