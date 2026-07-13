@@ -1264,6 +1264,229 @@ body {
 
 .demo-start { font-weight: 700; font-size: 32px; padding: 16px 56px; margin-top: 4px; }
 
+/* ===================================================================== */
+/* מסכי פתיחה מעוצבים (בהיר) — אינטרו לדמה ומשחק אונליין טלפונים            */
+/* ===================================================================== */
+
+.settings-screen.demo-intro-screen,
+.settings-screen.online-start-screen {
+  background: radial-gradient(ellipse at 50% -10%, #ffffff, #eef0f4 60%, #e6e9ef);
+  color: #171a2b;
+}
+
+/* פעולות משותפות: כפתור "התחל משחק" כהה עם מסגרת ורודה */
+.demo-intro-screen .demo-start,
+.online-start-screen .demo-start {
+  background: #141414;
+  color: #fff;
+  border: 3px solid #e5326b;
+  border-radius: 44px;
+  font-weight: 800;
+  font-size: 30px;
+  padding: 16px 52px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+}
+.demo-intro-screen .demo-start:hover,
+.online-start-screen .demo-start:hover { transform: translateY(-2px); }
+
+/* ---- אינטרו לדמה ---- */
+.demo-intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: safe center;
+  gap: 40px;
+  height: 100%;
+  overflow-y: auto;
+  padding: 30px 0;
+}
+.demo-intro-card {
+  background: #fff;
+  border: 1px solid #e3e5ea;
+  border-radius: 44px;
+  box-shadow: 0 26px 64px rgba(20, 20, 40, 0.14);
+  padding: 78px 90px 56px;
+  width: 1260px;
+  max-width: 92%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 42px;
+}
+.demo-intro-bubble {
+  position: relative;
+  background: #111;
+  color: #fff;
+  border-radius: 40px;
+  padding: 42px 72px;
+  max-width: 900px;
+  text-align: center;
+}
+.demo-intro-bubble-text strong {
+  display: block;
+  color: #ffd23f;
+  font-size: 40px;
+  font-weight: 900;
+  margin-bottom: 14px;
+}
+.demo-intro-bubble-text p { font-size: 30px; line-height: 1.5; margin: 0; }
+/* סימן קריאה אדום מעוצב (בר + נקודה) בפינת הבועה, בולט כלפי מעלה-שמאל */
+.demo-intro-bang {
+  position: absolute;
+  top: -56px;
+  inset-inline-end: 44px;
+  width: 46px;
+  height: 200px;
+  pointer-events: none;
+}
+.demo-intro-bang::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  inset-inline-start: 4px;
+  width: 40px;
+  height: 142px;
+  background: #f0426b;
+  border-radius: 22px;
+  transform: rotate(8deg);
+  transform-origin: bottom center;
+}
+.demo-intro-bang::after {
+  content: '';
+  position: absolute;
+  top: 150px;
+  inset-inline-start: 2px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #f0426b;
+}
+.demo-intro-howto {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.5;
+  text-align: center;
+  margin: 0;
+  color: #171a2b;
+}
+.demo-intro-actions { display: flex; align-items: center; gap: 26px; }
+.demo-advanced-toggle {
+  background: transparent;
+  border: 2px solid rgba(20, 20, 40, 0.28);
+  color: #171a2b;
+  border-radius: 32px;
+  font-size: 22px;
+  font-weight: 700;
+  padding: 12px 28px;
+  cursor: pointer;
+}
+.demo-advanced { width: 1560px; max-width: 96%; }
+.demo-advanced .demo-game-name { color: #171a2b; text-align: center; margin-bottom: 14px; }
+
+/* ---- משחק אונליין טלפונים ---- */
+.online-start {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 34px;
+  height: 100%;
+}
+.online-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas: 'info howto' 'advanced howto';
+  gap: 28px;
+  width: 1500px;
+  max-width: 94%;
+  align-items: start;
+}
+.online-howto { grid-area: howto; align-self: stretch; }
+.online-info { grid-area: info; }
+.online-advanced { grid-area: advanced; }
+.online-card {
+  background: #fff;
+  border: 1px solid #e3e5ea;
+  border-radius: 30px;
+  box-shadow: 0 16px 42px rgba(20, 20, 40, 0.12);
+  padding: 34px 42px;
+  color: #171a2b;
+}
+.online-card-title { font-size: 34px; font-weight: 900; margin: 0 0 24px; text-align: right; }
+.online-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 26px; }
+.online-step { display: flex; align-items: center; gap: 16px; }
+.online-step-text { flex: 1; text-align: right; font-size: 27px; font-weight: 800; }
+.online-step-num {
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-weight: 900;
+  font-size: 22px;
+}
+.online-step-num--0 { background: #141414; }
+.online-step-num--1 { background: #e5326b; }
+.online-step-num--2 { background: #141414; }
+.online-step-num--3 { background: #f4c430; color: #3a2a00; }
+.online-dial-label, .online-code-label { text-align: center; font-size: 24px; font-weight: 700; color: #5a5f70; margin-top: 16px; }
+.online-dial {
+  background: #111;
+  color: #ffd23f;
+  font-weight: 900;
+  font-size: 56px;
+  border-radius: 44px;
+  padding: 8px 44px;
+  text-align: center;
+  margin: 10px auto 0;
+  width: max-content;
+  max-width: 100%;
+}
+.online-code {
+  border: 3px solid #1b2340;
+  color: #e5326b;
+  font-weight: 900;
+  font-size: 46px;
+  border-radius: 44px;
+  padding: 6px 54px;
+  text-align: center;
+  margin: 10px auto 0;
+  width: max-content;
+  max-width: 100%;
+}
+.online-max { text-align: center; font-size: 22px; font-weight: 700; margin-top: 24px; }
+.online-max b { color: #2ec94f; }
+.online-field { display: flex; flex-direction: column; gap: 8px; font-size: 24px; font-weight: 700; }
+.online-field input {
+  border: 2px solid #7fb2ff;
+  border-radius: 30px;
+  padding: 9px 20px;
+  font-size: 20px;
+  color: #171a2b;
+  background: #fff;
+}
+.online-note { color: #e5326b; font-size: 15px; line-height: 1.4; margin: 8px 0 16px; }
+.online-check { display: flex; align-items: center; gap: 12px; font-size: 22px; font-weight: 600; margin-top: 12px; }
+.online-check input[type='checkbox'] { width: 24px; height: 24px; flex: 0 0 auto; }
+.online-actions { display: flex; justify-content: center; }
+
+/* פס הנחיות תחתון בזמן המשחק */
+.bottom-instructions {
+  position: absolute;
+  bottom: 0;
+  inset-inline: 0;
+  z-index: 45;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  text-align: center;
+  font-size: 26px;
+  font-weight: 700;
+  padding: 12px;
+}
+.bottom-instructions b { color: #ffd23f; }
+
 .demo-badge {
   position: absolute;
   bottom: 14px;

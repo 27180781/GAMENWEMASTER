@@ -273,6 +273,7 @@ export function App() {
           initial={settings}
           mode="start"
           allowDemo={params.demo || offline}
+          offline={offline}
           qrAvailable={!offline && (pendingGame.room ?? '') !== ''}
           onSave={(saved) => {
             persistAndSetSettings(saved);
