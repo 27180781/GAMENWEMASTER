@@ -65,6 +65,8 @@ export class GameEngine {
   private voting: VotingBookkeeping = freshBookkeeping();
   /** ניקוד שהוענק פר שקופית — מאפשר חישוב מחדש כשחוזרים לשקופית. */
   private awardedBySlide: Record<number, Record<string, number>> = {};
+  /** זמן תגובה (ms) פר שקופית — voterId → latency; מאפשר חישוב מחדש הפיך. */
+  private timeBySlide: Record<number, Record<string, number>> = {};
   private saveSeq = 0;
 
   constructor(game: GameFile, options: EngineOptions = {}) {
@@ -73,6 +75,7 @@ export class GameEngine {
     this.roomId = options.roomId ?? null;
     this.state = this.enterSlideState(0, {
       scores: {},
+      answerTimes: {},
       votesBySlide: {},
       slidesCompleted: [],
       firstClickWinners: {},
@@ -99,11 +102,25 @@ export class GameEngine {
     return slide;
   }
 
-  /** מובילי טבלת הניקוד, ממוינים יורד (ברירת מחדל: לפי multiWinners). */
+  /** זמן התגובה הממוצע (ms) של מצביע — נמוך = מהיר. אין תשובות → Infinity. */
+  averageResponseMs(voterId: string): number {
+    const t = this.state.answerTimes[voterId];
+    return t && t.count > 0 ? t.totalMs / t.count : Number.POSITIVE_INFINITY;
+  }
+
+  /**
+   * מובילי טבלת הניקוד, ממוינים יורד. שובר-שוויון: כשהניקוד זהה בדיוק, המהיר
+   * יותר (זמן תגובה ממוצע נמוך) מדורג גבוה יותר; ואז לפי המזהה ליציבות.
+   */
   getWinners(limit: number = this.game.setting.multiWinners): { voterId: string; score: number }[] {
     return Object.entries(this.state.scores)
       .map(([voterId, score]) => ({ voterId, score }))
-      .sort((a, b) => b.score - a.score || a.voterId.localeCompare(b.voterId))
+      .sort(
+        (a, b) =>
+          b.score - a.score ||
+          this.averageResponseMs(a.voterId) - this.averageResponseMs(b.voterId) ||
+          a.voterId.localeCompare(b.voterId),
+      )
       .slice(0, Math.max(0, limit));
   }
 
@@ -189,6 +206,7 @@ export class GameEngine {
     // הניקוד פר-שקופית אינו חלק מה-snapshot — אחרי שחזור, חזרה אחורה לשקופית
     // שכבר נוקדה תוסיף ניקוד חדש בלי להפחית את הישן (מגבלה מתועדת).
     this.awardedBySlide = {};
+    this.timeBySlide = {};
 
     const slide = index !== -1 ? this.game.questions[index] : undefined;
     const showOpenMedia = snapshot.phase === 'showing' && slide?.openMedia.src !== '';
@@ -203,6 +221,8 @@ export class GameEngine {
       subjectCommand: slide ? this.subjectCommandFor(slide) : null,
       liveVotes: null,
       scores: structuredClone(snapshot.scores),
+      // זמני התגובה אינם חלק מה-snapshot — מתאפסים בשחזור (כמו הניקוד פר-שקופית)
+      answerTimes: {},
       votesBySlide: structuredClone(snapshot.votesBySlide),
       slidesCompleted: [...snapshot.slidesCompleted],
       firstClickWinners: structuredClone(snapshot.firstClickWinners),
@@ -409,9 +429,37 @@ export class GameEngine {
     }
     this.awardedBySlide[slideId] = awards;
 
+    // זמני תגובה (ms) של מי שהצביע בשקופית זו — לשובר-שוויון לפי מהירות.
+    // latency = מתי נראתה הצבעתו לראשונה פחות זמן פתיחת ההצבעה (≥0).
+    const latencies: Record<string, number> = {};
+    const openedAt = this.voting.openedAt;
+    if (openedAt !== null) {
+      for (const voterId of Object.keys(finalVotes)) {
+        const seen = this.voting.firstSeenAt[voterId];
+        if (seen !== undefined) latencies[voterId] = Math.max(0, seen - openedAt);
+      }
+    }
+    const answerTimes = structuredClone(this.state.answerTimes);
+    const previousTimes = this.timeBySlide[slideId];
+    if (previousTimes) {
+      for (const [voterId, ms] of Object.entries(previousTimes)) {
+        const cur = answerTimes[voterId];
+        if (!cur) continue;
+        const count = cur.count - 1;
+        if (count <= 0) delete answerTimes[voterId];
+        else answerTimes[voterId] = { totalMs: cur.totalMs - ms, count };
+      }
+    }
+    for (const [voterId, ms] of Object.entries(latencies)) {
+      const cur = answerTimes[voterId] ?? { totalMs: 0, count: 0 };
+      answerTimes[voterId] = { totalMs: cur.totalMs + ms, count: cur.count + 1 };
+    }
+    this.timeBySlide[slideId] = latencies;
+
     this.setState({
       phase: 'results',
       scores,
+      answerTimes,
       votesBySlide: { ...this.state.votesBySlide, [slideId]: finalVotes },
       firstClickWinners,
       // endMedia אינו מתנגן אוטומטית — הוא שלב נפרד שמופעל ב-ADVANCE
@@ -513,7 +561,7 @@ export class GameEngine {
   private enterSlideState(
     index: number,
     carried: Partial<
-      Pick<GameState, 'scores' | 'votesBySlide' | 'slidesCompleted' | 'firstClickWinners'>
+      Pick<GameState, 'scores' | 'answerTimes' | 'votesBySlide' | 'slidesCompleted' | 'firstClickWinners'>
     >,
     _at?: number,
   ): GameState {
@@ -536,6 +584,7 @@ export class GameEngine {
       subjectCommand: this.subjectCommandFor(slide),
       liveVotes: null,
       scores: carried.scores ?? this.state.scores,
+      answerTimes: carried.answerTimes ?? this.state.answerTimes,
       votesBySlide: carried.votesBySlide ?? this.state.votesBySlide,
       slidesCompleted: carried.slidesCompleted ?? this.state.slidesCompleted,
       firstClickWinners: carried.firstClickWinners ?? this.state.firstClickWinners,

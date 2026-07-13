@@ -1128,12 +1128,14 @@ export function GameHost({
           </>
         )}
         {stage === 'winners' && <WinnersScreen engine={engine} nameOf={nameOf} />}
-        {stage === 'winnersList' && <WinnersListScreen engine={engine} nameOf={nameOf} />}
+        {stage === 'winnersList' && (
+          <WinnersListScreen engine={engine} nameOf={nameOf} roster={roster} />
+        )}
 
         {/* טבלת הניקוד באמצע משחק (פקודת מנחה 1) — מסך נפרד מלא מעל כל התצוגה */}
         {stage === 'playing' && leadersOverlay && (
           <div className="leaders-overlay">
-            <WinnersListScreen engine={engine} nameOf={nameOf} />
+            <WinnersListScreen engine={engine} nameOf={nameOf} roster={roster} />
           </div>
         )}
 
