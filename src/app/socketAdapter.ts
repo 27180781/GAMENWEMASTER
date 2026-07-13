@@ -167,9 +167,18 @@ export class SocketVoteAdapter implements VoteAdapter {
     if (snapshot !== null) this.snapshotListener?.(snapshot);
   }
 
-  /** פתיחת חלון הצבעה לשקופית (או null לסגירה). איפוס מונים בכל פתיחה. */
+  /**
+   * פתיחת חלון הצבעה לשקופית (או null לסגירה). פתיחה לשקופית שכבר פתוחה —
+   * no-op (לא מאפסים את המונים), כדי שפתיחת/סגירת מסך ההתחברות תוך כדי הצבעה
+   * לא תאפס את הצבעות השאלה.
+   */
   setActiveSlide(slideId: number | null): void {
-    this.window = slideId === null ? null : new VoteWindow(slideId);
+    if (slideId === null) {
+      this.window = null;
+      return;
+    }
+    if (this.window !== null && this.window.slideId === slideId) return;
+    this.window = new VoteWindow(slideId);
   }
 
   onVoteSnapshot(cb: (snapshot: VoteSnapshot) => void): void {
