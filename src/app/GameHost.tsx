@@ -56,6 +56,7 @@ import {
 } from './backup.ts';
 import { backupToSnapshot, buildBackupPayload, rosterFromBackup } from './backupState.ts';
 import { downloadGameReport } from './gameReport.ts';
+import { buildFunctionPayload, sendFunctionApi } from './functionApi.ts';
 import { useConnectionHealth } from './useConnectionHealth.ts';
 import { planCrowdVotes, snapshotAt } from './syntheticVotes.ts';
 import { joinQrUrl, type GameSettings } from './urlParams.ts';
@@ -251,6 +252,8 @@ export function GameHost({
     },
     [roster, serverNames],
   );
+  const nameOfRef = useRef(nameOf);
+  nameOfRef.current = nameOf;
   const [volume, setVolume] = useState(1);
   const syntheticCrowd = settings.crowdEnabled;
   /** מסך מובילים באמצע משחק (פקודת מנחה 1) — שכבה מעל, המשחק ממשיך מתחת. */
@@ -262,6 +265,8 @@ export function GameHost({
   const [timer, setTimer] = useState<TimerView | null>(null);
   /** שלבי החשיפה של השקופית הנוכחית (שאלה / תשובות / תשובה נכונה). */
   const [reveal, setReveal] = useState<RevealState>(NO_REVEAL);
+  /** מצב שליחת שקופית "פונקציה" ל-API (לתצוגה על המסך). */
+  const [functionStatus, setFunctionStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   /** מזהי המצביעים האחרונים בשקופית הנוכחית (החדש ראשון) — לאווטרים המתעופפים. */
   const [answerers, setAnswerers] = useState<string[]>([]);
   const players = useMemo<RailPlayer[]>(
@@ -445,6 +450,43 @@ export function GameHost({
       (err) => debugLog('game', `יצירת קובץ סיכום נכשלה (${String(err)})`),
     );
   }, [offline, stage, engine, nameOf]);
+
+  // שקופית "פונקציה" (type: "function") — כשמגיעים אליה, שולחים את כל נתוני
+  // המשחק ל-webhook שהוגדר בעורך (function.api). פעם אחת בכל כניסה לשקופית.
+  useEffect(() => {
+    if (stage !== 'playing') return;
+    const s = engine.getCurrentSlide();
+    if (s.type !== 'function') {
+      setFunctionStatus('idle');
+      return;
+    }
+    const api = s.function?.action === 'api' ? s.function.api : undefined;
+    if (!api || api.url.trim() === '') {
+      debugLog('game', 'שקופית פונקציה בלי כתובת API — מדלגים על השליחה');
+      setFunctionStatus('error');
+      return;
+    }
+    let cancelled = false;
+    setFunctionStatus('sending');
+    const payload = buildFunctionPayload(engine.getGame(), engine.getState(), rosterRef.current, nameOfRef.current);
+    debugLog('game', `שקופית פונקציה — שולח נתונים ל-API (${api.method} · ${payload.participantCount} משתתפים)`, {
+      url: api.url,
+    });
+    sendFunctionApi(api, payload)
+      .then(() => {
+        if (cancelled) return;
+        setFunctionStatus('sent');
+        debugLog('game', 'שקופית פונקציה — הנתונים נשלחו בהצלחה');
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setFunctionStatus('error');
+        debugLog('game', `שקופית פונקציה — השליחה נכשלה (${String(err)})`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [stage, state.currentSlideId, engine]);
 
   // איפוס שלבי חשיפה + מסילת המצטרפים + זיהוי הקשת שלט המנחה, במעבר שקופית.
   // בהרצה מהירה (מקש N) חושפים את השקופית הבאה במלואה במקום לאפס.
@@ -1263,6 +1305,7 @@ export function GameHost({
               reveal={reveal}
               players={players}
               leaders={leaders}
+              functionStatus={functionStatus}
             />
             {/* מיקום במשחק: שקופית נוכחית מתוך סה"כ */}
             <span className="slide-counter" dir="ltr">

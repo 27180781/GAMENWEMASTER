@@ -897,6 +897,28 @@ body {
 
 .subject-slide--image { position: absolute; inset: 0; }
 
+/* שקופית "פונקציה" — כרטיס חיווי לשליחת נתונים ל-API */
+.function-screen .screen-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.function-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 26px;
+  padding: 60px 90px;
+  border-radius: 46px;
+  background: var(--main-color, #222b45);
+  color: var(--secondary-color, #fff);
+  box-shadow: 0 20px 54px rgba(0, 0, 0, 0.4);
+}
+.function-icon { font-size: 120px; line-height: 1; filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.4)); }
+.function-text { font-size: 52px; font-weight: 800; text-align: center; }
+.function-card--sent { background: #16794a; color: #fff; }
+.function-card--error { background: #8a2b2b; color: #fff; }
+
 .subject-waiting,
 .subject-url { font-size: 24px; opacity: 0.85; }
 

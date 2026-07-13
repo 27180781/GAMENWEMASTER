@@ -63,9 +63,25 @@ export const slideSettingsSchema = z.object({
   showInLoop: z.boolean(),
 });
 
-export const slideTypeSchema = z.enum(['trivia', 'survey', 'ans_images', 'media', 'subject']);
+export const slideTypeSchema = z.enum(['trivia', 'survey', 'ans_images', 'media', 'subject', 'function']);
 
 const VOTABLE_TYPES = new Set(['trivia', 'survey', 'ans_images']);
+
+/**
+ * שקופית "פונקציה" (type: "function") — כשמגיעים אליה היא מבצעת פעולת מערכת
+ * (כרגע קריאת API בלבד) עם כל נתוני המשחק. הקונפיג נשמר ברמת השקופית עצמה
+ * תחת המפתח `function` (לא בתוך setting). כל השדות סלחניים כדי לתמוך בקבצים
+ * שנוצרו לפני שהוגדרו כל האפשרויות.
+ */
+const functionConfigSchema = z.object({
+  action: z.string().default('api'),
+  api: z
+    .object({
+      url: z.string().default(''),
+      method: z.string().default('GET'),
+    })
+    .optional(),
+});
 
 export const slideSchema = z
   .object({
@@ -82,6 +98,8 @@ export const slideSchema = z
     endMedia: mediaRef,
     backgroundMedia: mediaRef,
     setting: slideSettingsSchema,
+    // רק בשקופית "פונקציה"; אופציונלי כדי לא לפגוע בשאר סוגי השקופיות.
+    function: functionConfigSchema.optional(),
   })
   .superRefine((slide, ctx) => {
     if (VOTABLE_TYPES.has(slide.type)) {
