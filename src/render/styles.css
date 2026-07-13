@@ -244,6 +244,7 @@ body {
   border: 2px solid rgba(255, 255, 255, 0.35);
 }
 .lobby-name {
+  min-width: 0;
   font-weight: 700;
   font-size: 24px;
   white-space: nowrap;
@@ -451,7 +452,9 @@ body {
   align-items: center;
   gap: 18px;
 }
-.q-question h1 {
+.q-question-text {
+  max-width: 100%;
+  min-width: 0;
   font-weight: 900;
   font-size: 46px;
   line-height: 1.16;
@@ -666,6 +669,7 @@ body {
 .q-board-stars svg { animation: starPop 0.4s ease both; }
 .q-board-stars svg:nth-child(2) { margin-bottom: 6px; }
 .q-board-name {
+  display: inline-block;
   background: var(--pill);
   color: var(--text);
   border-radius: 16px;

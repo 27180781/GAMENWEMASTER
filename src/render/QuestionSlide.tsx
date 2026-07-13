@@ -16,6 +16,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { GameState, Slide } from '../engine/index.ts';
+import { FitText } from './FitText.tsx';
 import type { TimerView } from './TimerRing.tsx';
 
 export interface RevealState {
@@ -137,7 +138,7 @@ function Leaderboard({ leaders }: { leaders: RailPlayer[] }) {
               </svg>
             ))}
           </div>
-          <div className="q-board-name">{leader.name}</div>
+          <FitText className="q-board-name">{leader.name}</FitText>
         </div>
       ))}
     </div>
@@ -294,7 +295,7 @@ export function QuestionSlide({
           <div className={`q-question${reveal.questionShown ? '' : ' reveal-hidden'}`}>
             <div className="q-question-row">
               {isSurvey && <SurveyIcon />}
-              <h1>{slide.question.que}</h1>
+              <FitText className="q-question-text">{slide.question.que}</FitText>
             </div>
           </div>
 
@@ -324,7 +325,7 @@ export function QuestionSlide({
                   {isImages ? (
                     <img className="q-card-image" src={answer.ans} alt={`תשובה ${answer.id}`} />
                   ) : (
-                    <span className="q-card-text">{answer.ans}</span>
+                    <FitText className="q-card-text">{answer.ans}</FitText>
                   )}
                 </li>
               );
