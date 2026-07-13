@@ -3,6 +3,7 @@
  */
 
 import type { GameEngine } from '../engine/index.ts';
+import { FitText } from './FitText.tsx';
 import { MediaPlayer } from './MediaPlayer.tsx';
 import { QrCode } from './QrCode.tsx';
 import type { RailPlayer } from './QuestionSlide.tsx';
@@ -69,7 +70,7 @@ export function LobbyScreen({
               <span className="lobby-avatar" style={{ background: player.color }}>
                 {player.initial}
               </span>
-              <span className="lobby-name">{player.name}</span>
+              <FitText className="lobby-name">{player.name}</FitText>
             </div>
           ))}
           {players.length === 0 && (
@@ -122,7 +123,7 @@ export function WinnersScreen({
           {winners.map((winner, index) => (
             <li key={winner.voterId} className={`winner winner--${index + 1}`}>
               <span className="winner-rank">{index + 1}</span>
-              <span className="winner-name">{nameOf(winner.voterId)}</span>
+              <FitText className="winner-name">{nameOf(winner.voterId)}</FitText>
               <span className="winner-score">{winner.score} נק׳</span>
             </li>
           ))}
@@ -166,7 +167,7 @@ export function WinnersListScreen({
               {winners.map((winner, index) => (
                 <li key={winner.voterId}>
                   <span className="winner-rank">{index + 1}.</span>
-                  <span className="winner-name">{nameOf(winner.voterId)}</span>
+                  <FitText className="winner-name">{nameOf(winner.voterId)}</FitText>
                   <span className="winner-score">{winner.score}</span>
                 </li>
               ))}
@@ -185,7 +186,7 @@ export function WinnersListScreen({
                         <li key={s.groupId}>
                           <span className="winner-rank">{index + 1}.</span>
                           <span className="group-num">{s.number}</span>
-                          <span className="winner-name">{s.name || 'קבוצה'}</span>
+                          <FitText className="winner-name">{s.name || 'קבוצה'}</FitText>
                           <span className="group-members">{s.memberCount}👤</span>
                           <span className="winner-score">{Math.round(s.avgScore)}</span>
                         </li>
