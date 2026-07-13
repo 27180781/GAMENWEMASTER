@@ -149,7 +149,12 @@ export async function saveBackup(cfg: BackupConfig, gameId: string, payload: Bac
     users: JSON.stringify(payload.users),
     questions: JSON.stringify(payload.questions),
     groups: JSON.stringify(payload.groups),
+    // מטא בשתי צורות למקסימום תאימות: כאובייקט meta, וגם כשדות שורש (כפי
+    // ש"המלצת הזהב" במסמך מציגה) — כדי שהשחזור ישוחזר למיקום/שלב הנכונים.
     meta: JSON.stringify(payload.meta),
+    currentQueId: payload.meta.currentQueId,
+    phase: payload.meta.phase,
+    startedAt: payload.meta.startedAt,
     completed: false,
   });
   const res = await fetch(`${cfg.baseUrl}/save-backup`, { method: 'POST', headers: headers(cfg), body });

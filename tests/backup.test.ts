@@ -76,6 +76,10 @@ describe('saveBackup', () => {
     expect(typeof body.questions).toBe('string');
     expect(typeof body.groups).toBe('string');
     expect(JSON.parse(body.users as string).a.score).toBe(5);
+    // מטא גם כשדות שורש (המלצת המסמך) לשחזור מיקום/שלב
+    expect(body.currentQueId).toBe(1);
+    expect(body.phase).toBe('results');
+    expect(body.startedAt).toBe(111);
   });
 
   it('זורק כשה-POST נכשל', async () => {
