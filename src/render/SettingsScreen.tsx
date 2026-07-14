@@ -55,8 +55,8 @@ export function SettingsScreen({
   const [autoTransition, setAutoTransition] = useState<AutoTransition>(initial.autoTransition);
   const [showQr, setShowQr] = useState(initial.showQr);
   const [showBottomInstructions, setShowBottomInstructions] = useState(initial.showBottomInstructions);
-  /** מסך דמה: הגדרות הדמה המפורטות. באמצע משחק פתוחות מיד (רוצים לערוך). */
-  const [showAdvanced, setShowAdvanced] = useState(mode === 'ingame');
+  /** ההגדרות המתקדמות נפתחות בחלון קופץ (מודאל) — בלי גלילה בעמוד. */
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   // ברירת המחדל של המעברים נטענת אסינכרונית (מה-JSON/‏localStorage) אחרי טעינת
   // המשחק — מסתנכרנים איתה כשהיא מתעדכנת, לפני שהמפעיל עורך ידנית.
   useEffect(() => {
@@ -275,7 +275,56 @@ export function SettingsScreen({
     </div>
   );
 
-  // מסך אינטרו לדמה — כרטיס הסבר + הוראות + התחל משחק + הגדרות מתקדמות
+  // שדות ההגדרות המתקדמות למשחק טלפונים (מוצגים בתוך המודאל)
+  const phoneAdvancedFields = (
+    <>
+      <label className="online-field">
+        <span>מספר פלאפון מנחה</span>
+        <input type="text" dir="ltr" value={hostVoterId} onChange={(e) => setHostVoterId(e.target.value)} />
+      </label>
+      <p className="online-note">
+        שימו לב כי פלאפון מנחה אינו יכול להשתתף במשחק והקשותיו מבצעות פעולה שונה
+      </p>
+      <label className="online-check">
+        <input
+          type="checkbox"
+          checked={showBottomInstructions}
+          onChange={(e) => setShowBottomInstructions(e.target.checked)}
+        />
+        <span>הצג הנחיות בתחתית המסך</span>
+      </label>
+      <label className="online-check">
+        <input type="checkbox" checked={showQr} onChange={(e) => setShowQr(e.target.checked)} />
+        <span>הצגת QR / קוד</span>
+      </label>
+    </>
+  );
+
+  const advancedButton = (
+    <button className="settings-advanced-open" onClick={() => setAdvancedOpen(true)}>
+      ⚙ הגדרות מתקדמות
+    </button>
+  );
+
+  // חלון קופץ (מודאל) של ההגדרות המתקדמות — גלילה פנימית, בלי גלילת עמוד
+  const advancedModal = advancedOpen ? (
+    <div className="settings-modal-overlay" onClick={() => setAdvancedOpen(false)}>
+      <div className="settings-modal" dir="rtl" onClick={(e) => e.stopPropagation()}>
+        <div className="settings-modal-head">
+          <h2>הגדרות מתקדמות</h2>
+          <button className="settings-modal-close" title="סגירה" onClick={() => setAdvancedOpen(false)}>
+            ✕
+          </button>
+        </div>
+        <div className="settings-modal-body">{onlinePhone ? phoneAdvancedFields : columns}</div>
+        <button className="picker-button settings-modal-done" onClick={() => setAdvancedOpen(false)}>
+          סגירה
+        </button>
+      </div>
+    </div>
+  ) : null;
+
+  // מסך אינטרו לדמה — כרטיס הסבר + הוראות + התחל משחק + הגדרות מתקדמות (מודאל)
   if (demoIntro) {
     return (
       <div className="screen settings-screen demo-intro-screen">
@@ -298,24 +347,10 @@ export function SettingsScreen({
 
           <div className="demo-intro-actions">
             {actionButtons}
-            <button
-              className="demo-advanced-toggle"
-              onClick={() => setShowAdvanced((v) => !v)}
-              aria-expanded={showAdvanced}
-            >
-              {showAdvanced ? '▲ הסתר הגדרות מתקדמות' : '⚙ הגדרות מתקדמות'}
-            </button>
+            {advancedButton}
           </div>
-
-          {showAdvanced && (
-            <div className="demo-advanced">
-              <p className="demo-game-name">
-                משחק: <strong>{game.name}</strong> · {game.questions.length} שקופיות
-              </p>
-              {columns}
-            </div>
-          )}
         </div>
+        {advancedModal}
       </div>
     );
   }
@@ -325,20 +360,7 @@ export function SettingsScreen({
     return (
       <div className="screen settings-screen online-start-screen">
         <div className="screen-content online-start">
-          <div className="online-grid">
-            {/* הוראות הפעלה */}
-            <section className="online-card online-howto">
-              <h2 className="online-card-title">הוראות הפעלה</h2>
-              <ol className="online-steps">
-                {HOWTO_STEPS.map((step, i) => (
-                  <li key={i} className="online-step">
-                    <span className={`online-step-num online-step-num--${i}`}>{i + 1}</span>
-                    <span className="online-step-text">{step}</span>
-                  </li>
-                ))}
-              </ol>
-            </section>
-
+          <div className="online-grid online-grid--pair">
             {/* הגדרות משחק — טלפון, קוד, מגבלה */}
             <section className="online-card online-info">
               <h2 className="online-card-title">הגדרות משחק</h2>
@@ -351,38 +373,26 @@ export function SettingsScreen({
               </div>
             </section>
 
-            {/* הגדרות מתקדמות */}
-            <section className="online-card online-advanced">
-              <h2 className="online-card-title">הגדרות מתקדמות</h2>
-              <label className="online-field">
-                <span>מספר פלאפון מנחה</span>
-                <input
-                  type="text"
-                  dir="ltr"
-                  value={hostVoterId}
-                  onChange={(e) => setHostVoterId(e.target.value)}
-                />
-              </label>
-              <p className="online-note">
-                שימו לב כי פלאפון מנחה אינו יכול להשתתף במשחק והקשותיו מבצעות פעולה שונה
-              </p>
-              <label className="online-check">
-                <input
-                  type="checkbox"
-                  checked={showBottomInstructions}
-                  onChange={(e) => setShowBottomInstructions(e.target.checked)}
-                />
-                <span>הצג הנחיות בתחתית המסך</span>
-              </label>
-              <label className="online-check">
-                <input type="checkbox" checked={showQr} onChange={(e) => setShowQr(e.target.checked)} />
-                <span>הצגת QR / קוד</span>
-              </label>
+            {/* הוראות הפעלה */}
+            <section className="online-card online-howto">
+              <h2 className="online-card-title">הוראות הפעלה</h2>
+              <ol className="online-steps">
+                {HOWTO_STEPS.map((step, i) => (
+                  <li key={i} className="online-step">
+                    <span className={`online-step-num online-step-num--${i}`}>{i + 1}</span>
+                    <span className="online-step-text">{step}</span>
+                  </li>
+                ))}
+              </ol>
             </section>
           </div>
 
-          <div className="online-actions">{actionButtons}</div>
+          <div className="online-actions">
+            {advancedButton}
+            {actionButtons}
+          </div>
         </div>
+        {advancedModal}
       </div>
     );
   }
