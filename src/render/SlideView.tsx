@@ -23,31 +23,40 @@ interface SlideViewProps {
   leaders: RailPlayer[];
   /** מצב שליחת שקופית "פונקציה" ל-API (רלוונטי רק ל-type: "function"). */
   functionStatus?: 'idle' | 'sending' | 'sent' | 'error';
+  /** טקסט נלווה לשקופית פונקציה (למשל "12 שחקנים הוסרו מהמשחק"). */
+  functionDetail?: string;
   /** פותר שם לפי מזהה — לשקופית פונקציה מסוג "screen" (מנצחים/מובילים). */
   nameOf?: (voterId: string) => string;
   /** מרשם הקבוצות — לשקופית פונקציה מסוג "screen"/"leaderboard". */
   roster?: RosterData;
 }
 
-/** מסך שקופית "פונקציה" — פעולת מערכת (שליחת API / איפוס ניקוד) עם חיווי מצב. */
+/** מסך שקופית "פונקציה" — פעולת מערכת (API / ניקוד / משתתפים) עם חיווי מצב. */
 function FunctionScreen({
   action,
   status,
+  detail,
 }: {
   action: string;
   status: 'idle' | 'sending' | 'sent' | 'error';
+  detail: string;
 }) {
-  const isScore = action === 'score';
-  const icon = isScore ? '🔄' : '⚡';
-  const text = isScore
-    ? status === 'error'
-      ? '⚠ פעולת ניקוד לא מוכרת'
-      : '✓ הניקוד אופס'
-    : status === 'sent'
-      ? '✓ הנתונים נשלחו'
-      : status === 'error'
-        ? '⚠ השליחה נכשלה'
-        : 'שולח נתונים…';
+  let icon = '⚡';
+  let text: string;
+  if (action === 'score') {
+    icon = '🔄';
+    text = status === 'error' ? '⚠ פעולת ניקוד לא מוכרת' : '✓ הניקוד אופס';
+  } else if (action === 'players') {
+    icon = '👋';
+    text = status === 'error' ? '⚠ פעולת משתתפים לא תקינה' : detail || '✓ עודכנו המשתתפים';
+  } else {
+    text =
+      status === 'sent'
+        ? '✓ הנתונים נשלחו'
+        : status === 'error'
+          ? '⚠ השליחה נכשלה'
+          : 'שולח נתונים…';
+  }
   return (
     <div className="screen slide-screen function-screen">
       <div className="screen-content">
@@ -87,12 +96,13 @@ export function SlideView({
   players,
   leaders,
   functionStatus = 'idle',
+  functionDetail = '',
   nameOf,
   roster,
 }: SlideViewProps) {
   const slide = engine.getCurrentSlide();
 
-  // שקופית "פונקציה" — לפי הפעולה: מסך מנצחים/מובילים, או חיווי API/ניקוד.
+  // שקופית "פונקציה" — לפי הפעולה: מסך מנצחים/מובילים, או חיווי API/ניקוד/משתתפים.
   if (slide.type === 'function') {
     const fn = slide.function;
     if (fn?.action === 'screen') {
@@ -102,7 +112,7 @@ export function SlideView({
         <WinnersScreen engine={engine} {...(nameOf ? { nameOf } : {})} />
       );
     }
-    return <FunctionScreen action={fn?.action ?? 'api'} status={functionStatus} />;
+    return <FunctionScreen action={fn?.action ?? 'api'} status={functionStatus} detail={functionDetail} />;
   }
 
   // מדיה חוסמת — מסך מלא. מנוגנת אוטומטית; המעבר ממנה הוא ידני (רווח/0),

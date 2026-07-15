@@ -257,6 +257,34 @@ export class GameEngine {
     this.setState({ scores: {}, answerTimes: {} });
   }
 
+  /**
+   * הסרת משתתפים מהמשחק (שקופית function · players) — מוחקים את הניקוד,
+   * הזמנים וההצבעות שלהם, כך שלא יופיעו יותר בדירוג. סינון הצבעות עתידיות
+   * שלהם באחריות ה-host (רשימת המוסרים). מחזיר כמה הוסרו בפועל.
+   */
+  removeVoters(ids: readonly string[]): number {
+    const remove = new Set(ids);
+    if (remove.size === 0) return 0;
+    const scores = { ...this.state.scores };
+    const answerTimes = { ...this.state.answerTimes };
+    for (const id of remove) {
+      delete scores[id];
+      delete answerTimes[id];
+    }
+    const votesBySlide: GameState['votesBySlide'] = {};
+    for (const [slideId, votes] of Object.entries(this.state.votesBySlide)) {
+      const next: Record<string, number> = {};
+      for (const [voterId, answerId] of Object.entries(votes)) {
+        if (!remove.has(voterId)) next[voterId] = answerId;
+      }
+      votesBySlide[Number(slideId)] = next;
+    }
+    for (const bySlide of Object.values(this.awardedBySlide)) for (const id of remove) delete bySlide[id];
+    for (const bySlide of Object.values(this.timeBySlide)) for (const id of remove) delete bySlide[id];
+    this.setState({ scores, answerTimes, votesBySlide });
+    return remove.size;
+  }
+
   // -------------------------------------------------------------------------
   // רענון תוכן "חם" (push של רענון למשחק אונליין)
   // -------------------------------------------------------------------------

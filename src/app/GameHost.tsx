@@ -41,10 +41,12 @@ import {
   displayName,
   groupCounts,
   loadRoster,
+  playerGroupNames,
   resetCategoryMemberships,
   saveRoster,
   type RosterData,
 } from './roster.ts';
+import { selectPlayersToRemove } from './functionPlayers.ts';
 import { GroupConnectScreen } from '../render/GroupConnectScreen.tsx';
 import {
   DEFAULT_BACKUP_CONFIG,
@@ -207,9 +209,12 @@ export function GameHost({
   const participantLimitRef = useRef(participantLimit);
   participantLimitRef.current = participantLimit;
   const admittedRef = useRef<Set<string>>(new Set());
-  // איפוס רשימת המורשים כשמתחלף המשחק (id אחר) — רישיון חדש
+  /** משתתפים שהוסרו מהמשחק (שקופית function · players) — הצבעותיהם מסוננות. */
+  const removedRef = useRef<Set<string>>(new Set());
+  // איפוס רשימת המורשים/המוסרים כשמתחלף המשחק (id אחר) — רישיון חדש
   useEffect(() => {
     admittedRef.current = new Set();
+    removedRef.current = new Set();
   }, [game.id]);
   const admit = useCallback((id: string): boolean => {
     const admitted = admittedRef.current;
@@ -264,6 +269,8 @@ export function GameHost({
   const [reveal, setReveal] = useState<RevealState>(NO_REVEAL);
   /** מצב שליחת שקופית "פונקציה" ל-API (לתצוגה על המסך). */
   const [functionStatus, setFunctionStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  /** טקסט נלווה לשקופית פונקציה (למשל "הוסרו 12 שחקנים"). */
+  const [functionDetail, setFunctionDetail] = useState<string>('');
   /** מזהי המצביעים האחרונים בשקופית הנוכחית (החדש ראשון) — לאווטרים המתעופפים. */
   const [answerers, setAnswerers] = useState<string[]>([]);
   const players = useMemo<RailPlayer[]>(
@@ -286,7 +293,10 @@ export function GameHost({
   );
   /** כל מי שהתחבר למשחק (לחץ מקש) — למסך הלובי. סדר הצטרפות. */
   const [connectedIds, setConnectedIds] = useState<string[]>([]);
+  const connectedIdsRef = useRef<string[]>(connectedIds);
+  connectedIdsRef.current = connectedIds;
   const addConnected = useCallback((id: string, name?: string) => {
+    if (removedRef.current.has(id)) return; // הוסר מהמשחק — לא מצרפים חזרה
     if (!admitRef.current(id)) return; // מעל מגבלת הרישיון — לא מצרפים ללובי
     if (name !== undefined && name !== '') {
       setServerNames((prev) => (prev[id] === name ? prev : { ...prev, [id]: name }));
@@ -469,11 +479,43 @@ export function GameHost({
       if (op === 'reset_all') {
         engine.resetScores();
         setFunctionStatus('sent');
+        setFunctionDetail('');
         debugLog('game', 'שקופית פונקציה — איפוס ניקוד כל המשתתפים');
       } else {
         setFunctionStatus('error');
+        setFunctionDetail('');
         debugLog('game', `שקופית פונקציה — פעולת ניקוד לא מוכרת (${String(op)})`);
       }
+      return;
+    }
+
+    // פעולת "players" — הסרת/השארת משתתפים כך שלא יוכלו להשתתף יותר.
+    if (action === 'players') {
+      const cfg = s.function?.players;
+      if (!cfg) {
+        setFunctionStatus('error');
+        setFunctionDetail('');
+        return;
+      }
+      const scores = engine.getState().scores;
+      const roster = rosterRef.current;
+      // המשתתפים הפעילים: מי שהתחבר/הצביע; בבחירת קבוצות גם משויכי המרשם (כך
+      // ש חברי קבוצה שהוגדרו בקובץ המשחק ייחסמו גם אם עדיין לא הצביעו).
+      const pool = new Set<string>([...connectedIdsRef.current, ...Object.keys(scores)]);
+      if (cfg.selection === 'groups') for (const id of Object.keys(roster.memberships)) pool.add(id);
+      for (const id of removedRef.current) pool.delete(id);
+      const toRemove = selectPlayersToRemove([...pool], scores, cfg, {
+        groupNamesOf: (id) => playerGroupNames(roster, id),
+      });
+      for (const id of toRemove) removedRef.current.add(id);
+      const removedCount = engine.removeVoters(toRemove);
+      const removedSet = new Set(toRemove);
+      setConnectedIds((prev) => prev.filter((id) => !removedSet.has(id)));
+      setAnswerers((prev) => prev.filter((id) => !removedSet.has(id)));
+      setCorrectAnswerers((prev) => prev.filter((id) => !removedSet.has(id)));
+      setFunctionStatus('sent');
+      setFunctionDetail(`${removedCount} שחקנים הוסרו מהמשחק`);
+      debugLog('game', `שקופית פונקציה — עדכון משתתפים (${cfg.mode}/${cfg.selection}) · הוסרו ${removedCount}`);
       return;
     }
     // פעולת "api" — שליחת נתוני המשחק ל-webhook.
@@ -949,6 +991,7 @@ export function GameHost({
         const counts: Record<string, number> = {};
         let total = 0;
         for (const [voterId, answerId] of Object.entries(snapshot.voters)) {
+          if (removedRef.current.has(voterId)) continue; // הוסר מהמשחק — לא נספר
           if (!admitRef.current(voterId)) continue;
           voters[voterId] = answerId;
           counts[String(answerId)] = (counts[String(answerId)] ?? 0) + 1;
@@ -1282,6 +1325,7 @@ export function GameHost({
   /** "התחלת המשחק מחדש" מתוך מסך ההגדרות — איפוס מלא וחזרה למסך הפתיחה. */
   const restartGame = useCallback(() => {
     engine.reset();
+    removedRef.current = new Set(); // התחלה מחדש — משתתפים שהוסרו יכולים לחזור
     setStage('opening');
     setReveal(NO_REVEAL);
     setLeadersOverlay(false);
@@ -1345,6 +1389,7 @@ export function GameHost({
               players={players}
               leaders={leaders}
               functionStatus={functionStatus}
+              functionDetail={functionDetail}
               nameOf={nameOf}
               roster={roster}
             />

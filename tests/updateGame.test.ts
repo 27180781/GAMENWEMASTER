@@ -64,6 +64,22 @@ describe('GameEngine.reset — התחלת משחק מחדש', () => {
     expect(s.votesBySlide[1]).toEqual({ alice: 1 });
     expect(s.slidesCompleted).toContain(1);
   });
+
+  it('removeVoters מסיר משתתפים מהניקוד ומההצבעות', () => {
+    const engine = new GameEngine(triviaGame());
+    engine.dispatch({ type: 'ADVANCE', at: 0 });
+    engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(1, 1, { alice: 1, bob: 1, carol: 2 }), at: 100 });
+    engine.dispatch({ type: 'VOTING_TIMEOUT', at: 2000 });
+    expect(engine.getState().scores).toEqual({ alice: 3, bob: 3 }); // נכון=1
+
+    const removed = engine.removeVoters(['alice', 'carol']);
+
+    expect(removed).toBe(2);
+    const s = engine.getState();
+    expect(s.scores).toEqual({ bob: 3 });          // alice הוסרה
+    expect(s.votesBySlide[1]).toEqual({ bob: 1 }); // alice+carol הוסרו מההצבעות
+    expect(engine.getWinners().map((w) => w.voterId)).toEqual(['bob']);
+  });
 });
 
 describe('GameEngine.updateGame — רענון תוכן חם', () => {

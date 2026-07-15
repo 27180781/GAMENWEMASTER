@@ -81,6 +81,25 @@ describe('סכמה + מנוע: שקופית function', () => {
     const game = parseGameFile(rawGame([raw, rawSlide({ id: 2, type: 'trivia', que: 'ש', answers: fourAnswers(2) })]));
     expect(game.questions[0]!.function).toEqual({ action: 'score', score: { operation: 'reset_all' } });
   });
+
+  it('פעולת "players" — נשמר קונפיג ההסרה (כולל groups)', () => {
+    const base = {
+      question: { que: '', scoreForQue: '', timeForQue: '', answers: [], src: '' },
+      openMedia: { src: '' }, endMedia: { src: '' }, backgroundMedia: { src: '' }, setting: {
+        allowChangeVote: false, slideStartVoting: true, playAfterClicking: false, exitGame: false,
+        correctlyAnsweredBefore: false, firstClicker: false, answerIsSequenceClicks: false, fullscreen: false,
+        scoringReduction: { active: false, seconds: '', score: '' }, slidBackgroundMedia: { src: '' },
+        automaticSkip: { active: false, seconds: '' }, showInLoop: false,
+      }, type: 'function',
+    };
+    const g = parseGameFile(rawGame([
+      { ...base, id: 1, function: { action: 'players', players: { mode: 'remove', unit: 'percent', amount: 50, selection: 'bottom' } } },
+      { ...base, id: 2, function: { action: 'players', players: { mode: 'keep', selection: 'groups', groups: ['קבוצה א'] } } },
+      rawSlide({ id: 3, type: 'trivia', que: 'ש', answers: fourAnswers(2) }),
+    ]));
+    expect(g.questions[0]!.function).toMatchObject({ action: 'players', players: { mode: 'remove', unit: 'percent', amount: 50, selection: 'bottom' } });
+    expect(g.questions[1]!.function!.players!.groups).toEqual(['קבוצה א']);
+  });
 });
 
 function twoTrivia() {
