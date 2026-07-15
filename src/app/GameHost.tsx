@@ -49,9 +49,9 @@ import {
 import { selectPlayersToRemove } from './functionPlayers.ts';
 import { GroupConnectScreen } from '../render/GroupConnectScreen.tsx';
 import {
-  DEFAULT_BACKUP_CONFIG,
   endGame,
-  fetchBackup,
+  getBackup,
+  resolveBackupConfig,
   saveBackup,
   type BackupConfig,
   type BackupData,
@@ -346,16 +346,22 @@ export function GameHost({
     const value = new URLSearchParams(window.location.search).get('demo');
     return value !== null && ['', '1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
   }, [offline]);
-  const backupCfg = useMemo<BackupConfig | null>(() => {
-    if (offline || game.id === '') return null;
-    if (backupUrlOverride !== null) {
-      return { baseUrl: backupUrlOverride, anonKey: DEFAULT_BACKUP_CONFIG.anonKey };
-    }
-    return hasRoom && !syntheticCrowd ? DEFAULT_BACKUP_CONFIG : null;
-  }, [offline, backupUrlOverride, hasRoom, syntheticCrowd, game.id]);
+  const backupCfg = useMemo<BackupConfig | null>(
+    () =>
+      resolveBackupConfig({
+        offline,
+        gameId: game.id,
+        hasRoom,
+        crowdEnabled: syntheticCrowd,
+        backupUrlOverride,
+      }),
+    [offline, backupUrlOverride, hasRoom, syntheticCrowd, game.id],
+  );
 
   /** גיבוי חי שנמצא בטעינה — מציג חלונית "להמשיך מאותה נקודה?". */
   const [resumePrompt, setResumePrompt] = useState<BackupData | null>(null);
+  /** בדיקת הגיבוי בטעינה עדיין רצה — מציג חיווי "בודק אם יש משחק שמור…". */
+  const [backupChecking, setBackupChecking] = useState(false);
   const startedAtRef = useRef<number>(Date.now());
   const saveTimerRef = useRef<number | null>(null);
   const gameEndedRef = useRef(false);
@@ -377,17 +383,23 @@ export function GameHost({
   const saveBackupNowRef = useRef(saveBackupNow);
   saveBackupNowRef.current = saveBackupNow;
 
-  // טעינה: בדיקת גיבוי חי קיים למשחק (התאוששות מקריסה/רענון)
+  // טעינה: בדיקת גיבוי חי קיים למשחק (התאוששות מקריסה/רענון). getBackup מנצל
+  // prefetch שכבר רץ במסך ההגדרות — כך שהתוצאה זמינה מיד עם הכניסה למשחק.
   useEffect(() => {
     if (backupCfg === null) return;
     let cancelled = false;
-    void fetchBackup(backupCfg, game.id).then((data) => {
-      if (cancelled || data === null) return;
-      // משחק שכבר הסתיים (game-over) — לא מציעים המשך; מתחילים חדש.
-      if (data.completed) return;
-      const hasProgress = Object.keys(data.users).length > 0 || data.meta.currentQueId !== null;
-      if (hasProgress) setResumePrompt(data);
-    });
+    setBackupChecking(true);
+    void getBackup(backupCfg, game.id)
+      .then((data) => {
+        if (cancelled || data === null) return;
+        // משחק שכבר הסתיים (game-over) — לא מציעים המשך; מתחילים חדש.
+        if (data.completed) return;
+        const hasProgress = Object.keys(data.users).length > 0 || data.meta.currentQueId !== null;
+        if (hasProgress) setResumePrompt(data);
+      })
+      .finally(() => {
+        if (!cancelled) setBackupChecking(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -1465,6 +1477,14 @@ export function GameHost({
               <p>למשחק זה אין קוד חדר — ניתן להפעיל אותו רק עם שחקני דמה.</p>
               <button onClick={() => setLicenseAck(true)}>הבנתי</button>
             </div>
+          </div>
+        )}
+
+        {/* חיווי לא-חוסם בזמן בדיקת גיבוי חי (עד שהתשובה מ-Supabase חוזרת) */}
+        {backupChecking && resumePrompt === null && (
+          <div className="backup-checking" role="status">
+            <span className="spinner" />
+            <span>בודק אם יש משחק שמור…</span>
           </div>
         )}
 

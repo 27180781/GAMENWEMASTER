@@ -57,9 +57,6 @@ interface QuestionSlideProps {
   ansIsNumber: boolean;
   timer: TimerView | null;
   reveal: RevealState;
-  /** מספר השאלה מתוך סך השאלות (שקופיות המצביעות), לתצוגת הכותרת. */
-  questionNumber: number;
-  questionTotal: number;
   /** עונים אחרונים (החדש ראשון) — מזינים את האווטרים המתעופפים. */
   players: RailPlayer[];
   /** חמשת הראשונים שענו נכונה על השקופית (המהיר ראשון) — לפס המובילים בחשיפה. */
@@ -206,8 +203,6 @@ export function QuestionSlide({
   ansIsNumber,
   timer,
   reveal,
-  questionNumber,
-  questionTotal,
   players,
   leaders,
   title,
@@ -258,14 +253,6 @@ export function QuestionSlide({
               </div>
             )}
             {title !== '' && <div className="q-title-pill">{title}</div>}
-          </div>
-
-          <div className="q-hud-right">
-            <div className="q-counter" dir="ltr">
-              <span>{questionNumber}</span>
-              <span className="q-counter-sep">/</span>
-              <span>{questionTotal}</span>
-            </div>
           </div>
         </div>
 

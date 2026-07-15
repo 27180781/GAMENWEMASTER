@@ -4,7 +4,17 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { endGame, fetchBackup, saveBackup, type BackupConfig, type BackupPayload } from '../src/app/backup.ts';
+import {
+  DEFAULT_BACKUP_CONFIG,
+  endGame,
+  fetchBackup,
+  getBackup,
+  prefetchBackup,
+  resolveBackupConfig,
+  saveBackup,
+  type BackupConfig,
+  type BackupPayload,
+} from '../src/app/backup.ts';
 
 const cfg: BackupConfig = { baseUrl: 'http://x/functions/v1', anonKey: 'KEY123' };
 
@@ -87,6 +97,59 @@ describe('saveBackup', () => {
     await expect(
       saveBackup(cfg, 'g', { users: {}, questions: {}, groups: [], meta: { currentQueId: null, phase: 'showing', startedAt: 0 } }),
     ).rejects.toThrow();
+  });
+});
+
+describe('resolveBackupConfig', () => {
+  it('מחזיר null באופליין / בלי id / בדמו / בלי קוד חדר', () => {
+    const b = { hasRoom: true, crowdEnabled: false, backupUrlOverride: null };
+    expect(resolveBackupConfig({ ...b, offline: true, gameId: 'g' })).toBeNull();
+    expect(resolveBackupConfig({ ...b, offline: false, gameId: '' })).toBeNull();
+    expect(resolveBackupConfig({ ...b, offline: false, gameId: 'g', crowdEnabled: true })).toBeNull();
+    expect(resolveBackupConfig({ ...b, offline: false, gameId: 'g', hasRoom: false })).toBeNull();
+  });
+
+  it('משחק אונליין מורשה → קונפיג ברירת המחדל; ‎?backupUrl=‎ דורס את הכתובת', () => {
+    expect(
+      resolveBackupConfig({ offline: false, gameId: 'g', hasRoom: true, crowdEnabled: false, backupUrlOverride: null }),
+    ).toEqual(DEFAULT_BACKUP_CONFIG);
+    const override = resolveBackupConfig({
+      offline: false,
+      gameId: 'g',
+      hasRoom: false, // גם בלי קוד חדר — עקיפת כתובת מפעילה גיבוי (לבדיקות)
+      crowdEnabled: true,
+      backupUrlOverride: 'http://local/functions/v1',
+    });
+    expect(override).toEqual({ baseUrl: 'http://local/functions/v1', anonKey: DEFAULT_BACKUP_CONFIG.anonKey });
+  });
+});
+
+describe('prefetchBackup + getBackup', () => {
+  it('getBackup מוסר את תוצאת ה-prefetch בלי בקשה נוספת (מסירה חד-פעמית)', async () => {
+    const fn = mockFetch(() => ({ ok: true, json: async () => ({ id: 'pf1', currentQueId: 2, phase: 'voting' }) }));
+    prefetchBackup(cfg, 'pf1');
+    expect(fn).toHaveBeenCalledTimes(1); // הבקשה יצאה כבר ב-prefetch
+    const data = await getBackup(cfg, 'pf1');
+    expect(fn).toHaveBeenCalledTimes(1); // getBackup לא כפל בקשה
+    expect(data?.meta.currentQueId).toBe(2);
+  });
+
+  it('prefetch כפול לאותו משחק אינו כופל בקשה', () => {
+    const fn = mockFetch(() => ({ ok: true, json: async () => ({}) }));
+    prefetchBackup(cfg, 'pf2');
+    prefetchBackup(cfg, 'pf2');
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it('getBackup בלי prefetch שולף טרי; ואחרי מסירה — הקריאה הבאה שולפת שוב', async () => {
+    const fn = mockFetch(() => ({ ok: true, json: async () => ({ id: 'pf3', currentQueId: 1, phase: 'showing' }) }));
+    await getBackup(cfg, 'pf3'); // אין prefetch → בקשה טרייה
+    expect(fn).toHaveBeenCalledTimes(1);
+    prefetchBackup(cfg, 'pf3');
+    await getBackup(cfg, 'pf3'); // מוסר את ה-prefetch (בקשה אחת נוספת בלבד)
+    expect(fn).toHaveBeenCalledTimes(2);
+    await getBackup(cfg, 'pf3'); // המסירה כבר נוצלה → שליפה טרייה נוספת
+    expect(fn).toHaveBeenCalledTimes(3);
   });
 });
 

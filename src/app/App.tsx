@@ -16,6 +16,7 @@ import { SettingsScreen } from '../render/SettingsScreen.tsx';
 import { Stage } from '../render/Stage.tsx';
 import { themeStyle } from '../render/theme.ts';
 import { GameHost } from './GameHost.tsx';
+import { prefetchBackup, resolveBackupConfig } from './backup.ts';
 import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.ts';
 import { openPushChannel } from './pushChannel.ts';
 import { loadRoster, mergeGameUsers, parseGameUsers, saveRoster } from './roster.ts';
@@ -97,6 +98,11 @@ function MediaIssuesAlert({ issues, onClose }: { issues: MediaIssue[]; onClose: 
 export function App() {
   const hash = useHash();
   const params = useMemo(() => parseAppParams(window.location.search), []);
+  /** עקיפת כתובת הגיבוי דרך ‎?backupUrl=‎ (לבדיקות מול שרת מקומי), או null. */
+  const backupUrlOverride = useMemo(() => {
+    const value = new URLSearchParams(window.location.search).get('backupUrl');
+    return value !== null && value.trim() !== '' ? value.trim() : null;
+  }, []);
 
   /** משחק שנטען וממתין למסך ההגדרות (המסך הראשון תמיד). */
   const [pendingGame, setPendingGame] = useState<GameFile | null>(null);
@@ -132,6 +138,21 @@ export function App() {
     const categoryName = pendingGame.name.trim() !== '' ? pendingGame.name.trim() : 'קבוצות המשחק';
     saveRoster(pendingGame.id, mergeGameUsers(loadRoster(pendingGame.id), users, categoryName));
   }, [pendingGame]);
+
+  // Prefetch גיבוי: מתחילים לבדוק אם יש משחק שמור כבר במסך ההגדרות, במקביל
+  // לזמן שהמנחה שוהה בו — כך חלון "להמשיך?" מופיע מיד עם הכניסה למשחק, במקום
+  // להמתין ל-round-trip (וקר-סטארט של Supabase) רק אחרי הלחיצה על "התחל".
+  useEffect(() => {
+    if (pendingGame === null) return;
+    const cfg = resolveBackupConfig({
+      offline,
+      gameId: pendingGame.id,
+      hasRoom: (pendingGame.room ?? '') !== '',
+      crowdEnabled: settings.crowdEnabled,
+      backupUrlOverride,
+    });
+    if (cfg !== null) prefetchBackup(cfg, pendingGame.id);
+  }, [pendingGame, offline, settings.crowdEnabled, backupUrlOverride]);
 
   /** עדכון הגדרות + שמירת דריסת המעברים האוטומטיים ל-localStorage (פעולת מפעיל). */
   const persistAndSetSettings = useCallback(
