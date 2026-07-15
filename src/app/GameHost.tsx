@@ -457,7 +457,27 @@ export function GameHost({
       setFunctionStatus('idle');
       return;
     }
-    const api = s.function?.action === 'api' ? s.function.api : undefined;
+    const action = s.function?.action ?? 'api';
+    // פעולת "מסך" מטופלת ברינדור (SlideView מציג מנצחים/מובילים) — בלי side effect.
+    if (action === 'screen') {
+      setFunctionStatus('idle');
+      return;
+    }
+    // פעולת "ניקוד" — כרגע איפוס ניקוד כל המשתתפים.
+    if (action === 'score') {
+      const op = s.function?.score?.operation ?? 'reset_all';
+      if (op === 'reset_all') {
+        engine.resetScores();
+        setFunctionStatus('sent');
+        debugLog('game', 'שקופית פונקציה — איפוס ניקוד כל המשתתפים');
+      } else {
+        setFunctionStatus('error');
+        debugLog('game', `שקופית פונקציה — פעולת ניקוד לא מוכרת (${String(op)})`);
+      }
+      return;
+    }
+    // פעולת "api" — שליחת נתוני המשחק ל-webhook.
+    const api = s.function?.api;
     if (!api || api.url.trim() === '') {
       debugLog('game', 'שקופית פונקציה בלי כתובת API — מדלגים על השליחה');
       setFunctionStatus('error');
@@ -1325,6 +1345,8 @@ export function GameHost({
               players={players}
               leaders={leaders}
               functionStatus={functionStatus}
+              nameOf={nameOf}
+              roster={roster}
             />
             {/* מיקום במשחק: שקופית נוכחית מתוך סה"כ */}
             <span className="slide-counter" dir="ltr">

@@ -51,6 +51,36 @@ describe('סכמה + מנוע: שקופית function', () => {
     expect(engine.getState().phase).toBe('showing');
     expect(engine.getCurrentSlide().id).toBe(8);
   });
+
+  it('פעולת "screen" — נשמר screen.type (winners/leaderboard)', () => {
+    const raw = (id: number, type: string) => ({
+      question: { que: '', scoreForQue: '', timeForQue: '', answers: [], src: '' },
+      openMedia: { src: '' }, endMedia: { src: '' }, backgroundMedia: { src: '' }, setting: {
+        allowChangeVote: false, slideStartVoting: true, playAfterClicking: false, exitGame: false,
+        correctlyAnsweredBefore: false, firstClicker: false, answerIsSequenceClicks: false, fullscreen: false,
+        scoringReduction: { active: false, seconds: '', score: '' }, slidBackgroundMedia: { src: '' },
+        automaticSkip: { active: false, seconds: '' }, showInLoop: false,
+      },
+      function: { action: 'screen', screen: { type } }, type: 'function', id,
+    });
+    const game = parseGameFile(rawGame([raw(1, 'leaderboard'), rawSlide({ id: 2, type: 'trivia', que: 'ש', answers: fourAnswers(2) })]));
+    expect(game.questions[0]!.function).toEqual({ action: 'screen', screen: { type: 'leaderboard' } });
+  });
+
+  it('פעולת "score" — נשמר score.operation (reset_all)', () => {
+    const raw = {
+      question: { que: '', scoreForQue: '', timeForQue: '', answers: [], src: '' },
+      openMedia: { src: '' }, endMedia: { src: '' }, backgroundMedia: { src: '' }, setting: {
+        allowChangeVote: false, slideStartVoting: true, playAfterClicking: false, exitGame: false,
+        correctlyAnsweredBefore: false, firstClicker: false, answerIsSequenceClicks: false, fullscreen: false,
+        scoringReduction: { active: false, seconds: '', score: '' }, slidBackgroundMedia: { src: '' },
+        automaticSkip: { active: false, seconds: '' }, showInLoop: false,
+      },
+      function: { action: 'score', score: { operation: 'reset_all' } }, type: 'function', id: 1,
+    };
+    const game = parseGameFile(rawGame([raw, rawSlide({ id: 2, type: 'trivia', que: 'ש', answers: fourAnswers(2) })]));
+    expect(game.questions[0]!.function).toEqual({ action: 'score', score: { operation: 'reset_all' } });
+  });
 });
 
 function twoTrivia() {

@@ -8,6 +8,8 @@ import { isVotableSlide, type GameEngine, type GameState, type Slide } from '../
 import { MediaPlayer } from './MediaPlayer.tsx';
 import { QuestionSlide, type RailPlayer, type RevealState } from './QuestionSlide.tsx';
 import { SubjectSlide } from './SubjectSlide.tsx';
+import { WinnersListScreen, WinnersScreen } from './screens.tsx';
+import type { RosterData } from '../app/roster.ts';
 import type { TimerView } from './TimerRing.tsx';
 
 interface SlideViewProps {
@@ -21,12 +23,27 @@ interface SlideViewProps {
   leaders: RailPlayer[];
   /** מצב שליחת שקופית "פונקציה" ל-API (רלוונטי רק ל-type: "function"). */
   functionStatus?: 'idle' | 'sending' | 'sent' | 'error';
+  /** פותר שם לפי מזהה — לשקופית פונקציה מסוג "screen" (מנצחים/מובילים). */
+  nameOf?: (voterId: string) => string;
+  /** מרשם הקבוצות — לשקופית פונקציה מסוג "screen"/"leaderboard". */
+  roster?: RosterData;
 }
 
-/** מסך שקופית "פונקציה" — פעולת מערכת (שליחת נתונים ל-API) עם חיווי מצב. */
-function FunctionScreen({ status }: { status: 'idle' | 'sending' | 'sent' | 'error' }) {
-  const text =
-    status === 'sent'
+/** מסך שקופית "פונקציה" — פעולת מערכת (שליחת API / איפוס ניקוד) עם חיווי מצב. */
+function FunctionScreen({
+  action,
+  status,
+}: {
+  action: string;
+  status: 'idle' | 'sending' | 'sent' | 'error';
+}) {
+  const isScore = action === 'score';
+  const icon = isScore ? '🔄' : '⚡';
+  const text = isScore
+    ? status === 'error'
+      ? '⚠ פעולת ניקוד לא מוכרת'
+      : '✓ הניקוד אופס'
+    : status === 'sent'
       ? '✓ הנתונים נשלחו'
       : status === 'error'
         ? '⚠ השליחה נכשלה'
@@ -35,7 +52,7 @@ function FunctionScreen({ status }: { status: 'idle' | 'sending' | 'sent' | 'err
     <div className="screen slide-screen function-screen">
       <div className="screen-content">
         <div className={`function-card function-card--${status}`}>
-          <div className="function-icon">⚡</div>
+          <div className="function-icon">{icon}</div>
           <p className="function-text">{text}</p>
           {status === 'sending' && <div className="spinner" />}
         </div>
@@ -70,12 +87,22 @@ export function SlideView({
   players,
   leaders,
   functionStatus = 'idle',
+  nameOf,
+  roster,
 }: SlideViewProps) {
   const slide = engine.getCurrentSlide();
 
-  // שקופית "פונקציה" — פעולת מערכת (שליחת נתונים ל-API), מסך חיווי נפרד.
+  // שקופית "פונקציה" — לפי הפעולה: מסך מנצחים/מובילים, או חיווי API/ניקוד.
   if (slide.type === 'function') {
-    return <FunctionScreen status={functionStatus} />;
+    const fn = slide.function;
+    if (fn?.action === 'screen') {
+      return fn.screen?.type === 'leaderboard' ? (
+        <WinnersListScreen engine={engine} {...(nameOf ? { nameOf } : {})} {...(roster ? { roster } : {})} />
+      ) : (
+        <WinnersScreen engine={engine} {...(nameOf ? { nameOf } : {})} />
+      );
+    }
+    return <FunctionScreen action={fn?.action ?? 'api'} status={functionStatus} />;
   }
 
   // מדיה חוסמת — מסך מלא. מנוגנת אוטומטית; המעבר ממנה הוא ידני (רווח/0),
