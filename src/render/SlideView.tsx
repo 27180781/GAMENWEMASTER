@@ -4,7 +4,7 @@
  * ותוכן לפי סוג השקופית.
  */
 
-import { isVotableSlide, type GameEngine, type GameState, type Slide } from '../engine/index.ts';
+import { type GameEngine, type GameState, type Slide } from '../engine/index.ts';
 import { MediaPlayer } from './MediaPlayer.tsx';
 import { QuestionSlide, type RailPlayer, type RevealState } from './QuestionSlide.tsx';
 import { SubjectSlide } from './SubjectSlide.tsx';
@@ -132,7 +132,6 @@ export function SlideView({
   if (slide.type === 'subject' && background === '') {
     background = engine.getGame().setting.gameMedia.src;
   }
-  const votableSlides = engine.getGame().questions.filter(isVotableSlide);
 
   return (
     <div className="screen slide-screen">
@@ -154,8 +153,6 @@ export function SlideView({
             ansIsNumber={engine.getGame().setting.ansIsNumber}
             timer={timer}
             reveal={reveal}
-            questionNumber={votableSlides.findIndex((s) => s.id === slide.id) + 1}
-            questionTotal={votableSlides.length}
             players={players}
             leaders={leaders}
             title={engine.getGame().setting.titleThroughoutGame}

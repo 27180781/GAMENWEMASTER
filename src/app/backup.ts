@@ -35,6 +35,31 @@ export const DEFAULT_BACKUP_CONFIG: BackupConfig = {
   anonKey: envOr('VITE_SUPABASE_ANON_KEY', DEFAULT_ANON_KEY),
 };
 
+/** ההקשר להחלטה אם/כיצד לגבות: משחק אונליין מורשה שאינו דמו/אופליין. */
+export interface BackupContext {
+  offline: boolean;
+  gameId: string;
+  /** יש קוד חדר (room) — משחק אונליין מורשה. */
+  hasRoom: boolean;
+  /** שחקני דמה דלוקים — אין גיבוי אמיתי בדמו. */
+  crowdEnabled: boolean;
+  /** עקיפת כתובת דרך ‎?backupUrl=‎ (לבדיקות מול שרת מקומי), או null. */
+  backupUrlOverride: string | null;
+}
+
+/**
+ * מחזיר את קונפיגורציית הגיבוי למשחק, או null כשאין לגבות (אופליין/דמו/בלי
+ * קוד חדר/בלי id). מרכז את ההחלטה כדי שגם מסך ההגדרות (prefetch) וגם המשחק
+ * ישתמשו באותו כלל בדיוק.
+ */
+export function resolveBackupConfig(ctx: BackupContext): BackupConfig | null {
+  if (ctx.offline || ctx.gameId === '') return null;
+  if (ctx.backupUrlOverride !== null) {
+    return { baseUrl: ctx.backupUrlOverride, anonKey: DEFAULT_BACKUP_CONFIG.anonKey };
+  }
+  return ctx.hasRoom && !ctx.crowdEnabled ? DEFAULT_BACKUP_CONFIG : null;
+}
+
 export interface BackupUser {
   name: string;
   score: number;
@@ -140,6 +165,39 @@ export async function fetchBackup(cfg: BackupConfig, gameId: string): Promise<Ba
     debugLog('game', `שליפת גיבוי נכשלה (${String(err)})`);
     return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Prefetch: בדיקת הגיבוי מתחילה כבר במסך ההגדרות, במקביל לזמן שהמנחה שוהה בו,
+// כך שחלון "להמשיך מאותה נקודה?" מופיע מיד עם הכניסה למשחק — בלי להמתין ל-
+// round-trip (וקר-סטארט של Supabase Edge Function יכול לקחת כמה שניות).
+// ---------------------------------------------------------------------------
+const prefetchCache = new Map<string, Promise<BackupData | null>>();
+
+function prefetchKey(cfg: BackupConfig, gameId: string): string {
+  return `${cfg.baseUrl}::${gameId}`;
+}
+
+/** מתחיל את שליפת הגיבוי ברקע ושומר את ההבטחה למסירה חד-פעמית ל-getBackup. */
+export function prefetchBackup(cfg: BackupConfig, gameId: string): void {
+  const key = prefetchKey(cfg, gameId);
+  if (prefetchCache.has(key)) return; // כבר בדרך — לא כופלים בקשה
+  prefetchCache.set(key, fetchBackup(cfg, gameId));
+}
+
+/**
+ * מחזיר את תוצאת הגיבוי — מעדיף prefetch שכבר רץ (מסירה חד-פעמית, כדי שלא
+ * להחזיר תוצאה מיושנת בהמשך), אחרת שולף טרי. כך המשחק מקבל את התוצאה מיד
+ * כשההגדרות כבר הריצו prefetch, ועדיין עובד נכון גם בלי prefetch.
+ */
+export function getBackup(cfg: BackupConfig, gameId: string): Promise<BackupData | null> {
+  const key = prefetchKey(cfg, gameId);
+  const pending = prefetchCache.get(key);
+  if (pending !== undefined) {
+    prefetchCache.delete(key);
+    return pending;
+  }
+  return fetchBackup(cfg, gameId);
 }
 
 /** שמירת מצב חי. האובייקטים ממורים ל-JSON כנדרש. זורק בשגיאה כדי שהקורא יידע. */
