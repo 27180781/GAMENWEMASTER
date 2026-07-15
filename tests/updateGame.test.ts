@@ -48,6 +48,22 @@ describe('GameEngine.reset — התחלת משחק מחדש', () => {
     engine.dispatch({ type: 'VOTING_TIMEOUT', at: 30 });
     expect(engine.getState().scores).toEqual({ bob: 3 });
   });
+
+  it('resetScores מאפס ניקוד בלבד — מיקום, הצבעות והשקופיות שהושלמו נשמרים', () => {
+    const engine = new GameEngine(triviaGame());
+    playFirstSlideThenLandOnSecond(engine);
+    expect(engine.getState().scores).toEqual({ alice: 3 });
+
+    engine.resetScores();
+
+    const s = engine.getState();
+    expect(s.scores).toEqual({});
+    expect(s.answerTimes).toEqual({});
+    // מיקום, הצבעות והשקופיות שהושלמו נשמרים (בניגוד ל-reset המלא)
+    expect(s.currentSlideId).toBe(2);
+    expect(s.votesBySlide[1]).toEqual({ alice: 1 });
+    expect(s.slidesCompleted).toContain(1);
+  });
 });
 
 describe('GameEngine.updateGame — רענון תוכן חם', () => {

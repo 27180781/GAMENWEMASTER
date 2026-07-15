@@ -68,10 +68,14 @@ export const slideTypeSchema = z.enum(['trivia', 'survey', 'ans_images', 'media'
 const VOTABLE_TYPES = new Set(['trivia', 'survey', 'ans_images']);
 
 /**
- * שקופית "פונקציה" (type: "function") — כשמגיעים אליה היא מבצעת פעולת מערכת
- * (כרגע קריאת API בלבד) עם כל נתוני המשחק. הקונפיג נשמר ברמת השקופית עצמה
- * תחת המפתח `function` (לא בתוך setting). כל השדות סלחניים כדי לתמוך בקבצים
- * שנוצרו לפני שהוגדרו כל האפשרויות.
+ * שקופית "פונקציה" (type: "function") — כשמגיעים אליה היא מבצעת פעולת מערכת:
+ *   • action "api"    — שולחת את כל נתוני המשחק ל-webhook (function.api).
+ *   • action "screen" — מציגה במקום השקופית מסך מנצחים/מובילים
+ *                        (function.screen.type: "winners" | "leaderboard").
+ *   • action "score"  — פעולת ניקוד (function.score.operation: "reset_all"
+ *                        לאיפוס ניקוד כל המשתתפים; פתוח להרחבה).
+ * הקונפיג נשמר ברמת השקופית תחת `function` (לא בתוך setting). כל השדות
+ * סלחניים כדי לתמוך בקבצים שנוצרו לפני שהוגדרו כל האפשרויות.
  */
 const functionConfigSchema = z.object({
   action: z.string().default('api'),
@@ -79,6 +83,16 @@ const functionConfigSchema = z.object({
     .object({
       url: z.string().default(''),
       method: z.string().default('GET'),
+    })
+    .optional(),
+  screen: z
+    .object({
+      type: z.string().default('winners'),
+    })
+    .optional(),
+  score: z
+    .object({
+      operation: z.string().default('reset_all'),
     })
     .optional(),
 });
