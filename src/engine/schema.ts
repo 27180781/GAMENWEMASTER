@@ -74,6 +74,8 @@ const VOTABLE_TYPES = new Set(['trivia', 'survey', 'ans_images']);
  *                        (function.screen.type: "winners" | "leaderboard").
  *   • action "score"  — פעולת ניקוד (function.score.operation: "reset_all"
  *                        לאיפוס ניקוד כל המשתתפים; פתוח להרחבה).
+ *   • action "players"— הסרת/השארת משתתפים (function.players: mode/unit/
+ *                        amount/selection) כך שלא ישתתפו יותר.
  * הקונפיג נשמר ברמת השקופית תחת `function` (לא בתוך setting). כל השדות
  * סלחניים כדי לתמוך בקבצים שנוצרו לפני שהוגדרו כל האפשרויות.
  */
@@ -93,6 +95,16 @@ const functionConfigSchema = z.object({
   score: z
     .object({
       operation: z.string().default('reset_all'),
+    })
+    .optional(),
+  players: z
+    .object({
+      mode: z.string().default('remove'),
+      unit: z.string().default('percent'),
+      // amount נדרש רק ל-random/top/bottom; בבחירת "groups" הוא לא נשלח.
+      amount: emptyableNumber(0).optional(),
+      selection: z.string().default('random'),
+      groups: z.array(z.string()).optional().default([]),
     })
     .optional(),
 });

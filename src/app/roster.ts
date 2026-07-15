@@ -181,6 +181,19 @@ export function groupOf(roster: RosterData, playerId: string, categoryId: string
   return roster.memberships[playerId]?.[categoryId] ?? '';
 }
 
+/** שמות כל הקבוצות שהשחקן משויך אליהן (על פני כל הקטגוריות) — לפי שם הקבוצה. */
+export function playerGroupNames(roster: RosterData, playerId: string): string[] {
+  const byCat = roster.memberships[playerId];
+  if (byCat === undefined) return [];
+  const names: string[] = [];
+  for (const [categoryId, groupId] of Object.entries(byCat)) {
+    const category = roster.categories.find((c) => c.id === categoryId);
+    const group = category?.groups.find((g) => g.id === groupId);
+    if (group !== undefined) names.push(group.name);
+  }
+  return names;
+}
+
 /**
  * שיוך שחקן לקבוצה לפי *מספר* הקבוצה (1-based, לפי הסדר בקטגוריה) — כך שחקן
  * שמקיש ספרה במסך ההתחברות מצטרף לקבוצה המתאימה. "לחיצה אחרונה קובעת": קריאה
