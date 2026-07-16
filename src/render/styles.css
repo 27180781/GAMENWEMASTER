@@ -972,32 +972,40 @@ body {
   flex: none;
 }
 
-.winners-podium {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  width: 900px;
-  overflow: hidden;
+/* מסך המנצחים — פודיום: רק שם + ניקוד מעל רקע הפודיום (winnersMedia). כל מנצח
+   ממוקם במקומו הקבוע (left/top ב-inline), ונחשף אחד-אחד מהאחרון לראשון. */
+.podium-slot {
+  position: absolute;
+  width: 340px;
+  text-align: center;
+  transform: translate(-50%, 14px);
+  opacity: 0;
+  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+.podium-slot.is-shown { opacity: 1; transform: translate(-50%, 0); }
+
+.podium-name {
+  font-weight: 900;
+  font-size: 42px;
+  line-height: 1.05;
+  color: #fff;
+  text-shadow: 0 3px 10px rgba(0, 0, 0, 0.8), 0 0 6px rgba(0, 0, 0, 0.7);
+}
+.podium-score {
+  display: block;
+  margin-top: 8px;
+  font-weight: 900;
+  font-size: 36px;
+  color: #fff;
+  text-shadow: 0 3px 10px rgba(0, 0, 0, 0.8), 0 0 6px rgba(0, 0, 0, 0.7);
 }
 
-.winner {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  background: rgba(0, 0, 0, 0.4);
-  border-radius: 14px;
-  padding: 20px 32px;
-  font-size: 38px;
-  animation: winner-in 0.5s ease backwards;
-}
-
-.winner:nth-child(1) { animation-delay: 0.1s; border: 2px solid #facc15; font-size: 48px; }
-.winner:nth-child(2) { animation-delay: 0.25s; border: 2px solid #cbd5e1; }
-.winner:nth-child(3) { animation-delay: 0.4s; border: 2px solid #d97706; }
-
-@keyframes winner-in {
-  from { opacity: 0; transform: translateY(24px); }
+.winners-empty {
+  font-size: 44px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 3px 14px rgba(0, 0, 0, 0.6);
 }
 
 .winner-rank { font-weight: 800; min-width: 56px; }

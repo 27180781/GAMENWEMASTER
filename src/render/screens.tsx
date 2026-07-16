@@ -15,6 +15,21 @@ import type { RosterData } from '../app/roster.ts';
 const MEDALS: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
 
 /**
+ * מיקומי הפודיום במסך המנצחים — אחוזים ביחס לבמה, מכוונים לרקע הפודיום הסטנדרטי
+ * (winnersMedia). הסדר משמאל לימין הוא 4·2·1·3·5: מקום 1 במרכז (הגבוה), 2/3
+ * לצדדים, 4/5 בקצוות. מציגים רק שם + ניקוד — הפודיום עצמו מגיע מהרקע.
+ */
+const PODIUM_POS: Record<number, { x: number; y: number }> = {
+  1: { x: 50, y: 70 },
+  2: { x: 36, y: 73 },
+  3: { x: 64, y: 73 },
+  4: { x: 20.5, y: 75 },
+  5: { x: 79.5, y: 75 },
+};
+/** מספר מקומות הפודיום המרביים (לפי הרקע הסטנדרטי). */
+const MAX_PODIUM = 5;
+
+/**
  * צפיפות טבלת המובילים לפי כמות המובילים — מעט מובילים = כרטיסים גדולים עם
  * נוכחות; רבים = קומפקטי (ובעמודה צרה כשמוצג לצד דירוג קבוצתי).
  */
@@ -98,36 +113,53 @@ export function LobbyScreen({
   );
 }
 
+/**
+ * מסך המנצחים הסופי — פודיום. הרקע (winnersMedia) הוא תמונת הפודיום; אנחנו
+ * מניחים מעליו רק את השם והניקוד של כל מנצח, במיקום הקבוע של מקומו (PODIUM_POS).
+ * `revealed` קובע כמה מקומות כבר נחשפו — נחשפים אחד-אחד מהמקום האחרון לראשון
+ * (המנחה חושף עוד אחד בכל רווח). כשלא מסופק (למשל בשקופית פונקציה) — הכל גלוי.
+ */
 export function WinnersScreen({
   engine,
   nameOf = identityName,
+  revealed,
 }: {
   engine: GameEngine;
   nameOf?: NameResolver;
+  revealed?: number;
 }) {
   const setting = engine.getGame().setting;
-  const winners = engine.getWinners();
+  const winners = engine.getWinners(setting.multiWinners).slice(0, MAX_PODIUM);
+  const total = winners.length;
+  const shown = revealed ?? total; // ללא בקרת חשיפה — מציגים את כולם
   return (
-    <div className="screen winners-screen">
+    <div className="screen winners-screen winners-podium-screen">
       {setting.winnersMedia.src !== '' && (
         <div className="screen-background">
           <MediaPlayer src={setting.winnersMedia.src} asBackground />
         </div>
       )}
-      <div className="screen-content">
-        <h1 className="winners-title">🏆 הזוכים</h1>
-        <ol className="winners-podium">
-          {winners.map((winner, index) => (
-            <li key={winner.voterId} className={`winner winner--${index + 1}`}>
-              <span className="winner-rank">{index + 1}</span>
-              <FitText className="winner-name">{nameOf(winner.voterId)}</FitText>
-              <span className="winner-score">{winner.score} נק׳</span>
-            </li>
-          ))}
-          {winners.length === 0 && <li className="winner">אין משתתפים עם ניקוד</li>}
-        </ol>
-        <p className="opening-hint">רווח — לרשימה המלאה</p>
-      </div>
+      {total === 0 && (
+        <div className="screen-content">
+          <p className="winners-empty">אין משתתפים עם ניקוד</p>
+        </div>
+      )}
+      {winners.map((winner, index) => {
+        const rank = index + 1;
+        const pos = PODIUM_POS[rank] ?? PODIUM_POS[MAX_PODIUM]!;
+        // חשיפה מהאחרון לראשון: מקום r מופיע כשנחשפו לפחות (total − r + 1) מקומות.
+        const isShown = shown >= total - rank + 1;
+        return (
+          <div
+            key={winner.voterId}
+            className={`podium-slot${isShown ? ' is-shown' : ''}`}
+            style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
+          >
+            <FitText className="podium-name">{nameOf(winner.voterId)}</FitText>
+            <span className="podium-score">{winner.score} נק׳</span>
+          </div>
+        );
+      })}
     </div>
   );
 }

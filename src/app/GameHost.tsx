@@ -240,6 +240,10 @@ export function GameHost({
   const [leadersOverlay, setLeadersOverlay] = useState(false);
   /** מספר השאלות שהושלמו כשהוצגה לאחרונה טבלת המובילים האוטומטית — למניעת כפילות. */
   const autoLeadersShownAtRef = useRef(0);
+  /** כמה מקומות פודיום כבר נחשפו במסך המנצחים (חשיפה אחד-אחד מהאחרון לראשון). */
+  const [winnersRevealed, setWinnersRevealed] = useState(0);
+  const winnersRevealedRef = useRef(0);
+  winnersRevealedRef.current = winnersRevealed;
   /** חלונית דיבוג (F12) — מוצגת מעל הכל; ‏?debug=1 פותח אותה מראש. */
   const [debugOpen, setDebugOpen] = useState(
     () => new URLSearchParams(window.location.search).get('debug') === '1',
@@ -1046,6 +1050,11 @@ export function GameHost({
     }
   }, [stage, state.phase]);
 
+  // כניסה למסך המנצחים — מתחילים בלי אף מקום חשוף (המנחה חושף אחד-אחד ברווח).
+  useEffect(() => {
+    if (stage === 'winners') setWinnersRevealed(0);
+  }, [stage]);
+
   // קהל סינתטי: מזרים snapshots מצטברים בזמן הצבעה, לפי קונפיגורציית הדמו
   useEffect(() => {
     if (!votingActive || !syntheticCrowd) return;
@@ -1247,14 +1256,22 @@ export function GameHost({
       }
       if (stage === 'opening') setStage('playing');
       else if (stage === 'playing') advanceStep();
-      else if (stage === 'winners') setStage('winnersList');
+      else if (stage === 'winners') {
+        // חשיפת המנצחים אחד-אחד; אחרי שכולם נחשפו — מעבר לרשימה המלאה.
+        const podiumTotal = Math.min(engine.getWinners(engine.getGame().setting.multiWinners).length, 5);
+        if (winnersRevealedRef.current < podiumTotal) setWinnersRevealed((n) => n + 1);
+        else setStage('winnersList');
+      }
     };
     // חזרה שלב אחד אחורה — עובדת בכל מצב: בשקופית (stepBack), וגם במסכי הסיום
     // (רשימת מובילים → מנצחים → חזרה למשחק).
     const goBack = () => {
       if (stage === 'playing') stepBack();
-      else if (stage === 'winners') setStage('playing');
-      else if (stage === 'winnersList') setStage('winners');
+      else if (stage === 'winners') {
+        // מבטלים חשיפת מנצח אחרון; כשאין חשופים — חזרה למשחק.
+        if (winnersRevealedRef.current > 0) setWinnersRevealed((n) => Math.max(0, n - 1));
+        else setStage('playing');
+      } else if (stage === 'winnersList') setStage('winners');
     };
     const handleKey = (event: KeyboardEvent) => {
       const target = event.target;
@@ -1426,7 +1443,9 @@ export function GameHost({
             </span>
           </>
         )}
-        {stage === 'winners' && <WinnersScreen engine={engine} nameOf={nameOf} />}
+        {stage === 'winners' && (
+          <WinnersScreen engine={engine} nameOf={nameOf} revealed={winnersRevealed} />
+        )}
         {stage === 'winnersList' && (
           <WinnersListScreen engine={engine} nameOf={nameOf} roster={roster} />
         )}
