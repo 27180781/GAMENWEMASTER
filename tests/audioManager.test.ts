@@ -4,7 +4,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AudioManager } from '../src/app/AudioManager.ts';
+import { AudioManager, preloadAudio } from '../src/app/AudioManager.ts';
 
 class FakeAudio {
   static instances: FakeAudio[] = [];
@@ -81,5 +81,64 @@ describe('AudioManager — סאונד אחד בכל רגע', () => {
     manager.play('winners', 'w.mp3');
     manager.stopAll();
     expect(FakeAudio.instances.every((a) => !a.playing)).toBe(true);
+  });
+});
+
+describe('AudioManager — פתיחה אוטומטית לפי userActivation', () => {
+  it('אם ל-document כבר הייתה אינטראקציה — מנגן מיד בלי להמתין לאינטראקציה נוספת', () => {
+    FakeAudio.instances = [];
+    vi.stubGlobal('window', { addEventListener: () => {}, removeEventListener: () => {} });
+    vi.stubGlobal('Audio', FakeAudio as unknown as typeof Audio);
+    vi.stubGlobal('navigator', { userActivation: { hasBeenActive: true } });
+
+    const manager = new AudioManager(); // בלי לדמות keydown — אמור להיפתח מ-userActivation
+    manager.play('playersConnecting', 'connect.mp3', { loop: true });
+
+    const playing = FakeAudio.instances.filter((a) => a.playing);
+    expect(playing).toHaveLength(1);
+    expect(playing[0]!.src).toBe('connect.mp3');
+  });
+
+  it('בלי אינטראקציה קודמת — ממתין (לא מנגן עד אינטראקציה)', () => {
+    FakeAudio.instances = [];
+    vi.stubGlobal('window', { addEventListener: () => {}, removeEventListener: () => {} });
+    vi.stubGlobal('Audio', FakeAudio as unknown as typeof Audio);
+    vi.stubGlobal('navigator', { userActivation: { hasBeenActive: false } });
+
+    const manager = new AudioManager();
+    manager.play('playersConnecting', 'connect.mp3', { loop: true });
+
+    expect(FakeAudio.instances.every((a) => !a.playing)).toBe(true); // הכול בהמתנה
+  });
+});
+
+describe('preloadAudio — טעינה מוקדמת של קובצי סאונד', () => {
+  it('יוצר אלמנט אודיו לכל כתובת, מדלג על ריקים/כפילויות/blob/data', () => {
+    const created: { src: string; preload: string }[] = [];
+    class PreAudio {
+      preload = '';
+      private _src = '';
+      set src(v: string) {
+        this._src = v;
+        created.push({ src: v, preload: this.preload });
+      }
+      get src(): string {
+        return this._src;
+      }
+    }
+    vi.stubGlobal('Audio', PreAudio as unknown as typeof Audio);
+
+    preloadAudio([
+      'pre-a.mp3',
+      'pre-b.mp3',
+      'pre-a.mp3', // כפילות — מדולגת
+      '',           // ריק — מדולג
+      null,         // null — מדולג
+      'blob:xyz',   // אופליין — מדולג
+      'data:audio', // מוטמע — מדולג
+    ]);
+
+    expect(created.map((c) => c.src)).toEqual(['pre-a.mp3', 'pre-b.mp3']);
+    expect(created.every((c) => c.preload === 'auto')).toBe(true);
   });
 });
