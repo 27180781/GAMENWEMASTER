@@ -36,6 +36,34 @@ export function slidePreloadUrls(slide: Slide, triviaMediaSrc = ''): string[] {
   return urls;
 }
 
+// dedup מודול-לבל — כך שקריאה כבר במסך ההגדרות (head start למדיית הלובי
+// והשקופית הראשונה) לא תיצור כפילויות מול ה-prefetch שבתוך המשחק.
+const prefetchedMedia = new Set<string>();
+
+/** האם כדאי ל-prefetch את הכתובת (לא ריק/‏blob/‏data, ולא YouTube). */
+function isPrefetchable(src: string): boolean {
+  if (src === '' || src.startsWith('blob:') || src.startsWith('data:')) return false;
+  return classifyMediaUrl(src) !== 'youtube';
+}
+
+/**
+ * prefetch עצמאי (בלי מופע MediaPreloader) — נועד לרוץ כבר במסך ההגדרות כדי
+ * לחמם את מדיית הלובי (רקע פתיחה + לוגו) ואת השקופית הראשונה, כך שהמסך הראשון
+ * מופיע מיד עם הכניסה למשחק. סלחני לכתובות ריקות/כפולות/לא-ניתנות-ל-prefetch.
+ */
+export function prefetchMedia(urls: ReadonlyArray<string>): void {
+  if (typeof document === 'undefined') return;
+  for (const raw of urls) {
+    const src = raw.trim();
+    if (!isPrefetchable(src) || prefetchedMedia.has(src)) continue;
+    prefetchedMedia.add(src);
+    const link = document.createElement('link');
+    link.rel = 'prefetch';
+    link.href = src;
+    document.head.appendChild(link);
+  }
+}
+
 export class MediaPreloader {
   private readonly prefetched = new Set<string>();
   private readonly links = new Map<string, HTMLLinkElement>();

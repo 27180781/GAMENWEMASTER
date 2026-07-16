@@ -2,8 +2,8 @@
  * בדיקות ל-slidePreloadUrls — אילו כתובות מדיה נטענות מראש לשקופית.
  */
 
-import { describe, expect, it } from 'vitest';
-import { slidePreloadUrls } from '../src/app/mediaPreloader.ts';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { prefetchMedia, slidePreloadUrls } from '../src/app/mediaPreloader.ts';
 import { fourAnswers, makeGame, rawSlide } from './helpers.ts';
 
 function slide(spec: Parameters<typeof rawSlide>[0]) {
@@ -66,5 +66,40 @@ describe('slidePreloadUrls', () => {
       questionSrc: 'https://cdn/q.png',
     });
     expect(slidePreloadUrls(s, '')).toEqual(['https://cdn/q.png']);
+  });
+});
+
+describe('prefetchMedia', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  function fakeHead() {
+    const appended: { rel: string; href: string }[] = [];
+    const head = { appendChild: (el: { rel: string; href: string }) => appended.push(el) };
+    vi.stubGlobal('document', {
+      createElement: () => ({ rel: '', href: '' }),
+      head,
+    });
+    return appended;
+  }
+
+  it('יוצר <link rel=prefetch> לכל כתובת תקינה, מדלג על ריק/blob/data/YouTube', () => {
+    const appended = fakeHead();
+    prefetchMedia([
+      'https://cdn/pm-a.png',
+      'https://cdn/pm-b.mp4',
+      '',                       // ריק — מדולג
+      'blob:http://x/1',        // אופליין — מדולג
+      'data:image/png;base64,A',// מוטמע — מדולג
+      'https://youtu.be/xyzpm', // YouTube — לא ניתן ל-prefetch
+    ]);
+    expect(appended.map((l) => l.href)).toEqual(['https://cdn/pm-a.png', 'https://cdn/pm-b.mp4']);
+    expect(appended.every((l) => l.rel === 'prefetch')).toBe(true);
+  });
+
+  it('לא מייצר כפילויות לאותה כתובת (dedup מודול-לבל)', () => {
+    const appended = fakeHead();
+    prefetchMedia(['https://cdn/pm-dup.png']);
+    prefetchMedia(['https://cdn/pm-dup.png', 'https://cdn/pm-new.png']);
+    expect(appended.map((l) => l.href)).toEqual(['https://cdn/pm-dup.png', 'https://cdn/pm-new.png']);
   });
 });

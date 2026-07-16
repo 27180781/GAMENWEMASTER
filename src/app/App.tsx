@@ -18,6 +18,7 @@ import { themeStyle } from '../render/theme.ts';
 import { GameHost } from './GameHost.tsx';
 import { preloadAudio } from './AudioManager.ts';
 import { prefetchBackup, resolveBackupConfig } from './backup.ts';
+import { prefetchMedia, slidePreloadUrls } from './mediaPreloader.ts';
 import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.ts';
 import { openPushChannel } from './pushChannel.ts';
 import { loadRoster, mergeGameUsers, parseGameUsers, saveRoster } from './roster.ts';
@@ -161,6 +162,17 @@ export function App() {
     if (pendingGame === null) return;
     const s = pendingGame.setting.sound;
     preloadAudio([s.playersConnectingMediaSound.src, s.showQuestionMediaSound.src]);
+  }, [pendingGame]);
+
+  // Head start למדיה: מחממים כבר במסך ההגדרות את מדיית הלובי (רקע פתיחה + לוגו)
+  // ואת מדיית השקופית הראשונה — כך שהמסך הראשון מופיע מיד, בלי "קפיצה" של הרקע.
+  useEffect(() => {
+    if (pendingGame === null) return;
+    const s = pendingGame.setting;
+    const urls = [s.gameMedia.src, s.logo.src];
+    const first = pendingGame.questions[0];
+    if (first) urls.push(...slidePreloadUrls(first, s.triviaMedia.src));
+    prefetchMedia(urls);
   }, [pendingGame]);
 
   /** עדכון הגדרות + שמירת דריסת המעברים האוטומטיים ל-localStorage (פעולת מפעיל). */
