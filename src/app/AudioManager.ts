@@ -30,6 +30,32 @@ interface PendingPlay {
   loop: boolean;
 }
 
+// מטמון מודול-לבל של אלמנטי אודיו שנטענו מראש — נשמרים כדי שלא ייאספו ע"י ה-GC,
+// כך שקובצי הסאונד יישארו במטמון הדפדפן והניגון בפועל יהיה מיידי.
+const preloadedAudio = new Map<string, HTMLAudioElement>();
+
+/**
+ * טעינה מוקדמת של קובצי סאונד (בלי לנגן) — מושכת אותם לזיכרון מראש כדי שכשיגיע
+ * רגע הניגון הם כבר במטמון והקול יוצא מיד. אפשר לקרוא כבר במסך ההגדרות (head
+ * start). מדלגת על ריקים/כפילויות ו-blob:/data: (אופליין — כבר בזיכרון).
+ */
+export function preloadAudio(srcs: ReadonlyArray<string | null | undefined>): void {
+  if (typeof Audio === 'undefined') return;
+  for (const raw of srcs) {
+    const src = (raw ?? '').trim();
+    if (src === '' || preloadedAudio.has(src)) continue;
+    if (src.startsWith('blob:') || src.startsWith('data:')) continue;
+    try {
+      const audio = new Audio();
+      audio.preload = 'auto';
+      audio.src = src;
+      preloadedAudio.set(src, audio);
+    } catch {
+      /* סביבה בלי Audio — מתעלמים */
+    }
+  }
+}
+
 export class AudioManager {
   private readonly active = new Map<SoundChannel, HTMLAudioElement>();
   private readonly pending = new Map<SoundChannel, PendingPlay>();
@@ -40,6 +66,12 @@ export class AudioManager {
   private applauseSource: AudioBufferSourceNode | null = null;
 
   constructor() {
+    // אם ל-document כבר הייתה אינטראקציה (sticky activation) — למשל הקליק על
+    // "התחל משחק" שהוביל לכאן — הדפדפן כבר מתיר ניגון, אז פותחים מיד בלי להמתין
+    // לאינטראקציה נוספת. (navigator.userActivation לא קיים בכל סביבה — נזהרים.)
+    if (typeof navigator !== 'undefined' && navigator.userActivation?.hasBeenActive === true) {
+      this.unlocked = true;
+    }
     const unlock = () => {
       this.unlocked = true;
       window.removeEventListener('pointerdown', unlock);

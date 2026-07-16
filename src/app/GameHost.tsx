@@ -32,7 +32,7 @@ import { Stage } from '../render/Stage.tsx';
 import { themeStyle } from '../render/theme.ts';
 import type { TimerView } from '../render/TimerRing.tsx';
 import { SettingsScreen } from '../render/SettingsScreen.tsx';
-import { AudioManager } from './AudioManager.ts';
+import { AudioManager, preloadAudio } from './AudioManager.ts';
 import { extractHostVote } from './hostRemote.ts';
 import { MediaPreloader, slidePreloadUrls } from './mediaPreloader.ts';
 import {
@@ -612,6 +612,21 @@ export function GameHost({
   }, [state.currentSlideIndex, game, preloader]);
 
   useEffect(() => () => preloader.dispose(), [preloader]);
+
+  // טעינה מוקדמת של קובצי הסאונד של המשחק — כדי שהניגון (התחברות/שאלה/טיימר/
+  // חשיפה/זוכים) יהיה מיידי, בלי המתנה להורדה מהרשת ברגע הראשון שצריך לנגן.
+  useEffect(() => {
+    const s = game.setting.sound;
+    preloadAudio([
+      s.playersConnectingMediaSound.src,
+      s.showQuestionMediaSound.src,
+      s.timerMediaSound.src,
+      s.inShowAnsMediaSound.src,
+      s.winnersMediaSound.src,
+      s.winnersListMediaSound.src,
+      s.genericMediaSound.src,
+    ]);
+  }, [game]);
 
   // רענון תוכן חם ("פוש"): כשמגיע אובייקט game חדש — מחליפים את התוכן במנוע
   // בלי remount, כדי לשמר ניקוד/מיקום. שלבי החשיפה של השקופית הנוכחית נשמרים;

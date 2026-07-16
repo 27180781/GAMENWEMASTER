@@ -16,6 +16,7 @@ import { SettingsScreen } from '../render/SettingsScreen.tsx';
 import { Stage } from '../render/Stage.tsx';
 import { themeStyle } from '../render/theme.ts';
 import { GameHost } from './GameHost.tsx';
+import { preloadAudio } from './AudioManager.ts';
 import { prefetchBackup, resolveBackupConfig } from './backup.ts';
 import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.ts';
 import { openPushChannel } from './pushChannel.ts';
@@ -153,6 +154,14 @@ export function App() {
     });
     if (cfg !== null) prefetchBackup(cfg, pendingGame.id);
   }, [pendingGame, offline, settings.crowdEnabled, backupUrlOverride]);
+
+  // Head start לסאונד: מושכים את סאונד ההתחברות והשאלה כבר במסך ההגדרות, כך
+  // שברגע הכניסה ללובי הקול יוצא מיד (בלי להמתין להורדה מהרשת).
+  useEffect(() => {
+    if (pendingGame === null) return;
+    const s = pendingGame.setting.sound;
+    preloadAudio([s.playersConnectingMediaSound.src, s.showQuestionMediaSound.src]);
+  }, [pendingGame]);
 
   /** עדכון הגדרות + שמירת דריסת המעברים האוטומטיים ל-localStorage (פעולת מפעיל). */
   const persistAndSetSettings = useCallback(
