@@ -71,6 +71,31 @@ describe('autoTransition — ברירת מחדל ותקינות', () => {
   });
 });
 
+describe('טבלת מובילים — winnersListCount + showWinnersListAfter', () => {
+  it('קובץ בלי winnersListCount — ברירת מחדל 5', () => {
+    const game = makeGame([rawSlide({ id: 1, type: 'trivia', answers: fourAnswers(1) })]);
+    expect(game.setting.winnersListCount).toBe(5);
+  });
+
+  it('winnersListCount מהקובץ נשמר; "" מנורמל ל-5', () => {
+    const raw = rawGame([rawSlide({ id: 1, type: 'trivia', answers: fourAnswers(1) })], {});
+    (raw.setting as Record<string, unknown>).winnersListCount = 8;
+    expect(parseGameFile(raw).setting.winnersListCount).toBe(8);
+    (raw.setting as Record<string, unknown>).winnersListCount = '';
+    expect(parseGameFile(raw).setting.winnersListCount).toBe(5);
+  });
+
+  it('showWinnersListAfter — מספר נשמר; null/""/חסר = מכובה (null)', () => {
+    const raw = rawGame([rawSlide({ id: 1, type: 'trivia', answers: fourAnswers(1) })], {});
+    (raw.setting as Record<string, unknown>).showWinnersListAfter = 3;
+    expect(parseGameFile(raw).setting.showWinnersListAfter).toBe(3);
+    (raw.setting as Record<string, unknown>).showWinnersListAfter = '';
+    expect(parseGameFile(raw).setting.showWinnersListAfter).toBeNull();
+    delete (raw.setting as Record<string, unknown>).showWinnersListAfter;
+    expect(parseGameFile(raw).setting.showWinnersListAfter).toBeNull();
+  });
+});
+
 describe('שגיאות ולידציה בעברית עם מיקום מדויק', () => {
   it('שדה מספרי פגום בשקופית — הודעה עם מספר שקופית ו-id', () => {
     const raw = loadFixtureRaw('hadassah-ozen.json') as {

@@ -34,6 +34,7 @@ import type { TimerView } from '../render/TimerRing.tsx';
 import { SettingsScreen } from '../render/SettingsScreen.tsx';
 import { AudioManager, preloadAudio } from './AudioManager.ts';
 import { extractHostVote } from './hostRemote.ts';
+import { completedQuestionCount, shouldShowLeaderboard } from './leaderboardSchedule.ts';
 import { MediaPreloader, slidePreloadUrls } from './mediaPreloader.ts';
 import {
   assignGroupByNumber,
@@ -260,6 +261,8 @@ export function GameHost({
   const syntheticCrowd = settings.crowdEnabled;
   /** מסך מובילים באמצע משחק (פקודת מנחה 1) — שכבה מעל, המשחק ממשיך מתחת. */
   const [leadersOverlay, setLeadersOverlay] = useState(false);
+  /** מספר השאלות שהושלמו כשהוצגה לאחרונה טבלת המובילים האוטומטית — למניעת כפילות. */
+  const autoLeadersShownAtRef = useRef(0);
   /** חלונית דיבוג (F12) — מוצגת מעל הכל; ‏?debug=1 פותח אותה מראש. */
   const [debugOpen, setDebugOpen] = useState(
     () => new URLSearchParams(window.location.search).get('debug') === '1',
@@ -411,6 +414,8 @@ export function GameHost({
       try {
         engine.restore(backupToSnapshot(game, data));
         startedAtRef.current = data.meta.startedAt || Date.now();
+        // מסנכרנים את מונה טבלת המובילים למצב המשוחזר, כדי שלא תקפוץ מיד בשחזור.
+        autoLeadersShownAtRef.current = completedQuestionCount(game, engine.getState().slidesCompleted);
         if (rosterRef.current.categories.length === 0 && rosterRef.current.players.length === 0) {
           const restored = rosterFromBackup(data);
           if (restored.players.length > 0 || restored.categories.length > 0) updateRoster(restored);
@@ -1212,6 +1217,23 @@ export function GameHost({
     return () => audio.stop('winnersList');
   }, [leadersOverlay, audio, sounds]);
 
+  // טבלת מובילים אוטומטית (setting.showWinnersListAfter) — פעם בכל N שאלות
+  // שהושלמו קופצת אוטומטית שכבת המובילים (המנחה סוגר אותה ברווח/0 וממשיך).
+  // ה-ref מונע הצגה חוזרת לאותה כמות שאלות (ולא קופץ על שקופיות לא-מצביעות).
+  useEffect(() => {
+    if (stage !== 'playing' || state.phase === 'ended') return;
+    const completed = completedQuestionCount(engine.getGame(), state.slidesCompleted);
+    if (completed === autoLeadersShownAtRef.current) return; // אין שאלה חדשה שהושלמה
+    if (shouldShowLeaderboard(completed, engine.getGame().setting.showWinnersListAfter)) {
+      autoLeadersShownAtRef.current = completed;
+      setLeadersOverlay(true);
+      debugLog('game', `טבלת מובילים אוטומטית אחרי ${completed} שאלות`);
+    } else {
+      // מעדכנים את המונה גם בלי הצגה, כדי שספירה עתידית תשווה מול הכמות הנוכחית
+      autoLeadersShownAtRef.current = completed;
+    }
+  }, [state.slidesCompleted, state.phase, stage, engine]);
+
   // דמו: במסך התחברות קבוצות מדמים הצטרפויות אקראיות (בלי קליקר אמיתי) כדי
   // שאפשר יהיה להדגים ולבדוק את המסך. במשחק אמיתי ההקשות מגיעות מהסוקט.
   useEffect(() => {
@@ -1353,6 +1375,7 @@ export function GameHost({
   const restartGame = useCallback(() => {
     engine.reset();
     removedRef.current = new Set(); // התחלה מחדש — משתתפים שהוסרו יכולים לחזור
+    autoLeadersShownAtRef.current = 0; // מונה טבלת המובילים האוטומטית מתאפס
     setStage('opening');
     setReveal(NO_REVEAL);
     setLeadersOverlay(false);

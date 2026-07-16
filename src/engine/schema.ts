@@ -177,8 +177,17 @@ const autoTransitionSchema = z
 export const globalSettingsSchema = z.object({
   titleThroughoutGame: z.string(),
   ansIsNumber: z.boolean(),
+  // כמה זוכים מוצגים במסך המנצחים הסופי (בסוף המשחק).
   multiWinners: z.number(),
-  showWinnersListAfter: z.number().nullable(),
+  // פעם בכמה שאלות להציג אוטומטית את טבלת המובילים באמצע המשחק.
+  // null / '' / חסר = מכובה; מספר = כל N שאלות.
+  showWinnersListAfter: z
+    .union([z.number(), z.literal(''), z.null()])
+    .optional()
+    .transform((v) => (typeof v === 'number' ? v : null)),
+  // כמה מובילים מוצגים בטבלת המובילים בכל הצגה (נפרד מ-multiWinners). ברירת
+  // מחדל 5, כדי שקבצים ישנים בלי השדה ימשיכו לעבוד.
+  winnersListCount: emptyableNumber(5).optional().default(5),
   mainColor: hexColor,
   secondaryColor: hexColor,
   gameMedia: mediaRef,
