@@ -128,8 +128,8 @@ export function WinnersListScreen({
   roster?: RosterData;
 }) {
   const setting = engine.getGame().setting;
-  // 20 שורות בשתי עמודות — נכנס בבמה הקבועה בלי גלילה
-  const winners = engine.getWinners(20);
+  // מספר המובילים כפי שהוגדר בקובץ המשחק (winnersListCount; ברירת מחדל 5).
+  const winners = engine.getWinners(setting.winnersListCount);
   const state = engine.getState();
   const showGroups = roster !== undefined && hasGroupData(roster);
   const categories = showGroups ? roster.categories.filter((c) => c.groups.length > 0) : [];
