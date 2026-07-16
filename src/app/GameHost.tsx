@@ -615,6 +615,7 @@ export function GameHost({
 
   // טעינה מוקדמת של קובצי הסאונד של המשחק — כדי שהניגון (התחברות/שאלה/טיימר/
   // חשיפה/זוכים) יהיה מיידי, בלי המתנה להורדה מהרשת ברגע הראשון שצריך לנגן.
+  // (genericMediaSound אינו מנוגן בשום שלב — לכן לא טוענים אותו מראש.)
   useEffect(() => {
     const s = game.setting.sound;
     preloadAudio([
@@ -624,7 +625,6 @@ export function GameHost({
       s.inShowAnsMediaSound.src,
       s.winnersMediaSound.src,
       s.winnersListMediaSound.src,
-      s.genericMediaSound.src,
     ]);
   }, [game]);
 
