@@ -23,6 +23,7 @@ import {
   type VoteSnapshot,
 } from '../engine/index.ts';
 import { SocketVoteAdapter } from './socketAdapter.ts';
+import { avatarColor, railInitial } from '../render/avatar.ts';
 import { LobbyScreen, WinnersListScreen, WinnersScreen } from '../render/screens.tsx';
 import { OperatorMenu } from '../render/OperatorMenu.tsx';
 import type { RailPlayer, RevealState } from '../render/QuestionSlide.tsx';
@@ -82,30 +83,6 @@ const RAIL_MAX = 9;
 const VOTE_THROTTLE_MS = 140;
 /** השהיה בין שלבי מעבר אוטומטי (הצגת שאלה/תשובה · פתיחת הצבעה · חשיפת תשובה). */
 const AUTO_STEP_MS = 1000;
-/** פלטת צבעים לאווטרים במסילת המצטרפים (מהעיצוב). */
-const RAIL_COLORS = [
-  '#FF6B6B',
-  '#4ECDC4',
-  '#FFD93D',
-  '#6BCB77',
-  '#A66CFF',
-  '#FF9F45',
-  '#4D96FF',
-  '#FF6FB5',
-  '#22D3EE',
-];
-
-function hashId(id: string): number {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return h;
-}
-
-/** האות הראשונה להצגה באווטר (מהשם, אחרת '?'). */
-function railInitial(name: string): string {
-  const trimmed = name.trim();
-  return trimmed === '' ? '?' : [...trimmed][0]!;
-}
 
 interface GameHostProps {
   game: GameFile;
@@ -280,7 +257,7 @@ export function GameHost({
     () =>
       answerers.map((id) => {
         const name = nameOf(id);
-        return { id, name, initial: railInitial(name), color: RAIL_COLORS[hashId(id) % RAIL_COLORS.length]! };
+        return { id, name, initial: railInitial(name), color: avatarColor(id) };
       }),
     [answerers, nameOf],
   );
@@ -290,7 +267,7 @@ export function GameHost({
     () =>
       correctAnswerers.slice(0, 5).map((id) => {
         const name = nameOf(id);
-        return { id, name, initial: railInitial(name), color: RAIL_COLORS[hashId(id) % RAIL_COLORS.length]! };
+        return { id, name, initial: railInitial(name), color: avatarColor(id) };
       }),
     [correctAnswerers, nameOf],
   );
@@ -310,7 +287,7 @@ export function GameHost({
     () =>
       connectedIds.map((id) => {
         const name = nameOf(id);
-        return { id, name, initial: railInitial(name), color: RAIL_COLORS[hashId(id) % RAIL_COLORS.length]! };
+        return { id, name, initial: railInitial(name), color: avatarColor(id) };
       }),
     [connectedIds, nameOf],
   );

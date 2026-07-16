@@ -1009,24 +1009,145 @@ body {
 }
 .winner-score { font-weight: 700; }
 
-.winners-list {
+/* ---- טבלת המובילים: כרטיסי מובילים עם מדליות ל-3 הראשונים ---- */
+.leaders-board {
   list-style: none;
-  columns: 2;
-  column-gap: 80px;
-  width: 1400px;
-  max-height: 760px;
-  overflow: hidden;
-  font-size: 30px;
-}
-
-.winners-list li {
   display: flex;
+  flex-direction: column;
   gap: 16px;
-  padding: 9px 0;
-  break-inside: avoid;
+  width: 860px;
+  max-width: 100%;
+  max-height: 820px;
+  margin: 0 auto;
 }
 
-.winners-list .winner-name { flex: 1; }
+.leader-card {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 16px 30px;
+  border-radius: 20px;
+  background: rgba(6, 3, 15, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(6px);
+  animation: leaderIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes leaderIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+/* דירוג — מדליה ל-3 הראשונים, אחרת תג עגול עם המספר */
+.leader-rank {
+  flex: none;
+  width: 56px;
+  text-align: center;
+  font-size: 44px;
+  font-weight: 900;
+  line-height: 1;
+}
+.leader-card:not(.leader-card--top) .leader-rank {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+/* אווטר צבעוני עם האות הראשונה */
+.leader-avatar {
+  flex: none;
+  width: 68px;
+  height: 68px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 900;
+  font-size: 34px;
+  border: 3px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.leader-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 800;
+  font-size: 40px;
+  color: #fff;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+}
+.leader-score {
+  flex: none;
+  font-weight: 900;
+  font-size: 46px;
+  color: var(--secondary-color, #ffd23f);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+}
+.leader-score small { font-size: 0.5em; font-weight: 700; opacity: 0.85; }
+
+.leaders-empty {
+  text-align: center;
+  font-size: 34px;
+  color: #fff;
+  opacity: 0.8;
+  padding: 40px 0;
+}
+
+/* הדגשת 3 המקומות הראשונים — זהב/כסף/ארד */
+.leader-card--r1 {
+  border-color: rgba(255, 213, 74, 0.9);
+  background: linear-gradient(100deg, rgba(255, 213, 74, 0.28), rgba(6, 3, 15, 0.46) 60%);
+  box-shadow: 0 0 34px rgba(255, 200, 60, 0.34), 0 10px 30px rgba(0, 0, 0, 0.34);
+}
+.leader-card--r2 {
+  border-color: rgba(214, 223, 235, 0.85);
+  background: linear-gradient(100deg, rgba(214, 223, 235, 0.24), rgba(6, 3, 15, 0.46) 60%);
+}
+.leader-card--r3 {
+  border-color: rgba(224, 150, 108, 0.85);
+  background: linear-gradient(100deg, rgba(224, 150, 108, 0.24), rgba(6, 3, 15, 0.46) 60%);
+}
+
+/* צפיפות לפי כמות המובילים — מעט = גדול ומרשים, רבים = קומפקטי */
+.leaders-board--xl { width: 900px; gap: 26px; }
+.leaders-board--xl .leader-card { padding: 26px 44px; gap: 30px; }
+.leaders-board--xl .leader-rank { width: 72px; font-size: 60px; }
+.leaders-board--xl .leader-avatar { width: 96px; height: 96px; font-size: 46px; }
+.leaders-board--xl .leader-name { font-size: 56px; }
+.leaders-board--xl .leader-score { font-size: 60px; }
+
+.leaders-board--lg { width: 840px; gap: 18px; }
+.leaders-board--lg .leader-card { padding: 18px 36px; }
+.leaders-board--lg .leader-name { font-size: 46px; }
+.leaders-board--lg .leader-score { font-size: 50px; }
+
+.leaders-board--md { width: 780px; gap: 12px; }
+.leaders-board--md .leader-card { padding: 12px 28px; gap: 18px; }
+.leaders-board--md .leader-rank { width: 46px; font-size: 36px; }
+.leaders-board--md .leader-avatar { width: 56px; height: 56px; font-size: 28px; border-width: 2px; }
+.leaders-board--md .leader-name { font-size: 34px; }
+.leaders-board--md .leader-score { font-size: 38px; }
+
+/* הרבה מובילים — שתי עמודות קומפקטיות */
+.leaders-board--sm {
+  width: 1360px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 40px;
+}
+.leaders-board--sm .leader-card { padding: 8px 20px; gap: 14px; }
+.leaders-board--sm .leader-rank { width: 40px; height: 40px; font-size: 26px; }
+.leaders-board--sm .leader-card:not(.leader-card--top) .leader-rank { width: 38px; height: 38px; font-size: 20px; }
+.leaders-board--sm .leader-avatar { width: 46px; height: 46px; font-size: 24px; border-width: 2px; }
+.leaders-board--sm .leader-name { font-size: 28px; }
+.leaders-board--sm .leader-score { font-size: 30px; }
 
 /* פריסת טבלת הניקוד — אישי בלבד, או אישי + קבוצתי זה לצד זה */
 .winners-layout { display: flex; justify-content: center; gap: 60px; width: 100%; min-height: 0; }
@@ -1035,11 +1156,11 @@ body {
 .winners-col-title { font-size: 32px; font-weight: 800; color: var(--secondary-color, #fff); }
 
 /* כשמוצג גם דירוג קבוצתי — הדירוג האישי צר יותר (עמודה אחת) */
-.winners-layout--with-groups .winners-list {
-  columns: 1;
-  width: 680px;
-  font-size: 26px;
-  max-height: 720px;
+.winners-layout--with-groups .leaders-board,
+.winners-layout--with-groups .leaders-board--sm {
+  width: 660px;
+  display: flex;
+  grid-template-columns: none;
 }
 
 .group-cat { margin-bottom: 18px; }
