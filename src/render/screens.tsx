@@ -3,12 +3,27 @@
  */
 
 import type { GameEngine } from '../engine/index.ts';
+import { avatarColor, railInitial } from './avatar.ts';
 import { FitText } from './FitText.tsx';
 import { MediaPlayer } from './MediaPlayer.tsx';
 import { QrCode } from './QrCode.tsx';
 import type { RailPlayer } from './QuestionSlide.tsx';
 import { groupStandings, hasGroupData } from '../app/groupScore.ts';
 import type { RosterData } from '../app/roster.ts';
+
+/** מדליה ל-3 המקומות הראשונים; שאר המקומות מציגים את המספר בתג. */
+const MEDALS: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
+
+/**
+ * צפיפות טבלת המובילים לפי כמות המובילים — מעט מובילים = כרטיסים גדולים עם
+ * נוכחות; רבים = קומפקטי (ובעמודה צרה כשמוצג לצד דירוג קבוצתי).
+ */
+function leadersDensity(count: number): 'xl' | 'lg' | 'md' | 'sm' {
+  if (count <= 3) return 'xl';
+  if (count <= 6) return 'lg';
+  if (count <= 10) return 'md';
+  return 'sm';
+}
 
 /** ברירת מחדל: אם לא סופק מרשם שמות — מציגים את המספר עצמו. */
 type NameResolver = (voterId: string) => string;
@@ -145,14 +160,28 @@ export function WinnersListScreen({
         <div className={`winners-layout${showGroups ? ' winners-layout--with-groups' : ''}`}>
           <div className="winners-col">
             <h2 className="winners-col-title">דירוג אישי</h2>
-            <ol className="winners-list">
-              {winners.map((winner, index) => (
-                <li key={winner.voterId}>
-                  <span className="winner-rank">{index + 1}.</span>
-                  <FitText className="winner-name">{nameOf(winner.voterId)}</FitText>
-                  <span className="winner-score">{winner.score}</span>
-                </li>
-              ))}
+            <ol className={`leaders-board leaders-board--${leadersDensity(winners.length)}`}>
+              {winners.map((winner, index) => {
+                const rank = index + 1;
+                const name = nameOf(winner.voterId);
+                return (
+                  <li
+                    key={winner.voterId}
+                    className={`leader-card${rank <= 3 ? ` leader-card--top leader-card--r${rank}` : ''}`}
+                  >
+                    <span className="leader-rank">{MEDALS[rank] ?? rank}</span>
+                    <span className="leader-avatar" style={{ background: avatarColor(winner.voterId) }}>
+                      {railInitial(name)}
+                    </span>
+                    <FitText className="leader-name">{name}</FitText>
+                    <span className="leader-score">
+                      {winner.score}
+                      <small> נק׳</small>
+                    </span>
+                  </li>
+                );
+              })}
+              {winners.length === 0 && <li className="leaders-empty">אין משתתפים עם ניקוד</li>}
             </ol>
           </div>
           {showGroups && (
