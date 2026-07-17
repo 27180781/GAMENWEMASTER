@@ -24,7 +24,7 @@ import {
 } from '../engine/index.ts';
 import { SocketVoteAdapter } from './socketAdapter.ts';
 import { avatarColor, railInitial } from '../render/avatar.ts';
-import { LobbyScreen, WinnersListScreen, WinnersScreen } from '../render/screens.tsx';
+import { AllScoresScreen, LobbyScreen, WinnersListScreen, WinnersScreen } from '../render/screens.tsx';
 import { OperatorMenu } from '../render/OperatorMenu.tsx';
 import type { RailPlayer, RevealState } from '../render/QuestionSlide.tsx';
 import { RosterPanel } from '../render/RosterPanel.tsx';
@@ -69,7 +69,7 @@ import { DebugOverlay } from '../render/DebugOverlay.tsx';
 import { debugLog } from './debugLog.ts';
 import { useEngineState } from './useEngineState.ts';
 
-type HostStage = 'opening' | 'playing' | 'winners' | 'winnersList';
+type HostStage = 'opening' | 'playing' | 'winners' | 'scoreboard';
 
 const NO_REVEAL: RevealState = { questionShown: false, answersShown: 0, revealCorrect: false };
 
@@ -417,7 +417,7 @@ export function GameHost({
     // אחרי game-over הגיבוי ננעל — שמירה נוספת (completed:false) הייתה "פותחת"
     // אותו מחדש בשרת וגורמת להצעת המשך במשחק שכבר הסתיים. לכן לא שומרים יותר.
     if (gameEndedRef.current) return;
-    if (stage !== 'playing' && stage !== 'winners' && stage !== 'winnersList') return;
+    if (stage !== 'playing' && stage !== 'winners' && stage !== 'scoreboard') return;
     if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = window.setTimeout(() => {
       void saveBackupNowRef.current().catch((err) => debugLog('game', `שמירת גיבוי נכשלה (${String(err)})`));
@@ -1189,7 +1189,7 @@ export function GameHost({
       audio.play('winners', sounds.winnersMediaSound.src);
       return () => audio.stop('winners');
     }
-    if (stage === 'winnersList') {
+    if (stage === 'scoreboard') {
       audio.play('winnersList', sounds.winnersListMediaSound.src);
       return () => audio.stop('winnersList');
     }
@@ -1257,21 +1257,21 @@ export function GameHost({
       if (stage === 'opening') setStage('playing');
       else if (stage === 'playing') advanceStep();
       else if (stage === 'winners') {
-        // חשיפת המנצחים אחד-אחד; אחרי שכולם נחשפו — מעבר לרשימה המלאה.
+        // חשיפת המנצחים אחד-אחד; אחרי שכולם נחשפו — מעבר למסך ניקוד כל המשתתפים.
         const podiumTotal = Math.min(engine.getWinners(engine.getGame().setting.multiWinners).length, 5);
         if (winnersRevealedRef.current < podiumTotal) setWinnersRevealed((n) => n + 1);
-        else setStage('winnersList');
+        else setStage('scoreboard');
       }
     };
     // חזרה שלב אחד אחורה — עובדת בכל מצב: בשקופית (stepBack), וגם במסכי הסיום
-    // (רשימת מובילים → מנצחים → חזרה למשחק).
+    // (ניקוד כל המשתתפים → מנצחים → חזרה למשחק).
     const goBack = () => {
       if (stage === 'playing') stepBack();
       else if (stage === 'winners') {
         // מבטלים חשיפת מנצח אחרון; כשאין חשופים — חזרה למשחק.
         if (winnersRevealedRef.current > 0) setWinnersRevealed((n) => Math.max(0, n - 1));
         else setStage('playing');
-      } else if (stage === 'winnersList') setStage('winners');
+      } else if (stage === 'scoreboard') setStage('winners');
     };
     const handleKey = (event: KeyboardEvent) => {
       const target = event.target;
@@ -1446,9 +1446,7 @@ export function GameHost({
         {stage === 'winners' && (
           <WinnersScreen engine={engine} nameOf={nameOf} revealed={winnersRevealed} />
         )}
-        {stage === 'winnersList' && (
-          <WinnersListScreen engine={engine} nameOf={nameOf} roster={roster} />
-        )}
+        {stage === 'scoreboard' && <AllScoresScreen engine={engine} nameOf={nameOf} />}
 
         {/* טבלת הניקוד באמצע משחק (פקודת מנחה 1) — מסך נפרד מלא מעל כל התצוגה */}
         {stage === 'playing' && leadersOverlay && (

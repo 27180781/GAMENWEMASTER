@@ -2,6 +2,7 @@
  * מסכי המסגרת (SPEC סעיף 9): פתיחה/התחברות, זוכים, רשימת זוכים.
  */
 
+import { useEffect, useState } from 'react';
 import type { GameEngine } from '../engine/index.ts';
 import { avatarColor, railInitial } from './avatar.ts';
 import { FitText } from './FitText.tsx';
@@ -188,7 +189,7 @@ export function WinnersListScreen({
         </div>
       )}
       <div className="screen-content">
-        <h1 className="winners-title">טבלת הניקוד המלאה</h1>
+        <h1 className="winners-title">המובילים</h1>
         <div className={`winners-layout${showGroups ? ' winners-layout--with-groups' : ''}`}>
           <div className="winners-col">
             <h2 className="winners-col-title">דירוג אישי</h2>
@@ -241,6 +242,72 @@ export function WinnersListScreen({
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** כמה משתתפים בכל עמוד של מסך הניקוד, וכמה זמן (ms) כל עמוד מוצג לפני המעבר. */
+const SCORES_PER_PAGE = 18;
+const SCORES_PAGE_MS = 6500;
+
+/**
+ * מסך "הניקוד של כל המשתתפים" — מוצג אחרי מסך המנצחים. מציג את כל מי שצבר
+ * ניקוד, ממוין מהגבוה לנמוך. אם כולם לא נכנסים בעמוד אחד — מתחלק לעמודים
+ * (עד SCORES_PER_PAGE בכל עמוד) ועובר ביניהם בלולאה אוטומטית, כדי שיהיה זמן
+ * לקרוא וכל אחד יראה כמה צבר. עמוד יחיד = מוצג קבוע (בלי לולאה).
+ */
+export function AllScoresScreen({
+  engine,
+  nameOf = identityName,
+}: {
+  engine: GameEngine;
+  nameOf?: NameResolver;
+}) {
+  const setting = engine.getGame().setting;
+  const all = engine.getWinners(Number.MAX_SAFE_INTEGER);
+  const pages = Math.max(1, Math.ceil(all.length / SCORES_PER_PAGE));
+  const [page, setPage] = useState(0);
+  // לולאה אוטומטית בין העמודים (רק כשיש יותר מעמוד אחד)
+  useEffect(() => {
+    setPage(0);
+    if (pages <= 1) return undefined;
+    const timer = window.setInterval(() => setPage((p) => (p + 1) % pages), SCORES_PAGE_MS);
+    return () => window.clearInterval(timer);
+  }, [pages]);
+  const safePage = page % pages;
+  const start = safePage * SCORES_PER_PAGE;
+  const slice = all.slice(start, start + SCORES_PER_PAGE);
+  return (
+    <div className="screen winners-screen all-scores-screen">
+      {setting.winnersListMedia.src !== '' && (
+        <div className="screen-background">
+          <MediaPlayer src={setting.winnersListMedia.src} asBackground />
+        </div>
+      )}
+      <div className="screen-content">
+        <h1 className="winners-title">הניקוד של כל המשתתפים</h1>
+        {all.length === 0 ? (
+          <p className="winners-empty">אין משתתפים עם ניקוד</p>
+        ) : (
+          // key=safePage → העמוד נטען מחדש בכל מעבר, ואיתו אנימציית הכניסה
+          <ol className="scores-grid" key={safePage}>
+            {slice.map((row, i) => (
+              <li className="score-cell" key={row.voterId} style={{ animationDelay: `${i * 35}ms` }}>
+                <span className="score-rank">{start + i + 1}</span>
+                <FitText className="score-name">{nameOf(row.voterId)}</FitText>
+                <span className="score-pts">{row.score}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+        {pages > 1 && (
+          <div className="scores-pager">
+            {Array.from({ length: pages }, (_, i) => (
+              <span key={i} className={`scores-dot${i === safePage ? ' is-active' : ''}`} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
