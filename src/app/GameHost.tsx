@@ -33,10 +33,9 @@ import { Stage } from '../render/Stage.tsx';
 import { themeStyle } from '../render/theme.ts';
 import type { TimerView } from '../render/TimerRing.tsx';
 import { SettingsScreen } from '../render/SettingsScreen.tsx';
-import { AudioManager, preloadAudio } from './AudioManager.ts';
+import { AudioManager } from './AudioManager.ts';
 import { extractHostVote } from './hostRemote.ts';
 import { completedQuestionCount, shouldShowLeaderboard } from './leaderboardSchedule.ts';
-import { MediaPreloader, slidePreloadUrls } from './mediaPreloader.ts';
 import {
   assignGroupByNumber,
   categoryMemberTotal,
@@ -130,7 +129,6 @@ export function GameHost({
     [useSocket, voteServerUrl],
   );
   const audio = useMemo(() => new AudioManager(), []);
-  const preloader = useMemo(() => new MediaPreloader(), []);
   const state = useEngineState(engine);
 
   const [stage, setStage] = useState<HostStage>('opening');
@@ -580,39 +578,8 @@ export function GameHost({
     });
   }, [state.phase, state.currentSlideId, state.activeMedia, state.currentSlideIndex, engine]);
 
-  // טעינה מוקדמת של המדיה של השקופיות הקרובות — מעבר מיידי בלי מסך שחור/השהיה
-  useEffect(() => {
-    const questions = game.questions;
-    const triviaSrc = game.setting.triviaMedia.src;
-    const urls: string[] = [];
-    for (let i = state.currentSlideIndex; i <= state.currentSlideIndex + 2 && i < questions.length; i++) {
-      urls.push(...slidePreloadUrls(questions[i]!, triviaSrc));
-    }
-    // קרוב לסוף — גם מדיית מסכי הזוכים
-    if (state.currentSlideIndex >= questions.length - 2) {
-      for (const src of [game.setting.winnersMedia.src, game.setting.winnersListMedia.src]) {
-        if (src.trim() !== '' && !src.startsWith('blob:')) urls.push(src);
-      }
-    }
-    preloader.prefetch(urls);
-  }, [state.currentSlideIndex, game, preloader]);
-
-  useEffect(() => () => preloader.dispose(), [preloader]);
-
-  // טעינה מוקדמת של קובצי הסאונד של המשחק — כדי שהניגון (התחברות/שאלה/טיימר/
-  // חשיפה/זוכים) יהיה מיידי, בלי המתנה להורדה מהרשת ברגע הראשון שצריך לנגן.
-  // (genericMediaSound אינו מנוגן בשום שלב — לכן לא טוענים אותו מראש.)
-  useEffect(() => {
-    const s = game.setting.sound;
-    preloadAudio([
-      s.playersConnectingMediaSound.src,
-      s.showQuestionMediaSound.src,
-      s.timerMediaSound.src,
-      s.inShowAnsMediaSound.src,
-      s.winnersMediaSound.src,
-      s.winnersListMediaSound.src,
-    ]);
-  }, [game]);
+  // כל טעינת המדיה המוקדמת (שקופיות + סאונדים + מסכי זוכים) מטופלת מרוכז ב-
+  // useMediaPreload ברמת ה-App, שטוען את הכול לפי סדר השקופיות כבר מההגדרות.
 
   // רענון תוכן חם ("פוש"): כשמגיע אובייקט game חדש — מחליפים את התוכן במנוע
   // בלי remount, כדי לשמר ניקוד/מיקום. שלבי החשיפה של השקופית הנוכחית נשמרים;
