@@ -19,6 +19,8 @@ import { GameHost } from './GameHost.tsx';
 import { preloadAudio } from './AudioManager.ts';
 import { prefetchBackup, resolveBackupConfig } from './backup.ts';
 import { prefetchMedia, slidePreloadUrls } from './mediaPreloader.ts';
+import { useMediaPreload } from './useMediaPreload.ts';
+import { MediaLoadBar } from '../render/MediaLoadBar.tsx';
 import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.ts';
 import { openPushChannel } from './pushChannel.ts';
 import { loadRoster, mergeGameUsers, parseGameUsers, saveRoster } from './roster.ts';
@@ -290,19 +292,25 @@ export function App() {
     });
   }, [params, refetchGame, applyRawGame]);
 
+  // טעינה מוקדמת של כל מדיית המשחק — מתחילה כבר במסך ההגדרות וממשיכה במשחק.
+  const mediaPreload = useMediaPreload(game ?? pendingGame);
+
   if (hash === '#debug') return <DebugApp />;
 
   if (game !== null) {
     return (
-      <GameHost
-        key={game.id}
-        game={game}
-        settings={settings}
-        onSettingsChange={persistAndSetSettings}
-        onRequestRefresh={() => void refetchGame()}
-        voteServerUrl={params.voteServer ?? VOTE_SERVER_URL}
-        offline={offline}
-      />
+      <>
+        <GameHost
+          key={game.id}
+          game={game}
+          settings={settings}
+          onSettingsChange={persistAndSetSettings}
+          onRequestRefresh={() => void refetchGame()}
+          voteServerUrl={params.voteServer ?? VOTE_SERVER_URL}
+          offline={offline}
+        />
+        {!mediaPreload.done && <MediaLoadBar {...mediaPreload} />}
+      </>
     );
   }
 
@@ -325,6 +333,7 @@ export function App() {
         {mediaIssues.length > 0 && !mediaAlertDismissed && (
           <MediaIssuesAlert issues={mediaIssues} onClose={() => setMediaAlertDismissed(true)} />
         )}
+        {!mediaPreload.done && <MediaLoadBar {...mediaPreload} />}
       </Shell>
     );
   }
