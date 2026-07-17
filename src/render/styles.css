@@ -962,6 +962,47 @@ body {
   to { opacity: 1; transform: translate(-50%, 0); }
 }
 
+/* פס טעינת מדיה — פיל צף בתחתית, מעל הכל (מסך ההגדרות והמשחק) עד שהכול נטען */
+.media-load-bar {
+  position: fixed;
+  bottom: 26px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  width: min(560px, 82vw);
+  padding: 12px 20px 14px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+  animation: backup-checking-in 0.25s ease-out;
+  direction: rtl;
+}
+.media-load-track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  overflow: hidden;
+  margin-bottom: 9px;
+}
+.media-load-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--secondary-color, #ffd23f);
+  transition: width 0.35s ease;
+}
+.media-load-text {
+  font-size: 18px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.media-load-icon { margin-inline-end: 6px; }
+.media-load-failed { color: #ff9f9f; }
+.media-load-hint { opacity: 0.65; font-weight: 500; }
+
 /* ---- זוכים ---- */
 
 .winners-title {
