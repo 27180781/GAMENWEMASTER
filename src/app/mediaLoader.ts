@@ -52,12 +52,38 @@ export function orderedMediaUrls(game: GameFile): string[] {
 }
 
 /**
- * טעינה מוקדמת של נכס בודד — מחמם את ה-cache. תמיד נפתר ('loaded'/'failed'),
- * גם ב-timeout (נכס איטי מדי לא חוסם את השאר; ייטען כשיגיעו אליו).
+ * וידאו/סאונד — מורידים את *כל* הקובץ (fetch + ריקון הגוף) כדי שיהיה במלואו
+ * במטמון, ולא רק "מספיק כדי להתחיל". כך הנגן בפועל מנגן מיד במקום להציג פריים
+ * סטטי ולחכות ל-buffering. timeout רך: אחרי הזמן מדווחים 'loaded' אבל ההורדה
+ * ממשיכה ברקע (וידאו גדול על רשת איטית לא חוסם את השאר).
  */
-function preloadOne(url: string, timeoutMs: number): Promise<'loaded' | 'failed'> {
+async function preloadHeavy(url: string, timeoutMs: number, signal?: AbortSignal): Promise<'loaded' | 'failed'> {
+  if (typeof fetch === 'undefined') return 'loaded';
+  try {
+    const res = await fetch(url, signal ? { signal } : {});
+    if (!res.ok || !res.body) return 'failed';
+    const reader = res.body.getReader();
+    const drain = (async () => {
+      for (;;) {
+        const { done } = await reader.read();
+        if (done) break;
+      }
+    })();
+    let softTimer = 0;
+    const soft = new Promise<void>((r) => {
+      softTimer = setTimeout(r, timeoutMs) as unknown as number;
+    });
+    await Promise.race([drain, soft]);
+    if (softTimer) clearTimeout(softTimer);
+    return 'loaded';
+  } catch {
+    return 'failed';
+  }
+}
+
+/** תמונה — Image.onload = הורדה מלאה (מחמם את המטמון ל-<img>, בלי CORS). */
+function preloadImage(url: string, timeoutMs: number): Promise<'loaded' | 'failed'> {
   if (typeof document === 'undefined') return Promise.resolve('loaded');
-  const kind = classifyMediaUrl(url);
   return new Promise((resolve) => {
     let settled = false;
     let timer = 0;
@@ -68,27 +94,18 @@ function preloadOne(url: string, timeoutMs: number): Promise<'loaded' | 'failed'
       resolve(result);
     };
     timer = setTimeout(() => finish('loaded'), timeoutMs) as unknown as number;
-
-    if (kind === 'video' || kind === 'audio') {
-      const el = document.createElement(kind);
-      el.preload = 'auto';
-      el.oncanplaythrough = () => finish('loaded');
-      el.onloadeddata = () => finish('loaded'); // גיבוי אם canplaythrough לא נורה
-      el.onerror = () => finish('failed');
-      el.src = url;
-      try {
-        el.load();
-      } catch {
-        /* חלק מהסביבות לא תומכות ב-load() ידני — מתעלמים */
-      }
-    } else {
-      // image / unknown — Image נטען בלי CORS ומחמם את המטמון ל-<img>
-      const img = new Image();
-      img.onload = () => finish('loaded');
-      img.onerror = () => finish('failed');
-      img.src = url;
-    }
+    const img = new Image();
+    img.onload = () => finish('loaded');
+    img.onerror = () => finish('failed');
+    img.src = url;
   });
+}
+
+/** טעינה מוקדמת של נכס בודד — מחמם את ה-cache. תמיד נפתר ('loaded'/'failed'). */
+function preloadOne(url: string, timeoutMs: number, signal?: AbortSignal): Promise<'loaded' | 'failed'> {
+  const kind = classifyMediaUrl(url);
+  if (kind === 'video' || kind === 'audio') return preloadHeavy(url, timeoutMs, signal);
+  return preloadImage(url, timeoutMs);
 }
 
 export interface PreloadProgress {
@@ -119,7 +136,7 @@ export async function preloadMediaList(
     while (index < urls.length) {
       if (signal?.aborted) return;
       const url = urls[index++]!;
-      const result = await preloadOne(url, timeoutMs);
+      const result = await preloadOne(url, timeoutMs, signal);
       if (result === 'loaded') loaded += 1;
       else failed += 1;
       if (!signal?.aborted) onProgress?.({ total, loaded, failed });

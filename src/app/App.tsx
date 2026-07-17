@@ -16,9 +16,7 @@ import { SettingsScreen } from '../render/SettingsScreen.tsx';
 import { Stage } from '../render/Stage.tsx';
 import { themeStyle } from '../render/theme.ts';
 import { GameHost } from './GameHost.tsx';
-import { preloadAudio } from './AudioManager.ts';
 import { prefetchBackup, resolveBackupConfig } from './backup.ts';
-import { prefetchMedia, slidePreloadUrls } from './mediaPreloader.ts';
 import { useMediaPreload } from './useMediaPreload.ts';
 import { MediaLoadBar } from '../render/MediaLoadBar.tsx';
 import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.ts';
@@ -158,24 +156,8 @@ export function App() {
     if (cfg !== null) prefetchBackup(cfg, pendingGame.id);
   }, [pendingGame, offline, settings.crowdEnabled, backupUrlOverride]);
 
-  // Head start לסאונד: מושכים את סאונד ההתחברות והשאלה כבר במסך ההגדרות, כך
-  // שברגע הכניסה ללובי הקול יוצא מיד (בלי להמתין להורדה מהרשת).
-  useEffect(() => {
-    if (pendingGame === null) return;
-    const s = pendingGame.setting.sound;
-    preloadAudio([s.playersConnectingMediaSound.src, s.showQuestionMediaSound.src]);
-  }, [pendingGame]);
-
-  // Head start למדיה: מחממים כבר במסך ההגדרות את מדיית הלובי (רקע פתיחה + לוגו)
-  // ואת מדיית השקופית הראשונה — כך שהמסך הראשון מופיע מיד, בלי "קפיצה" של הרקע.
-  useEffect(() => {
-    if (pendingGame === null) return;
-    const s = pendingGame.setting;
-    const urls = [s.gameMedia.src, s.logo.src];
-    const first = pendingGame.questions[0];
-    if (first) urls.push(...slidePreloadUrls(first, s.triviaMedia.src));
-    prefetchMedia(urls);
-  }, [pendingGame]);
+  // טעינת המדיה המוקדמת (מדיית לובי + שקופיות + סאונדים) מטופלת כולה ב-
+  // useMediaPreload, שמתחיל כאן במסך ההגדרות וממשיך למשחק (ראה למטה).
 
   /** עדכון הגדרות + שמירת דריסת המעברים האוטומטיים ל-localStorage (פעולת מפעיל). */
   const persistAndSetSettings = useCallback(
