@@ -148,7 +148,8 @@ export function buildFunctionPayload(
 /**
  * שולח את המטען ל-webhook. POST — גוף JSON; GET — המטען מקודד בפרמטר `payload`
  * בכתובת (שימו לב: ב-GET ייתכן חשש מאורך URL במשחקים גדולים; מומלץ POST).
- * `keepalive` כדי שהבקשה תסיים גם אם עוברים שקופית מיד. זורק בשגיאה/סטטוס לא-תקין.
+ * אין שימוש ב-keepalive בכוונה: keepalive מגביל את גוף הבקשה ל-64KB, ובמשחקים
+ * גדולים המטען עלול לחרוג מכך ולהיכשל. זורק בשגיאה/סטטוס לא-תקין.
  */
 export async function sendFunctionApi(api: FunctionApiConfig, payload: FunctionPayload): Promise<void> {
   const url = api.url.trim();
@@ -161,7 +162,6 @@ export async function sendFunctionApi(api: FunctionApiConfig, payload: FunctionP
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
-      keepalive: true,
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return;
@@ -170,7 +170,6 @@ export async function sendFunctionApi(api: FunctionApiConfig, payload: FunctionP
   const sep = url.includes('?') ? '&' : '?';
   const res = await fetch(`${url}${sep}payload=${encodeURIComponent(body)}`, {
     method: 'GET',
-    keepalive: true,
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
 }
