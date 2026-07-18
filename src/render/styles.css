@@ -1003,6 +1003,46 @@ body {
 .media-load-failed { color: #ff9f9f; }
 .media-load-hint { opacity: 0.65; font-weight: 500; }
 
+/* עיגול טעינה זעיר בפינה השמאלית-תחתונה — חיווי לא-מפריע בזמן המשחק */
+.media-load-dot {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  z-index: 55;
+  animation: backup-checking-in 0.25s ease-out;
+}
+.media-load-dot-ring {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  /* טבעת התקדמות: החלק הצבעוני לפי האחוז, השאר חצי-שקוף */
+  background: conic-gradient(
+    var(--secondary-color, #ffd23f) calc(var(--pct, 0) * 1%),
+    rgba(255, 255, 255, 0.22) 0
+  );
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  transition: background 0.35s ease;
+}
+/* עיגול פנימי כהה שיוצר את אפקט הטבעת */
+.media-load-dot-ring::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  background: rgba(6, 3, 15, 0.92);
+}
+.media-load-dot-pct {
+  position: relative;
+  z-index: 1;
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.5px;
+}
+
 /* ---- זוכים ---- */
 
 .winners-title {
