@@ -43,19 +43,20 @@ function FunctionScreen({
 }) {
   let icon = '⚡';
   let text: string;
+  // כשל בשליחת ה-API הוא קריטי — מציגים הנחיה ברורה לעצור ולפנות לתמיכה.
+  let apiFailed = false;
   if (action === 'score') {
     icon = '🔄';
     text = status === 'error' ? '⚠ פעולת ניקוד לא מוכרת' : '✓ הניקוד אופס';
   } else if (action === 'players') {
     icon = '👋';
     text = status === 'error' ? '⚠ פעולת משתתפים לא תקינה' : detail || '✓ עודכנו המשתתפים';
+  } else if (status === 'error') {
+    icon = '⛔';
+    text = 'השליחה נכשלה';
+    apiFailed = true;
   } else {
-    text =
-      status === 'sent'
-        ? '✓ הנתונים נשלחו'
-        : status === 'error'
-          ? '⚠ השליחה נכשלה'
-          : 'שולח נתונים…';
+    text = status === 'sent' ? '✓ הנתונים נשלחו' : 'שולח נתונים…';
   }
   return (
     <div className="screen slide-screen function-screen">
@@ -63,6 +64,9 @@ function FunctionScreen({
         <div className={`function-card function-card--${status}`}>
           <div className="function-icon">{icon}</div>
           <p className="function-text">{text}</p>
+          {apiFailed && (
+            <p className="function-support">אין להמשיך — יש ליצור קשר עם התמיכה</p>
+          )}
           {status === 'sending' && <div className="spinner" />}
         </div>
       </div>
