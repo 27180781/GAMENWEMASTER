@@ -18,7 +18,7 @@ import { themeStyle } from '../render/theme.ts';
 import { GameHost } from './GameHost.tsx';
 import { prefetchBackup, resolveBackupConfig } from './backup.ts';
 import { useMediaPreload } from './useMediaPreload.ts';
-import { MediaLoadBar } from '../render/MediaLoadBar.tsx';
+import { MediaLoadBar, MediaLoadDot } from '../render/MediaLoadBar.tsx';
 import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.ts';
 import { openPushChannel } from './pushChannel.ts';
 import { loadRoster, mergeGameUsers, parseGameUsers, saveRoster } from './roster.ts';
@@ -291,7 +291,8 @@ export function App() {
           voteServerUrl={params.voteServer ?? VOTE_SERVER_URL}
           offline={offline}
         />
-        {!mediaPreload.done && <MediaLoadBar {...mediaPreload} />}
+        {/* בזמן משחק — עיגול זעיר בפינה, לא פס מלא שמכער את המסך */}
+        {!mediaPreload.done && <MediaLoadDot {...mediaPreload} />}
       </>
     );
   }
