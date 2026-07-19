@@ -704,6 +704,10 @@ export function GameHost({
       if (remainingMs <= 0) {
         flushVotesRef.current(); // ההצבעות האחרונות שהצטברו נספרות לפני הסגירה
         engine.dispatch({ type: 'VOTING_TIMEOUT', at: Date.now() });
+        // סקר/תמונות: תום הטיימר חושף את הפילוח — משמיעים את סאונד החשיפה
+        if (slide.type === 'survey' || slide.type === 'ans_images') {
+          audio.play('inShowAns', sounds.inShowAnsMediaSound.src);
+        }
       } else {
         setTimer({ remaining: remainingMs / 1000, total, paused: false });
       }
@@ -800,6 +804,11 @@ export function GameHost({
       // עצירת הטיימר וסגירת ההצבעה (אם לא נגמר כבר לבד)
       flushVotesRef.current(); // ההצבעות האחרונות שהצטברו נספרות לפני הסגירה
       engine.dispatch({ type: 'ADVANCE', at: now });
+      // סקר/תמונות: אין בהם שלב "תשובה נכונה" נפרד — המעבר לתוצאות הוא רגע חשיפת
+      // הפילוח, ולכן משמיעים כאן את סאונד החשיפה (ב-trivia הוא מתנגן בחשיפת הנכונה)
+      if (s.type === 'survey' || s.type === 'ans_images') {
+        audio.play('inShowAns', sounds.inShowAnsMediaSound.src);
+      }
       return;
     }
 
