@@ -56,6 +56,8 @@ export interface FunctionGroup {
 export interface FunctionPayload {
   gameId: string;
   gameName: string;
+  /** המייל שאליו המשחק מקושר (מגיע מ-cloudinaryFolder בקובץ המשחק); "" אם אין. */
+  ownerEmail: string;
   sentAt: string;
   participantCount: number;
   participants: FunctionParticipant[];
@@ -137,6 +139,7 @@ export function buildFunctionPayload(
   return {
     gameId: game.id,
     gameName: game.name,
+    ownerEmail: game.cloudinaryFolder,
     sentAt: now.toISOString(),
     participantCount: participants.length,
     participants,
