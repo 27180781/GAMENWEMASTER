@@ -1750,6 +1750,18 @@ body {
   padding: 4px 10px;
 }
 .settings-modal-body { overflow-y: auto; flex: 1; padding: 12px 4px; min-height: 0; }
+/* פאנל מדיה לא-מקוונת (מטמון Service Worker) בהגדרות המתקדמות */
+.media-cache-panel {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(20, 20, 40, 0.18);
+  border-radius: 14px;
+  background: rgba(20, 20, 40, 0.03);
+}
+.media-cache-title { margin: 0 0 6px; font-size: 16px; font-weight: 800; }
+.media-cache-status { margin: 0 0 10px; font-size: 13px; opacity: 0.8; line-height: 1.5; }
+.media-cache-clear { width: auto; padding: 8px 16px; font-size: 14px; }
+.media-cache-clear:disabled { opacity: 0.5; cursor: default; }
 .settings-modal-done {
   align-self: center;
   margin-top: 14px;

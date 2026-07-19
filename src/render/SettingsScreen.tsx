@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react';
 import type { GameFile } from '../engine/index.ts';
 import { JOIN_DIAL_DISPLAY, type AutoTransition, type GameSettings } from '../app/urlParams.ts';
+import { MediaCachePanel } from './MediaCachePanel.tsx';
 
 const SPEED_PRESETS: { label: string; value: number }[] = [
   { label: 'איטי — מפוזר על כל חלון ההצבעה', value: 1 },
@@ -316,7 +317,10 @@ export function SettingsScreen({
             ✕
           </button>
         </div>
-        <div className="settings-modal-body">{onlinePhone ? phoneAdvancedFields : columns}</div>
+        <div className="settings-modal-body">
+          {onlinePhone ? phoneAdvancedFields : columns}
+          <MediaCachePanel />
+        </div>
         <button className="picker-button settings-modal-done" onClick={() => setAdvancedOpen(false)}>
           סגירה
         </button>
