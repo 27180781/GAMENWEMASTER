@@ -142,6 +142,31 @@ describe('SocketVoteAdapter — אינטגרציה מול שרת Socket.IO', () 
     adapter.disconnect();
   });
 
+  it('onRawVote מדווח על הערך הגולמי מהטלפון כשחלון פתוח, ולא כשסגור', async () => {
+    const adapter = new SocketVoteAdapter(url);
+    const raw: { vote: string; phone: string }[] = [];
+    let connected = false;
+    adapter.onRawVote((v) => raw.push({ vote: v.vote, phone: String(v.phone) }));
+    adapter.onStatusChange((st) => {
+      if (st === 'connected') connected = true;
+    });
+    await adapter.connect('5005');
+    await waitFor(() => connected);
+
+    // חלון סגור — לא מדווח
+    ioServer.to('5005').emit('voting', { vote: '3', phone: '050', gameId: '5005' });
+    await delay(120);
+    expect(raw).toHaveLength(0);
+
+    // חלון פתוח — מדווח את הערך הגולמי בדיוק כפי שהגיע
+    adapter.setActiveSlide(7);
+    ioServer.to('5005').emit('voting', { vote: '1', phone: '0501234567', gameId: '5005' });
+    await waitFor(() => raw.length >= 1);
+    expect(raw[0]).toEqual({ vote: '1', phone: '0501234567' });
+
+    adapter.disconnect();
+  });
+
   it('כשאין חלון הצבעה פעיל — voting אינו יוצר snapshot', async () => {
     const adapter = new SocketVoteAdapter(url);
     const snapshots: VoteSnapshot[] = [];

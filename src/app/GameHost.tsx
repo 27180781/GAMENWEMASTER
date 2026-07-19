@@ -22,7 +22,7 @@ import {
   type VoteAdapter,
   type VoteSnapshot,
 } from '../engine/index.ts';
-import { SocketVoteAdapter } from './socketAdapter.ts';
+import { SocketVoteAdapter, type RawVote } from './socketAdapter.ts';
 import { avatarColor, railInitial } from '../render/avatar.ts';
 import { AllScoresScreen, LobbyScreen, WinnersListScreen, WinnersScreen } from '../render/screens.tsx';
 import { OperatorMenu } from '../render/OperatorMenu.tsx';
@@ -998,6 +998,23 @@ export function GameHost({
         setServerNames((prev) => (prev[phone] === name ? prev : { ...prev, [phone]: name })),
       );
       adapter.onPlayerJoined((phone, name) => addConnected(phone, name));
+      // חיווי דיבאג לאבחון סקרים/שאלות: הערך הגולמי שהטלפון שלח + לאיזו תשובה
+      // הוא ממופה (לפי answer.id). כך אפשר לראות ב-F12 אם הכפתור שנלחץ אכן
+      // מגיע כמספר הצפוי ונוחת על התשובה הנכונה.
+      adapter.onRawVote((raw: RawVote) => {
+        const slide = engine.getCurrentSlide();
+        const n = Number(raw.vote);
+        const match = slide.question.answers.find((a) => a.id === n);
+        const answerText = match ? match.ans.trim().slice(0, 40) : '⚠ אין תשובה עם id זה';
+        debugLog('vote', `הצבעה גולמית מהטלפון: "${raw.vote}" → id=${n} → ${answerText}`, {
+          phone: raw.phone,
+          rawVote: raw.vote,
+          mappedAnswerId: n,
+          slideId: slide.id,
+          slideType: slide.type,
+          answerText: match?.ans ?? null,
+        });
+      });
       void adapter.connect(roomId);
     } else {
       setVoteStatus('connected');
