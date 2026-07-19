@@ -26,8 +26,10 @@ import { VOTE_SERVER_URL } from './socketAdapter.ts';
 import {
   DEFAULT_GAME_SETTINGS,
   loadAutoTransition,
+  MAIN_SITE_URL,
   parseAppParams,
   saveAutoTransition,
+  shouldRedirectHome,
   type GameSettings,
 } from './urlParams.ts';
 import { loadGameFromZip } from './zipLoader.ts';
@@ -276,6 +278,32 @@ export function App() {
 
   // טעינה מוקדמת של כל מדיית המשחק — מתחילה כבר במסך ההגדרות וממשיכה במשחק.
   const mediaPreload = useMediaPreload(game ?? pendingGame);
+
+  // ב-URL הציבורי בלי קובץ משחק (‎?game=‎) מפנים לאתר הראשי במקום להציג את בורר
+  // קבצי הבדיקה — כדי שלא ישחקו בקבצים שנועדו רק לנסיון. פיתוח מקומי ו-EXE אופליין
+  // אינם מושפעים (ראו shouldRedirectHome).
+  const redirectHome =
+    typeof window !== 'undefined' &&
+    shouldRedirectHome({
+      protocol: window.location.protocol,
+      hostname: window.location.hostname,
+      hasGameUrl: params.gameUrl !== null,
+    });
+  useEffect(() => {
+    if (redirectHome) window.location.replace(MAIN_SITE_URL);
+  }, [redirectHome]);
+  if (redirectHome) {
+    return (
+      <Shell>
+        <div className="screen">
+          <div className="screen-content">
+            <div className="spinner" />
+            <p className="opening-hint">מעבירים אתכם לאתר הראשי…</p>
+          </div>
+        </div>
+      </Shell>
+    );
+  }
 
   if (hash === '#debug') return <DebugApp />;
 

@@ -36,6 +36,29 @@ export function parseAppParams(search: string): AppParams {
   return { gameUrl, pushUrl, voteServer, demo };
 }
 
+/** כתובת האתר הראשי — יעד ההפניה כשנכנסים ל-URL הציבורי בלי קובץ משחק. */
+export const MAIN_SITE_URL = 'https://clicker.co.il';
+
+/**
+ * האם להפנות לאתר הראשי במקום להציג את בורר קבצי הבדיקה. מפנים רק בווב הציבורי
+ * וכשלא שורשר קובץ משחק (‎?game=‎). כך ב-URL הציבורי אפשר להפעיל אך ורק משחק אמיתי
+ * שהקישור אליו מסופק — ולא לשחק בקבצי הבדיקה המקומיים. יוצאים מן הכלל (לא מפנים):
+ *   • ‎file://‎ — ה-EXE האופליין, שבו הבורר טוען ZIP.
+ *   • localhost / 127.0.0.1 / *.local / host ריק — פיתוח מקומי.
+ */
+export function shouldRedirectHome(opts: {
+  protocol: string;
+  hostname: string;
+  hasGameUrl: boolean;
+}): boolean {
+  const { protocol, hostname, hasGameUrl } = opts;
+  if (protocol === 'file:') return false;
+  const host = hostname.toLowerCase();
+  const local = host === 'localhost' || host === '127.0.0.1' || host === '' || host.endsWith('.local');
+  if (local) return false;
+  return !hasGameUrl;
+}
+
 /** מעברים אוטומטיים — ברירת מחדל מה-JSON, ניתן לדריסה בהגדרות ולשמירה. */
 export interface AutoTransition {
   /** הצגת התשובות אוטומטית לאחר הצגת השאלה. */

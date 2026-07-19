@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_GAME_SETTINGS, parseAppParams } from '../src/app/urlParams.ts';
+import { DEFAULT_GAME_SETTINGS, parseAppParams, shouldRedirectHome } from '../src/app/urlParams.ts';
 import { planCrowdVotes } from '../src/app/syntheticVotes.ts';
 import { fourAnswers, makeGame, rawSlide } from './helpers.ts';
 
@@ -47,6 +47,30 @@ describe('parseAppParams — פרמטרים בכתובת', () => {
     const encoded = encodeURIComponent('https://cdn.example/games/1.json?v=2&sig=abc');
     const { gameUrl } = parseAppParams(`?game=${encoded}&demo=1`);
     expect(gameUrl).toBe('https://cdn.example/games/1.json?v=2&sig=abc');
+  });
+});
+
+describe('shouldRedirectHome — הפניה לאתר הראשי ב-URL הציבורי', () => {
+  const prod = 'gamemwemaster.caprover.clicker.co.il';
+
+  it('ווב ציבורי בלי ?game= → מפנים', () => {
+    expect(shouldRedirectHome({ protocol: 'https:', hostname: prod, hasGameUrl: false })).toBe(true);
+    // גם GitHub Pages
+    expect(shouldRedirectHome({ protocol: 'https:', hostname: '27180781.github.io', hasGameUrl: false })).toBe(true);
+  });
+
+  it('ווב ציבורי עם ?game= → לא מפנים (המשחק תקין)', () => {
+    expect(shouldRedirectHome({ protocol: 'https:', hostname: prod, hasGameUrl: true })).toBe(false);
+  });
+
+  it('פיתוח מקומי (localhost/127.0.0.1/.local/ריק) → לא מפנים גם בלי ?game=', () => {
+    for (const hostname of ['localhost', '127.0.0.1', 'my-box.local', '']) {
+      expect(shouldRedirectHome({ protocol: 'http:', hostname, hasGameUrl: false })).toBe(false);
+    }
+  });
+
+  it('EXE אופליין (file://) → לא מפנים', () => {
+    expect(shouldRedirectHome({ protocol: 'file:', hostname: '', hasGameUrl: false })).toBe(false);
   });
 });
 
