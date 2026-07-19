@@ -116,8 +116,10 @@ export function GameHost({
   const roomId = game.room ?? '';
   const hasRoom = roomId !== '';
   const useSocket = !settings.crowdEnabled && roomId !== '';
-  // באנר הצטרפות: משחק אונליין עם קוד חדר. אזהרת רישיון: אונליין בלי קוד חדר.
-  const showJoinBanner = !offline && hasRoom;
+  // באנר הצטרפות (חיוג + קוד): רק כשמצביעים שחקנים אמיתיים — משחק אונליין עם קוד
+  // חדר, ולא במצב דמו. בדמו (‎?demo=1‎) ההרצה מקומית עם שחקני דמה גם אם יש רישיון
+  // טלפונים פעיל, ולכן אין להציג הזמנה לחייג. אזהרת רישיון: אונליין בלי קוד חדר.
+  const showJoinBanner = !offline && hasRoom && !settings.crowdEnabled;
   const showLicenseWarning = !offline && !hasRoom;
   // QR להתחברות מהטלפון — רק במשחק אונליין מורשה (קוד חדר) ושאינו דמו, וכשסומן
   // בהגדרות. הקוד מוביל ל-clicker.clicker.co.il/?game=<קוד המשחק>.
