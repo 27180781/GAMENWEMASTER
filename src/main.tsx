@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './app/App.tsx';
+import { registerMediaServiceWorker } from './app/mediaSW.ts';
 import './render/styles.css';
 
 const rootElement = document.getElementById('root');
@@ -11,3 +12,6 @@ createRoot(rootElement).render(
     <App />
   </StrictMode>,
 );
+
+// מטמון מדיה מתמשך (Service Worker) — לא-חוסם, נרשם ברקע אחרי הטעינה.
+registerMediaServiceWorker();
