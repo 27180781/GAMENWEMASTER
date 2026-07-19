@@ -103,10 +103,13 @@ describe('סכמה + מנוע: שקופית function', () => {
 });
 
 function twoTrivia() {
-  return makeGame([
-    rawSlide({ id: 1, type: 'trivia', que: 'בירת צרפת?', answers: fourAnswers(2), scoreForQue: 10, timeForQue: 15 }),
-    rawSlide({ id: 2, type: 'trivia', que: '2+2?', answers: fourAnswers(1), scoreForQue: 10, timeForQue: 15 }),
-  ]);
+  return makeGame(
+    [
+      rawSlide({ id: 1, type: 'trivia', que: 'בירת צרפת?', answers: fourAnswers(2), scoreForQue: 10, timeForQue: 15 }),
+      rawSlide({ id: 2, type: 'trivia', que: '2+2?', answers: fourAnswers(1), scoreForQue: 10, timeForQue: 15 }),
+    ],
+    { cloudinaryFolder: 'owner@example.com' }, // המייל שאליו המשחק מקושר
+  );
 }
 
 function playedBoth(): GameEngine {
@@ -138,6 +141,7 @@ describe('buildFunctionPayload', () => {
 
   it('מטא בסיסי', () => {
     expect(payload.gameName).toBe('משחק בדיקה');
+    expect(payload.ownerEmail).toBe('owner@example.com'); // מ-cloudinaryFolder
     expect(payload.participantCount).toBe(3);
     expect(payload.sentAt).toBe('2026-07-13T10:00:00.000Z');
   });
@@ -180,7 +184,7 @@ describe('buildFunctionPayload', () => {
 
 describe('sendFunctionApi', () => {
   afterEach(() => vi.unstubAllGlobals());
-  const payload = { gameId: 'g', gameName: 'x', sentAt: '', participantCount: 1, participants: [{ number: 'a', name: '', score: 5, numAnswers: 1, numCorrect: 1, groupId: null, answers: [] }], questions: [], groups: [] } as FunctionPayload;
+  const payload = { gameId: 'g', gameName: 'x', ownerEmail: 'owner@example.com', sentAt: '', participantCount: 1, participants: [{ number: 'a', name: '', score: 5, numAnswers: 1, numCorrect: 1, groupId: null, answers: [] }], questions: [], groups: [] } as FunctionPayload;
 
   it('POST — גוף JSON עם המטען', async () => {
     const fn = vi.fn((_url: string, _init?: RequestInit) => Promise.resolve({ ok: true }));
