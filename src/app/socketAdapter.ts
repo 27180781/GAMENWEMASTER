@@ -81,6 +81,7 @@ export class SocketVoteAdapter implements VoteAdapter {
   private statusListener: ((status: Status) => void) | null = null;
   private identifyListener: ((phone: string, name: string) => void) | null = null;
   private joinedListener: ((phone: string, name?: string) => void) | null = null;
+  private rawVoteListener: ((vote: RawVote) => void) | null = null;
   private window: VoteWindow | null = null;
   private roomId = '';
   private cleanupFns: (() => void)[] = [];
@@ -163,6 +164,8 @@ export class SocketVoteAdapter implements VoteAdapter {
     if (data.gameId !== undefined && String(data.gameId) !== this.roomId) return;
     this.report(data); // חיבור + שם השחקן מהטלפון
     if (this.window === null) return; // אין חלון הצבעה פתוח — מתעלמים
+    // חיווי דיבאג: הערך הגולמי כפי שהגיע מהטלפון (לפני עיבוד/מיפוי) — לאבחון
+    this.rawVoteListener?.(data);
     const snapshot = this.window.add(data);
     if (snapshot !== null) this.snapshotListener?.(snapshot);
   }
@@ -197,6 +200,14 @@ export class SocketVoteAdapter implements VoteAdapter {
   /** התראה על שחקן שהתחבר (לחץ מקש כלשהו) — למסך הלובי. */
   onPlayerJoined(cb: (phone: string, name?: string) => void): void {
     this.joinedListener = cb;
+  }
+
+  /**
+   * חיווי דיבאג: כל הצבעה גולמית שמגיעה מהטלפון בזמן שחלון ההצבעה פתוח,
+   * לפני אגירה/מיפוי. משמש לאבחון התאמה בין מספר הכפתור לתשובה המוצגת.
+   */
+  onRawVote(cb: (vote: RawVote) => void): void {
+    this.rawVoteListener = cb;
   }
 
   requestFullState(): Promise<VoteSnapshot> {
