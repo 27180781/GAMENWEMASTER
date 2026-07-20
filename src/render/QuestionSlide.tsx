@@ -14,7 +14,7 @@
  * ומייצגים את כפתורי השלט — אינם מושפעים מהערכה.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { GameState, Slide } from '../engine/index.ts';
 import { FitText } from './FitText.tsx';
 import type { TimerView } from './TimerRing.tsx';
@@ -216,6 +216,13 @@ export function QuestionSlide({
   const counts = state.liveVotes?.counts ?? {};
   const total = state.liveVotes?.total ?? 0;
 
+  // פריסת תשובות-כתמונה: עד 4 בשורה, מתחלקות לשורות מאוזנות (5=3+2, 6=3+3,
+  // 7=4+3, 8=4+4, 9=3+3+3 ...). מספר השורות/העמודות נשלח ל-CSS כמשתנים כדי
+  // שגובה הכרטיסים יתחלק לפי מספר השורות ולא יגלוש אל הכותרת/הטיימר/הפוטר.
+  const imgRows = Math.max(1, Math.ceil(answers.length / 4));
+  const imgCols = Math.max(1, Math.ceil(answers.length / imgRows));
+  const imagesGridVars = { '--img-cols': imgCols, '--img-rows': imgRows } as CSSProperties;
+
   // חשיפת הפילוח/התשובה הנכונה היא צעד מפורש (reveal.revealCorrect) בכל סוגי
   // השקופיות ההצבעה — trivia, סקר ותמונות כאחד. תום הטיימר רק *סוגר* את ההצבעה
   // ואינו חושף מעצמו; החשיפה קורית בלחיצה (או אוטומטית כש-showCorrectAnswerAfterTimer
@@ -291,7 +298,10 @@ export function QuestionSlide({
           {isSurvey && revealed ? (
             <SurveyPie answers={answers} counts={counts} total={total} />
           ) : (
-          <ul className={`q-answers${isImages ? ' q-answers--images' : ''}`}>
+          <ul
+            className={`q-answers${isImages ? ' q-answers--images' : ''}`}
+            {...(isImages ? { style: imagesGridVars } : {})}
+          >
             {answers.map((answer, index) => {
               const shown = index < reveal.answersShown;
               const count = counts[String(answer.id)] ?? 0;
@@ -312,7 +322,12 @@ export function QuestionSlide({
                     {revealed ? `${percent}%` : label}
                   </span>
                   {isImages ? (
-                    <img className="q-card-image" src={answer.ans} alt={`תשובה ${answer.id}`} />
+                    <>
+                      {/* רקע מטושטש מאותה תמונה — ממלא את "השוליים החסרים" של
+                          תמונה לרוחב שמוצגת במלואה (contain), בלי פסים ריקים. */}
+                      <img className="q-card-image-bg" src={answer.ans} alt="" aria-hidden="true" />
+                      <img className="q-card-image" src={answer.ans} alt={`תשובה ${answer.id}`} />
+                    </>
                   ) : (
                     <FitText className="q-card-text">{answer.ans}</FitText>
                   )}
