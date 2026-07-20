@@ -36,6 +36,7 @@ import { themeStyle } from '../render/theme.ts';
 import type { TimerView } from '../render/TimerRing.tsx';
 import { SettingsScreen } from '../render/SettingsScreen.tsx';
 import { AudioManager } from './AudioManager.ts';
+import { decodeSlideMedia } from './mediaDecode.ts';
 import { extractHostVote } from './hostRemote.ts';
 import { completedQuestionCount, shouldShowLeaderboard } from './leaderboardSchedule.ts';
 import {
@@ -313,6 +314,16 @@ export function GameHost({
   // רענון תוכן באמצע שאלה לא מאפס בטעות את שלבי החשיפה.
   const soundsRef = useRef(sounds);
   soundsRef.current = sounds;
+
+  // פענוח-מקדים של השקופית הבאה: כשמציגים שקופית, מפענחים כבר את המדיה של הבאה
+  // (תמונת שאלה / תמונות תשובה / רקע) כדי שהמעבר אליה יהיה מיידי. הסרטון-רקע
+  // המשותף כבר פוענח פעם אחת (במסך ההגדרות) ולכן מדולג כאן.
+  useEffect(() => {
+    const questions = engine.getGame().questions;
+    const idx = questions.findIndex((q) => q.id === slide.id);
+    const next = idx >= 0 ? questions[idx + 1] : undefined;
+    if (next) decodeSlideMedia(next, setting.triviaMedia.src);
+  }, [engine, slide.id, setting.triviaMedia.src]);
 
   const stageRef = useRef<HostStage>('opening');
   stageRef.current = stage;

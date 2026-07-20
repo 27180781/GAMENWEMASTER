@@ -20,6 +20,7 @@ import { prefetchBackup, resolveBackupConfig } from './backup.ts';
 import { useMediaPreload } from './useMediaPreload.ts';
 import { MediaLoadBar, MediaLoadDot } from '../render/MediaLoadBar.tsx';
 import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.ts';
+import { decodeInitialMedia } from './mediaDecode.ts';
 import { openPushChannel } from './pushChannel.ts';
 import { loadRoster, mergeGameUsers, parseGameUsers, saveRoster } from './roster.ts';
 import { VOTE_SERVER_URL } from './socketAdapter.ts';
@@ -152,6 +153,13 @@ export function App() {
   useEffect(() => {
     if (pendingGame === null) return;
     mergeUsersIntoRoster(pendingGame);
+  }, [pendingGame]);
+
+  // פענוח-מקדים כבר מהמסך הראשון: רקע הלובי והשקופית הראשונה (כולל הסרטון-רקע
+  // המשותף, שמפוענח פעם אחת) — כדי שההצגה הראשונה תהיה מיידית ולא "נטענת קצת-קצת".
+  useEffect(() => {
+    if (pendingGame === null) return;
+    decodeInitialMedia(pendingGame);
   }, [pendingGame]);
 
   // Prefetch גיבוי: מתחילים לבדוק אם יש משחק שמור כבר במסך ההגדרות, במקביל
