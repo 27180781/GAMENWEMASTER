@@ -4,7 +4,7 @@
  * YouTube; לתמונה אין "סיום" — המפעיל מקדם ידנית).
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { classifyMediaUrl } from '../engine/index.ts';
 
 interface MediaPlayerProps {
@@ -28,6 +28,16 @@ export function MediaPlayer({ src, onEnded, asBackground = false, className }: M
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [src]);
   const fail = () => setFailed(true);
+
+  // רקע = מושתק. התכונה muted ב-JSX אינה אמינה ל-autoplay (React מגדיר אותה
+  // כ-attribute ולא כ-property בזמן, אז הדפדפן עלול להתחיל לנגן *עם* קול); לכן
+  // מגדירים muted ישירות על ה-DOM ברגע שהמרכיב נוצר (callback ref).
+  const setVideoMuted = useCallback(
+    (node: HTMLVideoElement | null) => {
+      if (node) node.muted = asBackground;
+    },
+    [asBackground],
+  );
   if (failed && (kind === 'image' || kind === 'video' || kind === 'audio')) {
     if (asBackground) return null;
     return (
@@ -49,6 +59,7 @@ export function MediaPlayer({ src, onEnded, asBackground = false, className }: M
       return (
         <video
           key={src}
+          ref={setVideoMuted}
           className={className ?? 'media-fill'}
           src={src}
           autoPlay

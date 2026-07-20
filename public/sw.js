@@ -68,7 +68,25 @@ function usableFromCache(cached, req) {
 }
 
 /**
- * cache-first: מגישים מהמטמון אם קיים ושמיש; אחרת מהרשת ושומרים.
+ * מה מותר לשמור במטמון: רק תשובה *מלאה* שנצרכת עד הסוף. אסור לשמור תשובה חלקית/
+ * קטועה — אחרת נגישהּ שוב כ"מלאה" והנגינה תיתקע אחרי כמה שניות. שני מקרים:
+ *   1. בקשת Range — חלקית מעצם הגדרתה (ו-opaque מסתיר את סטטוס 206, כך שאי-אפשר
+ *      לסנן לפי status בלבד). לכן מסננים לפי כותרת ה-Range של *הבקשה*.
+ *   2. מרכיב <video>/<audio> — טוען חלקית ('metadata') ומפסיק/מדלג באמצע, כך
+ *      שה-clone לשמירה מגיע קטוע. גם בדיקת המדיה (probe) יוצרת <audio preload=
+ *      'metadata'> — מקור נפוץ ל"הרעלת" המטמון בגרסה חלקית.
+ * את המדיה הכבדה שומר ה-fetch של הטעינה-המוקדמת (destination '') שמנקז את כל
+ * הגוף עד הסוף. <img> נטענת במלואה (onload) ולכן בטוחה גם היא.
+ */
+function shouldCache(req, res) {
+  if (!res) return false;
+  if (req.headers.has('range')) return false;
+  if (req.destination === 'video' || req.destination === 'audio') return false;
+  return res.status === 200 || res.type === 'opaque';
+}
+
+/**
+ * cache-first: מגישים מהמטמון אם קיים ושמיש; אחרת מהרשת ושומרים (רק אם שלם).
  *
  * כשבמטמון יש רק מעטפה אטומה אך הבקשה אינה no-cors — לא מגישים אותה (תיפול),
  * אלא מושכים טרי. משיכה במצב CORS מחזירה תשובה מלאה שדורסת את המעטפה האטומה
@@ -81,10 +99,9 @@ async function cacheFirstMedia(req) {
   if (usableFromCache(cached, req)) return withRange(req, cached);
   try {
     const res = await fetch(req);
-    // שומרים תשובה שלמה (200) או opaque (מדיה cross-origin מ-no-cors) — לא 206
-    // חלקי ולא שגיאות. clone לפני שמחזירים כי אפשר לצרוך גוף פעם אחת. תשובת CORS
-    // מלאה דורסת מעטפה אטומה קודמת של אותה כתובת.
-    if (res && (res.status === 200 || res.type === 'opaque')) {
+    // clone לפני שמחזירים כי אפשר לצרוך גוף פעם אחת. תשובת CORS מלאה דורסת
+    // מעטפה אטומה קודמת של אותה כתובת. שומרים רק תשובה שלמה (ראה shouldCache).
+    if (shouldCache(req, res)) {
       cache.put(req, res.clone()).catch(() => {});
     }
     return res;
