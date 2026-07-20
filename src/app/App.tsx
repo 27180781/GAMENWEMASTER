@@ -20,6 +20,7 @@ import { prefetchBackup, resolveBackupConfig } from './backup.ts';
 import { useMediaPreload } from './useMediaPreload.ts';
 import { MediaLoadBar, MediaLoadDot } from '../render/MediaLoadBar.tsx';
 import { StartupOverlay } from '../render/StartupOverlay.tsx';
+import { ErrorScreen } from '../render/ErrorScreen.tsx';
 import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.ts';
 import { decodeInitialMedia } from './mediaDecode.ts';
 import { openPushChannel } from './pushChannel.ts';
@@ -443,6 +444,21 @@ export function App() {
     );
   }
 
+  // מסך שגיאה עצמאי — טעינת המשחק נכשלה. מחליף את בורר קבצי-הבדיקה כדי שיוצג רק
+  // *מה* נכשל (רלוונטי במיוחד בטעינה מקישור באירוע חי). בטעינה מקישור מציעים
+  // "נסה שוב" (טעינה מחדש); בבורר המקומי — "חזרה לבחירת קובץ".
+  if (error !== null) {
+    return (
+      <Shell>
+        <ErrorScreen
+          message={error}
+          onRetry={params.gameUrl !== null ? () => window.location.reload() : undefined}
+          onBack={params.gameUrl === null ? () => setError(null) : undefined}
+        />
+      </Shell>
+    );
+  }
+
   const loadRaw = (raw: unknown) => {
     try {
       revokeZip(); // עוזבים אופליין (אם היה) — משחררים את ה-Blob URLs שלו
@@ -517,11 +533,6 @@ export function App() {
               }}
             />
           </label>
-          {error !== null && (
-            <pre className="picker-error" style={{ whiteSpace: 'pre-wrap' }}>
-              {error}
-            </pre>
-          )}
           <p className="opening-hint" style={{ opacity: 0.5 }}>
             טעינה מקישור: ‎?game=&lt;URL&gt;&amp;demo=1 · מסך דיבאג: ‎#debug
           </p>
