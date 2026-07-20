@@ -238,6 +238,8 @@ export function GameHost({
   const syntheticCrowd = settings.crowdEnabled;
   /** מסך מובילים באמצע משחק (פקודת מנחה 1) — שכבה מעל, המשחק ממשיך מתחת. */
   const [leadersOverlay, setLeadersOverlay] = useState(false);
+  const leadersOverlayRef = useRef(false);
+  leadersOverlayRef.current = leadersOverlay;
   /** מספר השאלות שהושלמו כשהוצגה לאחרונה טבלת המובילים האוטומטית — למניעת כפילות. */
   const autoLeadersShownAtRef = useRef(0);
   /** כמה מקומות פודיום כבר נחשפו במסך המנצחים (חשיפה אחד-אחד מהאחרון לראשון). */
@@ -930,17 +932,51 @@ export function GameHost({
   // 3 כפיים · 4/5 ‎±10 שניות · 6 עצירה/המשך
   // -------------------------------------------------------------------------
 
+  /**
+   * "קדימה" — מסלול אחיד למקלדת (רווח/0) ולשלט המנחה מהטלפון (0), בכל שלבי
+   * המשחק: מסך מובילים פתוח נסגר, לובי מתחיל, שקופית מתקדמת שלב, ובמסך
+   * המנצחים חושף מקום ואז עובר לניקוד כל המשתתפים.
+   */
+  const advance = useCallback(() => {
+    // מסך המובילים (מקש 1) פתוח מעל המשחק — קדימה מסיר אותו (כמו לחיצה
+    // נוספת על 1) במקום לקדם את המשחק שמאחוריו.
+    if (leadersOverlayRef.current) {
+      setLeadersOverlay(false);
+      return;
+    }
+    const stage = stageRef.current;
+    if (stage === 'opening') setStage('playing');
+    else if (stage === 'playing') advanceStep();
+    else if (stage === 'winners') {
+      // חשיפת המנצחים אחד-אחד; אחרי שכולם נחשפו — מעבר למסך ניקוד כל המשתתפים.
+      const podiumTotal = Math.min(engine.getWinners(engine.getGame().setting.multiWinners).length, 5);
+      if (winnersRevealedRef.current < podiumTotal) setWinnersRevealed((n) => n + 1);
+      else setStage('scoreboard');
+    }
+  }, [engine, advanceStep]);
+
+  /** "אחורה" — מסלול אחיד: בשקופית (stepBack) וגם במסכי הסיום. */
+  const goBack = useCallback(() => {
+    const stage = stageRef.current;
+    if (stage === 'playing') stepBack();
+    else if (stage === 'winners') {
+      // מבטלים חשיפת מנצח אחרון; כשאין חשופים — חזרה למשחק.
+      if (winnersRevealedRef.current > 0) setWinnersRevealed((n) => Math.max(0, n - 1));
+      else setStage('playing');
+    } else if (stage === 'scoreboard') setStage('winners');
+  }, [stepBack]);
+
   const runHostCommand = useCallback(
     (command: number) => {
       switch (command) {
         case 0:
-          if (stageRef.current === 'playing') advanceStep();
+          advance();
           break;
         case 1:
           if (stageRef.current === 'playing') setLeadersOverlay((open) => !open);
           break;
         case 2:
-          if (stageRef.current === 'playing') stepBack();
+          goBack();
           break;
         case 3:
           audio.playApplause();
@@ -956,7 +992,7 @@ export function GameHost({
           break;
       }
     },
-    [audio, adjustTimer, togglePause, advanceStep, stepBack],
+    [audio, adjustTimer, togglePause, advance, goBack],
   );
   const runHostCommandRef = useRef(runHostCommand);
   runHostCommandRef.current = runHostCommand;
@@ -970,7 +1006,15 @@ export function GameHost({
       if (hostVoterIdRef.current !== '') {
         const extraction = extractHostVote(incoming, hostVoterIdRef.current);
         snapshot = extraction.snapshot;
-        if (extraction.hostAnswer !== null && extraction.hostAnswer !== lastHostAnswerRef.current) {
+        // בסוקט אמיתי פקודות המנחה מגיעות מהאירועים הגולמיים (onRawVote למטה) —
+        // כל לחיצה היא אירוע נפרד, בלי הדה-דופ שבולע לחיצות חוזרות על אותו מקש.
+        // כאן רק מסננים את הקשת המנחה מהמונים. במקורות ללא אירועים גולמיים
+        // (Replay/דמו) נשאר המסלול הישן מבוסס-ה-snapshot.
+        if (
+          !(adapter instanceof SocketVoteAdapter) &&
+          extraction.hostAnswer !== null &&
+          extraction.hostAnswer !== lastHostAnswerRef.current
+        ) {
           lastHostAnswerRef.current = extraction.hostAnswer;
           runHostCommandRef.current(extraction.hostAnswer);
         }
@@ -1009,12 +1053,22 @@ export function GameHost({
         setServerNames((prev) => (prev[phone] === name ? prev : { ...prev, [phone]: name })),
       );
       adapter.onPlayerJoined((phone, name) => addConnected(phone, name));
-      // חיווי דיבאג לאבחון סקרים/שאלות: הערך הגולמי שהטלפון שלח + לאיזו תשובה
-      // הוא ממופה (לפי answer.id). כך אפשר לראות ב-F12 אם הכפתור שנלחץ אכן
-      // מגיע כמספר הצפוי ונוחת על התשובה הנכונה.
+      // אירועי ההקשה הגולמיים מהטלפון — שני שימושים:
+      //   1. שלט המנחה: כל לחיצה של המנחה היא פקודה (0–6), בכל שלב במשחק —
+      //      גם כשאין חלון הצבעה פתוח, וגם לחיצות חוזרות על אותו מקש.
+      //   2. לוג אבחון: הערך הגולמי שהטלפון שלח + לאיזו תשובה הוא ממופה
+      //      (לפי answer.id) — נרשם רק בזמן הצבעה, שלא יציף את הלוג.
       adapter.onRawVote((raw: RawVote) => {
-        const slide = engine.getCurrentSlide();
+        const phone = String(raw.phone ?? '').trim();
         const n = Number(raw.vote);
+        if (hostVoterIdRef.current !== '' && phone === hostVoterIdRef.current) {
+          if (!Number.isInteger(n) || n < 0 || n > 6) return;
+          debugLog('command', `שלט מנחה (טלפון): מקש ${raw.vote}`, { stage: stageRef.current });
+          runHostCommandRef.current(n);
+          return;
+        }
+        if (engine.getState().phase !== 'voting') return;
+        const slide = engine.getCurrentSlide();
         const match = slide.question.answers.find((a) => a.id === n);
         const answerText = match ? match.ans.trim().slice(0, 40) : '⚠ אין תשובה עם id זה';
         debugLog('vote', `הצבעה גולמית מהטלפון: "${raw.vote}" → id=${n} → ${answerText}`, {
@@ -1242,32 +1296,6 @@ export function GameHost({
   // -------------------------------------------------------------------------
 
   useEffect(() => {
-    const advance = () => {
-      // מסך המובילים (מקש 1) פתוח מעל המשחק — רווח/קדימה מסירים אותו (כמו לחיצה
-      // נוספת על 1) במקום לקדם את המשחק שמאחוריו.
-      if (leadersOverlay) {
-        setLeadersOverlay(false);
-        return;
-      }
-      if (stage === 'opening') setStage('playing');
-      else if (stage === 'playing') advanceStep();
-      else if (stage === 'winners') {
-        // חשיפת המנצחים אחד-אחד; אחרי שכולם נחשפו — מעבר למסך ניקוד כל המשתתפים.
-        const podiumTotal = Math.min(engine.getWinners(engine.getGame().setting.multiWinners).length, 5);
-        if (winnersRevealedRef.current < podiumTotal) setWinnersRevealed((n) => n + 1);
-        else setStage('scoreboard');
-      }
-    };
-    // חזרה שלב אחד אחורה — עובדת בכל מצב: בשקופית (stepBack), וגם במסכי הסיום
-    // (ניקוד כל המשתתפים → מנצחים → חזרה למשחק).
-    const goBack = () => {
-      if (stage === 'playing') stepBack();
-      else if (stage === 'winners') {
-        // מבטלים חשיפת מנצח אחרון; כשאין חשופים — חזרה למשחק.
-        if (winnersRevealedRef.current > 0) setWinnersRevealed((n) => Math.max(0, n - 1));
-        else setStage('playing');
-      } else if (stage === 'scoreboard') setStage('winners');
-    };
     const handleKey = (event: KeyboardEvent) => {
       const target = event.target;
       // הקלדה בשדות טופס לא נחשבת פקודה. (בודקים instanceof Element כי מטרת
@@ -1297,12 +1325,8 @@ export function GameHost({
       if (menuOpen || settingsOpen || rosterOpen) return;
       if (event.key >= '0' && event.key <= '6') {
         debugLog('command', `שלט: מקש ${event.key}`, { stage });
-        // מסך מובילים פתוח — קדימה (0) מסיר אותו במקום לקדם את המשחק שמאחוריו
-        if (leadersOverlay && event.key === '0') setLeadersOverlay(false);
-        else if (event.key === '0' && stage !== 'playing') advance();
-        // מקש 2 (אחורה) — עובד גם במסכי הזוכים/מובילים, לא רק בשקופית
-        else if (event.key === '2' && stage !== 'playing') goBack();
-        else runHostCommandRef.current(Number(event.key));
+        // 0/2 מטופלים בתוך advance/goBack לכל שלבי המשחק (כולל מסכי הסיום)
+        runHostCommandRef.current(Number(event.key));
         return;
       }
       if (event.key === ' ' || event.key === 'Enter' || event.key === 'ArrowLeft') {
@@ -1346,7 +1370,7 @@ export function GameHost({
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [stage, menuOpen, settingsOpen, rosterOpen, leadersOverlay, connectCategory, engine, advanceStep, stepBack, onRequestRefresh]);
+  }, [stage, menuOpen, settingsOpen, rosterOpen, leadersOverlay, connectCategory, engine, advance, goBack, onRequestRefresh]);
 
   // מסך מלא — כפתור בפינה (window resize מעדכן את סקייל הבמה אוטומטית)
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
