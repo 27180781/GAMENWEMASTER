@@ -244,6 +244,8 @@ export function GameHost({
   const autoLeadersShownAtRef = useRef(0);
   /** כמה מקומות פודיום כבר נחשפו במסך המנצחים (חשיפה אחד-אחד מהאחרון לראשון). */
   const [winnersRevealed, setWinnersRevealed] = useState(0);
+  /** דפדוף ידני במסך ניקוד כל המשתתפים — כל רווח/0 מדפדף עמוד. */
+  const [scoresPageBump, setScoresPageBump] = useState(0);
   const winnersRevealedRef = useRef(0);
   winnersRevealedRef.current = winnersRevealed;
   /** חלונית דיבוג (F12) — מוצגת מעל הכל; ‏?debug=1 פותח אותה מראש. */
@@ -959,6 +961,9 @@ export function GameHost({
       const podiumTotal = Math.min(engine.getWinners(engine.getGame().setting.multiWinners).length, 5);
       if (winnersRevealedRef.current < podiumTotal) setWinnersRevealed((n) => n + 1);
       else setStage('scoreboard');
+    } else if (stage === 'scoreboard') {
+      // מסך הניקוד מדפדף לבד בלולאה; רווח/0 מדפדפים עמוד מיד (שליטה למנחה)
+      setScoresPageBump((n) => n + 1);
     }
   }, [engine, advanceStep]);
 
@@ -1101,6 +1106,13 @@ export function GameHost({
   // ניקוי האודיו בעזיבת המשחק (החלפת משחק/דמו) — עצירה והסרת מאזיני ה-unlock,
   // שאחרת מצטברים על window בכל mount.
   useEffect(() => () => audio.dispose(), [audio]);
+
+  // מדיה חוסמת (openMedia/endMedia) מתנגנת עם הקול שלה דרך הנגן — היא בלעדית,
+  // ולכן עוצרת כל סאונד-ערוץ שמתנגן (בדיוק כמו שסאונד חדש עוצר את הקודמים).
+  // בלי זה, סאונד ערוץ (למשל חשיפת תשובה) יכול להתערבב עם וידאו הסיום.
+  useEffect(() => {
+    if (stage === 'playing' && state.activeMedia !== null) audio.stopAll();
+  }, [stage, state.activeMedia, audio]);
 
   // סוף המשחק במנוע → מסך זוכים
   useEffect(() => {
@@ -1483,7 +1495,9 @@ export function GameHost({
         {stage === 'winners' && (
           <WinnersScreen engine={engine} nameOf={nameOf} revealed={winnersRevealed} />
         )}
-        {stage === 'scoreboard' && <AllScoresScreen engine={engine} nameOf={nameOf} />}
+        {stage === 'scoreboard' && (
+          <AllScoresScreen engine={engine} nameOf={nameOf} pageBump={scoresPageBump} />
+        )}
 
         {/* טבלת הניקוד באמצע משחק (פקודת מנחה 1) — מסך נפרד מלא מעל כל התצוגה */}
         {stage === 'playing' && leadersOverlay && (

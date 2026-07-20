@@ -4,7 +4,7 @@
  * YouTube; לתמונה אין "סיום" — המפעיל מקדם ידנית).
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { classifyMediaUrl } from '../engine/index.ts';
 
 interface MediaPlayerProps {
@@ -15,12 +15,36 @@ interface MediaPlayerProps {
   className?: string;
 }
 
+/** שם קובץ קצר לתצוגה בהודעת כשל (בלי query ונתיב ארוך). */
+function shortName(src: string): string {
+  const clean = src.split(/[?#]/, 1)[0] ?? src;
+  return clean.split('/').pop() || clean.slice(0, 50);
+}
+
 export function MediaPlayer({ src, onEnded, asBackground = false, className }: MediaPlayerProps) {
   const kind = classifyMediaUrl(src);
+  // מדיה שנכשלה בטעינה: במקום מסך שחור/ריק — חיווי ברור למפעיל (רווח ממשיך
+  // כרגיל). ברקע — פשוט לא מציגים כלום (החיווי היה מכער את השקופית).
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
+  const fail = () => setFailed(true);
+  if (failed && (kind === 'image' || kind === 'video' || kind === 'audio')) {
+    if (asBackground) return null;
+    return (
+      <div className="media-error" role="alert">
+        <div className="media-error-icon">⚠️</div>
+        <p>המדיה לא נטענה</p>
+        <p className="media-error-src" dir="ltr">
+          {shortName(src)}
+        </p>
+        <p className="media-error-hint">רווח להמשך</p>
+      </div>
+    );
+  }
 
   switch (kind) {
     case 'image':
-      return <img className={className ?? 'media-fill'} src={src} alt="" />;
+      return <img className={className ?? 'media-fill'} src={src} alt="" onError={fail} />;
     case 'video':
       return (
         <video
@@ -32,13 +56,21 @@ export function MediaPlayer({ src, onEnded, asBackground = false, className }: M
           loop={asBackground}
           playsInline
           onEnded={asBackground ? undefined : onEnded}
+          onError={fail}
         />
       );
     case 'audio':
       return (
         <div className={className ?? 'media-audio'}>
           <div className="media-audio-icon">🎵</div>
-          <audio key={src} src={src} autoPlay loop={asBackground} onEnded={asBackground ? undefined : onEnded} />
+          <audio
+            key={src}
+            src={src}
+            autoPlay
+            loop={asBackground}
+            onEnded={asBackground ? undefined : onEnded}
+            onError={fail}
+          />
         </div>
       );
     case 'youtube':
