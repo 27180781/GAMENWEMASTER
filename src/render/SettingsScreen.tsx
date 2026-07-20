@@ -67,6 +67,10 @@ export function SettingsScreen({
   const clampedVoters = Math.min(5000, Math.max(1, Math.floor(voterCount) || 1));
   const patchAuto = (patch: Partial<AutoTransition>) =>
     setAutoTransition((a) => ({ ...a, ...patch }));
+  const patchAutoImage = (patch: Partial<AutoTransition['media']['image']>) =>
+    setAutoTransition((a) => ({ ...a, media: { ...a.media, image: { ...a.media.image, ...patch } } }));
+  const patchAutoVideo = (playToEnd: boolean) =>
+    setAutoTransition((a) => ({ ...a, media: { ...a.media, video: { playToEnd } } }));
   // QR רלוונטי רק למשחק אונליין עם רישיון שאינו דמו
   const showQrOption = qrAvailable && !crowdEnabled;
   // הפריסה נקבעת לפי סוג המשחק — זהה במסך הפתיחה ובכפתור ההגדרות שבמשחק.
@@ -261,6 +265,32 @@ export function SettingsScreen({
           />
           <span>שניות</span>
         </label>
+        <label className="demo-field demo-field--row demo-field--auto-next">
+          <input
+            type="checkbox"
+            checked={autoTransition.media.image.active}
+            onChange={(e) => patchAutoImage({ active: e.target.checked })}
+          />
+          <span>מעבר אוטומטי בתמונת מדיה — לאחר</span>
+          <input
+            type="number"
+            min="1"
+            max="120"
+            value={autoTransition.media.image.seconds}
+            onChange={(e) =>
+              patchAutoImage({ seconds: Math.max(1, Math.min(120, Number(e.target.value) || 5)) })
+            }
+          />
+          <span>שניות</span>
+        </label>
+        <label className="demo-field demo-field--row">
+          <input
+            type="checkbox"
+            checked={autoTransition.media.video.playToEnd}
+            onChange={(e) => patchAutoVideo(e.target.checked)}
+          />
+          <span>סרטון מדיה מתנגן עד הסוף ואז עובר אוטומטית</span>
+        </label>
 
         {showQrOption && (
           <>
@@ -348,6 +378,32 @@ export function SettingsScreen({
           }
         />
         <span>שניות</span>
+      </label>
+      <label className="online-check online-check--auto-next">
+        <input
+          type="checkbox"
+          checked={autoTransition.media.image.active}
+          onChange={(e) => patchAutoImage({ active: e.target.checked })}
+        />
+        <span>מעבר אוטומטי בתמונת מדיה — לאחר</span>
+        <input
+          type="number"
+          min="1"
+          max="120"
+          value={autoTransition.media.image.seconds}
+          onChange={(e) =>
+            patchAutoImage({ seconds: Math.max(1, Math.min(120, Number(e.target.value) || 5)) })
+          }
+        />
+        <span>שניות</span>
+      </label>
+      <label className="online-check">
+        <input
+          type="checkbox"
+          checked={autoTransition.media.video.playToEnd}
+          onChange={(e) => patchAutoVideo(e.target.checked)}
+        />
+        <span>סרטון מדיה מתנגן עד הסוף ואז עובר אוטומטית</span>
       </label>
     </>
   );
