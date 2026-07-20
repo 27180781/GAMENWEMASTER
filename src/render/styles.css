@@ -381,6 +381,9 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  /* safe center: מרכוז אנכי, אבל אם התוכן גבוה מהאזור — נצמד למעלה במקום לגלוש
+     לשני הכיוונים. כך השאלה לעולם לא "עולה" אל אזור הלוגו/הכותרת ומסתירה אותם. */
+  justify-content: safe center;
   gap: 22px;
 }
 
@@ -480,8 +483,9 @@ body {
   width: 100%;
   align-self: center;
 }
-/* מספר אי-זוגי של תשובות — האחרונה ממורכזת ברוחב עמודה (מראה סימטרי) */
-.q-answers > .q-card:last-child:nth-child(odd) {
+/* מספר אי-זוגי של תשובות (טקסט) — האחרונה ממורכזת ברוחב עמודה (מראה סימטרי).
+   לא חל על גריד התמונות שהוא flex — שם הריכוז מטופל אחרת. */
+.q-answers:not(.q-answers--images) > .q-card:last-child:nth-child(odd) {
   grid-column: 1 / -1;
   justify-self: center;
   width: calc(50% - 10px);
@@ -537,15 +541,43 @@ body {
 }
 .q-card--correct .q-card-text { color: var(--pill); }
 
-/* גריד תמונות (ans_images) */
-.q-answers--images .q-card { flex-direction: column; border-radius: 26px; gap: 10px; padding: 14px; }
+/* גריד תמונות (ans_images) — התמונות ממלאות את הכרטיס בשורה אחת, והמספר/אחוז
+   צף על הפינה העליונה של התמונה (במקום מטבע נפרד מעליה שמבזבז שטח). */
+.q-answers--images {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 22px;
+  max-width: 1760px;
+}
+.q-answers--images .q-card {
+  flex: 1 1 260px;
+  max-width: 420px;
+  min-height: 0;
+  padding: 0;
+  gap: 0;
+  border-radius: 26px;
+  border-width: 4px;
+}
 .q-card-image {
   width: 100%;
-  height: 240px;
-  object-fit: contain;
-  background: rgba(0, 0, 0, 0.4);
-  border-radius: 14px;
+  height: 460px;
+  object-fit: cover; /* ממלא את הכרטיס — בלי שוליים כהים מסביב */
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 22px;
+  display: block;
 }
+/* המטבע (מספר לפני חשיפה, אחוז בחשיפה) — צף על פינת התמונה */
+.q-answers--images .q-coin {
+  position: absolute;
+  top: 14px;
+  inset-inline-end: 14px;
+  width: 64px;
+  height: 64px;
+  font-size: 34px;
+  z-index: 3;
+}
+.q-answers--images .q-coin--reveal { font-size: 24px; }
 
 /* ---------- סקר: סימון + פילוח עוגה ---------- */
 .q-question-row { display: flex; align-items: center; justify-content: center; gap: 18px; }
