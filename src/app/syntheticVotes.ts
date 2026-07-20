@@ -4,7 +4,7 @@
  * הפונקציות טהורות (PRNG עם seed) כדי שיהיו ניתנות לבדיקה.
  */
 
-import type { Slide, VoteSnapshot } from '../engine/index.ts';
+import { countsOfVotes, type Slide, type VoteSnapshot } from '../engine/index.ts';
 
 export interface PlannedVote {
   voterId: string;
@@ -78,19 +78,17 @@ export function snapshotAt(
   elapsedMs: number,
   seq: number,
 ): VoteSnapshot {
-  const counts: Record<string, number> = {};
   const voters: Record<string, number> = {};
   let firstVoter: string | undefined;
   for (const vote of plan) {
     if (vote.atOffsetMs > elapsedMs) break; // התוכנית ממוינת לפי זמן
     if (firstVoter === undefined) firstVoter = vote.voterId;
     voters[vote.voterId] = vote.answerId;
-    counts[String(vote.answerId)] = (counts[String(vote.answerId)] ?? 0) + 1;
   }
   return {
     seq,
     slideId,
-    counts,
+    counts: countsOfVotes(voters),
     total: Object.keys(voters).length,
     voters,
     ...(firstVoter !== undefined ? { firstVoter } : {}),

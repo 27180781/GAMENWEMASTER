@@ -6,17 +6,16 @@
  * לא זמין באופליין (‎file://‎ ב-EXE) ולא בפיתוח — שם נופלים חלק להתנהגות הרגילה.
  */
 
-// מדיניות הסיומות — נשמרת מסונכרנת עם MEDIA_EXT ב-public/sw.js (עותק קטן וזהה).
-const MEDIA_EXT =
-  /\.(png|jpe?g|gif|webp|avif|bmp|ico|svg|mp3|wav|ogg|oga|m4a|aac|flac|opus|mp4|m4v|webm|mov|ogv)(\?.*)?$/i;
+import { classifyMediaUrl } from '../engine/index.ts';
 
-/** האם כתובת נחשבת מדיה לצורך המטמון (משמש לתיעוד/בדיקות; ה-SW מחליט בפועל). */
+/**
+ * האם כתובת נחשבת מדיה לצורך המטמון — נגזר ישירות ממסווג המדיה של המנוע
+ * (המקור היחיד לסיומות). ה-SW עצמו (public/sw.js) מחזיק עותק-רגקס הכרחי;
+ * בדיקת יחידה משווה אותו לרשימות שב-classify ותיכשל אם יסטו.
+ */
 export function isMediaUrl(url: string): boolean {
-  try {
-    return MEDIA_EXT.test(new URL(url, 'http://x').pathname);
-  } catch {
-    return false;
-  }
+  const kind = classifyMediaUrl(url);
+  return kind === 'image' || kind === 'video' || kind === 'audio';
 }
 
 /** רושם את ה-SW של מטמון המדיה — בבטחה, ובלי לחסום את הטעינה. */

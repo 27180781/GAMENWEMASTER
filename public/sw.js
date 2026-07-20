@@ -14,6 +14,8 @@
 const CACHE = 'media-cache-v1';
 
 // סיומות מדיה שנשמרות. שאר הבקשות אינן מיורטות כלל.
+// עותק הכרחי של הרשימות שב-src/engine/classify.ts (קובץ SW עצמאי לא יכול
+// לייבא) — בדיקת mediaSW.test.ts משווה אותו אליהן ותיכשל אם יסטו זה מזה.
 const MEDIA_EXT =
   /\.(png|jpe?g|gif|webp|avif|bmp|ico|svg|mp3|wav|ogg|oga|m4a|aac|flac|opus|mp4|m4v|webm|mov|ogv)(\?.*)?$/i;
 

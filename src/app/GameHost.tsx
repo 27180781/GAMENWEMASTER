@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   GameEngine,
   ReplayAdapter,
+  countsOfVotes,
   isVotableSlide,
   type GameFile,
   type VoteAdapter,
@@ -1035,16 +1036,17 @@ export function GameHost({
       // המונים/סה"כ מתוכם — כך שהצבעות מעבר לרישיון לא נספרות ולא משפיעות על הניקוד.
       if (snapshot.voters) {
         const voters: Record<string, number> = {};
-        const counts: Record<string, number> = {};
-        let total = 0;
         for (const [voterId, answerId] of Object.entries(snapshot.voters)) {
           if (removedRef.current.has(voterId)) continue; // הוסר מהמשחק — לא נספר
           if (!admitRef.current(voterId)) continue;
           voters[voterId] = answerId;
-          counts[String(answerId)] = (counts[String(answerId)] ?? 0) + 1;
-          total += 1;
         }
-        snapshot = { ...snapshot, voters, counts, total };
+        snapshot = {
+          ...snapshot,
+          voters,
+          counts: countsOfVotes(voters),
+          total: Object.keys(voters).length,
+        };
       }
       // מסך התחברות לקבוצות פעיל: ההקשות הן שיוך לקבוצה לפי מספר, לא הצבעה לשאלה
       const connectCat = connectCategoryRef.current;

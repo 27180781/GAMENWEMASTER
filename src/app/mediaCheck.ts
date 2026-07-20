@@ -10,6 +10,7 @@
  */
 
 import { classifyMediaUrl, type GameFile, type MediaKind } from '../engine/index.ts';
+import { mediaFields } from './mediaFields.ts';
 
 export interface MediaRef {
   src: string;
@@ -24,46 +25,13 @@ export interface MediaIssue {
   reason: 'missing' | 'broken';
 }
 
-const SOUND_LABELS: Record<string, string> = {
-  playersConnectingMediaSound: 'סאונד התחברות',
-  showQuestionMediaSound: 'סאונד הצגת שאלה',
-  winnersMediaSound: 'סאונד זוכים',
-  winnersListMediaSound: 'סאונד טבלת זוכים',
-  genericMediaSound: 'סאונד כללי',
-  timerMediaSound: 'סאונד טיימר',
-  inShowAnsMediaSound: 'סאונד חשיפת תשובה',
-};
-
-/** אוסף את כל הפניות המדיה במשחק, עם תיאור היכן הן משמשות. */
+/** אוסף את כל הפניות המדיה במשחק (דרך ההולך המשותף), עם תיאור היכן הן משמשות. */
 export function collectMediaRefs(game: GameFile): MediaRef[] {
   const refs: MediaRef[] = [];
-  const add = (raw: string, context: string) => {
-    const src = raw.trim();
-    if (src !== '') refs.push({ src, context, kind: classifyMediaUrl(src) });
-  };
-
-  const s = game.setting;
-  add(s.gameMedia.src, 'מדיית פתיחה');
-  add(s.logo.src, 'לוגו');
-  add(s.triviaMedia.src, 'רקע שאלות');
-  add(s.winnersMedia.src, 'רקע זוכים');
-  add(s.winnersListMedia.src, 'רקע טבלת זוכים');
-  for (const [key, channel] of Object.entries(s.sound)) {
-    if (channel.src) add(channel.src, SOUND_LABELS[key] ?? `סאונד (${key})`);
+  for (const field of mediaFields(game)) {
+    const src = field.get().trim();
+    if (src !== '') refs.push({ src, context: field.label, kind: classifyMediaUrl(src) });
   }
-
-  game.questions.forEach((slide, i) => {
-    const n = `שקופית ${i + 1}`;
-    add(slide.openMedia.src, `${n} · מדיית פתיחה`);
-    add(slide.endMedia.src, `${n} · מדיית סיום`);
-    add(slide.backgroundMedia.src, `${n} · רקע`);
-    add(slide.setting.slidBackgroundMedia.src, `${n} · רקע שקופית`);
-    add(slide.question.src, `${n} · תמונת שאלה`);
-    if (slide.type === 'ans_images') {
-      slide.question.answers.forEach((a, j) => add(a.ans, `${n} · תמונת תשובה ${j + 1}`));
-    }
-  });
-
   return refs;
 }
 
