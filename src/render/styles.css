@@ -2614,11 +2614,13 @@ body {
 /* ---- תמונת שאלה: כרטיס ממוסגר בצד, כל התמונה נכנסת (contain) ---- */
 .q-question-image {
   position: absolute;
-  top: 150px;
-  left: 40px; /* פיזי — פינה שמאלית עליונה, כמו בדוגמה (מתחת לכפתורי הפינה) */
+  /* גבוה יותר וקצת שמאלה — צמוד לפינה השמאלית-עליונה (מתחת לכפתורי הפינה
+     שמסתיימים ב-y≈66), כדי לא להסתיר את טקסט השאלה ואת התשובות שמתחת. */
+  top: 88px;
+  left: 24px;
   z-index: 4;
-  width: 330px;
-  height: 320px;
+  width: 300px;
+  height: 300px;
   padding: 12px;
   background: #f4f1ea;
   border: 5px solid var(--text);
