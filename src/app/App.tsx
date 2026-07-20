@@ -10,7 +10,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { parseGameFile, type GameFile } from '../engine/index.ts';
+import { parseGameFileLenient, type DroppedSlide, type GameFile } from '../engine/index.ts';
 import { DebugApp } from '../debug/DebugApp.tsx';
 import { SettingsScreen } from '../render/SettingsScreen.tsx';
 import { Stage } from '../render/Stage.tsx';
@@ -138,6 +138,13 @@ export function App() {
   });
   const [remoteLoading, setRemoteLoading] = useState(params.gameUrl !== null);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * טעינה עם שקופיות פגומות בודדות: המשחק תקין-למשחק אך יש שקופיות שנשמטו.
+   * מוצג מסך אזהרה (מה לתקן) + "דלג והמשך" — ורק בלחיצה נכנסים למשחק.
+   */
+  const [loadNotice, setLoadNotice] = useState<{ game: GameFile; dropped: DroppedSlide[] } | null>(
+    null,
+  );
 
   // בטעינת משחק — טוענים את המעברים האוטומטיים מברירת המחדל שב-JSON, אלא אם
   // נשמרה דריסה ב-localStorage למשחק הזה (id). כך ההעדפה נשמרת בין רענונים,
@@ -203,12 +210,14 @@ export function App() {
           throw new Error(`השרת החזיר ${response.status} ${response.statusText}`);
         }
         const raw: unknown = await response.json();
-        const loaded = parseGameFile(raw);
+        const { game: loaded, dropped } = parseGameFileLenient(raw);
         if (!cancelled) {
           setOffline(false); // ‏?game=URL — משחק אונליין
           setMediaIssues([]);
           setMediaAlertDismissed(false);
-          setPendingGame(loaded);
+          // שקופיות פגומות → מסך אזהרה תחילה; אחרת ישר להגדרות.
+          if (dropped.length > 0) setLoadNotice({ game: loaded, dropped });
+          else setPendingGame(loaded);
           setRemoteLoading(false);
         }
       } catch (e) {
@@ -270,7 +279,9 @@ export function App() {
   const applyRawGame = useCallback(
     (raw: unknown) => {
       try {
-        applyGame(parseGameFile(raw));
+        // רענון חם/פוש: טעינה סלחנית — שקופית שנשברה בעדכון מושמטת ולא מפילה את
+        // הרענון. (מסך האזהרה מוצג רק בטעינה הראשונית, לא באמצע משחק חי.)
+        applyGame(parseGameFileLenient(raw).game);
       } catch (e) {
         setError(`רענון מהפוש נכשל:\n${(e as Error).message}`);
       }
@@ -444,6 +455,28 @@ export function App() {
     );
   }
 
+  // מסך אזהרה — נמצאו שקופיות פגומות בודדות, אך שאר המשחק תקין. מציגים מה לתקן
+  // בעמוד יצירת המשחק, ומאפשרים לדלג עליהן ולשחק בכל זאת בשאר השקופיות.
+  if (loadNotice !== null) {
+    const { game: noticeGame, dropped } = loadNotice;
+    return (
+      <Shell style={themeStyle(noticeGame.setting)}>
+        <ErrorScreen
+          variant="warning"
+          title={`נמצאו ${dropped.length} שקופיות בעייתיות`}
+          issues={dropped}
+          note="יש לתקן את השקופיות האלו בעמוד יצירת המשחק. אפשר לדלג עליהן ולשחק כרגיל בשאר השקופיות."
+          onContinue={() => {
+            setPendingGame(noticeGame);
+            setLoadNotice(null);
+          }}
+          continueLabel="דלג על השקופיות הבעייתיות והמשך"
+          onBack={params.gameUrl === null ? () => setLoadNotice(null) : undefined}
+        />
+      </Shell>
+    );
+  }
+
   // מסך שגיאה עצמאי — טעינת המשחק נכשלה. מחליף את בורר קבצי-הבדיקה כדי שיוצג רק
   // *מה* נכשל (רלוונטי במיוחד בטעינה מקישור באירוע חי). בטעינה מקישור מציעים
   // "נסה שוב" (טעינה מחדש); בבורר המקומי — "חזרה לבחירת קובץ".
@@ -451,6 +484,8 @@ export function App() {
     return (
       <Shell>
         <ErrorScreen
+          variant="error"
+          title="לא ניתן לפתוח את המשחק"
           message={error}
           onRetry={params.gameUrl !== null ? () => window.location.reload() : undefined}
           onBack={params.gameUrl === null ? () => setError(null) : undefined}
@@ -465,7 +500,9 @@ export function App() {
       setOffline(false); // בחירת fixture / העלאת JSON — משחק אונליין
       setMediaIssues([]);
       setMediaAlertDismissed(false);
-      setPendingGame(parseGameFile(raw));
+      const { game, dropped } = parseGameFileLenient(raw);
+      if (dropped.length > 0) setLoadNotice({ game, dropped });
+      else setPendingGame(game);
       setError(null);
     } catch (e) {
       setError((e as Error).message);
@@ -476,7 +513,7 @@ export function App() {
     file
       .arrayBuffer()
       .then((buffer) => loadGameFromZip(buffer))
-      .then(({ game, missing, revoke }) => {
+      .then(({ game, missing, revoke, dropped }) => {
         zipRevokeRef.current?.(); // שחרור משחק אופליין קודם (אם נטען אחד)
         zipRevokeRef.current = revoke;
         setOffline(true); // ZIP — משחק אופליין
@@ -484,7 +521,8 @@ export function App() {
         setSettings((prev) => ({ ...prev, crowdEnabled: true }));
         setMediaIssues(missing); // נכסים חסרים בתיקיית ה-ZIP
         setMediaAlertDismissed(false);
-        setPendingGame(game);
+        if (dropped.length > 0) setLoadNotice({ game, dropped });
+        else setPendingGame(game);
         setError(null);
       })
       .catch((e: unknown) => setError(`טעינת ה-ZIP נכשלה:\n${(e as Error).message}`));
