@@ -79,11 +79,35 @@ function preloadImage(url: string, timeoutMs: number): Promise<'loaded' | 'faile
   });
 }
 
-/** טעינה מוקדמת של נכס בודד — מחמם את ה-cache. תמיד נפתר ('loaded'/'failed'). */
-function preloadOne(url: string, timeoutMs: number, signal?: AbortSignal): Promise<'loaded' | 'failed'> {
+/** טעינה מוקדמת של נכס בודד (ניסיון יחיד). */
+function preloadOnce(url: string, timeoutMs: number, signal?: AbortSignal): Promise<'loaded' | 'failed'> {
   const kind = classifyMediaUrl(url);
   if (kind === 'video' || kind === 'audio') return preloadHeavy(url, timeoutMs, signal);
   return preloadImage(url, timeoutMs);
+}
+
+const preloadDelay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/**
+ * טעינה מוקדמת של נכס בודד עם ניסיונות חוזרים — מחמם את ה-cache כדי שהנגינה
+ * בפועל תהיה מהמטמון ולא תלויה בהזרמה חיה. כשל זמני של פרוקסי/Worker (Cloudflare)
+ * מקבל רענון נוסף במקום להישאר לא-שמור (מה שגרם, למשל, לסאונד שנתקע אחרי כמה
+ * שניות כשההזרמה החיה נכשלה). לא מנסים שוב אם בוטל (signal).
+ */
+async function preloadOne(
+  url: string,
+  timeoutMs: number,
+  signal?: AbortSignal,
+  retries = 2,
+): Promise<'loaded' | 'failed'> {
+  let result = await preloadOnce(url, timeoutMs, signal);
+  for (let attempt = 1; attempt <= retries && result === 'failed'; attempt++) {
+    if (signal?.aborted) return 'failed';
+    await preloadDelay(400 * attempt);
+    if (signal?.aborted) return 'failed';
+    result = await preloadOnce(url, timeoutMs, signal);
+  }
+  return result;
 }
 
 export interface PreloadProgress {

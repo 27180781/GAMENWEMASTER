@@ -79,15 +79,44 @@ function probeOne(src: string, kind: MediaKind, timeoutMs: number): Promise<bool
   });
 }
 
+const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** מוסיף פרמטר-שאילתה כדי לעקוף מטמון (של הדפדפן/CDN) בניסיון חוזר. */
+function cacheBust(src: string): string {
+  return src + (src.includes('?') ? '&' : '?') + `_probe=${Date.now()}`;
+}
+
+/**
+ * בדיקה עם ניסיונות חוזרים: תקלה בבדיקה הראשונה מסומנת "שבורה" רק אם היא חוזרת
+ * גם אחרי כמה ניסיונות (עם השהיה גוברת ועקיפת מטמון). כך כשל זמני של פרוקסי/
+ * Worker (Cloudflare cold-start / מגבלת subrequests / rate-limit תחת מטח מקבילי)
+ * אינו מסומן שבור אם רענון נוסף מצליח — בדיוק המקרה שבו "צריך רענון נוסף".
+ */
+async function probeWithRetry(
+  src: string,
+  kind: MediaKind,
+  timeoutMs: number,
+  retries: number,
+): Promise<boolean> {
+  if (await probeOne(src, kind, timeoutMs)) return true;
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    await delay(300 * attempt);
+    if (await probeOne(cacheBust(src), kind, timeoutMs)) return true;
+  }
+  return false;
+}
+
 interface ProbeOptions {
   timeoutMs?: number;
   concurrency?: number;
+  /** כמה ניסיונות חוזרים לפני שמסמנים "שבור" (ברירת מחדל 2). */
+  retries?: number;
 }
 
 /** בודק את כל הפניות המדיה (מלבד YouTube/blob) ומחזיר את השבורות. */
 export async function probeMediaRefs(
   refs: MediaRef[],
-  { timeoutMs = 8000, concurrency = 8 }: ProbeOptions = {},
+  { timeoutMs = 8000, concurrency = 4, retries = 2 }: ProbeOptions = {},
 ): Promise<MediaIssue[]> {
   const toProbe = refs.filter(
     (r) => r.kind !== 'youtube' && !r.src.startsWith('blob:') && !r.src.startsWith('data:'),
@@ -97,7 +126,7 @@ export async function probeMediaRefs(
   const worker = async () => {
     while (index < toProbe.length) {
       const ref = toProbe[index++]!;
-      const ok = await probeOne(ref.src, ref.kind, timeoutMs);
+      const ok = await probeWithRetry(ref.src, ref.kind, timeoutMs, retries);
       if (!ok) issues.push({ src: ref.src, context: ref.context, reason: 'broken' });
     }
   };
