@@ -616,6 +616,10 @@ export function GameHost({
     if (gameRef.current === game) return; // אותו אובייקט — הטעינה הראשונית, לא רענון
     gameRef.current = game;
     engine.updateGame(game);
+    // שמות/קבוצות מעודכנים מהקובץ כבר מוזגו למרשם השמור (App, לפני setGame) —
+    // טוענים מחדש כדי שהלשונית/הדירוג הקבוצתי יראו אותם מיד. עריכות ידניות של
+    // המפעיל נשמרות: כל שינוי מרשם נכתב ל-localStorage, והמיזוג הוא upsert.
+    setRoster(loadRoster(game.id));
   }, [game, engine]);
 
   // -------------------------------------------------------------------------
