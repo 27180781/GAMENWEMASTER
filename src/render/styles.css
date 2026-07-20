@@ -583,28 +583,53 @@ body {
 
 /* גריד תמונות (ans_images) — התמונות ממלאות את הכרטיס בשורה אחת, והמספר/אחוז
    צף על הפינה העליונה של התמונה (במקום מטבע נפרד מעליה שמבזבז שטח). */
+/* תשובות-כתמונה: עד 4 בשורה, מתחלקות לשורות מאוזנות. האזור ממלא את הגובה שנותר
+   ב-q-main (flex:1) ומתחלק בין השורות — כך התמונות לעולם אינן גולשות אל הכותרת/
+   הלוגו/הטיימר או אל הפס התחתון. --img-cols/--img-rows מגיעים מ-QuestionSlide. */
 .q-answers--images {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
+  align-content: center;
   gap: 22px;
+  width: 100%;
   max-width: 1760px;
+  margin-inline: auto;
+  flex: 1 1 0;
+  min-height: 0;
 }
 .q-answers--images .q-card {
-  flex: 1 1 260px;
-  max-width: 420px;
+  flex: 0 0 auto;
+  /* רוחב לפי מספר העמודות בשורה (עד 4); גובה לפי מספר השורות — כך שהכול נכנס. */
+  width: min(520px, calc((100% - (var(--img-cols, 4) - 1) * 22px) / var(--img-cols, 4)));
+  height: min(460px, calc((100% - (var(--img-rows, 1) - 1) * 22px) / var(--img-rows, 1)));
   min-height: 0;
   padding: 0;
   gap: 0;
   border-radius: 26px;
   border-width: 4px;
+  position: relative;
+  overflow: hidden;
+}
+/* רקע מטושטש מהתמונה עצמה — ממלא את הכרטיס כדי שתמונה לרוחב (או כל יחס שאינו
+   מרובע) תוצג במלואה עם object-fit:contain, בלי חיתוך ובלי פסים ריקים בשוליים. */
+.q-card-image-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(22px) brightness(0.7);
+  transform: scale(1.18);
+  z-index: 0;
 }
 .q-card-image {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: 460px;
-  object-fit: cover; /* ממלא את הכרטיס — בלי שוליים כהים מסביב */
-  background: rgba(0, 0, 0, 0.25);
-  border-radius: 22px;
+  height: 100%;
+  object-fit: contain; /* התמונה כולה נראית — בלי חיתוך */
+  z-index: 1;
   display: block;
 }
 /* המטבע (מספר לפני חשיפה, אחוז בחשיפה) — צף על הפינה הימנית-עליונה של התמונה */
