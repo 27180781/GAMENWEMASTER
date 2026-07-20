@@ -129,7 +129,9 @@ export function App() {
   // ומשחק חדש חוזר לברירת המחדל שלו.
   useEffect(() => {
     if (pendingGame === null) return;
-    const at = loadAutoTransition(pendingGame.id) ?? pendingGame.setting.autoTransition;
+    const at =
+      loadAutoTransition(pendingGame.id, pendingGame.setting.autoTransition) ??
+      pendingGame.setting.autoTransition;
     setSettings((prev) => ({ ...prev, autoTransition: at }));
   }, [pendingGame]);
 

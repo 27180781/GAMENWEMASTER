@@ -177,7 +177,6 @@ body {
    והשחקנים המתחברים יזרמו מתחתיו. */
 .lobby-content--join { justify-content: flex-start; padding-top: 12px; gap: 14px; }
 .lobby-content--join .lobby-logo { max-height: 92px; }
-.lobby-content--join .lobby-title { font-size: 44px; max-height: 92px; }
 .lobby-logo { max-height: 150px; }
 .lobby-title { font-size: 60px; max-height: 150px; }
 

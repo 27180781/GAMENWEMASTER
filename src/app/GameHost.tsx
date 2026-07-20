@@ -411,6 +411,14 @@ export function GameHost({
           const restored = rosterFromBackup(data);
           if (restored.players.length > 0 || restored.categories.length > 0) updateRoster(restored);
         }
+        // שחזור אל תוך הצבעה/תוצאות — כל התשובות כבר נחשפו לפני הקריסה, לכן
+        // מציגים אותן מיד. (כשמזהה השקופית לא השתנה, effect האיפוס לא ירוץ —
+        // ולכן קובעים כאן במפורש; כשהוא כן רץ, הוא מחשב את אותו הערך בעצמו.)
+        const rs = engine.getState();
+        const rSlide = engine.getCurrentSlide();
+        if (isVotableSlide(rSlide) && rs.activeMedia === null && (rs.phase === 'voting' || rs.phase === 'results')) {
+          setReveal({ questionShown: true, answersShown: rSlide.question.answers.length, revealCorrect: false });
+        }
         setStage(data.meta.phase === 'ended' ? 'winners' : 'playing');
         debugLog('game', 'שוחזר מגיבוי', { phase: data.meta.phase, currentQueId: data.meta.currentQueId });
       } catch (err) {
@@ -567,10 +575,17 @@ export function GameHost({
           : NO_REVEAL,
       );
     } else if (isVotableSlide(s) && engine.getState().activeMedia !== 'open') {
-      // הצגת השאלה מיד עם הכניסה לשקופית הצבעה — בלי "מסך רקע ריק" ולחיצה ראשונה.
-      // (אם מתנגנת מדיית פתיחה חוסמת, השאלה מוצגת אחרי סיומה כרגיל.)
-      setReveal({ questionShown: true, answersShown: 0, revealCorrect: false });
-      audio.play('showQuestion', soundsRef.current.showQuestionMediaSound.src);
+      const phase = engine.getState().phase;
+      if (phase === 'voting' || phase === 'results') {
+        // כניסה לשקופית שכבר באמצע הצבעה/תוצאות (שחזור מגיבוי) — התשובות כבר
+        // נחשפו לפני הקריסה, לכן מציגים את כולן (ובלי סאונד הצגת-שאלה).
+        setReveal({ questionShown: true, answersShown: s.question.answers.length, revealCorrect: false });
+      } else {
+        // הצגת השאלה מיד עם הכניסה לשקופית הצבעה — בלי "מסך רקע ריק" ולחיצה ראשונה.
+        // (אם מתנגנת מדיית פתיחה חוסמת, השאלה מוצגת אחרי סיומה כרגיל.)
+        setReveal({ questionShown: true, answersShown: 0, revealCorrect: false });
+        audio.play('showQuestion', soundsRef.current.showQuestionMediaSound.src);
+      }
     } else {
       setReveal(NO_REVEAL);
     }
@@ -1464,7 +1479,7 @@ export function GameHost({
   // קליק עכבר אינו מקדם שלבים — קידום רק ברווח/0 (בקשת המנחה)
   return (
     <div
-      className={`game-root${showJoinBanner ? ' has-banner' : ''}`}
+      className={`game-root${showJoinBanner && stage !== 'opening' ? ' has-banner' : ''}`}
       dir="rtl"
       style={themeStyle(setting)}
     >
