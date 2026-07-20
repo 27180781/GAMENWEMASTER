@@ -29,6 +29,7 @@ export function buildBackupPayload(
   roster: RosterData,
   nameOf: (voterId: string) => string,
   startedAt: number,
+  removedIds: readonly string[] = [],
 ): BackupPayload {
   const correctBySlide = correctAnswersBySlide(game);
   const votesBySlide = state.votesBySlide;
@@ -44,6 +45,8 @@ export function buildBackupPayload(
     let numCorrect = 0;
     let lastQue: number | null = null;
     let lastVote: number | null = null;
+    // כל ההצבעות פר-שקופית — נשמרות בגיבוי כדי שהשחזור יחזיר votesBySlide מלא
+    const votes: Record<string, number> = {};
     for (const slide of game.questions) {
       const answerId = votesBySlide[slide.id]?.[voterId];
       if (answerId === undefined) continue;
@@ -51,6 +54,7 @@ export function buildBackupPayload(
       if (correctBySlide.get(slide.id)?.has(answerId)) numCorrect += 1;
       lastQue = slide.id;
       lastVote = answerId;
+      votes[String(slide.id)] = answerId;
     }
     const byCat = roster.memberships[voterId];
     const groupId = byCat !== undefined ? Object.values(byCat)[0] ?? null : null;
@@ -60,7 +64,7 @@ export function buildBackupPayload(
       groupId,
       numAnswers,
       numCorrect,
-      details: { lastQue, lastVote },
+      details: numAnswers > 0 ? { lastQue, lastVote, votes } : { lastQue, lastVote },
     };
   }
 
@@ -105,7 +109,12 @@ export function buildBackupPayload(
     users,
     questions,
     groups,
-    meta: { currentQueId: state.currentSlideId, phase: state.phase, startedAt },
+    meta: {
+      currentQueId: state.currentSlideId,
+      phase: state.phase,
+      startedAt,
+      ...(removedIds.length > 0 ? { removedIds: [...removedIds] } : {}),
+    },
   };
 }
 
@@ -119,9 +128,11 @@ function mapPhase(phase: string): GamePhase {
 }
 
 /**
- * בונה GameSnapshot של המנוע מגיבוי — לשחזור. הניקוד והמיקום משוחזרים במלואם;
- * votesBySlide אינו ניתן לשחזור מדויק (הפורמט מצטבר) ולכן ריק — חזרה אחורה
- * לשקופית שכבר נוקדה תחשב אותה מחדש (מגבלה מתועדת, כמו בשחזור snapshot רגיל).
+ * בונה GameSnapshot של המנוע מגיבוי — לשחזור. הניקוד, המיקום וההצבעות
+ * פר-שקופית משוחזרים: votesBySlide נבנה מחדש מ-details.votes של כל משתמש
+ * (נשמר בתוך מחרוזת ה-users שהשרת מחזיר תמיד), כך שסינון
+ * correctlyAnsweredBefore ממשיך לעבוד גם אחרי קריסה. גיבויים ישנים בלי
+ * details.votes משוחזרים עם votesBySlide ריק (ההתנהגות הקודמת).
  *
  * המיקום (`currentQueId`) נלקח קודם מ-meta; אך שרת הגיבוי ממזג רק שדות מוכרים
  * (id/users/questions/groups/completed) ועלול להשמיט את שדות ה-meta, ואז נחזור
@@ -135,6 +146,17 @@ export function backupToSnapshot(game: GameFile, backup: BackupData): GameSnapsh
     if (user.score !== 0) scores[voterId] = user.score;
   }
   const orderIndex = new Map(game.questions.map((s, i) => [s.id, i]));
+  // שחזור ההצבעות פר-שקופית מ-details.votes (רק לשקופיות שקיימות בקובץ)
+  const votesBySlide: Record<number, Record<string, number>> = {};
+  for (const [voterId, user] of Object.entries(backup.users)) {
+    const votes = user.details?.votes;
+    if (votes === undefined) continue;
+    for (const [slideIdStr, answerId] of Object.entries(votes)) {
+      const slideId = Number(slideIdStr);
+      if (!orderIndex.has(slideId) || typeof answerId !== 'number') continue;
+      (votesBySlide[slideId] ??= {})[voterId] = answerId;
+    }
+  }
   const displayedIds = Object.values(backup.questions)
     .filter((q) => q.display && orderIndex.has(q.queId))
     .map((q) => q.queId);
@@ -159,7 +181,7 @@ export function backupToSnapshot(game: GameFile, backup: BackupData): GameSnapsh
     currentSlideId,
     phase: mapPhase(backup.meta.phase),
     scores,
-    votesBySlide: {},
+    votesBySlide,
     slidesCompleted,
     firstClickWinners: {},
   };

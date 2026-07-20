@@ -163,9 +163,11 @@ export class SocketVoteAdapter implements VoteAdapter {
     // רק החדר שלנו (השרת אמור לשלוח רק אותו, אבל מסננים ליתר ביטחון)
     if (data.gameId !== undefined && String(data.gameId) !== this.roomId) return;
     this.report(data); // חיבור + שם השחקן מהטלפון
-    if (this.window === null) return; // אין חלון הצבעה פתוח — מתעלמים
-    // חיווי דיבאג: הערך הגולמי כפי שהגיע מהטלפון (לפני עיבוד/מיפוי) — לאבחון
+    // האירוע הגולמי מדווח *תמיד* — גם כשאין חלון הצבעה פתוח. פקודות שלט המנחה
+    // מהטלפון מגיעות מכאן, וחייבות לעבוד בכל שלב במשחק (הצגת שאלה, תוצאות,
+    // מסכי סיום) ולא רק בזמן הצבעה. הצבירה לחלון נעשית רק כשחלון פתוח.
     this.rawVoteListener?.(data);
+    if (this.window === null) return; // אין חלון הצבעה פתוח — לא נצבר כהצבעה
     const snapshot = this.window.add(data);
     if (snapshot !== null) this.snapshotListener?.(snapshot);
   }
@@ -203,8 +205,9 @@ export class SocketVoteAdapter implements VoteAdapter {
   }
 
   /**
-   * חיווי דיבאג: כל הצבעה גולמית שמגיעה מהטלפון בזמן שחלון ההצבעה פתוח,
-   * לפני אגירה/מיפוי. משמש לאבחון התאמה בין מספר הכפתור לתשובה המוצגת.
+   * כל הקשה גולמית שמגיעה מהטלפון (בכל שלב — גם כשאין חלון הצבעה פתוח), לפני
+   * אגירה/מיפוי. משמש לשני דברים: פקודות שלט המנחה (כל לחיצה = אירוע אחד,
+   * בלי בעיית הדה-דופ של snapshots), ולוג אבחון הצבעות.
    */
   onRawVote(cb: (vote: RawVote) => void): void {
     this.rawVoteListener = cb;

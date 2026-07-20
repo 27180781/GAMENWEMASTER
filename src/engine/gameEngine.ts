@@ -54,6 +54,15 @@ function freshBookkeeping(): VotingBookkeeping {
   };
 }
 
+/** מוני הצבעות (answerId → כמות) ממפת מצביעים. */
+function countsOfVotes(votes: Record<string, number>): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const answerId of Object.values(votes)) {
+    counts[String(answerId)] = (counts[String(answerId)] ?? 0) + 1;
+  }
+  return counts;
+}
+
 export class GameEngine {
   private game: GameFile;
   private readonly surveyParticipationScoring: boolean;
@@ -425,8 +434,18 @@ export class GameEngine {
       this.voting.latestFirstVoter = snapshot.firstVoter;
     }
 
+    // כש-allowChangeVote כבוי, ההצבעה שתנוקד היא הראשונה (הנעולה) — לכן גם
+    // המונים החיים מוצגים לפי ההצבעות הנעולות, כדי שהמסך לא יראה שינויי הצבעה
+    // שלא ייספרו. עם allowChangeVote (או בלי voters) — המונים מה-snapshot כרגיל.
+    const locked =
+      !this.getCurrentSlide().setting.allowChangeVote && snapshot.voters !== undefined;
     this.setState({
-      liveVotes: { counts: { ...snapshot.counts }, total: snapshot.total },
+      liveVotes: locked
+        ? {
+            counts: countsOfVotes(this.voting.lockedVotes),
+            total: Object.keys(this.voting.lockedVotes).length,
+          }
+        : { counts: { ...snapshot.counts }, total: snapshot.total },
     });
   }
 
@@ -518,6 +537,12 @@ export class GameEngine {
       answerTimes,
       votesBySlide: { ...this.state.votesBySlide, [slideId]: finalVotes },
       firstClickWinners,
+      // הפילוח שמוצג בחשיפה (עוגת סקר / אחוזי תשובות) נגזר מ-liveVotes — מיישרים
+      // אותו להצבעות הסופיות שנשמרו ונוקדו, כך שהמסך, הדוח וה-API תמיד זהים.
+      liveVotes: {
+        counts: countsOfVotes(finalVotes),
+        total: Object.keys(finalVotes).length,
+      },
       // endMedia אינו מתנגן אוטומטית — הוא שלב נפרד שמופעל ב-ADVANCE
       activeMedia: null,
     });

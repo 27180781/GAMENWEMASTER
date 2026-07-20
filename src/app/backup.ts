@@ -66,7 +66,17 @@ export interface BackupUser {
   groupId: string | null;
   numAnswers: number;
   numCorrect: number;
-  details: { lastQue: number | null; lastVote: number | null };
+  details: {
+    lastQue: number | null;
+    lastVote: number | null;
+    /**
+     * כל ההצבעות של המשתתף (slideId → answerId) — לשחזור מלא של votesBySlide
+     * אחרי קריסה, כדי שסינון correctlyAnsweredBefore ימשיך לעבוד. נשמר בתוך
+     * users (מחרוזת JSON שהשרת מחזיר תמיד במלואה). אופציונלי — גיבויים ישנים
+     * בלעדיו משוחזרים כמו קודם.
+     */
+    votes?: Record<string, number>;
+  };
 }
 
 export interface BackupQuestion {
@@ -90,6 +100,11 @@ export interface BackupMeta {
   currentQueId: number | null;
   phase: string;
   startedAt: number;
+  /**
+   * משתתפים שהוסרו מהמשחק (שקופית function · players) — כדי שההסרה תשרוד
+   * קריסה/רענון. best-effort: אם השרת משמיט את ה-meta, ההסרה אובדת (כמו קודם).
+   */
+  removedIds?: string[];
 }
 
 /** המטען שנשמר (POST /save-backup). האובייקטים ממורים ל-JSON לפני השליחה. */
