@@ -63,7 +63,28 @@ export const slideSettingsSchema = z.object({
   showInLoop: z.boolean(),
 });
 
-export const slideTypeSchema = z.enum(['trivia', 'survey', 'ans_images', 'media', 'subject', 'function']);
+/**
+ * שמות-סוג חלופיים שמערכת יצירת המשחקים מייצרת, ממופים לסוגים של המנוע —
+ * כדי לקבל קבצים "כמו שהם" בלי לדרוש שינוי במערכת החיצונית. הבולט: `multiselect`
+ * (שאלת רב-ברירה עם תשובה נכונה) = `trivia` אצלנו.
+ */
+const SLIDE_TYPE_ALIASES: Record<string, string> = {
+  multiselect: 'trivia',
+  multi_select: 'trivia',
+  multiple: 'trivia',
+  multichoice: 'trivia',
+  quiz: 'trivia',
+  poll: 'survey',
+  images: 'ans_images',
+  ans_image: 'ans_images',
+  image_answers: 'ans_images',
+  text: 'subject',
+};
+
+export const slideTypeSchema = z.preprocess(
+  (v) => (typeof v === 'string' && SLIDE_TYPE_ALIASES[v] !== undefined ? SLIDE_TYPE_ALIASES[v] : v),
+  z.enum(['trivia', 'survey', 'ans_images', 'media', 'subject', 'function']),
+);
 
 const VOTABLE_TYPES = new Set(['trivia', 'survey', 'ans_images']);
 
