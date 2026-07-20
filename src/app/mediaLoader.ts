@@ -7,41 +7,19 @@
  * orderedMediaUrls טהורה (ניתנת לבדיקה); הטעינה בפועל דורשת DOM ומוגנת.
  */
 
-import { classifyMediaUrl, type GameFile, type Slide } from '../engine/index.ts';
-
-/** כל כתובות המדיה החזותית של שקופית, בסדר קבוע. */
-function slideMediaUrls(slide: Slide): string[] {
-  const urls = [
-    slide.openMedia.src,
-    slide.question.src,
-    slide.backgroundMedia.src,
-    slide.setting.slidBackgroundMedia.src,
-    slide.endMedia.src,
-  ];
-  if (slide.type === 'ans_images') {
-    for (const answer of slide.question.answers) urls.push(answer.ans);
-  }
-  return urls;
-}
+import { classifyMediaUrl, type GameFile } from '../engine/index.ts';
+import { mediaFields } from './mediaFields.ts';
 
 /**
- * כל כתובות המדיה של המשחק בסדר עדיפות: מדיית לובי (פתיחה/לוגו/רקע שאלות) →
+ * כל כתובות המדיה של המשחק בסדר עדיפות (הסדר של mediaFields): מדיית לובי →
  * שקופיות לפי הסדר → מסכי הזוכים → סאונדים. בלי כפילויות, ובלי YouTube/blob/
  * data (לא ניתנים לטעינה מראש / כבר בזיכרון).
  */
 export function orderedMediaUrls(game: GameFile): string[] {
-  const s = game.setting;
-  const raw: string[] = [s.gameMedia.src, s.logo.src, s.triviaMedia.src];
-  for (const slide of game.questions) raw.push(...slideMediaUrls(slide));
-  raw.push(s.winnersMedia.src, s.winnersListMedia.src);
-  for (const channel of Object.values(s.sound)) {
-    if (channel.src) raw.push(channel.src);
-  }
-
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const rawUrl of raw) {
-    const url = rawUrl.trim();
+  for (const field of mediaFields(game)) {
+    const url = field.get().trim();
     if (url === '' || seen.has(url)) continue;
     if (url.startsWith('blob:') || url.startsWith('data:')) continue;
     if (classifyMediaUrl(url) === 'youtube') continue;

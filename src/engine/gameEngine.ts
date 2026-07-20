@@ -54,8 +54,12 @@ function freshBookkeeping(): VotingBookkeeping {
   };
 }
 
-/** מוני הצבעות (answerId → כמות) ממפת מצביעים. */
-function countsOfVotes(votes: Record<string, number>): Record<string, number> {
+/**
+ * מוני הצבעות (answerId → כמות) ממפת מצביעים (voterId → answerId).
+ * המקור היחיד לחישוב הזה — משמש גם את המנוע, את צוברי ההצבעות (סוקט/דמו)
+ * ואת סינון הרישיון ב-host, כדי שלא יהיו ארבע גרסאות שסוטות זו מזו.
+ */
+export function countsOfVotes(votes: Record<string, number>): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const answerId of Object.values(votes)) {
     counts[String(answerId)] = (counts[String(answerId)] ?? 0) + 1;

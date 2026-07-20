@@ -14,6 +14,7 @@ import {
   type Slide,
 } from '../engine/index.ts';
 import type { MediaIssue } from './mediaCheck.ts';
+import { mediaFields } from './mediaFields.ts';
 
 export interface LoadedZipGame {
   game: GameFile;
@@ -32,50 +33,7 @@ export function isRelativeAsset(src: string): boolean {
   return true;
 }
 
-/**
- * מחזיר accessors לכל שדות המדיה במשחק (קריאה + כתיבה), כדי למפות נתיבים
- * יחסיים בלי לשכפל את מבנה המשחק.
- */
-interface MediaAccessor {
-  get: () => string;
-  set: (v: string) => void;
-  /** תיאור היכן המדיה משמשת — לדיווח על נכס חסר. */
-  label: string;
-}
-
-function mediaAccessors(game: GameFile): MediaAccessor[] {
-  const acc: MediaAccessor[] = [];
-  const s = game.setting;
-  const push = (obj: { src: string }, label: string) =>
-    acc.push({ get: () => obj.src, set: (v) => (obj.src = v), label });
-
-  push(s.gameMedia, 'מדיית פתיחה');
-  push(s.logo, 'לוגו');
-  push(s.triviaMedia, 'רקע שאלות');
-  push(s.winnersMedia, 'רקע זוכים');
-  push(s.winnersListMedia, 'רקע טבלת זוכים');
-  for (const [key, channel] of Object.entries(s.sound)) {
-    if (channel.src !== null) {
-      acc.push({ get: () => channel.src ?? '', set: (v) => (channel.src = v), label: `סאונד (${key})` });
-    }
-  }
-
-  game.questions.forEach((slide, i) => {
-    const n = `שקופית ${i + 1}`;
-    push(slide.openMedia, `${n} · מדיית פתיחה`);
-    push(slide.endMedia, `${n} · מדיית סיום`);
-    push(slide.backgroundMedia, `${n} · רקע`);
-    push(slide.setting.slidBackgroundMedia, `${n} · רקע שקופית`);
-    acc.push({ get: () => slide.question.src, set: (v) => (slide.question.src = v), label: `${n} · תמונת שאלה` });
-    // ans_images: כל תשובה היא נתיב תמונה
-    if (slide.type === 'ans_images') {
-      slide.question.answers.forEach((answer, j) => {
-        acc.push({ get: () => answer.ans, set: (v) => (answer.ans = v), label: `${n} · תמונת תשובה ${j + 1}` });
-      });
-    }
-  });
-  return acc;
-}
+// כל שדות המדיה (קריאה+כתיבה) מגיעים מההולך המשותף — ראו mediaFields.ts.
 
 /** dirname פשוט לנתיב בתוך ZIP (קדימה-סלאש בלבד). */
 function dirOf(path: string): string {
@@ -166,7 +124,7 @@ export async function loadGameFromZip(input: ArrayBuffer | Uint8Array | Blob): P
   };
 
   const missing: MediaIssue[] = [];
-  for (const field of mediaAccessors(game)) {
+  for (const field of mediaFields(game)) {
     const src = field.get();
     if (!isRelativeAsset(src)) continue;
     const url = await resolve(src);

@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 import {
   GameEngine,
   ReplayAdapter,
+  countsOfVotes,
   isVotableSlide,
   parseGameFile,
   type GameFile,
@@ -210,14 +211,10 @@ export function makeSnapshot(
   voters: Record<string, number>,
   firstVoter?: string,
 ): VoteSnapshot {
-  const counts: Record<string, number> = {};
-  for (const answerId of Object.values(voters)) {
-    counts[String(answerId)] = (counts[String(answerId)] ?? 0) + 1;
-  }
   const snapshot: VoteSnapshot = {
     seq,
     slideId,
-    counts,
+    counts: countsOfVotes(voters),
     total: Object.keys(voters).length,
     voters,
   };

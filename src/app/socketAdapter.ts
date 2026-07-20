@@ -16,7 +16,7 @@
  */
 
 import { io, type Socket } from 'socket.io-client';
-import type { VoteAdapter, VoteSnapshot } from '../engine/index.ts';
+import { countsOfVotes, type VoteAdapter, type VoteSnapshot } from '../engine/index.ts';
 
 /** כתובת שרת ההצבעות (Voting Bridge). */
 export const VOTE_SERVER_URL = 'https://masshin.caprover.clicker.co.il';
@@ -56,15 +56,11 @@ export class VoteWindow {
 
   /** ה-snapshot המצטבר הנוכחי (seq עולה בכל קריאה — מונוטוני למנוע). */
   snapshot(): VoteSnapshot {
-    const counts: Record<string, number> = {};
-    for (const answerId of Object.values(this.voters)) {
-      counts[String(answerId)] = (counts[String(answerId)] ?? 0) + 1;
-    }
     this.seq += 1;
     const snapshot: VoteSnapshot = {
       seq: this.seq,
       slideId: this.slideId,
-      counts,
+      counts: countsOfVotes(this.voters),
       total: Object.keys(this.voters).length,
       voters: { ...this.voters },
     };

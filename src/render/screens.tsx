@@ -2,7 +2,7 @@
  * מסכי המסגרת (SPEC סעיף 9): פתיחה/התחברות, זוכים, רשימת זוכים.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { GameEngine } from '../engine/index.ts';
 import { avatarColor, railInitial } from './avatar.ts';
 import { FitText } from './FitText.tsx';
@@ -260,9 +260,12 @@ const SCORES_PAGE_MS = 6500;
 export function AllScoresScreen({
   engine,
   nameOf = identityName,
+  pageBump = 0,
 }: {
   engine: GameEngine;
   nameOf?: NameResolver;
+  /** מונה חיצוני: כל עלייה שלו מדפדפת עמוד מיד (רווח/0 של המנחה). */
+  pageBump?: number;
 }) {
   const setting = engine.getGame().setting;
   // כל המשתתפים — כולל מי שהצביע אך לא צבר נקודות (מוצג עם 0), כדי שבאמת
@@ -287,6 +290,14 @@ export function AllScoresScreen({
     const timer = window.setInterval(() => setPage((p) => (p + 1) % pages), SCORES_PAGE_MS);
     return () => window.clearInterval(timer);
   }, [pages]);
+  // דפדוף ידני של המנחה (רווח/0) — עמוד הבא מיד, בלי להמתין ללולאה.
+  // מגיבים רק לעלייה שקרתה אחרי ה-mount (לא לערך שהצטבר בכניסה קודמת למסך).
+  const lastBumpRef = useRef(pageBump);
+  useEffect(() => {
+    if (pageBump === lastBumpRef.current) return;
+    lastBumpRef.current = pageBump;
+    setPage((p) => (p + 1) % pages);
+  }, [pageBump, pages]);
   const safePage = page % pages;
   const start = safePage * SCORES_PER_PAGE;
   const slice = all.slice(start, start + SCORES_PER_PAGE);

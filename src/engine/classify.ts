@@ -32,9 +32,12 @@ export function extractDynamicImageUrl(que: string, gamaId: string): string | nu
   return match[1].replaceAll('{{GAMA_ID}}', gamaId);
 }
 
-const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'avif', 'bmp']);
-const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'mov', 'm4v', 'ogv']);
-const AUDIO_EXTENSIONS = new Set(['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac']);
+// המקור היחיד לסיומות המדיה של המערכת. ל-public/sw.js יש עותק-רגקס הכרחי
+// (הוא קובץ עצמאי שלא יכול לייבא מ-src) — בדיקת יחידה (mediaSW.test) משווה
+// אותו לרשימות כאן ותיכשל אם יסטו זו מזו.
+export const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'avif', 'bmp', 'ico']);
+export const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'mov', 'm4v', 'ogv']);
+export const AUDIO_EXTENSIONS = new Set(['mp3', 'wav', 'ogg', 'oga', 'm4a', 'aac', 'flac', 'opus']);
 
 /**
  * רישום סוג-מדיה מפורש עבור כתובות שאין בהן סיומת (בעיקר blob: URLs שנוצרים
