@@ -567,11 +567,11 @@ body {
   border-radius: 22px;
   display: block;
 }
-/* המטבע (מספר לפני חשיפה, אחוז בחשיפה) — צף על פינת התמונה */
+/* המטבע (מספר לפני חשיפה, אחוז בחשיפה) — צף על הפינה הימנית-עליונה של התמונה */
 .q-answers--images .q-coin {
   position: absolute;
   top: 14px;
-  inset-inline-end: 14px;
+  inset-inline-start: 14px;
   width: 64px;
   height: 64px;
   font-size: 34px;
