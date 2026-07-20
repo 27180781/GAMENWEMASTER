@@ -144,6 +144,22 @@ export const slideSchema = z
         });
       }
     }
+  })
+  .transform((slide) => {
+    // חוזה המערכת: ההצבעה מהטלפון/קליקר היא *מספר הכפתור*, כלומר מיקום התשובה
+    // על המסך (1..N). כל השרשרת (ספירה, ניקוד, תצוגה) מצליבה לפי answer.id —
+    // לכן מנרמלים כאן את ה-id למיקום התצוגה. בקבצים תקינים (id == מיקום) זה
+    // no-op; קובץ עם מזהים לא-רציפים/מעורבבים מיושר, ודגלי correct נשארים
+    // צמודים לתשובה שלהם.
+    if (!VOTABLE_TYPES.has(slide.type)) return slide;
+    if (slide.question.answers.every((a, i) => a.id === i + 1)) return slide;
+    return {
+      ...slide,
+      question: {
+        ...slide.question,
+        answers: slide.question.answers.map((a, i) => ({ ...a, id: i + 1 })),
+      },
+    };
   });
 
 // ---------------------------------------------------------------------------

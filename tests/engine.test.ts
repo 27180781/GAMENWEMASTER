@@ -182,6 +182,33 @@ describe('ניקוד (SPEC 5.2)', () => {
     expect(engine.getState().votesBySlide[1]).toEqual({ a: 2 });
   });
 
+  it('allowChangeVote=false: המונים החיים מציגים את ההצבעות הנעולות, לא את השינויים', () => {
+    const engine = votingEngine({ allowChangeVote: false });
+    engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(1, 1, { a: 1 }) });
+    // a מנסה לשנות ל-2 — המונים מהשרת מראים 2, אבל הנעולה היא 1
+    engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(2, 1, { a: 2, b: 2 }) });
+    // התצוגה החיה: a נעול על 1, b על 2 — לא {'2':2} כפי שה-snapshot טוען
+    expect(engine.getState().liveVotes).toEqual({ counts: { '1': 1, '2': 1 }, total: 2 });
+  });
+
+  it('בחשיפה (results) הפילוח המוצג זהה תמיד להצבעות שנשמרו ונוקדו', () => {
+    // allowChangeVote=false: מצביע שינה — התצוגה בחשיפה לפי הנעולות
+    const locked = votingEngine({ allowChangeVote: false });
+    locked.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(1, 1, { a: 1, b: 2 }) });
+    locked.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(2, 1, { a: 2, b: 2 }) });
+    locked.dispatch({ type: 'VOTING_TIMEOUT' });
+    expect(locked.getState().votesBySlide[1]).toEqual({ a: 1, b: 2 });
+    expect(locked.getState().liveVotes).toEqual({ counts: { '1': 1, '2': 1 }, total: 2 });
+
+    // allowChangeVote=true: התצוגה לפי האחרונות (שהן גם מה שנשמר)
+    const latest = votingEngine({ allowChangeVote: true });
+    latest.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(1, 1, { a: 1, b: 2 }) });
+    latest.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(2, 1, { a: 2, b: 2 }) });
+    latest.dispatch({ type: 'VOTING_TIMEOUT' });
+    expect(latest.getState().votesBySlide[1]).toEqual({ a: 2, b: 2 });
+    expect(latest.getState().liveVotes).toEqual({ counts: { '2': 2 }, total: 2 });
+  });
+
   it('scoringReduction: אחרי seconds שניות הניקוד יורד ל-score', () => {
     const engine = votingEngine({ scoringReduction: { active: true, seconds: 10, score: 3 } });
     // ההצבעה נפתחה ב-T0 (ה-ADVANCE של votingEngine)

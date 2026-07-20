@@ -96,6 +96,48 @@ describe('טבלת מובילים — winnersListCount + showWinnersListAfter', 
   });
 });
 
+describe('נרמול מזהי תשובות למיקום התצוגה (1..N)', () => {
+  const slideWith = (answers: { ans: string; correct: boolean; id: number }[]) =>
+    parseGameFile(rawGame([rawSlide({ id: 1, type: 'trivia', que: 'ש?', answers })])).questions[0]!;
+
+  it('מזהים מעורבבים/לא-רציפים מיושרים ל-1..N, ו-correct נשאר צמוד לתשובה שלו', () => {
+    const slide = slideWith([
+      { ans: 'ראשונה', correct: false, id: 3 },
+      { ans: 'שנייה (נכונה)', correct: true, id: 7 },
+      { ans: 'שלישית', correct: false, id: 1 },
+      { ans: 'רביעית', correct: false, id: 2 },
+    ]);
+    expect(slide.question.answers.map((a) => a.id)).toEqual([1, 2, 3, 4]);
+    // התשובה הנכונה היא זו שמוצגת שנייה — הכפתור 2 בטלפון יזכה בניקוד
+    expect(slide.question.answers.find((a) => a.correct)!.id).toBe(2);
+    expect(slide.question.answers[1]!.ans).toBe('שנייה (נכונה)');
+  });
+
+  it('קובץ תקין (id == מיקום) נשאר ללא שינוי', () => {
+    const answers = fourAnswers(2);
+    const slide = slideWith(answers);
+    expect(slide.question.answers).toEqual(answers);
+  });
+
+  it('גם ans_images מנורמל; שקופיות לא-מצביעות לא נוגעים בהן', () => {
+    const game = parseGameFile(
+      rawGame([
+        rawSlide({
+          id: 1,
+          type: 'ans_images',
+          que: 'בחר',
+          answers: [
+            { ans: '/a.png', correct: true, id: 9 },
+            { ans: '/b.png', correct: true, id: 4 },
+          ],
+        }),
+        rawSlide({ id: 2, type: 'subject', que: 'טקסט' }),
+      ]),
+    );
+    expect(game.questions[0]!.question.answers.map((a) => a.id)).toEqual([1, 2]);
+  });
+});
+
 describe('שגיאות ולידציה בעברית עם מיקום מדויק', () => {
   it('שדה מספרי פגום בשקופית — הודעה עם מספר שקופית ו-id', () => {
     const raw = loadFixtureRaw('hadassah-ozen.json') as {
