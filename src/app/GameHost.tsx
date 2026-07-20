@@ -65,6 +65,7 @@ import { buildFunctionPayload, sendFunctionApi } from './functionApi.ts';
 import { useConnectionHealth } from './useConnectionHealth.ts';
 import { planCrowdVotes, snapshotAt } from './syntheticVotes.ts';
 import { joinQrUrl, JOIN_DIAL_DISPLAY, type GameSettings } from './urlParams.ts';
+import { hostKeyHints } from './hostHints.ts';
 import { QrCode } from '../render/QrCode.tsx';
 import { DebugOverlay } from '../render/DebugOverlay.tsx';
 import { debugLog } from './debugLog.ts';
@@ -1480,9 +1481,26 @@ export function GameHost({
         )}
 
         {/* פס הנחיות תחתון — חיוג + קוד, לכל אורך המשחק (אם סומן בהגדרות) */}
-        {settings.showBottomInstructions && showJoinBanner && (stage === 'playing' || stage === 'opening') && (
-          <div className="bottom-instructions">
-            📞 חייגו <b>{JOIN_DIAL_DISPLAY}</b> · קוד <b dir="ltr">{roomId}</b> · רווח להמשך
+        {/* פס הנחיות תחתון למנחה — לפי השלב הנוכחי מציג מה כל מקש עושה עכשיו
+            (רווח משתנה + מקשי מספרים רלוונטיים), בצורה חכמה לפי מיקום המשחק. */}
+        {settings.showBottomInstructions && stage === 'playing' && (
+          <div className="bottom-instructions host-hints" dir="rtl">
+            {hostKeyHints({
+              phase: state.phase,
+              activeMedia: state.activeMedia,
+              slideType: slide.type,
+              votable: isVotableSlide(slide),
+              totalAnswers: slide.question.answers.length,
+              questionShown: reveal.questionShown,
+              answersShown: reveal.answersShown,
+              revealCorrect: reveal.revealCorrect,
+              hasNextSlide: state.currentSlideIndex + 1 < engine.getGame().questions.length,
+            }).map((h) => (
+              <span key={h.key} className="host-hint">
+                <b className="host-hint-key">{h.key}</b>
+                <span className="host-hint-label">{h.label}</span>
+              </span>
+            ))}
           </div>
         )}
 

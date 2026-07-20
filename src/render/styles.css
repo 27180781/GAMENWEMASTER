@@ -2047,6 +2047,34 @@ body {
   padding: 12px;
 }
 .bottom-instructions b { color: #ffd23f; }
+/* פס רמזי-מקשים למנחה — צ׳יפים של מקש+פעולה, לפי השלב הנוכחי */
+.bottom-instructions.host-hints {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 20px;
+  font-size: 22px;
+  padding: 10px 16px;
+}
+.host-hint { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.host-hint-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 9px;
+  border-radius: 9px;
+  background: #ffd23f;
+  color: #1a1a2e;
+  font-weight: 900;
+  font-size: 19px;
+}
+.host-hint-label { color: #fff; font-weight: 700; }
+/* מדגישים את פעולת הרווח (הראשונה) — היא הפעולה המרכזית בשלב */
+.host-hint:first-child .host-hint-key { background: #34d399; color: #05271b; }
+.host-hint:first-child .host-hint-label { color: #ffe9a6; }
 
 .demo-badge {
   position: absolute;
