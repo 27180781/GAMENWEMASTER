@@ -265,7 +265,19 @@ export function AllScoresScreen({
   nameOf?: NameResolver;
 }) {
   const setting = engine.getGame().setting;
-  const all = engine.getWinners(Number.MAX_SAFE_INTEGER);
+  // כל המשתתפים — כולל מי שהצביע אך לא צבר נקודות (מוצג עם 0), כדי שבאמת
+  // "כל אחד יראה כמה צבר". המנוקדים לפי דירוג המנוע; חסרי-הניקוד אחריהם.
+  const scored = engine.getWinners(Number.MAX_SAFE_INTEGER);
+  const seen = new Set(scored.map((w) => w.voterId));
+  const state = engine.getState();
+  const zeroIds = new Set<string>();
+  for (const votes of Object.values(state.votesBySlide)) {
+    for (const id of Object.keys(votes)) if (!seen.has(id)) zeroIds.add(id);
+  }
+  const all = [
+    ...scored,
+    ...[...zeroIds].sort((a, b) => a.localeCompare(b)).map((voterId) => ({ voterId, score: 0 })),
+  ];
   const pages = Math.max(1, Math.ceil(all.length / SCORES_PER_PAGE));
   const [page, setPage] = useState(0);
   // לולאה אוטומטית בין העמודים (רק כשיש יותר מעמוד אחד)

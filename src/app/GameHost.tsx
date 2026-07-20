@@ -1098,6 +1098,10 @@ export function GameHost({
   // ווליום
   useEffect(() => audio.setVolume(volume), [audio, volume]);
 
+  // ניקוי האודיו בעזיבת המשחק (החלפת משחק/דמו) — עצירה והסרת מאזיני ה-unlock,
+  // שאחרת מצטברים על window בכל mount.
+  useEffect(() => () => audio.dispose(), [audio]);
+
   // סוף המשחק במנוע → מסך זוכים
   useEffect(() => {
     if (stage === 'playing' && state.phase === 'ended') {
