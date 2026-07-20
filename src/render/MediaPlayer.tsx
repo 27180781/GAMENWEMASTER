@@ -26,8 +26,31 @@ export function MediaPlayer({ src, onEnded, asBackground = false, className }: M
   // מדיה שנכשלה בטעינה: במקום מסך שחור/ריק — חיווי ברור למפעיל (רווח ממשיך
   // כרגיל). ברקע — פשוט לא מציגים כלום (החיווי היה מכער את השקופית).
   const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [src]);
-  const fail = () => setFailed(true);
+  // ניסיון-חוזר על כשל טעינה: כשל זמני של פרוקסי/Worker — במיוחד על וידאו כבד
+  // שנטען "קר" במסך המנצחים/מובילים — מקבל ניסיון נוסף עם עקיפת מטמון לפני
+  // שמוותרים, כדי שרקע לא ייפול למסך שחור בגלל תקלה רגעית. רק אחרי הניסיונות
+  // מסמנים "נכשל".
+  const RETRIES = 2;
+  const [attempt, setAttempt] = useState(0);
+  const attemptRef = useRef(0);
+  attemptRef.current = attempt;
+  const retryTimer = useRef(0);
+  useEffect(() => {
+    setFailed(false);
+    setAttempt(0);
+    return () => window.clearTimeout(retryTimer.current);
+  }, [src]);
+  const fail = () => {
+    if (attemptRef.current < RETRIES) {
+      const next = attemptRef.current + 1;
+      retryTimer.current = window.setTimeout(() => setAttempt(next), 500 * next);
+    } else {
+      setFailed(true);
+    }
+  };
+  // בניסיון-חוזר מוסיפים פרמטר לעקיפת מטמון (מרכיב מדיה — לא fetch), כדי לאלץ
+  // משיכה טרייה של הנכס שנכשל רגעית.
+  const loadSrc = attempt === 0 ? src : `${src}${src.includes('?') ? '&' : '?'}_retry=${attempt}`;
 
   // רקע = מושתק. התכונה muted ב-JSX אינה אמינה ל-autoplay (React מגדיר אותה
   // כ-attribute ולא כ-property בזמן, אז הדפדפן עלול להתחיל לנגן *עם* קול); לכן
@@ -54,14 +77,14 @@ export function MediaPlayer({ src, onEnded, asBackground = false, className }: M
 
   switch (kind) {
     case 'image':
-      return <img className={className ?? 'media-fill'} src={src} alt="" onError={fail} />;
+      return <img key={loadSrc} className={className ?? 'media-fill'} src={loadSrc} alt="" onError={fail} />;
     case 'video':
       return (
         <video
-          key={src}
+          key={loadSrc}
           ref={setVideoMuted}
           className={className ?? 'media-fill'}
-          src={src}
+          src={loadSrc}
           autoPlay
           muted={asBackground}
           loop={asBackground}
@@ -75,8 +98,8 @@ export function MediaPlayer({ src, onEnded, asBackground = false, className }: M
         <div className={className ?? 'media-audio'}>
           <div className="media-audio-icon">🎵</div>
           <audio
-            key={src}
-            src={src}
+            key={loadSrc}
+            src={loadSrc}
             autoPlay
             loop={asBackground}
             onEnded={asBackground ? undefined : onEnded}
