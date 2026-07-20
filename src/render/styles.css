@@ -1130,6 +1130,79 @@ body {
 .media-load-failed { color: #ff9f9f; }
 .media-load-hint { opacity: 0.65; font-weight: 500; }
 
+/* מסך פתיחת המשחק — טעינה חוסמת + ספירה-לאחור */
+.startup-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.startup-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 34px;
+  text-align: center;
+}
+.startup-logo {
+  max-width: 420px;
+  max-height: 300px;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.35));
+}
+.startup-load-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: min(680px, 74vw);
+}
+.startup-bar-track {
+  width: 100%;
+  height: 16px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+}
+.startup-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--secondary-color, #ffd23f);
+  transition: width 0.35s ease;
+}
+.startup-text {
+  font-size: 34px;
+  font-weight: 800;
+  color: var(--main-color, #fff);
+  margin: 0;
+}
+.startup-sub {
+  font-size: 24px;
+  font-weight: 600;
+  opacity: 0.8;
+  color: var(--main-color, #fff);
+  margin: 0;
+}
+.startup-failed { color: #ff9f9f; }
+.startup-count-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.startup-countdown {
+  font-size: 190px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--secondary-color, #ffd23f);
+  text-shadow: 0 8px 34px rgba(0, 0, 0, 0.4);
+  animation: startup-pop 1s ease-out;
+}
+@keyframes startup-pop {
+  0% { transform: scale(0.55); opacity: 0.2; }
+  40% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
 /* עיגול טעינה זעיר בפינה השמאלית-תחתונה — חיווי לא-מפריע בזמן המשחק */
 .media-load-dot {
   position: fixed;
