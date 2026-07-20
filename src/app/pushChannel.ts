@@ -29,6 +29,7 @@ export type PushDirective =
   /** הודעה לא רלוונטית — מתעלמים. */
   | { kind: 'ignore' };
 
+// הענף הריק בסוף מכוון: גם הודעה ריקה בערוץ נחשבת אות רענון (ping בלי גוף).
 const REFRESH_WORD = /^(refresh|reload|refetch|update|ping|)$/i;
 
 /**

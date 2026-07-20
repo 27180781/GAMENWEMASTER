@@ -41,6 +41,8 @@ export class AudioManager {
   private context: AudioContext | null = null;
   private applauseBuffer: AudioBuffer | null = null;
   private applauseSource: AudioBufferSourceNode | null = null;
+  /** מאזין הפתיחה (unlock) — נשמר כדי שאפשר יהיה להסירו ב-dispose. */
+  private readonly unlockFn: () => void;
 
   constructor() {
     // אם ל-document כבר הייתה אינטראקציה (sticky activation) — למשל הקליק על
@@ -49,10 +51,10 @@ export class AudioManager {
     if (typeof navigator !== 'undefined' && navigator.userActivation?.hasBeenActive === true) {
       this.unlocked = true;
     }
-    const unlock = () => {
+    this.unlockFn = () => {
       this.unlocked = true;
-      window.removeEventListener('pointerdown', unlock);
-      window.removeEventListener('keydown', unlock);
+      window.removeEventListener('pointerdown', this.unlockFn);
+      window.removeEventListener('keydown', this.unlockFn);
       // ניגון מה שחיכה לאינטראקציה הראשונה (play אקסקלוסיבי — נשאר האחרון)
       const queued = [...this.pending.entries()];
       this.pending.clear();
@@ -61,8 +63,15 @@ export class AudioManager {
         this.play(channel, play.src, { loop: play.loop });
       }
     };
-    window.addEventListener('pointerdown', unlock);
-    window.addEventListener('keydown', unlock);
+    window.addEventListener('pointerdown', this.unlockFn);
+    window.addEventListener('keydown', this.unlockFn);
+  }
+
+  /** ניקוי מלא בעזיבת המשחק: עצירת כל הסאונדים והסרת מאזיני ה-unlock מ-window. */
+  dispose(): void {
+    this.stopAll();
+    window.removeEventListener('pointerdown', this.unlockFn);
+    window.removeEventListener('keydown', this.unlockFn);
   }
 
   setVolume(volume: number): void {
