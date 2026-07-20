@@ -697,13 +697,17 @@ export function GameHost({
       pendingVoteRef.current = null;
       return;
     }
-    const total = slide.question.timeForQue;
+    // קוראים את השקופית והסאונדים דרך המנוע/ref (ולא כתלות ישירה) — כדי שרענון
+    // תוכן חם (updateGame, שמחליף את זהות האובייקטים) באמצע הצבעה לא יריץ מחדש
+    // את ה-effect ויאפס את הטיימר לזמן מלא.
+    const s = engine.getCurrentSlide();
+    const total = s.question.timeForQue;
     deadlineRef.current = Date.now() + total * 1000;
     pausedRemainingMsRef.current = null;
     pausedRef.current = false;
     pausedAccumMsRef.current = 0;
     setTimer({ remaining: total, total, paused: false });
-    audio.play('timer', sounds.timerMediaSound.src, { loop: true });
+    audio.play('timer', soundsRef.current.timerMediaSound.src, { loop: true });
 
     const interval = window.setInterval(() => {
       if (pausedRef.current) return;
@@ -712,8 +716,8 @@ export function GameHost({
         flushVotesRef.current(); // ההצבעות האחרונות שהצטברו נספרות לפני הסגירה
         engine.dispatch({ type: 'VOTING_TIMEOUT', at: Date.now() });
         // סקר/תמונות: תום הטיימר חושף את הפילוח — משמיעים את סאונד החשיפה
-        if (slide.type === 'survey' || slide.type === 'ans_images') {
-          audio.play('inShowAns', sounds.inShowAnsMediaSound.src);
+        if (s.type === 'survey' || s.type === 'ans_images') {
+          audio.play('inShowAns', soundsRef.current.inShowAnsMediaSound.src);
         }
       } else {
         setTimer({ remaining: remainingMs / 1000, total, paused: false });
@@ -723,7 +727,7 @@ export function GameHost({
       window.clearInterval(interval);
       audio.stop('timer');
     };
-  }, [votingActive, state.currentSlideId, engine, audio, slide, sounds]);
+  }, [votingActive, state.currentSlideId, engine, audio]);
 
   /** הוספת/החסרת שניות לטיימר הפעיל (פקודות 4/5). */
   const adjustTimer = useCallback(
@@ -1389,6 +1393,7 @@ export function GameHost({
 
   /** "התחלת המשחק מחדש" מתוך מסך ההגדרות — איפוס מלא וחזרה למסך הפתיחה. */
   const restartGame = useCallback(() => {
+    const wasEnded = gameEndedRef.current;
     engine.reset();
     removedRef.current = new Set(); // התחלה מחדש — משתתפים שהוסרו יכולים לחזור
     autoLeadersShownAtRef.current = 0; // מונה טבלת המובילים האוטומטית מתאפס
@@ -1397,11 +1402,17 @@ export function GameHost({
     setLeadersOverlay(false);
     setAnswerers([]);
     setCorrectAnswerers([]);
+    // ריצה חדשה גם מבחינת הגיבוי: זמן התחלה טרי, והשמירות שיבואו יפתחו גיבוי
+    // חי חדש לאותו משחק — במקום להיראות כהמשך של הריצה הקודמת. אם הריצה
+    // הקודמת הסתיימה (game-over), הגיבוי הנעול שלה בארכיון "נפתח" מחדש בכוונה.
+    startedAtRef.current = Date.now();
     gameEndedRef.current = false;
     reportDownloadedRef.current = false;
     winnersPreviewRef.current = null;
     setSettingsOpen(false);
-    debugLog('command', 'התחלת המשחק מחדש (מתוך ההגדרות)');
+    debugLog('command', 'התחלת המשחק מחדש (מתוך ההגדרות)', {
+      backupRun: wasEnded ? 'ריצה חדשה אחרי סיום — הגיבוי ייפתח מחדש' : 'ריצה חדשה',
+    });
   }, [engine]);
 
   // קליק עכבר אינו מקדם שלבים — קידום רק ברווח/0 (בקשת המנחה)
