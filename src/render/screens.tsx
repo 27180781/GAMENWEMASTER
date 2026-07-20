@@ -91,9 +91,13 @@ export function LobbyScreen({
       )}
       <div className={`screen-content lobby-content${joinInfo !== undefined ? ' lobby-content--join' : ''}`}>
         {setting.logo.src !== '' && <img className="opening-logo lobby-logo" src={setting.logo.src} alt="" />}
-        <h1 className="opening-title lobby-title">
-          {setting.titleThroughoutGame || engine.getGame().name}
-        </h1>
+        {/* בלובי האונליין (עם מספר החיוג הגדול) מסתירים את שם המשחק — המספר והקוד
+            הם ה"גיבור" בראש המסך. בלובי הדמו שם המשחק עדיין מוצג. */}
+        {joinInfo === undefined && (
+          <h1 className="opening-title lobby-title">
+            {setting.titleThroughoutGame || engine.getGame().name}
+          </h1>
+        )}
         {joinInfo !== undefined && (
           <div className="lobby-join">
             <span className="lobby-join-label">חייגו למספר</span>
