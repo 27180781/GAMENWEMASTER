@@ -148,7 +148,10 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
  */
 const AUTO_TRANSITION_KEY = (gameId: string) => `trivia:autoTransition:${gameId}`;
 
-export function loadAutoTransition(gameId: string): AutoTransition | null {
+export function loadAutoTransition(
+  gameId: string,
+  defaults: AutoTransition = DEFAULT_AUTO_TRANSITION,
+): AutoTransition | null {
   try {
     const raw = localStorage.getItem(AUTO_TRANSITION_KEY(gameId));
     if (raw === null) return null;
@@ -161,15 +164,19 @@ export function loadAutoTransition(gameId: string): AutoTransition | null {
         active: Boolean(parsed.nextSlide?.active),
         seconds: Number(parsed.nextSlide?.seconds) || 6,
       },
-      media: {
-        image: {
-          active: Boolean(parsed.media?.image?.active),
-          seconds: Number(parsed.media?.image?.seconds) || 5,
-        },
-        video: {
-          playToEnd: Boolean(parsed.media?.video?.playToEnd),
-        },
-      },
+      // דריסה שנשמרה לפני שנוסף מעבר-מדיה — לא "מכבים" את מה שהוגדר בקובץ
+      // המשחק, אלא נופלים לברירת המחדל שלו (defaults).
+      media: parsed.media === undefined
+        ? defaults.media
+        : {
+            image: {
+              active: Boolean(parsed.media.image?.active),
+              seconds: Number(parsed.media.image?.seconds) || 5,
+            },
+            video: {
+              playToEnd: Boolean(parsed.media.video?.playToEnd),
+            },
+          },
     };
   } catch {
     return null;
