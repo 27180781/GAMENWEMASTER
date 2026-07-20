@@ -924,15 +924,14 @@ export function GameHost({
       setStage('winners'); // אין שקופית הבאה — סיום
       return;
     }
-    // דגל שגורם ל-effect איפוס-השקופית לחשוף במלואה (במקום לאפס)
-    fastRevealRef.current = true;
     const target = questions[nextIndex]!;
     engine.dispatch({ type: 'GOTO', slideId: target.id, at: now });
-    // מדלגים על מדיית הפתיחה רק בשקופית הצבעה (כדי להגיע לשאלה החשופה). בשקופית
-    // מדיה/טקסט המדיה עצמה היא התוכן — נותנים לה להתנגן, לא מדלגים למסך ריק.
-    if (engine.getState().activeMedia === 'open' && isVotableSlide(target)) {
-      engine.dispatch({ type: 'MEDIA_ENDED', at: now });
-    }
+    // אם לשקופית יש מדיית פתיחה (סרטון/תמונה) — נוחתים על *תחילת* השקופית ונותנים
+    // למדיה להתנגן; רווח ייכנס לשאלה כרגיל ו-N ימשיך לשקופית הבאה. לא מדלגים עליה.
+    if (engine.getState().activeMedia === 'open') return;
+    // אין מדיית פתיחה — דגל שגורם ל-effect איפוס-השקופית לחשוף את השקופית במלואה
+    // (שאלה + כל התשובות) במקום לאפס, כדי שהרצה מהירה תנחת על שאלה חשופה.
+    fastRevealRef.current = true;
   }, [engine]);
   const fastNextSlideRef = useRef(fastNextSlide);
   fastNextSlideRef.current = fastNextSlide;
