@@ -1671,6 +1671,68 @@ body {
   text-align: right;
 }
 
+/* ---- מסך שגיאה עצמאי (טעינת קובץ המשחק נכשלה) ---- */
+
+.error-screen {
+  background:
+    radial-gradient(ellipse at 50% -12%, rgba(255, 255, 255, 0.06), transparent 55%),
+    linear-gradient(135deg, #1a1030, #0c0716 55%, #1a0b16);
+}
+.error-content {
+  gap: 24px;
+}
+.error-icon {
+  font-size: 96px;
+  line-height: 1;
+  filter: drop-shadow(0 6px 22px rgba(0, 0, 0, 0.5));
+}
+.error-title {
+  font-size: 60px;
+  font-weight: 900;
+  color: #fca5a5;
+  text-align: center;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+}
+.error-detail {
+  max-width: 1400px;
+  max-height: 460px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 22px 28px;
+  background: rgba(220, 38, 38, 0.1);
+  border: 2px solid rgba(220, 38, 38, 0.45);
+  border-radius: 14px;
+  color: #fecaca;
+  font-size: 26px;
+  line-height: 1.5;
+  text-align: right;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.error-actions {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.error-btn {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-radius: 12px;
+  padding: 16px 40px;
+  font-size: 26px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.error-btn:hover { background: rgba(255, 255, 255, 0.22); }
+.error-btn--primary {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+.error-btn--primary:hover { background: #b91c1c; }
+
 /* ---- מסך הגדרות (מסך מלא — ראשון וגם מכפתור ⚙ באמצע משחק) ---- */
 
 /* רקע אטום בצבע המשחק + z-index גבוה, כדי שיהיה מסך שלם ולא חלון מעל המשחק. */
