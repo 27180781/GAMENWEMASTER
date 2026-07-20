@@ -1810,8 +1810,20 @@ body {
 }
 .media-cache-title { margin: 0 0 6px; font-size: 16px; font-weight: 800; }
 .media-cache-status { margin: 0 0 10px; font-size: 13px; opacity: 0.8; line-height: 1.5; }
-.media-cache-clear { width: auto; padding: 8px 16px; font-size: 14px; }
-.media-cache-clear:disabled { opacity: 0.5; cursor: default; }
+/* הפאנל יושב על רקע בהיר (המודאל של ההגדרות המתקדמות), ולכן צריך צבע מלא
+   וקריא — לא ירושה מ-.picker-button (טקסט לבן על רקע שקוף, שנעלם על בהיר). */
+.media-cache-clear {
+  width: auto;
+  padding: 9px 18px;
+  font-size: 14px;
+  font-weight: 700;
+  background: #e5484d;
+  color: #fff;
+  border: 2px solid #c93b40;
+  border-radius: 10px;
+}
+.media-cache-clear:hover:not(:disabled) { background: #d13a3f; }
+.media-cache-clear:disabled { opacity: 0.45; cursor: default; }
 .settings-modal-done {
   align-self: center;
   margin-top: 14px;
@@ -1913,6 +1925,28 @@ body {
 .online-note { color: #e5326b; font-size: 15px; line-height: 1.4; margin: 8px 0 16px; }
 .online-check { display: flex; align-items: center; gap: 12px; font-size: 22px; font-weight: 600; margin-top: 12px; }
 .online-check input[type='checkbox'] { width: 24px; height: 24px; flex: 0 0 auto; }
+/* כותרת-משנה בתוך המודאל (למשל "מעברים אוטומטיים") */
+.online-subhead {
+  margin: 22px 0 4px;
+  font-size: 20px;
+  font-weight: 800;
+  color: #2a3a86;
+  border-top: 1px solid rgba(20, 20, 40, 0.12);
+  padding-top: 16px;
+}
+/* שורת "מעבר אוטומטי לשקופית הבאה — לאחר [N] שניות" עם קלט מספר משובץ */
+.online-check--auto-next { flex-wrap: wrap; }
+.online-check--auto-next input[type='number'] {
+  width: 80px;
+  border: 2px solid #7fb2ff;
+  border-radius: 16px;
+  padding: 4px 10px;
+  font-size: 19px;
+  font-weight: 700;
+  color: #171a2b;
+  background: #fff;
+  text-align: center;
+}
 .online-actions { display: flex; justify-content: center; align-items: center; gap: 26px; flex-wrap: wrap; }
 
 /* כפתורי הגדרות באמצע משחק: "התחל מחדש" + "המשך משחק" */
