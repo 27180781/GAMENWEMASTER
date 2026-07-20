@@ -1018,9 +1018,14 @@ export function GameHost({
         case 2:
           goBack();
           break;
-        case 3:
-          audio.playApplause();
+        case 3: {
+          // מחיאות כפיים: אם הוגדר קובץ ב-genericMediaSound שבגייסון — מנגנים אותו;
+          // אחרת נופלים למחיאות מסונתזות (WebAudio) כברירת מחדל.
+          const applause = soundsRef.current.genericMediaSound.src;
+          if (applause !== null && applause.trim() !== '') audio.play('generic', applause);
+          else audio.playApplause();
           break;
+        }
         case 4:
           adjustTimer(10);
           break;
