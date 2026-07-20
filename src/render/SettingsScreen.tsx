@@ -56,6 +56,7 @@ export function SettingsScreen({
   const [autoTransition, setAutoTransition] = useState<AutoTransition>(initial.autoTransition);
   const [showQr, setShowQr] = useState(initial.showQr);
   const [showBottomInstructions, setShowBottomInstructions] = useState(initial.showBottomInstructions);
+  const [allowStartBeforeLoad, setAllowStartBeforeLoad] = useState(initial.allowStartBeforeLoad);
   /** ההגדרות המתקדמות נפתחות בחלון קופץ (מודאל) — בלי גלילה בעמוד. */
   const [advancedOpen, setAdvancedOpen] = useState(false);
   // ברירת המחדל של המעברים נטענת אסינכרונית (מה-JSON/‏localStorage) אחרי טעינת
@@ -88,8 +89,21 @@ export function SettingsScreen({
     autoTransition,
     showQr: showQrOption ? showQr : false,
     showBottomInstructions,
+    allowStartBeforeLoad,
   });
   const save = () => onSave(buildSettings());
+
+  // הגדרת חסימת-הטעינה — מוצגת בשני סוגי המסכים המתקדמים (className שונה).
+  const loadBlockField = (cls: string) => (
+    <label className={cls}>
+      <input
+        type="checkbox"
+        checked={allowStartBeforeLoad}
+        onChange={(e) => setAllowStartBeforeLoad(e.target.checked)}
+      />
+      <span>אפשר להתחיל את המשחק מיד — בלי לחסום עד סיום טעינת המדיה</span>
+    </label>
+  );
 
   const limitNumber = game.setting.limit.number;
   const maxParticipants =
@@ -212,6 +226,8 @@ export function SettingsScreen({
             ההקשות שלו הן פקודות מנחה (0 קדימה, 2 אחורה, 1 מובילים...) — לא משתתף בהצבעות
           </span>
         </label>
+
+        {loadBlockField('demo-field demo-field--row')}
       </section>
 
       <section className="demo-form demo-col">
@@ -327,6 +343,7 @@ export function SettingsScreen({
         <input type="checkbox" checked={showQr} onChange={(e) => setShowQr(e.target.checked)} />
         <span>הצגת QR / קוד</span>
       </label>
+      {loadBlockField('online-check')}
 
       {/* מעברים אוטומטיים — ברירת המחדל מקובץ המשחק, ניתנת לשינוי למשחק הזה */}
       <div className="online-subhead">מעברים אוטומטיים</div>

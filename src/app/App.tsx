@@ -19,6 +19,7 @@ import { GameHost } from './GameHost.tsx';
 import { prefetchBackup, resolveBackupConfig } from './backup.ts';
 import { useMediaPreload } from './useMediaPreload.ts';
 import { MediaLoadBar, MediaLoadDot } from '../render/MediaLoadBar.tsx';
+import { StartupOverlay } from '../render/StartupOverlay.tsx';
 import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.ts';
 import { decodeInitialMedia } from './mediaDecode.ts';
 import { openPushChannel } from './pushChannel.ts';
@@ -300,8 +301,48 @@ export function App() {
     });
   }, [params, refetchGame, applyRawGame]);
 
+  // חסימת התחלה עד סיום טעינה (ברירת מחדל): אחרי "התחל" ממתינים לסיום ההורדה
+  // (עם סבבי ניסיון-חוזר על כשל), ואז ספירה-לאחור קצרה לפני מסך ההתחברות.
+  const STARTUP_COUNTDOWN = 3;
+  const MAX_PRELOAD_ROUNDS = 6; // מקסימום סבבי ניסיון-חוזר לפני שממשיכים בכל זאת
+  const [starting, setStarting] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [preloadNonce, setPreloadNonce] = useState(0);
+
   // טעינה מוקדמת של כל מדיית המשחק — מתחילה כבר במסך ההגדרות וממשיכה במשחק.
-  const mediaPreload = useMediaPreload(game ?? pendingGame);
+  const mediaPreload = useMediaPreload(game ?? pendingGame, preloadNonce);
+
+  const preloadReady =
+    mediaPreload.done && (mediaPreload.failed === 0 || preloadNonce >= MAX_PRELOAD_ROUNDS);
+  const preloadRetrying =
+    mediaPreload.done && mediaPreload.failed > 0 && preloadNonce < MAX_PRELOAD_ROUNDS;
+
+  // בזמן חסימה: אם ההורדה "הסתיימה" אך יש כשלונות — מנסים שוב סבב נוסף (נכסים
+  // שכבר במטמון מסתיימים מיד; רק הנכשלים מנסים שוב), עד MAX_PRELOAD_ROUNDS.
+  useEffect(() => {
+    if (!starting || !preloadRetrying) return undefined;
+    const t = window.setTimeout(() => setPreloadNonce((n) => n + 1), 1500);
+    return () => window.clearTimeout(t);
+  }, [starting, preloadRetrying]);
+
+  // כשהטעינה מוכנה (או מיצינו את הניסיונות) — פותחים ספירה-לאחור בזמן הפענוח.
+  useEffect(() => {
+    if (starting && preloadReady && countdown === null) setCountdown(STARTUP_COUNTDOWN);
+  }, [starting, preloadReady, countdown]);
+
+  // טיק הספירה-לאחור; ב-0 נכנסים למשחק (מסך ההתחברות).
+  useEffect(() => {
+    if (countdown === null) return undefined;
+    if (countdown <= 0) {
+      if (pendingGame !== null) setGame(pendingGame);
+      setStarting(false);
+      setCountdown(null);
+      setPreloadNonce(0);
+      return undefined;
+    }
+    const t = window.setTimeout(() => setCountdown((c) => (c === null ? null : c - 1)), 1000);
+    return () => window.clearTimeout(t);
+  }, [countdown, pendingGame]);
 
   // ב-URL הציבורי בלי קובץ משחק (‎?game=‎) מפנים לאתר הראשי במקום להציג את בורר
   // קבצי הבדיקה — כדי שלא ישחקו בקבצים שנועדו רק לנסיון. פיתוח מקומי ו-EXE אופליין
@@ -351,6 +392,19 @@ export function App() {
 
   // מסך ההגדרות — המסך הראשון אחרי טעינת משחק
   if (pendingGame !== null) {
+    // חסימת התחלה עד סיום טעינה: מסך פתיחה עם התקדמות/ניסיונות-חוזרים וספירה.
+    if (starting) {
+      return (
+        <Shell style={themeStyle(pendingGame.setting)}>
+          <StartupOverlay
+            logo={pendingGame.setting.logo.src}
+            preload={mediaPreload}
+            retrying={preloadRetrying}
+            countdown={countdown}
+          />
+        </Shell>
+      );
+    }
     return (
       <Shell style={themeStyle(pendingGame.setting)}>
         <SettingsScreen
@@ -362,7 +416,10 @@ export function App() {
           qrAvailable={!offline && (pendingGame.room ?? '') !== ''}
           onSave={(saved) => {
             persistAndSetSettings(saved);
-            setGame(pendingGame);
+            // ברירת מחדל — חוסמים עד סיום טעינה (מסך פתיחה + ספירה); עם ההגדרה
+            // "אפשר להתחיל מיד" — מעבר ישיר למשחק כמו קודם.
+            if (saved.allowStartBeforeLoad) setGame(pendingGame);
+            else setStarting(true);
           }}
         />
         {mediaIssues.length > 0 && !mediaAlertDismissed && (

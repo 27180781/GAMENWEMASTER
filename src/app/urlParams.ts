@@ -109,6 +109,12 @@ export interface GameSettings {
   showQr: boolean;
   /** הצגת פס הנחיות (חיוג + קוד) בתחתית המסך לאורך המשחק. */
   showBottomInstructions: boolean;
+  /**
+   * אפשר להתחיל את המשחק *מיד*, בלי לחסום עד סיום טעינת כל המדיה. ברירת מחדל
+   * false — כלומר חוסם: לחיצה על "התחל" ממתינה לסיום ההורדה (עם ניסיונות-חוזרים
+   * על כשל) ואז ספירה-לאחור קצרה לפני מסך ההתחברות. true = ההתנהגות הישנה.
+   */
+  allowStartBeforeLoad: boolean;
 }
 
 /** כתובת ההתחברות מהטלפון עבור קוד QR — לפי קוד המשחק (room). */
@@ -140,6 +146,7 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   autoTransition: DEFAULT_AUTO_TRANSITION,
   showQr: false,
   showBottomInstructions: false,
+  allowStartBeforeLoad: false,
 };
 
 /**
