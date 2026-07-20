@@ -8,8 +8,9 @@
 import JSZip from 'jszip';
 import {
   classifyMediaUrl,
-  parseGameFile,
+  parseGameFileLenient,
   registerMediaKind,
+  type DroppedSlide,
   type GameFile,
   type Slide,
 } from '../engine/index.ts';
@@ -22,6 +23,8 @@ export interface LoadedZipGame {
   revoke: () => void;
   /** נכסים שהוזכרו ב-data.json אך חסרים בתוך ה-ZIP. */
   missing: MediaIssue[];
+  /** שקופיות פגומות שהושמטו בטעינה (ריק = הכול תקין). */
+  dropped: DroppedSlide[];
 }
 
 /** האם ה-src הוא נתיב יחסי לנכס בתוך ה-ZIP (ולא URL מוחלט / youtube / blob). */
@@ -90,7 +93,7 @@ export async function loadGameFromZip(input: ArrayBuffer | Uint8Array | Blob): P
   } catch (e) {
     throw new Error(`data.json אינו JSON תקין: ${(e as Error).message}`);
   }
-  const game = parseGameFile(data);
+  const { game, dropped } = parseGameFileLenient(data);
 
   // מיפוי נתיבים יחסיים → Blob URLs (עם cache לפי נתיב, ורישום סוג המדיה)
   const baseDir = dirOf(dataEntry.name);
@@ -139,6 +142,7 @@ export async function loadGameFromZip(input: ArrayBuffer | Uint8Array | Blob): P
       for (const url of created) URL.revokeObjectURL(url);
     },
     missing,
+    dropped,
   };
 }
 

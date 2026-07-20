@@ -1733,6 +1733,65 @@ body {
 }
 .error-btn--primary:hover { background: #b91c1c; }
 
+/* ---- וריאנט אזהרה (שקופיות פגומות — אפשר לדלג ולשחק) ---- */
+
+.error-screen--warning {
+  background:
+    radial-gradient(ellipse at 50% -12%, rgba(255, 255, 255, 0.06), transparent 55%),
+    linear-gradient(135deg, #2a1f06, #140d02 55%, #241705);
+}
+.error-screen--warning .error-title { color: #fcd34d; }
+.error-screen--warning .error-btn--primary {
+  background: #d97706;
+  border-color: #d97706;
+}
+.error-screen--warning .error-btn--primary:hover { background: #b45309; }
+
+.error-issues {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  max-width: 1400px;
+  max-height: 440px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: right;
+}
+.error-issue {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(217, 119, 6, 0.12);
+  border: 2px solid rgba(217, 119, 6, 0.4);
+  border-radius: 12px;
+  padding: 14px 20px;
+}
+.error-issue-head {
+  font-size: 26px;
+  font-weight: 800;
+  color: #fde68a;
+}
+.error-issue-id {
+  font-size: 20px;
+  font-weight: 600;
+  opacity: 0.75;
+}
+.error-issue-msgs {
+  font-size: 22px;
+  line-height: 1.4;
+  color: #fef3c7;
+}
+.error-note {
+  max-width: 1400px;
+  font-size: 24px;
+  line-height: 1.5;
+  color: #fde68a;
+  text-align: center;
+}
+
 /* ---- מסך הגדרות (מסך מלא — ראשון וגם מכפתור ⚙ באמצע משחק) ---- */
 
 /* רקע אטום בצבע המשחק + z-index גבוה, כדי שיהיה מסך שלם ולא חלון מעל המשחק. */
