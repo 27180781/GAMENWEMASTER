@@ -298,6 +298,58 @@ export function SettingsScreen({
         <input type="checkbox" checked={showQr} onChange={(e) => setShowQr(e.target.checked)} />
         <span>הצגת QR / קוד</span>
       </label>
+
+      {/* מעברים אוטומטיים — ברירת המחדל מקובץ המשחק, ניתנת לשינוי למשחק הזה */}
+      <div className="online-subhead">מעברים אוטומטיים</div>
+      <label className="online-check">
+        <input
+          type="checkbox"
+          checked={autoTransition.showAnswersAfterQuestion}
+          onChange={(e) => patchAuto({ showAnswersAfterQuestion: e.target.checked })}
+        />
+        <span>הצגת התשובות אוטומטית לאחר הצגת השאלה</span>
+      </label>
+      <label className="online-check">
+        <input
+          type="checkbox"
+          checked={autoTransition.startTimerAfterLastAnswer}
+          onChange={(e) => patchAuto({ startTimerAfterLastAnswer: e.target.checked })}
+        />
+        <span>התחלת הטיימר אוטומטית לאחר התשובה האחרונה</span>
+      </label>
+      <label className="online-check">
+        <input
+          type="checkbox"
+          checked={autoTransition.showCorrectAnswerAfterTimer}
+          onChange={(e) => patchAuto({ showCorrectAnswerAfterTimer: e.target.checked })}
+        />
+        <span>הצגת התשובה הנכונה אוטומטית לאחר סיום הטיימר</span>
+      </label>
+      <label className="online-check online-check--auto-next">
+        <input
+          type="checkbox"
+          checked={autoTransition.nextSlide.active}
+          onChange={(e) =>
+            patchAuto({ nextSlide: { ...autoTransition.nextSlide, active: e.target.checked } })
+          }
+        />
+        <span>מעבר אוטומטי לשקופית הבאה — לאחר</span>
+        <input
+          type="number"
+          min="1"
+          max="120"
+          value={autoTransition.nextSlide.seconds}
+          onChange={(e) =>
+            patchAuto({
+              nextSlide: {
+                ...autoTransition.nextSlide,
+                seconds: Math.max(1, Math.min(120, Number(e.target.value) || 6)),
+              },
+            })
+          }
+        />
+        <span>שניות</span>
+      </label>
     </>
   );
 
