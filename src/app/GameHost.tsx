@@ -717,11 +717,9 @@ export function GameHost({
       const remainingMs = deadlineRef.current - Date.now();
       if (remainingMs <= 0) {
         flushVotesRef.current(); // ההצבעות האחרונות שהצטברו נספרות לפני הסגירה
+        // תום הטיימר *סוגר* את ההצבעה בלבד (מעבר ל-results). חשיפת הפילוח/התשובה
+        // הנכונה היא צעד נפרד — בלחיצה, או אוטומטית אם showCorrectAnswerAfterTimer דלוק.
         engine.dispatch({ type: 'VOTING_TIMEOUT', at: Date.now() });
-        // סקר/תמונות: תום הטיימר חושף את הפילוח — משמיעים את סאונד החשיפה
-        if (s.type === 'survey' || s.type === 'ans_images') {
-          audio.play('inShowAns', soundsRef.current.inShowAnsMediaSound.src);
-        }
       } else {
         setTimer({ remaining: remainingMs / 1000, total, paused: false });
       }
@@ -815,20 +813,16 @@ export function GameHost({
     }
 
     if (current.phase === 'voting') {
-      // עצירת הטיימר וסגירת ההצבעה (אם לא נגמר כבר לבד)
+      // עצירת הטיימר וסגירת ההצבעה (אם לא נגמר כבר לבד) — בלי חשיפה: זו קורית
+      // בלחיצה הבאה (שלב results), אחיד לכל סוגי השקופיות.
       flushVotesRef.current(); // ההצבעות האחרונות שהצטברו נספרות לפני הסגירה
       engine.dispatch({ type: 'ADVANCE', at: now });
-      // סקר/תמונות: אין בהם שלב "תשובה נכונה" נפרד — המעבר לתוצאות הוא רגע חשיפת
-      // הפילוח, ולכן משמיעים כאן את סאונד החשיפה (ב-trivia הוא מתנגן בחשיפת הנכונה)
-      if (s.type === 'survey' || s.type === 'ans_images') {
-        audio.play('inShowAns', sounds.inShowAnsMediaSound.src);
-      }
       return;
     }
 
     if (current.phase === 'results') {
-      // שלב חשיפת התשובה הנכונה (ב-trivia בלבד)
-      if (s.type === 'trivia' && !revealRef.current.revealCorrect) {
+      // שלב חשיפת הפילוח/התשובה הנכונה — אחיד ל-trivia, סקר ותמונות.
+      if (!revealRef.current.revealCorrect) {
         setReveal((r) => ({ ...r, revealCorrect: true }));
         audio.play('inShowAns', sounds.inShowAnsMediaSound.src);
         return;
@@ -1225,14 +1219,16 @@ export function GameHost({
         delayMs = Math.max(1, autoT.nextSlide.seconds) * 1000;
       }
     } else if (state.phase === 'results') {
-      const isTrivia = s.type === 'trivia';
-      if (autoT.showCorrectAnswerAfterTimer && isTrivia && !reveal.revealCorrect) {
-        label = 'חשיפת התשובה הנכונה';
+      // חשיפת הפילוח/התשובה הנכונה אוטומטית לאחר הטיימר — לכל סוגי השקופיות
+      // (trivia/סקר/תמונות), רק אם הדגל דלוק. אחרת נשארים ב-results עד ללחיצה.
+      if (autoT.showCorrectAnswerAfterTimer && !reveal.revealCorrect) {
+        label = 'חשיפת התשובה/התוצאות';
         action = () => {
           setReveal((r) => ({ ...r, revealCorrect: true }));
           audio.play('inShowAns', sounds.inShowAnsMediaSound.src);
         };
-      } else if (autoT.nextSlide.active && (!isTrivia || reveal.revealCorrect)) {
+      } else if (autoT.nextSlide.active && reveal.revealCorrect) {
+        // מעבר אוטומטי לשקופית הבאה — רק אחרי שהפילוח כבר נחשף.
         label = 'שקופית הבאה';
         action = () => engine.dispatch({ type: 'ADVANCE', at: Date.now() });
         delayMs = Math.max(1, autoT.nextSlide.seconds) * 1000;

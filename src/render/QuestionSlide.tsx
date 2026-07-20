@@ -208,7 +208,6 @@ export function QuestionSlide({
   title,
   logo,
 }: QuestionSlideProps) {
-  const isResults = state.phase === 'results';
   const isVoting = state.phase === 'voting';
   const isTrivia = slide.type === 'trivia';
   const isImages = slide.type === 'ans_images';
@@ -217,8 +216,11 @@ export function QuestionSlide({
   const counts = state.liveVotes?.counts ?? {};
   const total = state.liveVotes?.total ?? 0;
 
-  // אחוזים בתוך המטבעות: בחשיפת התשובה הנכונה (trivia) או בתוצאות (סקר/תמונות).
-  const revealed = reveal.revealCorrect || (isResults && !isTrivia);
+  // חשיפת הפילוח/התשובה הנכונה היא צעד מפורש (reveal.revealCorrect) בכל סוגי
+  // השקופיות ההצבעה — trivia, סקר ותמונות כאחד. תום הטיימר רק *סוגר* את ההצבעה
+  // ואינו חושף מעצמו; החשיפה קורית בלחיצה (או אוטומטית כש-showCorrectAnswerAfterTimer
+  // דלוק). כך "מעבר אוטומטי כבוי" באמת עוצר אחרי הטיימר עד ללחיצה.
+  const revealed = reveal.revealCorrect;
   // פס מובילים מוצג רק ב-trivia אחרי חשיפת התשובה הנכונה.
   const showBoard = reveal.revealCorrect && isTrivia && leaders.length > 0;
 
