@@ -14,6 +14,8 @@
 const CACHE = 'media-cache-v1';
 
 // סיומות מדיה שנשמרות. שאר הבקשות אינן מיורטות כלל.
+// עותק הכרחי של הרשימות שב-src/engine/classify.ts (קובץ SW עצמאי לא יכול
+// לייבא) — בדיקת mediaSW.test.ts משווה אותו אליהן ותיכשל אם יסטו זה מזה.
 const MEDIA_EXT =
   /\.(png|jpe?g|gif|webp|avif|bmp|ico|svg|mp3|wav|ogg|oga|m4a|aac|flac|opus|mp4|m4v|webm|mov|ogv)(\?.*)?$/i;
 
@@ -57,7 +59,7 @@ self.addEventListener('fetch', (event) => {
 async function cacheFirstMedia(req) {
   const cache = await caches.open(CACHE);
   const cached = await cache.match(req, { ignoreVary: true });
-  if (cached) return cached;
+  if (cached) return withRange(req, cached);
   try {
     const res = await fetch(req);
     // שומרים רק תשובה שלמה (200) או opaque (מדיה cross-origin מ-no-cors) —
@@ -68,8 +70,49 @@ async function cacheFirstMedia(req) {
     return res;
   } catch (err) {
     const fallback = await cache.match(req, { ignoreVary: true });
-    if (fallback) return fallback;
+    if (fallback) return withRange(req, fallback);
     throw err;
+  }
+}
+
+/**
+ * נגני וידאו/אודיו מבקשים טווחי בייטים (Range). התשובה שבמטמון היא 200 מלאה —
+ * כשמתבקש טווח, חותכים ממנה 206 תקני כדי ש-seek יעבוד חלק. תשובת opaque
+ * (cross-origin ללא CORS) אינה קריאה — מוחזרת כמות שהיא (הדפדפן מתמודד עם
+ * 200 מלא כמו מול שרת בלי תמיכת Range).
+ */
+async function withRange(req, cached) {
+  const rangeHeader = req.headers.get('range');
+  if (!rangeHeader || cached.type === 'opaque' || cached.status !== 200) return cached;
+  const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader.trim());
+  if (!match || (match[1] === '' && match[2] === '')) return cached;
+  try {
+    const buf = await cached.clone().arrayBuffer();
+    const size = buf.byteLength;
+    let start;
+    let end;
+    if (match[1] === '') {
+      // צורת suffix: bytes=-N (N הבייטים האחרונים)
+      const n = Number(match[2]);
+      start = Math.max(0, size - n);
+      end = size - 1;
+    } else {
+      start = Number(match[1]);
+      end = match[2] === '' ? size - 1 : Math.min(Number(match[2]), size - 1);
+    }
+    if (start >= size || start > end) {
+      return new Response(null, {
+        status: 416,
+        headers: { 'Content-Range': `bytes */${size}` },
+      });
+    }
+    const headers = new Headers(cached.headers);
+    headers.set('Content-Range', `bytes ${start}-${end}/${size}`);
+    headers.set('Content-Length', String(end - start + 1));
+    headers.set('Accept-Ranges', 'bytes');
+    return new Response(buf.slice(start, end + 1), { status: 206, statusText: 'Partial Content', headers });
+  } catch {
+    return cached; // גוף לא קריא — נופלים לתשובה המלאה כמו קודם
   }
 }
 
