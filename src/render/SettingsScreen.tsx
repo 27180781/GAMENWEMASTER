@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from 'react';
 import type { GameFile } from '../engine/index.ts';
-import { JOIN_DIAL_DISPLAY, type AutoTransition, type GameSettings } from '../app/urlParams.ts';
+import { type AutoTransition, type GameSettings } from '../app/urlParams.ts';
 import { MediaCachePanel } from './MediaCachePanel.tsx';
 
 const SPEED_PRESETS: { label: string; value: number }[] = [
@@ -87,7 +87,6 @@ export function SettingsScreen({
   });
   const save = () => onSave(buildSettings());
 
-  const room = game.room ?? '';
   const limitNumber = game.setting.limit.number;
   const maxParticipants =
     limitNumber === undefined || limitNumber >= Number.MAX_SAFE_INTEGER
@@ -416,20 +415,9 @@ export function SettingsScreen({
     return (
       <div className="screen settings-screen online-start-screen">
         <div className="screen-content online-start">
-          <div className="online-grid online-grid--pair">
-            {/* הגדרות משחק — טלפון, קוד, מגבלה */}
-            <section className="online-card online-info">
-              <h2 className="online-card-title">הגדרות משחק</h2>
-              <div className="online-dial-label">מס׳ טלפון להתחברות</div>
-              <div className="online-dial" dir="ltr">{JOIN_DIAL_DISPLAY}</div>
-              <div className="online-code-label">קוד</div>
-              <div className="online-code" dir="ltr">{room}</div>
-              <div className="online-max">
-                מספר שלטים מקסימלי להפעלה: <b>{maxParticipants}</b>
-              </div>
-            </section>
-
-            {/* הוראות הפעלה */}
+          {/* הוראות הפעלה בלבד — מספר הטלפון והקוד ירדו מהמסך הזה (מוצגים בבאנר
+              העליון ובמסך ההתחברות). כרטיס אחד ממורכז. */}
+          <div className="online-grid online-grid--single">
             <section className="online-card online-howto">
               <h2 className="online-card-title">הוראות הפעלה</h2>
               <ol className="online-steps">
@@ -441,6 +429,10 @@ export function SettingsScreen({
                 ))}
               </ol>
             </section>
+          </div>
+
+          <div className="online-max online-max--standalone">
+            מספר שלטים מקסימלי להפעלה: <b>{maxParticipants}</b>
           </div>
 
           <div className="online-actions">
