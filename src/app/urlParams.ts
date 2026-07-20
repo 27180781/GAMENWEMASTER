@@ -69,6 +69,15 @@ export interface AutoTransition {
   showCorrectAnswerAfterTimer: boolean;
   /** מעבר אוטומטי לשקופית הבאה לאחר X שניות. */
   nextSlide: { active: boolean; seconds: number };
+  /**
+   * מעבר אוטומטי של מדיה (חל על כל קבצי המדיה: openMedia לפני שאלה, endMedia
+   * אחריה, ומסכי מדיה עצמאיים). תמונה — מעבר אחרי X שניות; סרטון (אחסון רגיל +
+   * יוטיוב) — מתנגן עד הסוף ואז עובר.
+   */
+  media: {
+    image: { active: boolean; seconds: number };
+    video: { playToEnd: boolean };
+  };
 }
 
 /**
@@ -116,6 +125,7 @@ export const DEFAULT_AUTO_TRANSITION: AutoTransition = {
   startTimerAfterLastAnswer: false,
   showCorrectAnswerAfterTimer: false,
   nextSlide: { active: false, seconds: 6 },
+  media: { image: { active: false, seconds: 5 }, video: { playToEnd: false } },
 };
 
 export const DEFAULT_GAME_SETTINGS: GameSettings = {
@@ -150,6 +160,15 @@ export function loadAutoTransition(gameId: string): AutoTransition | null {
       nextSlide: {
         active: Boolean(parsed.nextSlide?.active),
         seconds: Number(parsed.nextSlide?.seconds) || 6,
+      },
+      media: {
+        image: {
+          active: Boolean(parsed.media?.image?.active),
+          seconds: Number(parsed.media?.image?.seconds) || 5,
+        },
+        video: {
+          playToEnd: Boolean(parsed.media?.video?.playToEnd),
+        },
       },
     };
   } catch {

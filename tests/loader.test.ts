@@ -52,6 +52,7 @@ describe('autoTransition — ברירת מחדל ותקינות', () => {
       startTimerAfterLastAnswer: false,
       showCorrectAnswerAfterTimer: false,
       nextSlide: { active: false, seconds: 6 },
+      media: { image: { active: false, seconds: 5 }, video: { playToEnd: false } },
     });
   });
 

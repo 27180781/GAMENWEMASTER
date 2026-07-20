@@ -182,12 +182,33 @@ const autoTransitionSchema = z
         seconds: z.number().default(6),
       })
       .default({ active: false, seconds: 6 }),
+    // מעבר אוטומטי של מדיה (חל על *כל* קבצי המדיה: openMedia לפני שאלה,
+    // endMedia אחריה, ומסכי מדיה עצמאיים):
+    //   image.active/seconds — תמונה עוברת אוטומטית אחרי X שניות.
+    //   video.playToEnd — סרטון (אחסון רגיל + יוטיוב) מתנגן עד הסוף ואז עובר.
+    // ברירת המחדל שומרת על ההתנהגות הקיימת (מעבר ידני) לקבצים בלי השדה.
+    media: z
+      .object({
+        image: z
+          .object({
+            active: z.boolean().default(false),
+            seconds: z.number().default(5),
+          })
+          .default({ active: false, seconds: 5 }),
+        video: z
+          .object({
+            playToEnd: z.boolean().default(false),
+          })
+          .default({ playToEnd: false }),
+      })
+      .default({ image: { active: false, seconds: 5 }, video: { playToEnd: false } }),
   })
   .default({
     showAnswersAfterQuestion: false,
     startTimerAfterLastAnswer: false,
     showCorrectAnswerAfterTimer: false,
     nextSlide: { active: false, seconds: 6 },
+    media: { image: { active: false, seconds: 5 }, video: { playToEnd: false } },
   });
 
 export const globalSettingsSchema = z.object({
