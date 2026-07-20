@@ -55,22 +55,42 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(cacheFirstMedia(req));
 });
 
-/** cache-first: מגישים מהמטמון אם קיים; אחרת מהרשת ושומרים. */
+/**
+ * מעטפה "אטומה" (opaque) — תשובת מדיה cross-origin שהתבקשה ב-no-cors — תקינה
+ * להגשה *רק* חזרה לבקשת no-cors (מרכיב <video>/<audio>/<img>). הגשתה לבקשה
+ * שאינה no-cors (למשל ה-fetch של הטעינה-המוקדמת, במצב CORS) גורמת לדפדפן להפיל
+ * אותה כ-network error ("an opaque response was used for a request whose type is
+ * not no-cors"), וגם אי-אפשר לחתוך ממנה Range. לכן היא "שמישה מהמטמון" רק אם
+ * הבקשה היא no-cors.
+ */
+function usableFromCache(cached, req) {
+  return Boolean(cached) && !(cached.type === 'opaque' && req.mode !== 'no-cors');
+}
+
+/**
+ * cache-first: מגישים מהמטמון אם קיים ושמיש; אחרת מהרשת ושומרים.
+ *
+ * כשבמטמון יש רק מעטפה אטומה אך הבקשה אינה no-cors — לא מגישים אותה (תיפול),
+ * אלא מושכים טרי. משיכה במצב CORS מחזירה תשובה מלאה שדורסת את המעטפה האטומה
+ * (שדרוג עצמי של המטמון): היא ניתנת לחיתוך Range ושמישה לשני סוגי הבקשות, כך
+ * שה-<video>/<audio> הבא כבר יקבל אותה מהמטמון בלי הזרמה חיה שנתקעת.
+ */
 async function cacheFirstMedia(req) {
   const cache = await caches.open(CACHE);
   const cached = await cache.match(req, { ignoreVary: true });
-  if (cached) return withRange(req, cached);
+  if (usableFromCache(cached, req)) return withRange(req, cached);
   try {
     const res = await fetch(req);
-    // שומרים רק תשובה שלמה (200) או opaque (מדיה cross-origin מ-no-cors) —
-    // לא 206 חלקי ולא שגיאות. clone לפני שמחזירים כי אפשר לצרוך גוף פעם אחת.
+    // שומרים תשובה שלמה (200) או opaque (מדיה cross-origin מ-no-cors) — לא 206
+    // חלקי ולא שגיאות. clone לפני שמחזירים כי אפשר לצרוך גוף פעם אחת. תשובת CORS
+    // מלאה דורסת מעטפה אטומה קודמת של אותה כתובת.
     if (res && (res.status === 200 || res.type === 'opaque')) {
       cache.put(req, res.clone()).catch(() => {});
     }
     return res;
   } catch (err) {
     const fallback = await cache.match(req, { ignoreVary: true });
-    if (fallback) return withRange(req, fallback);
+    if (usableFromCache(fallback, req)) return withRange(req, fallback);
     throw err;
   }
 }
