@@ -46,6 +46,18 @@ const RAW_FIXTURES: Record<string, unknown> = {
   neuwirth: neuwirth,
 };
 
+/**
+ * מיזוג שמות/קבוצות משדה `users` של קובץ המשחק אל המרשם השמור (לפי id המשחק).
+ * אידמפוטנטי (upsert לפי מספר; קטגוריה/קבוצות לפי שם) — בטוח להריץ גם בטעינה
+ * וגם בכל רענון חם באמצע משחק.
+ */
+function mergeUsersIntoRoster(file: GameFile): void {
+  const users = parseGameUsers(file.users);
+  if (users.length === 0) return;
+  const categoryName = file.name.trim() !== '' ? file.name.trim() : 'קבוצות המשחק';
+  saveRoster(file.id, mergeGameUsers(loadRoster(file.id), users, categoryName));
+}
+
 function useHash(): string {
   const [hash, setHash] = useState(window.location.hash);
   useEffect(() => {
@@ -139,10 +151,7 @@ export function App() {
   // והשיוך לקבוצות תחת קטגוריה בשם המשחק (השיוך בגייסון מגיע בלי קטגוריה).
   useEffect(() => {
     if (pendingGame === null) return;
-    const users = parseGameUsers(pendingGame.users);
-    if (users.length === 0) return;
-    const categoryName = pendingGame.name.trim() !== '' ? pendingGame.name.trim() : 'קבוצות המשחק';
-    saveRoster(pendingGame.id, mergeGameUsers(loadRoster(pendingGame.id), users, categoryName));
+    mergeUsersIntoRoster(pendingGame);
   }, [pendingGame]);
 
   // Prefetch גיבוי: מתחילים לבדוק אם יש משחק שמור כבר במסך ההגדרות, במקביל
@@ -239,8 +248,13 @@ export function App() {
   /** החלת קובץ משחק מעודכן: רענון חם באמצע משחק, או עדכון התצוגה לפני התחלה. */
   const applyGame = useCallback((loaded: GameFile) => {
     setError(null);
-    if (gameStartedRef.current) setGame(loaded); // אותו id → GameHost מרענן בלי remount
-    else setPendingGame(loaded);
+    if (gameStartedRef.current) {
+      // רענון חם באמצע משחק: ממזגים קודם שמות/קבוצות מעודכנים אל המרשם השמור
+      // (סינכרונית, לפני setGame) — ואז GameHost טוען את המרשם המעודכן יחד עם
+      // התוכן החדש. הניקוד/ההצבעות/המיקום נשמרים ב-engine.updateGame.
+      mergeUsersIntoRoster(loaded);
+      setGame(loaded); // אותו id → GameHost מרענן בלי remount
+    } else setPendingGame(loaded);
   }, []);
 
   const applyRawGame = useCallback(
