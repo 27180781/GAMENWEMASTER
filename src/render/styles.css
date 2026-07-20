@@ -173,8 +173,48 @@ body {
 /* ---- מסך התחברות שחקנים (לובי) ---- */
 
 .lobby-content { gap: 22px; justify-content: center; }
+/* לובי אונליין עם מספר החיוג — מיושר לראש, כדי שהמספר יישב בשליש העליון
+   והשחקנים המתחברים יזרמו מתחתיו. */
+.lobby-content--join { justify-content: flex-start; padding-top: 40px; gap: 16px; }
+.lobby-content--join .lobby-logo { max-height: 92px; }
+.lobby-content--join .lobby-title { font-size: 44px; max-height: 92px; }
 .lobby-logo { max-height: 150px; }
 .lobby-title { font-size: 60px; max-height: 150px; }
+
+/* מספר החיוג + קוד המשחק בגדול — בשליש העליון של הלובי, גדול וברור לקריאה
+   מרחוק. מחליף את הבאנר הקטן העליון (שממשיך להופיע בשאר המשחק). */
+.lobby-join {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.lobby-join-label {
+  font-size: 26px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.82);
+}
+.lobby-join-dial {
+  background: #111;
+  color: #ffd23f;
+  font-weight: 900;
+  font-size: 92px;
+  line-height: 1.12;
+  border-radius: 44px;
+  padding: 6px 60px;
+  letter-spacing: 2px;
+}
+.lobby-join-code {
+  margin-top: 4px;
+  background: rgba(0, 0, 0, 0.42);
+  border: 3px solid rgba(255, 255, 255, 0.22);
+  color: #fff;
+  font-weight: 900;
+  font-size: 60px;
+  border-radius: 34px;
+  padding: 2px 52px;
+  letter-spacing: 10px;
+}
 
 .lobby-count {
   display: flex;

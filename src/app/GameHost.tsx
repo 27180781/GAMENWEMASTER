@@ -1468,8 +1468,10 @@ export function GameHost({
       style={themeStyle(setting)}
     >
       <Stage>
-        {/* באנר הצטרפות עליון — משחק אונליין עם קוד חדר, לכל אורך המשחק */}
-        {showJoinBanner && (
+        {/* באנר הצטרפות עליון — משחק אונליין עם קוד חדר, לכל אורך המשחק. במסך
+            הלובי (opening) הוא מוסתר, ובמקומו מוצג מספר גדול+קוד בשליש העליון של
+            הלובי (ראו LobbyScreen) כדי שיהיה ברור וגדול לקריאה. */}
+        {showJoinBanner && stage !== 'opening' && (
           <div className="join-banner">
             📞 להצטרפות למשחק חייגו <b>{JOIN_DIAL_DISPLAY}</b> והקישו את קוד המשחק:{' '}
             <b className="join-banner-code">{roomId}</b>
@@ -1499,6 +1501,7 @@ export function GameHost({
             engine={engine}
             players={connectedPlayers}
             {...(showQrCode ? { qrUrl } : {})}
+            {...(showJoinBanner ? { joinInfo: { dial: JOIN_DIAL_DISPLAY, code: roomId } } : {})}
           />
         )}
         {stage === 'playing' && (

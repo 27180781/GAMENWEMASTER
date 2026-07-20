@@ -65,11 +65,14 @@ export function LobbyScreen({
   engine,
   players,
   qrUrl,
+  joinInfo,
 }: {
   engine: GameEngine;
   players: RailPlayer[];
   /** כשמוגדר — מציג קוד QR גדול בצד הלובי להתחברות מהטלפון. */
   qrUrl?: string;
+  /** מספר החיוג וקוד המשחק — מוצגים בגדול בשליש העליון של הלובי. */
+  joinInfo?: { dial: string; code: string };
 }) {
   const setting = engine.getGame().setting;
   const density = lobbyDensity(players.length);
@@ -86,11 +89,19 @@ export function LobbyScreen({
           <div className="lobby-qr-caption">סרקו להצטרפות מהטלפון 📱</div>
         </aside>
       )}
-      <div className="screen-content lobby-content">
+      <div className={`screen-content lobby-content${joinInfo !== undefined ? ' lobby-content--join' : ''}`}>
         {setting.logo.src !== '' && <img className="opening-logo lobby-logo" src={setting.logo.src} alt="" />}
         <h1 className="opening-title lobby-title">
           {setting.titleThroughoutGame || engine.getGame().name}
         </h1>
+        {joinInfo !== undefined && (
+          <div className="lobby-join">
+            <span className="lobby-join-label">חייגו למספר</span>
+            <span className="lobby-join-dial" dir="ltr">{joinInfo.dial}</span>
+            <span className="lobby-join-label">והקישו את הקוד</span>
+            <span className="lobby-join-code" dir="ltr">{joinInfo.code}</span>
+          </div>
+        )}
         <div className="lobby-count">
           <span className="lobby-count-dot" />
           <span className="lobby-count-num">{players.length}</span> מחוברים
