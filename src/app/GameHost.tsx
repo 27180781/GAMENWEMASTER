@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   GameEngine,
   ReplayAdapter,
+  classifyMediaUrl,
   countsOfVotes,
   isVotableSlide,
   type GameFile,
@@ -960,6 +961,8 @@ export function GameHost({
       setScoresPageBump((n) => n + 1);
     }
   }, [engine, advanceStep]);
+  const advanceRef = useRef(advance);
+  advanceRef.current = advance;
 
   /** "אחורה" — מסלול אחיד: בשקופית (stepBack) וגם במסכי הסיום. */
   const goBack = useCallback(() => {
@@ -1188,6 +1191,8 @@ export function GameHost({
   // בכל רגע נבחרת פעולה אחת; לחיצת מפעיל ידנית פשוט מקדימה את אותה פעולה.
   // -------------------------------------------------------------------------
   const autoT = settings.autoTransition;
+  const autoTRef = useRef(autoT);
+  autoTRef.current = autoT;
   useEffect(() => {
     if (stage !== 'playing' || state.activeMedia !== null) return;
     const s = engine.getCurrentSlide();
@@ -1244,6 +1249,33 @@ export function GameHost({
     }, delayMs);
     return () => window.clearTimeout(timeout);
   }, [stage, state.phase, state.currentSlideId, state.activeMedia, reveal, autoT, engine, audio, sounds]);
+
+  // מעבר אוטומטי של מדיה חוסמת (openMedia/endMedia + מסכי מדיה עצמאיים):
+  //   • תמונה — מעבר אחרי autoT.media.image.seconds (אם image.active דלוק).
+  //   • סרטון/יוטיוב — מטופל ב-onEnded של הנגן (ראו onBlockingMediaEnded), לא כאן.
+  // המעבר עצמו הוא advance() — אותה התנהגות כמו לחיצה ידנית על המדיה (openMedia →
+  // כניסה לשאלה; endMedia / מסך מדיה → שקופית הבאה).
+  useEffect(() => {
+    if (stage !== 'playing' || state.activeMedia === null) return;
+    const s = engine.getCurrentSlide();
+    const src = state.activeMedia === 'open' ? s.openMedia.src : s.endMedia.src;
+    if (classifyMediaUrl(src) !== 'image') return; // רק תמונה; וידאו דרך onEnded
+    if (!autoT.media.image.active) return;
+    const timeout = window.setTimeout(
+      () => {
+        debugLog('auto', 'מעבר אוטומטי: תמונת מדיה', { seconds: autoT.media.image.seconds });
+        advanceRef.current();
+      },
+      Math.max(1, autoT.media.image.seconds) * 1000,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [stage, state.activeMedia, state.currentSlideId, autoT, engine]);
+
+  // סיום סרטון/יוטיוב חוסם — מעבר אוטומטי רק אם autoT.media.video.playToEnd דלוק.
+  // (מחובר ל-onEnded של הנגן דרך SlideView; אם כבוי — הסרטון נשאר עד לחיצה.)
+  const onBlockingMediaEnded = useCallback(() => {
+    if (autoTRef.current.media.video.playToEnd) advanceRef.current();
+  }, []);
 
   // -------------------------------------------------------------------------
   // סאונד לפי מצב (SPEC סעיף 9): התחברות / מנצחים / רשימת זוכים / מובילים
@@ -1482,6 +1514,7 @@ export function GameHost({
               functionDetail={functionDetail}
               nameOf={nameOf}
               roster={roster}
+              onBlockingMediaEnded={onBlockingMediaEnded}
             />
             {/* מיקום במשחק: שקופית נוכחית מתוך סה"כ */}
             <span className="slide-counter" dir="ltr">

@@ -29,6 +29,8 @@ interface SlideViewProps {
   nameOf?: (voterId: string) => string;
   /** מרשם הקבוצות — לשקופית פונקציה מסוג "screen"/"leaderboard". */
   roster?: RosterData;
+  /** סיום מדיה חוסמת (סרטון/יוטיוב) — למעבר אוטומטי אם מוגדר playToEnd. */
+  onBlockingMediaEnded?: () => void;
 }
 
 /** מסך שקופית "פונקציה" — פעולת מערכת (API / ניקוד / משתתפים) עם חיווי מצב. */
@@ -103,6 +105,7 @@ export function SlideView({
   functionDetail = '',
   nameOf,
   roster,
+  onBlockingMediaEnded,
 }: SlideViewProps) {
   const slide = engine.getCurrentSlide();
 
@@ -119,13 +122,14 @@ export function SlideView({
     return <FunctionScreen action={fn?.action ?? 'api'} status={functionStatus} detail={functionDetail} />;
   }
 
-  // מדיה חוסמת — מסך מלא. מנוגנת אוטומטית; המעבר ממנה הוא ידני (רווח/0),
-  // ולכן אין onEnded שמדלג אוטומטית ומשאיר מסך ריק.
+  // מדיה חוסמת — מסך מלא. סרטון/יוטיוב מדווחים onEnded ל-onBlockingMediaEnded
+  // (המעבר בפועל מותנה ב-playToEnd, נקבע ב-GameHost); לתמונה אין "סיום" והמעבר
+  // שלה מטופל בטיימר ב-GameHost. אם אין handler — נשמרת ההתנהגות הידנית (רווח/0).
   if (state.activeMedia !== null) {
     const src = state.activeMedia === 'open' ? slide.openMedia.src : slide.endMedia.src;
     return (
       <div className="screen slide-media-screen">
-        <MediaPlayer src={src} />
+        <MediaPlayer src={src} {...(onBlockingMediaEnded ? { onEnded: onBlockingMediaEnded } : {})} />
       </div>
     );
   }
