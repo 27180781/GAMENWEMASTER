@@ -362,6 +362,7 @@ export function GameHost({
       rosterRef.current,
       nameOf,
       startedAtRef.current,
+      [...removedRef.current], // הסרות משתתפים שורדות קריסה/רענון
     );
     await saveBackup(backupCfg, engine.getGame().id, payload);
     debugLog('game', 'גיבוי נשמר', { phase: payload.meta.phase, currentQueId: payload.meta.currentQueId });
@@ -397,6 +398,8 @@ export function GameHost({
       try {
         engine.restore(backupToSnapshot(game, data));
         startedAtRef.current = data.meta.startedAt || Date.now();
+        // שחזור המשתתפים שהוסרו (שקופית players) — שההסרה תמשיך להיאכף
+        removedRef.current = new Set(data.meta.removedIds ?? []);
         // מסנכרנים את מונה טבלת המובילים למצב המשוחזר, כדי שלא תקפוץ מיד בשחזור.
         autoLeadersShownAtRef.current = completedQuestionCount(game, engine.getState().slidesCompleted);
         if (rosterRef.current.categories.length === 0 && rosterRef.current.players.length === 0) {
