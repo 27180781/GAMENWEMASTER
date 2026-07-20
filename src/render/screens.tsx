@@ -115,11 +115,8 @@ export function LobbyScreen({
               <FitText className="lobby-name">{player.name}</FitText>
             </div>
           ))}
-          {players.length === 0 && (
-            <div className="lobby-empty">ממתינים לשחקנים… לחצו מקש כלשהו במכשיר כדי להתחבר</div>
-          )}
+          {players.length === 0 && <div className="lobby-empty">ממתינים לשחקנים…</div>}
         </div>
-        <p className="opening-hint">לחצו רווח כדי להתחיל</p>
       </div>
     </div>
   );
