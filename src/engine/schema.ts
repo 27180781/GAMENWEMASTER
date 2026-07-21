@@ -42,7 +42,10 @@ export const answerSchema = z.object({
 });
 
 export const slideSettingsSchema = z.object({
-  allowChangeVote: z.boolean(),
+  // שינוי הצבעה בזמן הטיימר (ההצבעה האחרונה קובעת) — פעיל רק כשמסומן במפורש
+  // ב-JSON. חסר/false = כמו קודם, ההצבעה הראשונה ננעלת ואי אפשר לשנות. אופציונלי
+  // עם ברירת מחדל false כדי שקבצים בלי השדה ייטענו כרגיל (בלי אפשרות שינוי).
+  allowChangeVote: z.boolean().optional().default(false),
   slideStartVoting: z.boolean(),
   playAfterClicking: z.boolean(),
   exitGame: z.boolean(),
