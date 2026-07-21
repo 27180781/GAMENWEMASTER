@@ -193,26 +193,30 @@ body {
   font-weight: 700;
   color: rgba(255, 255, 255, 0.82);
 }
+/* מספר החיוג וקוד המשחק — בצבעי המשחק (רקע ראשי, טקסט משני) כמו בועות הטקסט
+   של המשחק (.subject-text/.question). צל כהה כדי לבלוט מעל מדיית הרקע. */
 .lobby-join-dial {
-  background: #111;
-  color: #ffd23f;
+  background: var(--main-color, #222b45);
+  color: var(--secondary-color, #ffd23f);
   font-weight: 900;
   font-size: 92px;
   line-height: 1.12;
   border-radius: 44px;
   padding: 6px 60px;
   letter-spacing: 2px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
 }
 .lobby-join-code {
   margin-top: 4px;
-  background: rgba(0, 0, 0, 0.42);
-  border: 3px solid rgba(255, 255, 255, 0.22);
-  color: #fff;
+  background: var(--main-color, #222b45);
+  border: 3px solid color-mix(in srgb, var(--secondary-color, #ffd23f) 45%, transparent);
+  color: var(--secondary-color, #ffd23f);
   font-weight: 900;
   font-size: 60px;
   border-radius: 34px;
   padding: 2px 52px;
   letter-spacing: 10px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.4);
 }
 
 .lobby-count {
