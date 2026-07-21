@@ -8,6 +8,8 @@ import { AudioManager } from '../src/app/AudioManager.ts';
 
 class FakeAudio {
   static instances: FakeAudio[] = [];
+  /** אם מוגדר — הניגון הבא נכשל עם DOMException בשם הזה (לבדיקת טיפול בשגיאות). */
+  static rejectNextWith: string | null = null;
   paused = false;
   playing = false;
   loop = false;
@@ -21,6 +23,11 @@ class FakeAudio {
     this.handlers[type] = cb;
   }
   play(): Promise<void> {
+    if (FakeAudio.rejectNextWith !== null) {
+      const name = FakeAudio.rejectNextWith;
+      FakeAudio.rejectNextWith = null;
+      return Promise.reject(new DOMException('נכשל', name));
+    }
     this.playing = true;
     this.paused = false;
     return Promise.resolve();
@@ -31,18 +38,25 @@ class FakeAudio {
   }
 }
 
+/** מאזיני ה-window שנרשמו ע"י ה-AudioManager (keydown/pointerdown) — לירי בבדיקות. */
+let winListeners: Record<string, () => void> = {};
+
 function setup(): AudioManager {
   FakeAudio.instances = [];
-  const listeners: Record<string, () => void> = {};
+  FakeAudio.rejectNextWith = null;
+  winListeners = {};
   vi.stubGlobal('window', {
-    addEventListener: (type: string, cb: () => void) => (listeners[type] = cb),
-    removeEventListener: () => {},
+    addEventListener: (type: string, cb: () => void) => (winListeners[type] = cb),
+    removeEventListener: (type: string) => delete winListeners[type],
   });
   vi.stubGlobal('Audio', FakeAudio as unknown as typeof Audio);
   const manager = new AudioManager();
-  listeners.keydown?.(); // שחרור נעילת ה-autoplay (אינטראקציה ראשונה)
+  winListeners.keydown?.(); // שחרור נעילת ה-autoplay (אינטראקציה ראשונה)
   return manager;
 }
+
+/** משחרר את ה-microtasks כדי שה-catch של audio.play() ירוץ. */
+const flush = () => Promise.resolve().then(() => Promise.resolve());
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -109,5 +123,36 @@ describe('AudioManager — פתיחה אוטומטית לפי userActivation', (
     manager.play('playersConnecting', 'connect.mp3', { loop: true });
 
     expect(FakeAudio.instances.every((a) => !a.playing)).toBe(true); // הכול בהמתנה
+  });
+});
+
+describe('AudioManager — טיפול חסין בשגיאות ניגון', () => {
+  it('כשל טעינה של קובץ בודד (NotSupportedError) לא נועל את מערכת הסאונד', async () => {
+    const manager = setup();
+    FakeAudio.rejectNextWith = 'NotSupportedError';
+    manager.play('timer', 'bad.mp3', { loop: true }); // ייכשל בטעינה
+    await flush();
+    // סאונד אחר עדיין מתנגן — לא ננעלנו בגלל כשל של קובץ אחד
+    manager.play('showQuestion', 'good.mp3');
+    const playing = FakeAudio.instances.filter((a) => a.playing);
+    expect(playing).toHaveLength(1);
+    expect(playing[0]!.src).toBe('good.mp3');
+  });
+
+  it('חסימת autoplay אמיתית (NotAllowedError) נועלת — ואינטראקציה חוזרת משחררת שוב', async () => {
+    const manager = setup(); // כבר "נפתח" ב-keydown של setup
+    FakeAudio.rejectNextWith = 'NotAllowedError';
+    manager.play('timer', 't.mp3', { loop: true }); // ייחסם וייכנס להמתנה
+    await flush();
+    // עדיין כלום לא מתנגן — ננעלנו והסאונד ממתין
+    expect(FakeAudio.instances.every((a) => !a.playing)).toBe(true);
+    // מאזין ה-unlock הוחזר → אינטראקציה חוזרת מנגנת את מה שהמתין
+    expect(winListeners.keydown).toBeTypeOf('function');
+    winListeners.keydown?.();
+    await flush();
+    const playing = FakeAudio.instances.filter((a) => a.playing);
+    expect(playing).toHaveLength(1);
+    expect(playing[0]!.src).toBe('t.mp3');
+    expect(playing[0]!.loop).toBe(true);
   });
 });
