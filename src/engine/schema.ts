@@ -238,6 +238,10 @@ const autoTransitionSchema = z
 export const globalSettingsSchema = z.object({
   titleThroughoutGame: z.string(),
   ansIsNumber: z.boolean(),
+  // שינוי הצבעה בזמן הטיימר לכל המשחק (ההצבעה האחרונה קובעת) — הגדרה גלובלית
+  // שחלה על *כל* השקופיות. חסר/false = כבוי גלובלית, וכל שקופית נקבעת לפי
+  // slide.setting.allowChangeVote שלה (התנהגות קודמת). true = כל המשחק מאפשר.
+  allowChangeVote: z.boolean().optional().default(false),
   // כמה זוכים מוצגים במסך המנצחים הסופי (בסוף המשחק).
   multiWinners: z.number(),
   // פעם בכמה שאלות להציג אוטומטית את טבלת המובילים באמצע המשחק.

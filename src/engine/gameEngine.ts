@@ -115,6 +115,15 @@ export class GameEngine {
     return slide;
   }
 
+  /**
+   * האם מותר לשנות הצבעה בשקופית נתונה (ההצבעה האחרונה קובעת). ההגדרה הגלובלית
+   * (game.setting.allowChangeVote) חלה על *כל* המשחק ומפעילה מעל הכל; אחרת נופלים
+   * להגדרה הפר-שקופית (slide.setting.allowChangeVote). כך שני המנגנונים חיים יחד.
+   */
+  private allowChangeVoteFor(slide: Slide): boolean {
+    return this.game.setting.allowChangeVote || slide.setting.allowChangeVote;
+  }
+
   /** זמן התגובה הממוצע (ms) של מצביע — נמוך = מהיר. אין תשובות → Infinity. */
   averageResponseMs(voterId: string): number {
     const t = this.state.answerTimes[voterId];
@@ -442,7 +451,7 @@ export class GameEngine {
     // המונים החיים מוצגים לפי ההצבעות הנעולות, כדי שהמסך לא יראה שינויי הצבעה
     // שלא ייספרו. עם allowChangeVote (או בלי voters) — המונים מה-snapshot כרגיל.
     const locked =
-      !this.getCurrentSlide().setting.allowChangeVote && snapshot.voters !== undefined;
+      !this.allowChangeVoteFor(this.getCurrentSlide()) && snapshot.voters !== undefined;
     this.setState({
       liveVotes: locked
         ? {
@@ -480,7 +489,7 @@ export class GameEngine {
     const slide = this.getCurrentSlide();
     const slideId = slide.id;
 
-    const finalVotes = slide.setting.allowChangeVote
+    const finalVotes = this.allowChangeVoteFor(slide)
       ? { ...(this.voting.latestVoters ?? {}) }
       : { ...this.voting.lockedVotes };
 
