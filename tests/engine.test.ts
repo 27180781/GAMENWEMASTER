@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { GameEngine } from '../src/engine/index.ts';
-import { fourAnswers, makeGame, makeSnapshot, rawSlide } from './helpers.ts';
+import { GameEngine, parseGameFile } from '../src/engine/index.ts';
+import { fourAnswers, makeGame, makeSnapshot, rawGame, rawSlide } from './helpers.ts';
 
 const T0 = 1_000_000;
 
@@ -207,6 +207,52 @@ describe('ניקוד (SPEC 5.2)', () => {
     latest.dispatch({ type: 'VOTING_TIMEOUT' });
     expect(latest.getState().votesBySlide[1]).toEqual({ a: 2, b: 2 });
     expect(latest.getState().liveVotes).toEqual({ counts: { '2': 2 }, total: 2 });
+  });
+
+  // הגדרה גלובלית (game.setting.allowChangeVote) — חלה על כל המשחק ומפעילה מעל
+  // ההגדרה הפר-שקופית. בונים משחק עם הגדרה גלובלית וגם setting פר-שקופית.
+  const globalChangeEngine = (global: boolean, slideAllows: boolean): GameEngine => {
+    const raw = rawGame([
+      rawSlide({
+        id: 1,
+        type: 'trivia',
+        que: 'שאלה?',
+        answers: fourAnswers(2),
+        scoreForQue: 10,
+        settings: { allowChangeVote: slideAllows },
+      }),
+      rawSlide({ id: 2, type: 'media', openMediaSrc: 'https://x.dev/v.mp4' }),
+    ]);
+    (raw.setting as Record<string, unknown>).allowChangeVote = global;
+    const engine = new GameEngine(parseGameFile(raw));
+    engine.dispatch({ type: 'ADVANCE', at: T0 });
+    return engine;
+  };
+
+  it('הגדרה גלובלית true: כל המשחק מאפשר שינוי — גם כששקופית מוגדרת false', () => {
+    const engine = globalChangeEngine(true, false); // גלובלי פותח, שקופית סגורה
+    engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(1, 1, { a: 1 }) });
+    engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(2, 1, { a: 2 }) }); // שינוי
+    engine.dispatch({ type: 'VOTING_TIMEOUT' });
+    expect(engine.getState().scores).toEqual({ a: 10 }); // האחרונה (2, נכונה) נספרה
+    expect(engine.getState().votesBySlide[1]).toEqual({ a: 2 });
+  });
+
+  it('הגדרה גלובלית false + שקופית false: ההצבעה הראשונה ננעלת (כמו קודם)', () => {
+    const engine = globalChangeEngine(false, false);
+    engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(1, 1, { a: 1 }) });
+    engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(2, 1, { a: 2 }) });
+    engine.dispatch({ type: 'VOTING_TIMEOUT' });
+    expect(engine.getState().scores).toEqual({}); // ננעל על 1 (שגויה)
+    expect(engine.getState().votesBySlide[1]).toEqual({ a: 1 });
+  });
+
+  it('הגדרה גלובלית false + שקופית true: ההגדרה הפר-שקופית עדיין עובדת', () => {
+    const engine = globalChangeEngine(false, true);
+    engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(1, 1, { a: 1 }) });
+    engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(2, 1, { a: 2 }) });
+    engine.dispatch({ type: 'VOTING_TIMEOUT' });
+    expect(engine.getState().scores).toEqual({ a: 10 }); // האחרונה גוברת
   });
 
   it('scoringReduction: אחרי seconds שניות הניקוד יורד ל-score', () => {
