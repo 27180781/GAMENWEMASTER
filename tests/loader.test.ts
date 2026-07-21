@@ -64,6 +64,26 @@ describe('טעינה וולידציה של 4 קבצי המשחק האמיתיי�
   });
 });
 
+describe('allowChangeVote — אופציונלי עם ברירת מחדל false', () => {
+  it('שקופית בלי allowChangeVote ב-setting — נטענת עם false (בלי אפשרות שינוי)', () => {
+    const slide = rawSlide({ id: 1, type: 'trivia', answers: fourAnswers(2) });
+    delete (slide.setting as Record<string, unknown>).allowChangeVote;
+    const game = makeGame([slide]);
+    expect(game.questions[0]!.setting.allowChangeVote).toBe(false);
+  });
+
+  it('allowChangeVote: true ב-setting נשמר', () => {
+    const slide = rawSlide({
+      id: 1,
+      type: 'trivia',
+      answers: fourAnswers(2),
+      settings: { allowChangeVote: true },
+    });
+    const game = makeGame([slide]);
+    expect(game.questions[0]!.setting.allowChangeVote).toBe(true);
+  });
+});
+
 describe('autoTransition — ברירת מחדל ותקינות', () => {
   it('קובץ בלי autoTransition — מקבל ברירת מחדל (הכל כבוי, nextSlide 6 שניות)', () => {
     const game = makeGame([rawSlide({ id: 1, type: 'trivia', answers: fourAnswers(1) })]);
