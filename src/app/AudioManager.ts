@@ -38,6 +38,8 @@ export class AudioManager {
   private readonly pending = new Map<SoundChannel, PendingPlay>();
   private volume = 1;
   private unlocked = false;
+  /** האם מאזיני ה-unlock מותקנים כרגע על window (למניעת הוספה/הסרה כפולה). */
+  private listening = false;
   private context: AudioContext | null = null;
   private applauseBuffer: AudioBuffer | null = null;
   private applauseSource: AudioBufferSourceNode | null = null;
@@ -52,9 +54,9 @@ export class AudioManager {
       this.unlocked = true;
     }
     this.unlockFn = () => {
+      this.disarmUnlockListeners();
+      if (this.unlocked) return; // כבר פתוח (למשל מ-userActivation) — רק מסירים מאזינים
       this.unlocked = true;
-      window.removeEventListener('pointerdown', this.unlockFn);
-      window.removeEventListener('keydown', this.unlockFn);
       // ניגון מה שחיכה לאינטראקציה הראשונה (play אקסקלוסיבי — נשאר האחרון)
       const queued = [...this.pending.entries()];
       this.pending.clear();
@@ -63,15 +65,29 @@ export class AudioManager {
         this.play(channel, play.src, { loop: play.loop });
       }
     };
+    // מאזיני הפתיחה מותקנים תמיד — גם אם unlocked כבר true — כדי שאם נצטרך לנעול
+    // שוב (חסימת autoplay אמיתית) אינטראקציה עתידית תשחרר מחדש.
+    this.armUnlockListeners();
+  }
+
+  private armUnlockListeners(): void {
+    if (this.listening) return;
+    this.listening = true;
     window.addEventListener('pointerdown', this.unlockFn);
     window.addEventListener('keydown', this.unlockFn);
+  }
+
+  private disarmUnlockListeners(): void {
+    if (!this.listening) return;
+    this.listening = false;
+    window.removeEventListener('pointerdown', this.unlockFn);
+    window.removeEventListener('keydown', this.unlockFn);
   }
 
   /** ניקוי מלא בעזיבת המשחק: עצירת כל הסאונדים והסרת מאזיני ה-unlock מ-window. */
   dispose(): void {
     this.stopAll();
-    window.removeEventListener('pointerdown', this.unlockFn);
-    window.removeEventListener('keydown', this.unlockFn);
+    this.disarmUnlockListeners();
   }
 
   setVolume(volume: number): void {
@@ -100,18 +116,25 @@ export class AudioManager {
     debugLog('audio', `${channel} מנגן`, { src: shortSrc(src), loop });
     audio.play().catch((err: unknown) => {
       const name = err instanceof DOMException ? err.name : String(err);
-      // AbortError = הניגון הופסק ע"י סאונד אקסקלוסיבי חדש/‏stop — לא חסימת דפדפן.
-      // אסור להתייחס אליו כאל חסימת autoplay (אחרת ננעל את המנהל בטעות ונשתיק
-      // את הסאונד הבא). מתעלמים בשקט.
-      if (name === 'AbortError') {
-        if (this.active.get(channel) === audio) this.active.delete(channel);
+      if (this.active.get(channel) === audio) this.active.delete(channel);
+      // AbortError = הניגון הופסק ע"י סאונד אקסקלוסיבי חדש/‏stop — לא שגיאה. מתעלמים.
+      if (name === 'AbortError') return;
+      // חסימת autoplay אמיתית — ורק היא — נועלת את המנהל ושומרת לניסיון אחרי
+      // אינטראקציה. מחזירים את מאזיני ה-unlock כדי שאינטראקציה הבאה תשחרר שוב;
+      // בלעדיהם היינו נשארים נעולים לצמיתות אחרי הפתיחה הראשונה.
+      if (name === 'NotAllowedError' || name === 'SecurityError') {
+        this.unlocked = false;
+        this.pending.set(channel, { src, loop });
+        this.armUnlockListeners();
+        debugLog('audio', `${channel} נחסם (autoplay) — יְנוגן אחרי האינטראקציה הבאה`, {
+          src: shortSrc(src),
+        });
         return;
       }
-      // חסימת autoplay אמיתית (NotAllowedError וכו') — ננעל ונשמור לניסיון אחרי אינטראקציה
-      this.unlocked = false;
-      this.pending.set(channel, { src, loop });
-      if (this.active.get(channel) === audio) this.active.delete(channel);
-      debugLog('audio', `${channel} נחסם (${name}) — יְנוגן אחרי האינטראקציה הבאה`, { src: shortSrc(src) });
+      // כל שאר השגיאות (טעינה/פורמט/רשת של קובץ בודד — NotSupportedError וכו') —
+      // *לא* נועלות את מערכת הסאונד; מדלגים רק על הסאונד הזה כדי ששאר הסאונדים
+      // ימשיכו לעבוד. (זו הייתה נעילת-שווא: כשל טעינה של קובץ אחד השתיק את הכול.)
+      debugLog('audio', `${channel} נכשל (${name}) — מדלגים על הסאונד הזה`, { src: shortSrc(src) });
     });
   }
 
