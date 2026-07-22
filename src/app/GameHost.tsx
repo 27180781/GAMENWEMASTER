@@ -648,6 +648,8 @@ export function GameHost({
   const pauseStartedAtRef = useRef(0);
   /** משך העצירות המצטבר בחלון הנוכחי — להקפאת הקהל הסינתטי. */
   const pausedAccumMsRef = useRef(0);
+  /** true = הטיימר קופא כרגע בגלל שכבה חוסמת (ולא עצירה ידנית) — לְהַפְשָׁרָה בסגירה. */
+  const overlayFrozeRef = useRef(false);
   const lastHostAnswerRef = useRef<number | null>(null);
 
   const votingActive = stage === 'playing' && state.phase === 'voting';
@@ -728,6 +730,7 @@ export function GameHost({
       setTimer(null);
       pausedRef.current = false;
       pausedRemainingMsRef.current = null;
+      overlayFrozeRef.current = false;
       // סגירת חלון ההצבעה — ניקוי ה-throttle (השאריות כבר נשלחו לפני הסגירה)
       if (voteFlushTimerRef.current !== null) {
         window.clearTimeout(voteFlushTimerRef.current);
@@ -1256,8 +1259,41 @@ export function GameHost({
   const autoT = settings.autoTransition;
   const autoTRef = useRef(autoT);
   autoTRef.current = autoT;
+
+  // שכבה חוסמת פתוחה (מובילים / פירוט הצבעות / מצב קבוצות / הגדרות / תפריט /
+  // שמות) — המשחק "נעצר": המעברים האוטומטיים לא מתקדמים והטיימר קופא, וממשיכים
+  // מאותה נקודה בדיוק כשהיא נסגרת. כך לא "מפסידים שאלה" כשמוצג מסך אחר.
+  const overlayActive =
+    leadersOverlay || votesOverlay || connectCategory !== null || settingsOpen || rosterOpen || menuOpen;
+
+  // הקפאת/הפשרת טיימר ההצבעה בזמן שכבה חוסמת. מכבדים עצירה ידנית (מקש 6): מפשירים
+  // רק אם *אנחנו* הקפאנו בגלל השכבה, לא אם המנחה עצר בעצמו.
   useEffect(() => {
-    if (stage !== 'playing' || state.activeMedia !== null) return;
+    if (engine.getState().phase !== 'voting') return;
+    if (overlayActive) {
+      if (pausedRemainingMsRef.current === null) {
+        pausedRemainingMsRef.current = Math.max(0, deadlineRef.current - Date.now());
+        pausedRef.current = true;
+        pauseStartedAtRef.current = Date.now();
+        overlayFrozeRef.current = true;
+        audio.stop('timer');
+        setTimer((t) => (t ? { ...t, remaining: pausedRemainingMsRef.current! / 1000, paused: true } : t));
+      }
+    } else if (overlayFrozeRef.current) {
+      overlayFrozeRef.current = false;
+      if (pausedRemainingMsRef.current !== null) {
+        deadlineRef.current = Date.now() + pausedRemainingMsRef.current;
+        pausedAccumMsRef.current += Date.now() - pauseStartedAtRef.current;
+        pausedRemainingMsRef.current = null;
+        pausedRef.current = false;
+        audio.play('timer', soundsRef.current.timerMediaSound.src, { loop: true });
+        setTimer((t) => (t ? { ...t, paused: false } : t));
+      }
+    }
+  }, [overlayActive, engine, audio]);
+
+  useEffect(() => {
+    if (stage !== 'playing' || state.activeMedia !== null || overlayActive) return;
     const s = engine.getCurrentSlide();
     const votable = isVotableSlide(s);
     const totalAnswers = s.question.answers.length;
@@ -1311,7 +1347,7 @@ export function GameHost({
       fire();
     }, delayMs);
     return () => window.clearTimeout(timeout);
-  }, [stage, state.phase, state.currentSlideId, state.activeMedia, reveal, autoT, engine, audio, sounds]);
+  }, [stage, state.phase, state.currentSlideId, state.activeMedia, reveal, autoT, overlayActive, engine, audio, sounds]);
 
   // מעבר אוטומטי של מדיה חוסמת (openMedia/endMedia + מסכי מדיה עצמאיים):
   //   • תמונה — מעבר אחרי autoT.media.image.seconds (אם image.active דלוק).
@@ -1319,7 +1355,7 @@ export function GameHost({
   // המעבר עצמו הוא advance() — אותה התנהגות כמו לחיצה ידנית על המדיה (openMedia →
   // כניסה לשאלה; endMedia / מסך מדיה → שקופית הבאה).
   useEffect(() => {
-    if (stage !== 'playing' || state.activeMedia === null) return;
+    if (stage !== 'playing' || state.activeMedia === null || overlayActive) return;
     const s = engine.getCurrentSlide();
     const src = state.activeMedia === 'open' ? s.openMedia.src : s.endMedia.src;
     if (classifyMediaUrl(src) !== 'image') return; // רק תמונה; וידאו דרך onEnded
@@ -1332,7 +1368,7 @@ export function GameHost({
       Math.max(1, autoT.media.image.seconds) * 1000,
     );
     return () => window.clearTimeout(timeout);
-  }, [stage, state.activeMedia, state.currentSlideId, autoT, engine]);
+  }, [stage, state.activeMedia, state.currentSlideId, autoT, overlayActive, engine]);
 
   // סיום סרטון/יוטיוב חוסם — מעבר אוטומטי רק אם autoT.media.video.playToEnd דלוק.
   // (מחובר ל-onEnded של הנגן דרך SlideView; אם כבוי — הסרטון נשאר עד לחיצה.)
