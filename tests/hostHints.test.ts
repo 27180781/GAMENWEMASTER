@@ -59,4 +59,9 @@ describe('hostKeyHints — מקשי מספרים לפי הקשר', () => {
   it('מחוץ להצבעה — בלי 4/5 ו-6', () => {
     expect(keys({ phase: 'showing' })).toEqual(['רווח', '1', '2', '3', 'N']);
   });
+  it('בשלב חשיפת התשובה (results) מציג את מקש 5 — פירוט הצבעות', () => {
+    expect(keys({ phase: 'results', votable: true })).toEqual(['רווח', '5', '1', '2', '3', 'N']);
+    // שקופית לא-מצביעה — בלי 5
+    expect(keys({ phase: 'results', votable: false })).toEqual(['רווח', '1', '2', '3', 'N']);
+  });
 });

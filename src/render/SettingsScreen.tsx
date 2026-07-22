@@ -48,6 +48,7 @@ export function SettingsScreen({
   const [autoTransition, setAutoTransition] = useState<AutoTransition>(initial.autoTransition);
   const [showQr, setShowQr] = useState(initial.showQr);
   const [showBottomInstructions, setShowBottomInstructions] = useState(initial.showBottomInstructions);
+  const [showBottomButtons, setShowBottomButtons] = useState(initial.showBottomButtons);
   const [allowStartBeforeLoad, setAllowStartBeforeLoad] = useState(initial.allowStartBeforeLoad);
   /** ההגדרות המתקדמות נפתחות בחלון קופץ (מודאל) — בלי גלילה בעמוד. */
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -83,6 +84,7 @@ export function SettingsScreen({
     autoTransition,
     showQr: showQrOption ? showQr : false,
     showBottomInstructions,
+    showBottomButtons,
     allowStartBeforeLoad,
   });
   const save = () => onSave(buildSettings());
@@ -300,9 +302,23 @@ export function SettingsScreen({
         <input
           type="checkbox"
           checked={showBottomInstructions}
-          onChange={(e) => setShowBottomInstructions(e.target.checked)}
+          onChange={(e) => {
+            setShowBottomInstructions(e.target.checked);
+            if (e.target.checked) setShowBottomButtons(false); // סותר את שורת הכפתורים
+          }}
         />
         <span>הצג הנחיות בתחתית המסך</span>
+      </label>
+      <label className="online-check">
+        <input
+          type="checkbox"
+          checked={showBottomButtons}
+          onChange={(e) => {
+            setShowBottomButtons(e.target.checked);
+            if (e.target.checked) setShowBottomInstructions(false); // סותר את ההנחיות
+          }}
+        />
+        <span>הצג שורת כפתורי פקודה בתחתית המסך</span>
       </label>
       <label className="online-check">
         <input type="checkbox" checked={showQr} onChange={(e) => setShowQr(e.target.checked)} />
