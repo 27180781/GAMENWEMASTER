@@ -31,6 +31,7 @@ import { OperatorMenu } from '../render/OperatorMenu.tsx';
 import type { RailPlayer, RevealState } from '../render/QuestionSlide.tsx';
 import { RosterPanel } from '../render/RosterPanel.tsx';
 import { SlideView } from '../render/SlideView.tsx';
+import { VotesBreakdown } from '../render/VotesBreakdown.tsx';
 import { Stage } from '../render/Stage.tsx';
 import { themeStyle } from '../render/theme.ts';
 import type { TimerView } from '../render/TimerRing.tsx';
@@ -244,6 +245,8 @@ export function GameHost({
   const [leadersOverlay, setLeadersOverlay] = useState(false);
   const leadersOverlayRef = useRef(false);
   leadersOverlayRef.current = leadersOverlay;
+  /** פירוט הצבעות השחקנים (פקודת מנחה 5, בשלב חשיפת התשובה). */
+  const [votesOverlay, setVotesOverlay] = useState(false);
   /** מספר השאלות שהושלמו כשהוצגה לאחרונה טבלת המובילים האוטומטית — למניעת כפילות. */
   const autoLeadersShownAtRef = useRef(0);
   /** כמה מקומות פודיום כבר נחשפו במסך המנצחים (חשיפה אחד-אחד מהאחרון לראשון). */
@@ -1030,14 +1033,20 @@ export function GameHost({
           adjustTimer(10);
           break;
         case 5:
-          adjustTimer(-10);
+          // בשלב חשיפת התשובה (results) — פותח/סוגר את פירוט הצבעות השחקנים;
+          // אחרת (בזמן טיימר) נשאר קיצור להורדת 10 שניות.
+          if (engine.getState().phase === 'results' && isVotableSlide(engine.getCurrentSlide())) {
+            setVotesOverlay((open) => !open);
+          } else {
+            adjustTimer(-10);
+          }
           break;
         case 6:
           togglePause();
           break;
       }
     },
-    [audio, adjustTimer, togglePause, advance, goBack],
+    [engine, audio, adjustTimer, togglePause, advance, goBack],
   );
   const runHostCommandRef = useRef(runHostCommand);
   runHostCommandRef.current = runHostCommand;
@@ -1340,6 +1349,12 @@ export function GameHost({
     return () => audio.stop('winnersList');
   }, [leadersOverlay, audio, sounds]);
 
+  // פירוט ההצבעות (פקודה 5) רלוונטי רק בשלב חשיפת התשובה — נסגר אוטומטית
+  // כשעוזבים את שלב ה-results או עוברים שקופית.
+  useEffect(() => {
+    if (state.phase !== 'results') setVotesOverlay(false);
+  }, [state.phase, state.currentSlideId]);
+
   // טבלת מובילים אוטומטית (setting.showWinnersListAfter) — פעם בכל N שאלות
   // שהושלמו קופצת אוטומטית שכבת המובילים (המנחה סוגר אותה ברווח/0 וממשיך).
   // ה-ref מונע הצגה חוזרת לאותה כמות שאלות (ולא קופץ על שקופיות לא-מצביעות).
@@ -1590,6 +1605,17 @@ export function GameHost({
           <div className="leaders-overlay">
             <WinnersListScreen engine={engine} nameOf={nameOf} roster={roster} />
           </div>
+        )}
+
+        {/* פירוט הצבעות השחקנים (פקודת מנחה 5) — מי הצביע על מה, מחולק לפי תשובות */}
+        {stage === 'playing' && votesOverlay && (
+          <VotesBreakdown
+            slide={slide}
+            votes={state.votesBySlide[state.currentSlideId] ?? {}}
+            nameOf={nameOf}
+            ansIsNumber={setting.ansIsNumber}
+            onClose={() => setVotesOverlay(false)}
+          />
         )}
 
         {/* כפתורי פינה: מסך מלא + הגדרות + שמות וקבוצות */}

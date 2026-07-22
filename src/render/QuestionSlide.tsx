@@ -37,10 +37,10 @@ export interface RailPlayer {
 }
 
 /** תגי התשובות כשאינן מספרים — אותיות לטיניות A, B, C, D… (לפי ansIsNumber ב-JSON). */
-const ANSWER_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+export const ANSWER_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 
 /** צבעי המטבעות הקבועים — מייצגים את כפתורי השלט (רקע + צבע טקסט). */
-const COIN_COLORS = [
+export const COIN_COLORS = [
   { bg: '#38B24A', fg: '#0b2b16' }, // A ירוק
   { bg: '#E23B3B', fg: '#ffffff' }, // B אדום
   { bg: '#F5F5F5', fg: '#111827' }, // C לבן
