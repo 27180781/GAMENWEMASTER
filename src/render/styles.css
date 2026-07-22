@@ -2803,6 +2803,186 @@ body {
 }
 .media-alert-box button:hover { background: #2563eb; }
 
+/* ---- פירוט הצבעות השחקנים (פקודת מנחה 5) ---- */
+.votes-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 56;
+  background: rgba(4, 2, 10, 0.86);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  animation: screen-fade 0.3s ease;
+}
+.votes-panel {
+  width: 1780px;
+  max-width: 100%;
+  height: 100%;
+  max-height: 1000px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, rgb(var(--main-rgb, 34, 43, 69)) 62%, #05030c),
+    color-mix(in srgb, rgb(var(--main-rgb, 34, 43, 69)) 30%, #05030c)
+  );
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  border-radius: 26px;
+  padding: 26px 32px;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.6);
+}
+.votes-head {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex: 0 0 auto;
+}
+.votes-title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.votes-question {
+  font-size: 44px;
+  font-weight: 900;
+  color: var(--secondary-color, #fff);
+  max-height: 108px;
+  text-align: right;
+}
+.votes-total {
+  flex: 0 0 auto;
+  font-size: 28px;
+  font-weight: 800;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 8px 22px;
+}
+.votes-close {
+  flex: 0 0 auto;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 24px;
+  cursor: pointer;
+}
+.votes-close:hover {
+  background: rgba(255, 255, 255, 0.26);
+}
+.votes-cols {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  align-content: start;
+}
+.votes-cols--images {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+.votes-col {
+  min-height: 0;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  overflow: hidden;
+}
+.votes-col--correct {
+  border-color: rgba(56, 178, 74, 0.85);
+  background: rgba(56, 178, 74, 0.12);
+}
+.votes-col-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.08);
+}
+.votes-coin {
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 900;
+}
+.votes-col-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+  max-height: 66px;
+  text-align: right;
+}
+.votes-col-image {
+  flex: 0 0 auto;
+  height: 58px;
+  max-width: 130px;
+  object-fit: cover;
+  border-radius: 10px;
+}
+.votes-correct-mark {
+  flex: 0 0 auto;
+  font-size: 19px;
+  font-weight: 800;
+  color: #4ade80;
+}
+.votes-col-count {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--secondary-color, #ffd23f);
+}
+.votes-names {
+  list-style: none;
+  margin: 0;
+  padding: 12px 14px;
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 8px;
+}
+.votes-name {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 5px 14px;
+  font-size: 21px;
+  color: #f1f1f4;
+  white-space: nowrap;
+}
+.votes-name--more {
+  background: transparent;
+  opacity: 0.7;
+  font-style: italic;
+}
+.votes-name--empty {
+  background: transparent;
+  opacity: 0.4;
+}
+.votes-foot {
+  flex: 0 0 auto;
+  text-align: center;
+  font-size: 20px;
+  opacity: 0.55;
+}
+
 /* ---- חלונית דיבוג (F12) ---- */
 
 .debug-overlay {
