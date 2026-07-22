@@ -54,6 +54,10 @@ export function hostKeyHints(a: HostHintInput): HostHint[] {
     hints.push({ key: '4/5', label: '‎+10 / ‎−10 שניות' });
     hints.push({ key: '6', label: 'השהיה / המשך' });
   }
+  // בשלב חשיפת התשובה — מקש 5 פותח את פירוט הצבעות השחקנים.
+  if (a.phase === 'results' && a.votable) {
+    hints.push({ key: '5', label: 'פירוט הצבעות' });
+  }
   hints.push({ key: '1', label: 'טבלת מובילים' });
   hints.push({ key: '2', label: 'צעד אחורה' });
   hints.push({ key: '3', label: 'מחיאות כפיים' });

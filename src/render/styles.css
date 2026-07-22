@@ -2273,6 +2273,54 @@ body {
 .host-hint:first-child .host-hint-key { background: #34d399; color: #05271b; }
 .host-hint:first-child .host-hint-label { color: #ffe9a6; }
 
+/* ---- שורת כפתורי פקודה בתחתית המסך (חלופה לפס ההנחיות) ---- */
+.host-cmd-bar {
+  position: absolute;
+  bottom: 10px;
+  inset-inline: 0;
+  z-index: 45;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  pointer-events: none; /* רק הכפתורים לחיצים — הבר עצמו שקוף למעבר */
+}
+.host-cmd-btn {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1.5px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+  padding: 6px 16px;
+  font-size: 19px;
+  font-weight: 700;
+  cursor: pointer;
+  opacity: 0.32; /* כתב חלש כברירת מחדל */
+  transition: opacity 0.15s ease, background 0.15s ease, transform 0.1s ease;
+}
+.host-cmd-btn:hover {
+  opacity: 1; /* מתחזק בהובר */
+  background: rgba(0, 0, 0, 0.6);
+  transform: translateY(-2px);
+}
+.host-cmd-btn--primary {
+  opacity: 0.5;
+  border-color: rgba(52, 211, 153, 0.5);
+  background: rgba(52, 211, 153, 0.18);
+}
+.host-cmd-btn--primary:hover {
+  opacity: 1;
+  background: rgba(52, 211, 153, 0.85);
+  color: #05271b;
+}
+.host-cmd-icon { font-size: 18px; line-height: 1; }
+.host-cmd-label { white-space: nowrap; }
+
 .demo-badge {
   position: absolute;
   bottom: 14px;

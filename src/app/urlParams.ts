@@ -110,6 +110,12 @@ export interface GameSettings {
   /** הצגת פס הנחיות (חיוג + קוד) בתחתית המסך לאורך המשחק. */
   showBottomInstructions: boolean;
   /**
+   * שורת כפתורי פקודה בתחתית המסך — כפתורים קטנים בכתב חלש (מתחזק בהובר) עם שם
+   * הפקודה של כל מקש מנחה בשלב הנוכחי (המשך/חזור/מובילים...). לחיצה מריצה את
+   * הפקודה. סותר את showBottomInstructions (לא ניתן להפעיל את שניהם יחד).
+   */
+  showBottomButtons: boolean;
+  /**
    * אפשר להתחיל את המשחק *מיד*, בלי לחסום עד סיום טעינת כל המדיה. ברירת מחדל
    * false — כלומר חוסם: לחיצה על "התחל" ממתינה לסיום ההורדה (עם ניסיונות-חוזרים
    * על כשל) ואז ספירה-לאחור קצרה לפני מסך ההתחברות. true = ההתנהגות הישנה.
@@ -146,6 +152,7 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   autoTransition: DEFAULT_AUTO_TRANSITION,
   showQr: false,
   showBottomInstructions: false,
+  showBottomButtons: false,
   allowStartBeforeLoad: false,
 };
 

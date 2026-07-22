@@ -32,6 +32,7 @@ import type { RailPlayer, RevealState } from '../render/QuestionSlide.tsx';
 import { RosterPanel } from '../render/RosterPanel.tsx';
 import { SlideView } from '../render/SlideView.tsx';
 import { VotesBreakdown } from '../render/VotesBreakdown.tsx';
+import { HostCommandBar } from '../render/HostCommandBar.tsx';
 import { Stage } from '../render/Stage.tsx';
 import { themeStyle } from '../render/theme.ts';
 import type { TimerView } from '../render/TimerRing.tsx';
@@ -1051,6 +1052,23 @@ export function GameHost({
   const runHostCommandRef = useRef(runHostCommand);
   runHostCommandRef.current = runHostCommand;
 
+  /** הרצת פקודה משורת הכפתורים התחתונה — לפי אותם מקשים כמו המקלדת. */
+  const runHintKey = useCallback(
+    (key: string) => {
+      if (key === 'רווח') {
+        advance();
+        return;
+      }
+      if (key === 'N') {
+        if (stageRef.current === 'playing') fastNextSlideRef.current();
+        return;
+      }
+      const n = Number(key);
+      if (Number.isInteger(n) && n >= 0 && n <= 6) runHostCommandRef.current(n);
+    },
+    [advance],
+  );
+
   // חיבור ה-ReplayAdapter כמקור הצבעות: סינון שלט המנחה + הקפאה בעצירה
   const hostVoterIdRef = useRef(hostVoterId);
   hostVoterIdRef.current = hostVoterId;
@@ -1552,6 +1570,25 @@ export function GameHost({
               </span>
             ))}
           </div>
+        )}
+
+        {/* חלופה לפס ההנחיות — שורת כפתורי פקודה קליקביליים (שם הפקודה, לא המספר),
+            משתנה לפי השלב. מוצג רק כשסומן בהגדרות (וסותר את showBottomInstructions). */}
+        {settings.showBottomButtons && stage === 'playing' && (
+          <HostCommandBar
+            hints={hostKeyHints({
+              phase: state.phase,
+              activeMedia: state.activeMedia,
+              slideType: slide.type,
+              votable: isVotableSlide(slide),
+              totalAnswers: slide.question.answers.length,
+              questionShown: reveal.questionShown,
+              answersShown: reveal.answersShown,
+              revealCorrect: reveal.revealCorrect,
+              hasNextSlide: state.currentSlideIndex + 1 < engine.getGame().questions.length,
+            })}
+            onRun={runHintKey}
+          />
         )}
 
         {/* אזהרות איכות חיבור — מופיעות רק כשהחיבור באמת בעייתי */}
