@@ -512,6 +512,7 @@ export function App() {
           onRequestRefresh={() => void refetchGame()}
           voteServerUrl={params.voteServer ?? VOTE_SERVER_URL}
           offline={offline}
+          onApplyGame={applyRawGame}
         />
         {/* בזמן משחק — עיגול זעיר בפינה, לא פס מלא שמכער את המסך */}
         {!mediaPreload.done && <MediaLoadDot {...mediaPreload} />}

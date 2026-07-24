@@ -140,6 +140,8 @@ interface GameHostProps {
   voteServerUrl: string;
   /** המשחק נטען כאופליין (ZIP) — פטור מבאנר ההצטרפות ומבדיקת הרישיון. */
   offline: boolean;
+  /** החלת משחק מעודכן מעריכה חיה במסך המנחה (עובר פענוח סלחני ו-hot-swap). */
+  onApplyGame?: (raw: unknown) => void;
 }
 
 export function GameHost({
@@ -149,6 +151,7 @@ export function GameHost({
   onRequestRefresh,
   voteServerUrl,
   offline,
+  onApplyGame,
 }: GameHostProps) {
   // המנוע נוצר פעם אחת; רענון תוכן מתבצע דרך engine.updateGame בלי remount,
   // כדי לשמר את מהלך המשחק (ניקוד/מיקום). ראו useEffect על שינוי game למטה.
@@ -1255,6 +1258,9 @@ export function GameHost({
         case 'roster':
           setRoster(loadRoster(game.id)); // המרשם עודכן במסך המנחה — טעינה מחדש
           break;
+        case 'setGame':
+          onApplyGameRef.current?.(msg.game); // עריכה חיה — פענוח סלחני + hot-swap
+          break;
       }
     },
     [engine, goBack, game.id],
@@ -1264,29 +1270,38 @@ export function GameHost({
   buildSnapshotRef.current = buildSnapshot;
   const onHostControlRef = useRef(onHostControl);
   onHostControlRef.current = onHostControl;
+  const onApplyGameRef = useRef(onApplyGame);
+  onApplyGameRef.current = onApplyGame;
   const controlRef = useRef<ControlChannel | null>(null);
 
   useEffect(() => {
     const ch = openControlChannel((msg) => {
-      if (msg.t === 'state') return; // התצוגה מתעלמת מתמונות-מצב (הד/הצד השני)
+      if (msg.t === 'state' || msg.t === 'game') return; // הד/הצד-השני — התצוגה מתעלמת
       if (msg.t === 'hello') {
         ch.post(buildSnapshotRef.current());
+        ch.post({ t: 'game', game: engine.getGame() });
         return;
       }
       onHostControlRef.current(msg);
     });
     controlRef.current = ch;
     ch.post(buildSnapshotRef.current()); // מצב ראשוני לכל מסך מנחה שכבר פתוח
+    ch.post({ t: 'game', game: engine.getGame() });
     return () => {
       ch.close();
       controlRef.current = null;
     };
-  }, []);
+  }, [engine]);
 
   // פרסום-מחדש בכל שינוי רלוונטי (שלב/שקופית/הצבעות חיות/מרשם/מחוברים).
   useEffect(() => {
     controlRef.current?.post(buildSnapshot());
   }, [stage, state, reveal, connectedIds, roster, buildSnapshot]);
+
+  // פרסום המשחק המלא (לעריכה) בכל החלפת תוכן — כולל אחרי עריכה חיה (hot-swap).
+  useEffect(() => {
+    controlRef.current?.post({ t: 'game', game });
+  }, [game]);
 
   // חיבור ה-ReplayAdapter כמקור הצבעות: סינון שלט המנחה + הקפאה בעצירה
   const hostVoterIdRef = useRef(hostVoterId);

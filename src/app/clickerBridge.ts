@@ -79,6 +79,10 @@ interface TriviaDesktop {
   /** ממסר הודעות שליטה בין החלונות (ראו controlChannel.ts). */
   controlPost?: (msg: unknown) => void;
   onControl?: (cb: (msg: unknown) => void) => () => void;
+  /** שמירת קובץ מדיה (עריכה חיה) לתיקיית המדיה; מחזיר trivia-media:// או null. */
+  mediaAddFile?: (name: string, bytes: Uint8Array) => Promise<string | null>;
+  /** מעבר לתצוגת מסכים מורחבת (Windows DisplaySwitch /extend). */
+  extendDisplay?: () => void;
 }
 
 function desktop(): TriviaDesktop | undefined {
@@ -270,4 +274,30 @@ export function canOpenHostWindow(): boolean {
 /** פתיחת חלון "מסך המנחה" הנפרד (EXE). no-op בדפדפן. */
 export function openHostWindow(): void {
   desktop()?.openHostWindow?.();
+}
+
+/** האם ה-EXE יודע לשמור קובץ מדיה לדיסק (עריכה חיה של מדיה). */
+export function canAddMediaFile(): boolean {
+  return typeof desktop()?.mediaAddFile === 'function';
+}
+
+/** שמירת קובץ מדיה לדיסק (EXE); מחזיר trivia-media:// או null. */
+export async function desktopMediaAddFile(name: string, bytes: Uint8Array): Promise<string | null> {
+  const fn = desktop()?.mediaAddFile;
+  if (typeof fn !== 'function') return null;
+  try {
+    return await fn(name, bytes);
+  } catch {
+    return null;
+  }
+}
+
+/** האם ה-EXE יודע לעבור לתצוגה מורחבת (Windows). */
+export function canExtendDisplay(): boolean {
+  return typeof desktop()?.extendDisplay === 'function';
+}
+
+/** מעבר לתצוגת מסכים מורחבת (EXE, Windows). no-op בדפדפן. */
+export function extendDisplay(): void {
+  desktop()?.extendDisplay?.();
 }
