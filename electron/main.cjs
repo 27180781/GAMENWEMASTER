@@ -7,13 +7,24 @@
  * שליטה: F11 מסך מלא/יציאה · Ctrl+Shift+I כלי פיתוח · Ctrl+Q יציאה.
  */
 
-const { app, BrowserWindow, globalShortcut, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, globalShortcut, ipcMain, shell, protocol, net } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const crypto = require('node:crypto');
+const { pathToFileURL } = require('node:url');
 const { spawn, spawnSync } = require('node:child_process');
+const JSZip = require('jszip');
 const { createClickerServer, DEFAULT_PORT } = require('./clickerServer.cjs');
 const { readSealedFromFile } = require('./sealPayload.cjs');
+
+// סכימת מדיה מהדיסק (trivia-media://) — חייבת להירשם כ"מיוחסת" לפני app.ready
+// כדי ש-<video>/<img> יוכלו לטעון ממנה, ותמיכת fetch/זרימה (Range) תעבוד.
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'trivia-media',
+    privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true },
+  },
+]);
 
 /** @type {BrowserWindow | null} */
 let mainWindow = null;
@@ -269,6 +280,103 @@ function backupPath(id) {
   return path.join(backupsDir(), `${safeGameId(id)}.json`);
 }
 
+// ---------------------------------------------------------------------------
+// מטמון מדיה אופליין (זרימה מהדיסק): במקום להחזיק את *כל* מדיית ה-ZIP בזיכרון
+// כ-Blob לכל אורך הסשן, מחלצים אותה פעם אחת לתיקייה בדיסק
+// (userData/media-cache/<hash>) ומזרימים ממנה דרך פרוטוקול trivia-media://.
+// כך רק המדיה המתנגנת כרגע נטענת — הזיכרון נשאר נמוך גם למשחקים כבדי-וידאו.
+// שומרים רק את המשחק הנוכחי (prune) כדי שלא ייצבר, וניקוי ידני זמין בנפרד.
+// חשוב: התיקייה הזו נפרדת לחלוטין מ-backups/ ומ-reports/ — ניקוי מדיה לעולם
+// אינו נוגע בגיבויים או בקבצי התוצאות.
+// ---------------------------------------------------------------------------
+/** שורש מטמון המדיה (נוצר אם חסר). */
+function mediaCacheRoot() {
+  const dir = path.join(app.getPath('userData'), 'media-cache');
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+  } catch {
+    /* קיימת כבר */
+  }
+  return dir;
+}
+/** מזהה מטמון בטוח לשם תיקייה (hex בלבד). */
+function safeCacheKey(key) {
+  return String(key ?? '').replace(/[^a-f0-9]/gi, '').slice(0, 64) || 'x';
+}
+/** תיקיית המטמון של משחק לפי מזהה. */
+function mediaCacheDir(key) {
+  return path.join(mediaCacheRoot(), safeCacheKey(key));
+}
+/**
+ * מזהה מטמון יציב לפי תוכן ה-ZIP. דגימה מהירה (אורך + 1MB מכל קצה) כדי שגם
+ * קובץ ענק לא ידרוש hash של גיגה-בייטים — מספיק ייחודי כדי להבחין בין משחקים.
+ */
+function mediaCacheKey(buf) {
+  const h = crypto.createHash('sha256').update(String(buf.length));
+  const sample = 1 << 20; // 1MB מכל קצה
+  if (buf.length <= sample * 2) h.update(buf);
+  else {
+    h.update(buf.subarray(0, sample));
+    h.update(buf.subarray(buf.length - sample));
+  }
+  return h.digest('hex').slice(0, 24);
+}
+/** נתיב יחסי בטוח בתוך המטמון — חוסם path traversal / נתיב מוחלט. null = לדלג. */
+function safeRelPath(name) {
+  const out = [];
+  for (const part of String(name).replace(/\\/g, '/').split('/')) {
+    if (part === '' || part === '.') continue;
+    if (part === '..') return null; // חשוד — לא מחלצים/מגישים
+    out.push(part);
+  }
+  return out.length > 0 ? out.join('/') : null;
+}
+/** מחיקת כל המטמונים חוץ מזה שרוצים לשמור — מונע הצטברות בדיסק. */
+function pruneMediaCache(keepKey) {
+  const keep = safeCacheKey(keepKey);
+  try {
+    for (const name of fs.readdirSync(mediaCacheRoot())) {
+      if (name === keep) continue;
+      try {
+        fs.rmSync(path.join(mediaCacheRoot(), name), { recursive: true, force: true });
+      } catch {
+        /* התעלמות */
+      }
+    }
+  } catch {
+    /* אין תיקייה */
+  }
+}
+/**
+ * חילוץ מדיית ה-ZIP לדיסק (פעם אחת לכל משחק — לפי hash התוכן). אם כבר חולץ
+ * (יש manifest) — שימוש חוזר בלי חילוץ מחדש. מחזיר את מזהה המטמון.
+ */
+async function extractMediaCache(bytes) {
+  const buf = Buffer.from(bytes);
+  const key = mediaCacheKey(buf);
+  const dir = mediaCacheDir(key);
+  const manifest = path.join(dir, '.manifest.json');
+  if (fs.existsSync(manifest)) {
+    pruneMediaCache(key); // כבר חולץ — רק מנקים מטמונים ישנים
+    return key;
+  }
+  pruneMediaCache(key); // שומרים רק את המשחק הנוכחי
+  fs.mkdirSync(dir, { recursive: true });
+  const zip = await JSZip.loadAsync(buf);
+  const names = [];
+  for (const entry of Object.values(zip.files)) {
+    if (entry.dir) continue;
+    const rel = safeRelPath(entry.name);
+    if (rel === null) continue;
+    const dest = path.join(dir, rel);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.writeFileSync(dest, await entry.async('nodebuffer'));
+    names.push(rel);
+  }
+  fs.writeFileSync(manifest, JSON.stringify({ names, savedAt: Date.now() }));
+  return key;
+}
+
 /** תיקיית קבצי התוצאות (אקסל) — נוצרת אם חסרה. */
 function reportsDir() {
   const dir = path.join(app.getPath('userData'), 'reports');
@@ -378,6 +486,49 @@ app.whenReady().then(() => {
   // פתיחת תיקיית התוצאות בסייר הקבצים.
   ipcMain.handle('report:open', () => {
     void shell.openPath(reportsDir());
+  });
+
+  // פרוטוקול trivia-media:// — מגיש קבצי מדיה מהמטמון בדיסק בזרימה (net.fetch
+  // על file:// תומך ב-Range, כך שחיפוש/דילוג בווידאו עובד) — רק המדיה המתנגנת
+  // כרגע נטענת, לא הכול לזיכרון. עם הגנת traversal (safeRelPath + בדיקת prefix).
+  protocol.handle('trivia-media', async (request) => {
+    try {
+      const url = new URL(request.url);
+      const key = safeCacheKey(decodeURIComponent(url.hostname));
+      const rel = safeRelPath(decodeURIComponent(url.pathname));
+      if (rel === null) return new Response('forbidden', { status: 403 });
+      const root = path.resolve(mediaCacheDir(key));
+      const file = path.resolve(path.join(root, rel));
+      if (file !== root && !file.startsWith(root + path.sep)) {
+        return new Response('forbidden', { status: 403 });
+      }
+      if (!fs.existsSync(file)) return new Response('not found', { status: 404 });
+      return net.fetch(pathToFileURL(file).toString());
+    } catch (err) {
+      console.error('[media] הגשת מדיה נכשלה:', /** @type {Error} */ (err).message);
+      return new Response('error', { status: 500 });
+    }
+  });
+  // חילוץ מדיית ה-ZIP לדיסק (מצב זרימה) — מחזיר { cacheKey } או null.
+  ipcMain.handle('media:extract', async (_e, bytes) => {
+    try {
+      return { cacheKey: await extractMediaCache(bytes) };
+    } catch (err) {
+      console.error('[media] חילוץ מדיה נכשל:', /** @type {Error} */ (err).message);
+      return null;
+    }
+  });
+  // ניקוי מדיה זמנית מהדיסק. מזהה ריק/חסר = כל המטמון. לעולם לא נוגע
+  // בגיבויים (backups/) או בקבצי התוצאות (reports/) — הם בתיקיות נפרדות.
+  ipcMain.handle('media:clear', (_e, cacheKey) => {
+    try {
+      if (cacheKey) fs.rmSync(mediaCacheDir(cacheKey), { recursive: true, force: true });
+      else fs.rmSync(mediaCacheRoot(), { recursive: true, force: true });
+      return true;
+    } catch (err) {
+      console.error('[media] ניקוי מדיה נכשל:', /** @type {Error} */ (err).message);
+      return false;
+    }
   });
   // יציאה מהמשחק (סגירת ה-EXE) — נקרא אחרי אישור המשתמש ב-renderer.
   ipcMain.handle('app:quit', () => {

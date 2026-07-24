@@ -14,8 +14,18 @@ import {
   type GameFile,
   type Slide,
 } from '../engine/index.ts';
+import { canStreamMedia, desktopMediaExtract } from './clickerBridge.ts';
 import type { MediaIssue } from './mediaCheck.ts';
 import { mediaFields } from './mediaFields.ts';
+
+/** אפשרויות טעינה. */
+export interface ZipLoadOptions {
+  /**
+   * מצב EXE: חילוץ המדיה לדיסק וזרימה ממנה (‏trivia-media://) במקום להחזיק את
+   * כולה כ-Blob בזיכרון. no-op בדפדפן (אין גשר) — נופל חזרה ל-Blob.
+   */
+  stream?: boolean;
+}
 
 export interface LoadedZipGame {
   game: GameFile;
@@ -31,7 +41,7 @@ export interface LoadedZipGame {
 export function isRelativeAsset(src: string): boolean {
   const s = src.trim();
   if (s === '') return false;
-  if (/^(https?:|blob:|data:|file:)/i.test(s)) return false;
+  if (/^(https?:|blob:|data:|file:|trivia-media:)/i.test(s)) return false;
   if (classifyMediaUrl(s) === 'youtube') return false;
   return true;
 }
@@ -73,9 +83,27 @@ function extensionOf(path: string): string {
   return i === -1 ? '' : base.slice(i + 1);
 }
 
-/** טעינת ZIP והמרתו למשחק עם Blob URLs מקומיים. */
-export async function loadGameFromZip(input: ArrayBuffer | Uint8Array | Blob): Promise<LoadedZipGame> {
-  const zip = await JSZip.loadAsync(input);
+/** טעינת ZIP והמרתו למשחק. ב-EXE (stream) המדיה נזרמת מהדיסק; אחרת Blob בזיכרון. */
+export async function loadGameFromZip(
+  input: ArrayBuffer | Uint8Array | Blob,
+  opts: ZipLoadOptions = {},
+): Promise<LoadedZipGame> {
+  const zipBytes =
+    input instanceof Uint8Array
+      ? input
+      : input instanceof Blob
+        ? new Uint8Array(await input.arrayBuffer())
+        : new Uint8Array(input);
+  const zip = await JSZip.loadAsync(zipBytes);
+
+  // מצב זרימה (EXE): מחלצים את כל המדיה לדיסק פעם אחת ומקבלים מזהה מטמון;
+  // כל נכס יקבל כתובת trivia-media:// שנטענת לפי דרישה — לא לזיכרון. אם החילוץ
+  // נכשל או אין גשר (דפדפן) — cacheKey יישאר null ונופלים חזרה ל-Blob.
+  let cacheKey: string | null = null;
+  if (opts.stream === true && canStreamMedia()) {
+    const res = await desktopMediaExtract(zipBytes);
+    cacheKey = res?.cacheKey ?? null;
+  }
 
   // איתור data.json (בכל עומק, ללא תלות ברישיות)
   const entries = Object.values(zip.files).filter((f) => !f.dir);
@@ -115,6 +143,19 @@ export async function loadGameFromZip(input: ArrayBuffer | Uint8Array | Blob): P
           (relSrc.split('/').pop() ?? '').toLowerCase(),
       );
     if (!entry) return null;
+
+    // מצב זרימה: הקובץ כבר חולץ לדיסק — מחזירים כתובת שמצביעה אליו (נטענת לפי
+    // דרישה, בלי לקרוא בייטים לזיכרון). הנתיב זהה לזה שבו ה-main חילץ (safeRelPath).
+    if (cacheKey !== null) {
+      const rel = normalizePath(entry.name)
+        .split('/')
+        .map((seg) => encodeURIComponent(seg))
+        .join('/');
+      const url = `trivia-media://${cacheKey}/${rel}`;
+      registerMediaKind(url, classifyMediaUrl(relSrc));
+      cache.set(resolvedPath, url);
+      return url;
+    }
 
     const bytes = await entry.async('uint8array');
     const ext = extensionOf(entry.name);

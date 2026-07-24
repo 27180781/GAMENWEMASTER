@@ -2132,6 +2132,26 @@ body {
   max-width: 640px;
   white-space: pre-wrap;
 }
+/* ניקוי מדיה זמנית — קישור משני עדין (לא נוגע בגיבויים/בתוצאות) */
+.offline-open-clear {
+  background: transparent;
+  border: none;
+  color: #3a3f52;
+  opacity: 0.6;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 6px;
+  transition: opacity 0.15s ease;
+}
+.offline-open-clear:hover { opacity: 0.95; text-decoration: underline; }
+.offline-open-note {
+  color: #1a7f4b;
+  font-size: 17px;
+  font-weight: 600;
+  margin: 2px 0 0;
+  text-align: center;
+}
 
 /* "טען משחק אחר" — קישור משני עדין במסך הפתיחה של המשחק השמור */
 .settings-pick-another {

@@ -85,4 +85,12 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
   quit() {
     void ipcRenderer.invoke('app:quit');
   },
+  /** חילוץ מדיית ה-ZIP לדיסק (מצב זרימה) — מחזיר { cacheKey } או null. */
+  mediaExtract(/** @type {Uint8Array} */ bytes) {
+    return ipcRenderer.invoke('media:extract', bytes);
+  },
+  /** ניקוי מדיה זמנית מהדיסק (לא נוגע בגיבויים/בתוצאות). ריק = כל המטמון. */
+  mediaClear(/** @type {string=} */ cacheKey) {
+    return ipcRenderer.invoke('media:clear', cacheKey);
+  },
 });

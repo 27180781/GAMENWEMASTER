@@ -29,6 +29,8 @@ import {
   getLastGame,
   forgetGame,
   getSealedGame,
+  canStreamMedia,
+  desktopMediaClear,
   type SealConfig,
 } from './clickerBridge.ts';
 import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.ts';
@@ -153,6 +155,8 @@ export function App() {
   });
   const [remoteLoading, setRemoteLoading] = useState(params.gameUrl !== null);
   const [error, setError] = useState<string | null>(null);
+  /** חיווי שהמדיה הזמנית נוקתה מהדיסק (EXE) — הגיבויים והתוצאות לא נגעו. */
+  const [mediaCleared, setMediaCleared] = useState(false);
   /**
    * טעינה עם שקופיות פגומות בודדות: המשחק תקין-למשחק אך יש שקופיות שנשמטו.
    * מוצג מסך אזהרה (מה לתקן) + "דלג והמשך" — ורק בלחיצה נכנסים למשחק.
@@ -339,7 +343,9 @@ export function App() {
   };
 
   const loadZipBuffer = (buffer: ArrayBuffer, seal?: SealConfig) =>
-    loadGameFromZip(buffer)
+    // ב-EXE — המדיה נזרמת מהדיסק (‏trivia-media://) במקום Blob בזיכרון, כדי
+    // שהזיכרון יישאר נמוך גם למשחקים כבדי-וידאו. בדפדפן — נופל חזרה ל-Blob.
+    loadGameFromZip(buffer, { stream: desktopApp })
       .then((res) => {
         // משחק מוטבע ("סגור"): מחילים את ההגדרות שנקבעו בכלי החותמת —
         // קוד חדר לטלפונים ומגבלת משתתפים.
@@ -639,6 +645,23 @@ export function App() {
                 {zipInput}
               </label>
               {error !== null && <p className="offline-open-error">{error}</p>}
+              {canStreamMedia() && (
+                <button
+                  type="button"
+                  className="offline-open-clear"
+                  onClick={() => {
+                    setMediaCleared(false);
+                    void desktopMediaClear().then((ok) => setMediaCleared(ok));
+                  }}
+                >
+                  🧹 נקה מדיה זמנית מהדיסק
+                </button>
+              )}
+              {mediaCleared && (
+                <p className="offline-open-note">
+                  המדיה הזמנית נוקתה. הגיבויים וקבצי התוצאות נשמרו כרגיל.
+                </p>
+              )}
             </div>
           </div>
         </div>

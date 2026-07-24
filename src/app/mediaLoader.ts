@@ -21,7 +21,9 @@ export function orderedMediaUrls(game: GameFile): string[] {
   for (const field of mediaFields(game)) {
     const url = field.get().trim();
     if (url === '' || seen.has(url)) continue;
-    if (url.startsWith('blob:') || url.startsWith('data:')) continue;
+    // blob:/data: כבר בזיכרון; trivia-media:// נזרם מהדיסק לפי דרישה — אין
+    // טעם (ואף מזיק) למשוך אותו במלואו מראש לזיכרון/מטמון.
+    if (url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('trivia-media:')) continue;
     if (classifyMediaUrl(url) === 'youtube') continue;
     seen.add(url);
     out.push(url);
