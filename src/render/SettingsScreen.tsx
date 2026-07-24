@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react';
 import type { GameFile } from '../engine/index.ts';
 import { type AutoTransition, type GameSettings } from '../app/urlParams.ts';
+import { isDesktopClicker, launchReceiver } from '../app/clickerBridge.ts';
 import { MediaCachePanel } from './MediaCachePanel.tsx';
 
 interface SettingsScreenProps {
@@ -39,9 +40,17 @@ export function SettingsScreen({
   allowDemo = false,
   offline = false,
 }: SettingsScreenProps) {
-  // במצב דמה/אופליין הקהל המדומה תמיד פעיל — אין צורך לסמן, זה קורה ממילא.
-  // בלי ‎?demo=1‎ אין שחקני דמה — המשחק אונליין רגיל.
-  const crowdEnabled = allowDemo;
+  // אונליין-דמו (‎?demo=1‎, לא אופליין): הקהל המדומה תמיד פעיל. אופליין: תלוי
+  // בהקשר — ב-EXE עם קליקרים (RF317) הקהל כבוי (מקור ההצבעות הוא הקליקרים);
+  // בדפדפן רגיל שטוען ZIP הוא דלוק (דמו). ערך זה מגיע מ-App לפי isDesktopClicker.
+  const onlineDemo = allowDemo && !offline;
+  const crowdEnabled = onlineDemo ? true : initial.crowdEnabled;
+  // מצב קליקרים (RF317) פעיל כשרצים ב-EXE (אופליין) עם גשר קליקרים והקהל המדומה
+  // כבוי — אז מקור ההצבעות הוא השלטים, ולא הטלפונים או הקהל המדומה.
+  const clickerMode = offline && isDesktopClicker() && !crowdEnabled;
+  // מסך בחירת מצב הפעלה (אופליין/EXE בלבד): "האם הריסיבר מחובר?" — כן ⇒ שלטים,
+  // לא ⇒ מצב דמה. באונליין אין ריסיבר, ולכן המסך הזה אינו מוצג כלל.
+  const clickerCapable = offline && isDesktopClicker();
   const [voterCount, setVoterCount] = useState(initial.voterCount);
   const [intervalMs, setIntervalMs] = useState(initial.intervalMs);
   const [hostVoterId, setHostVoterId] = useState(initial.hostVoterId);
@@ -72,8 +81,8 @@ export function SettingsScreen({
   const demoIntro = allowDemo && !offline;
   const onlinePhone = !allowDemo && qrAvailable;
 
-  const buildSettings = (): GameSettings => ({
-    crowdEnabled,
+  const buildSettings = (crowdOverride?: boolean): GameSettings => ({
+    crowdEnabled: crowdOverride ?? crowdEnabled,
     voterCount: clampedVoters,
     // מהירות ההצבעה ואחוז העונים-נכון של הקהל המדומה אינם נערכים יותר במסך —
     // נשמרים על ברירת המחדל מה-URL/JSON כדי שסימולציית הדמה תמשיך לעבוד.
@@ -88,6 +97,13 @@ export function SettingsScreen({
     allowStartBeforeLoad,
   });
   const save = () => onSave(buildSettings());
+  // "כן, הריסיבר מחובר" — מפעילים את תוכנת הריסיבר המצורפת ומתחילים במצב שלטים
+  // (קהל דמה כבוי). "לא" — מתחילים במצב דמה (קהל דמה דלוק).
+  const startWithClicker = () => {
+    launchReceiver();
+    onSave(buildSettings(false));
+  };
+  const startWithDemo = () => onSave(buildSettings(true));
 
   // הגדרת חסימת-הטעינה — מוצגת בשני סוגי המסכים המתקדמים (className שונה).
   const loadBlockField = (cls: string) => (
@@ -139,9 +155,8 @@ export function SettingsScreen({
       <section className="demo-form demo-col">
         <div className="demo-col-title">שחקנים והצבעה</div>
 
-        {allowDemo ? (
-          // מצב דמה: הקהל המדומה תמיד פעיל (בלי צ'קבוקס). נשאר רק כמה שחקני-דמה
-          // לדמות; שאר כיווני-הדמה (מהירות/אחוז נכון/קצב עדכון/שלט מנחה) הוסרו.
+        {crowdEnabled ? (
+          // קהל מדומה פעיל (דמו): רק כמה שחקני-דמה לדמות.
           <label className="demo-field">
             <span>כמות שחקני דמה: {clampedVoters.toLocaleString()}</span>
             <div className="demo-field-inline">
@@ -162,6 +177,9 @@ export function SettingsScreen({
               />
             </div>
           </label>
+        ) : clickerMode ? (
+          // EXE עם קליקרים — ההצבעות מגיעות מהשלטים (RF317) דרך השרת המקומי.
+          <p className="demo-hint">מצב קליקרים — ההצבעות מגיעות מהשלטים (RF317, פורט 8090).</p>
         ) : (
           <>
             <p className="demo-hint">משחק אונליין — השחקנים מצביעים מהטלפון/קליקר האמיתי.</p>
@@ -432,6 +450,48 @@ export function SettingsScreen({
       </div>
     </div>
   ) : null;
+
+  // מסך בחירת מצב הפעלה — אופליין/EXE עם גשר קליקרים, לפני תחילת המשחק.
+  // "האם הריסיבר מחובר?" כן ⇒ הפעלת השלטים (RF317); לא ⇒ מצב דמה.
+  if (clickerCapable && mode === 'start') {
+    return (
+      <div className="screen settings-screen clicker-intro-screen">
+        <div className="screen-content clicker-intro">
+          <div className="clicker-intro-card">
+            <div className="clicker-intro-icon" aria-hidden="true">
+              🎛️
+            </div>
+            <h1 className="clicker-intro-title">איך משחקים?</h1>
+            <p className="clicker-intro-lead">
+              המשחק <strong>{game.name}</strong> מוכן. בחרו כיצד להצביע:
+            </p>
+
+            <div className="clicker-intro-actions">
+              <button className="clicker-choice clicker-choice--remotes" onClick={startWithClicker}>
+                <span className="clicker-choice-emoji" aria-hidden="true">
+                  📡
+                </span>
+                <span className="clicker-choice-title">הריסיבר מחובר — שחק עם שלטים</span>
+                <span className="clicker-choice-sub">
+                  נפעיל את תוכנת הקליטה (RF317) ונתחבר לשלטים אוטומטית
+                </span>
+              </button>
+              <button className="clicker-choice clicker-choice--demo" onClick={startWithDemo}>
+                <span className="clicker-choice-emoji" aria-hidden="true">
+                  🎭
+                </span>
+                <span className="clicker-choice-title">אין ריסיבר — מצב דמה</span>
+                <span className="clicker-choice-sub">הרצה עם שחקני דמה, בלי שלטים</span>
+              </button>
+            </div>
+
+            <div className="clicker-intro-advanced">{advancedButton}</div>
+          </div>
+        </div>
+        {advancedModal}
+      </div>
+    );
+  }
 
   // מסך אינטרו לדמה — כרטיס הסבר + הוראות + התחל משחק + הגדרות מתקדמות (מודאל)
   if (demoIntro) {

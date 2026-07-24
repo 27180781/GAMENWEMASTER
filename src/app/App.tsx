@@ -22,6 +22,7 @@ import { MediaLoadBar, MediaLoadDot } from '../render/MediaLoadBar.tsx';
 import { StartupOverlay } from '../render/StartupOverlay.tsx';
 import { ErrorScreen } from '../render/ErrorScreen.tsx';
 import { ClickerDiagnostic } from '../render/ClickerDiagnostic.tsx';
+import { isDesktopClicker } from './clickerBridge.ts';
 import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.ts';
 import { decodeInitialMedia } from './mediaDecode.ts';
 import { openPushChannel } from './pushChannel.ts';
@@ -519,8 +520,9 @@ export function App() {
         zipRevokeRef.current?.(); // שחרור משחק אופליין קודם (אם נטען אחד)
         zipRevokeRef.current = revoke;
         setOffline(true); // ZIP — משחק אופליין
-        // באופליין אין סוקט — מקור ההצבעות היחיד הוא קהל הדמה, לכן מדליקים אותו.
-        setSettings((prev) => ({ ...prev, crowdEnabled: true }));
+        // אופליין: ב-EXE עם קליקרים (RF317) — הקליקרים הם מקור ההצבעות, לכן קהל
+        // הדמה כבוי כברירת מחדל. בדפדפן רגיל (בלי קליקרים) — מדליקים קהל דמה.
+        setSettings((prev) => ({ ...prev, crowdEnabled: !isDesktopClicker() }));
         setMediaIssues(missing); // נכסים חסרים בתיקיית ה-ZIP
         setMediaAlertDismissed(false);
         if (dropped.length > 0) setLoadNotice({ game, dropped });

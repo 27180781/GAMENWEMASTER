@@ -24,7 +24,9 @@ import {
   type VoteAdapter,
   type VoteSnapshot,
 } from '../engine/index.ts';
-import { SocketVoteAdapter, type RawVote } from './socketAdapter.ts';
+import { SocketVoteAdapter, isLiveVoteAdapter, type RawVote } from './socketAdapter.ts';
+import { ClickerVoteAdapter } from './clickerAdapter.ts';
+import { isDesktopClicker } from './clickerBridge.ts';
 import { avatarColor, railInitial } from '../render/avatar.ts';
 import { AllScoresScreen, LobbyScreen, WinnersListScreen, WinnersScreen } from '../render/screens.tsx';
 import { OperatorMenu } from '../render/OperatorMenu.tsx';
@@ -122,20 +124,31 @@ export function GameHost({
   // אחרת ReplayAdapter (דמו/סינתטי, וגם אופליין — בלי רשת).
   const roomId = game.room ?? '';
   const hasRoom = roomId !== '';
-  const useSocket = !settings.crowdEnabled && roomId !== '';
+  // מצב קליקרים — אך ורק במשחק אופליין (EXE): כשגשר הקליקרים זמין ולא נבחר
+  // קהל-דמה, הקליקרים (RF317, מקומי) הם מקור ההצבעות. באונליין אין ריסיבר —
+  // התנאי `offline` מבטיח שהמשחק האונליין (טלפונים) נשאר בדיוק כפי שהיה.
+  const useClicker = offline && isDesktopClicker() && !settings.crowdEnabled;
+  const useSocket = !useClicker && !settings.crowdEnabled && roomId !== '';
   // באנר הצטרפות (חיוג + קוד): רק כשמצביעים שחקנים אמיתיים — משחק אונליין עם קוד
   // חדר, ולא במצב דמו. בדמו (‎?demo=1‎) ההרצה מקומית עם שחקני דמה גם אם יש רישיון
   // טלפונים פעיל, ולכן אין להציג הזמנה לחייג. אזהרת רישיון: אונליין בלי קוד חדר.
   const showJoinBanner = !offline && hasRoom && !settings.crowdEnabled;
-  const showLicenseWarning = !offline && !hasRoom;
+  // אזהרת "אין רישיון" רלוונטית רק כשאין כלל מקור הצבעות: אונליין בלי קוד חדר
+  // ובלי קליקרים. במצב קליקרים (EXE) יש מקור הצבעות (השלטים) — אין אזהרה.
+  const showLicenseWarning = !offline && !hasRoom && !useClicker;
   // QR להתחברות מהטלפון — רק במשחק אונליין מורשה (קוד חדר) ושאינו דמו, וכשסומן
   // בהגדרות. הקוד מוביל ל-clicker.clicker.co.il/?game=<קוד המשחק>.
   const qrAvailable = showJoinBanner;
   const showQrCode = settings.showQr && qrAvailable && !settings.crowdEnabled;
   const qrUrl = joinQrUrl(roomId);
   const adapter = useMemo<VoteAdapter>(
-    () => (useSocket ? new SocketVoteAdapter(voteServerUrl) : new ReplayAdapter()),
-    [useSocket, voteServerUrl],
+    () =>
+      useClicker
+        ? new ClickerVoteAdapter()
+        : useSocket
+          ? new SocketVoteAdapter(voteServerUrl)
+          : new ReplayAdapter(),
+    [useClicker, useSocket, voteServerUrl],
   );
   const audio = useMemo(() => new AudioManager(), []);
   const state = useEngineState(engine);
@@ -1087,7 +1100,7 @@ export function GameHost({
         // כאן רק מסננים את הקשת המנחה מהמונים. במקורות ללא אירועים גולמיים
         // (Replay/דמו) נשאר המסלול הישן מבוסס-ה-snapshot.
         if (
-          !(adapter instanceof SocketVoteAdapter) &&
+          !isLiveVoteAdapter(adapter) &&
           extraction.hostAnswer !== null &&
           extraction.hostAnswer !== lastHostAnswerRef.current
         ) {
@@ -1123,8 +1136,8 @@ export function GameHost({
       pendingVoteRef.current = snapshot;
       scheduleVoteFlushRef.current();
     });
-    if (adapter instanceof SocketVoteAdapter) {
-      // שרת אמיתי: סטטוס חיבור + מיפוי אוטומטי של שם השחקן מהטלפון + לובי
+    if (isLiveVoteAdapter(adapter)) {
+      // מקור חי (סוקט/קליקרים): סטטוס חיבור + מיפוי שם השחקן + לובי + אירועי הקשה
       adapter.onStatusChange(setVoteStatus);
       adapter.onPlayerIdentified((phone, name) =>
         setServerNames((prev) => (prev[phone] === name ? prev : { ...prev, [phone]: name })),
@@ -1216,7 +1229,7 @@ export function GameHost({
   // ההתחברות לקבוצות — כדי שהקשות השחקנים יתקבלו תמיד (גם בין שאלה לשאלה), לא
   // רק בזמן הצבעה על שאלה. אחרת השרת שולח הקשות אך הן נזרקות (אין חלון פתוח).
   useEffect(() => {
-    if (!(adapter instanceof SocketVoteAdapter)) return;
+    if (!isLiveVoteAdapter(adapter)) return;
     const windowOpen = votingActive || connectCategory !== null;
     adapter.setActiveSlide(windowOpen ? slide.id : null);
   }, [adapter, votingActive, connectCategory, slide.id]);
@@ -1638,6 +1651,14 @@ export function GameHost({
             ))}
           </div>
         )}
+        {/* מצב קליקרים: כשהריסיבר לא מחובר — אזהרה (לא מציגים דמו במקום). */}
+        {useClicker && voteStatus !== 'connected' && (
+          <div className="conn-warnings">
+            <div className="conn-warning conn-warning--error">
+              ⛔ אין חיבור לריסיבר — ודאו ש-RF317SocketForm פועל (פורט 8090) והדונגל מחובר
+            </div>
+          </div>
+        )}
         {stage === 'opening' && (
           <LobbyScreen
             engine={engine}
@@ -1775,19 +1796,27 @@ export function GameHost({
         )}
 
         <span
-          className={`status-dot status-dot--${useSocket ? voteStatus : 'connected'}`}
+          className={`status-dot status-dot--${useSocket || useClicker ? voteStatus : 'connected'}`}
           title={
             syntheticCrowd
               ? `מצב דמו: ${crowdConfig.voterCount} שחקני דמה`
-              : useSocket
-                ? `שרת הצבעות · חדר ${roomId} · ${
+              : useClicker
+                ? `קליקרים (RF317) · ${
                     voteStatus === 'connected'
-                      ? 'מחובר'
+                      ? 'הריסיבר מחובר'
                       : voteStatus === 'reconnecting'
-                        ? 'מתחבר מחדש…'
-                        : 'מנותק'
+                        ? 'ממתין לריסיבר…'
+                        : 'הריסיבר מנותק'
                   }`
-                : 'אין מקור הצבעות (אין קוד חדר במשחק)'
+                : useSocket
+                  ? `שרת הצבעות · חדר ${roomId} · ${
+                      voteStatus === 'connected'
+                        ? 'מחובר'
+                        : voteStatus === 'reconnecting'
+                          ? 'מתחבר מחדש…'
+                          : 'מנותק'
+                    }`
+                  : 'אין מקור הצבעות (אין קוד חדר במשחק)'
           }
         />
         {syntheticCrowd && (
