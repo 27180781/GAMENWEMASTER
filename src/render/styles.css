@@ -3887,3 +3887,138 @@ body {
 .settings-host-link:hover {
   background: rgba(123, 140, 255, 0.12);
 }
+
+/* ---- מסך המנחה: טאבים + מדריך מסכים + עורך שקופיות ---- */
+.hc-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.hc-tab--on { background: rgba(123, 140, 255, 0.28); border-color: rgba(123, 140, 255, 0.6); }
+
+.hc-guide {
+  margin-top: 18px;
+  text-align: right;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 20px 24px;
+  max-width: 640px;
+}
+.hc-guide-title { font-size: 22px; font-weight: 900; margin: 0 0 12px; }
+.hc-guide-steps { margin: 0; padding-inline-start: 22px; line-height: 1.7; font-size: 17px; }
+.hc-guide-steps li { margin-bottom: 10px; }
+.hc-key {
+  display: inline-block;
+  background: #22263c;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-bottom-width: 3px;
+  border-radius: 6px;
+  padding: 1px 9px;
+  font-weight: 800;
+  font-size: 15px;
+  margin: 0 2px;
+}
+.hc-guide-btn {
+  margin-top: 8px;
+  background: #2a7d4f;
+  border: none;
+  color: #fff;
+  border-radius: 10px;
+  padding: 9px 18px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.hc-guide-btn:hover { background: #329159; }
+.hc-guide-close {
+  margin-top: 14px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #eef1ff;
+  border-radius: 10px;
+  padding: 9px 20px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.hc-guide-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(4, 2, 10, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+}
+
+/* עורך השקופיות */
+.se-root {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 900px) { .se-root { grid-template-columns: 1fr; } }
+.se-list-head { display: flex; align-items: center; justify-content: space-between; }
+.se-add, .se-add-answer {
+  background: #2a7d4f; border: none; color: #fff; border-radius: 10px;
+  padding: 8px 16px; font-size: 16px; font-weight: 700; cursor: pointer;
+}
+.se-add:hover, .se-add-answer:hover { background: #329159; }
+.se-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 74vh; overflow-y: auto; }
+.se-item {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px; padding: 8px 10px;
+}
+.se-item--sel { border-color: #7b8cff; background: rgba(123, 140, 255, 0.12); }
+.se-item-main {
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 10px;
+  background: transparent; border: none; color: #eef1ff; text-align: right;
+  font-size: 17px; cursor: pointer;
+}
+.se-item-num {
+  flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12); display: flex; align-items: center;
+  justify-content: center; font-weight: 800; font-size: 14px;
+}
+.se-item-que { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.se-item-now { flex: 0 0 auto; font-size: 12px; font-weight: 800; color: #ffd23f; background: rgba(255,210,63,0.16); border-radius: 999px; padding: 2px 8px; }
+.se-item-ops { display: flex; gap: 2px; flex: 0 0 auto; }
+.se-item-ops button {
+  background: rgba(255, 255, 255, 0.08); border: none; color: #eef1ff;
+  border-radius: 8px; width: 30px; height: 30px; font-size: 15px; cursor: pointer;
+}
+.se-item-ops button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.18); }
+.se-item-ops button:disabled { opacity: 0.35; cursor: default; }
+.se-del:hover:not(:disabled) { background: rgba(220, 60, 80, 0.4) !important; }
+.se-form { display: flex; flex-direction: column; gap: 12px; }
+.se-empty { opacity: 0.5; padding: 30px; text-align: center; }
+.se-label { font-size: 14px; font-weight: 700; opacity: 0.65; display: block; margin-bottom: 4px; }
+.se-input {
+  width: 100%; box-sizing: border-box; background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15); color: #eef1ff; border-radius: 10px;
+  padding: 10px 12px; font-size: 16px; font-family: inherit;
+}
+.se-input:focus { outline: none; border-color: #7b8cff; }
+.se-textarea { min-height: 64px; resize: vertical; }
+.se-num-row { display: flex; gap: 12px; }
+.se-num-row > div { flex: 1 1 0; }
+.se-num { width: 100%; }
+.se-media-row { display: flex; gap: 8px; }
+.se-media-row .se-input { flex: 1 1 auto; }
+.se-file-btn {
+  flex: 0 0 auto; display: inline-flex; align-items: center; background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18); color: #eef1ff; border-radius: 10px;
+  padding: 0 14px; font-size: 15px; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.se-file-btn:hover { background: rgba(255, 255, 255, 0.18); }
+.se-note { color: #ffd23f; font-size: 14px; margin: 4px 0 0; }
+.se-answers { display: flex; flex-direction: column; gap: 8px; }
+.se-answer { display: flex; align-items: center; gap: 8px; }
+.se-answer input[type="radio"] { width: 20px; height: 20px; flex: 0 0 auto; accent-color: #2a7d4f; }
+.se-answer-text { flex: 1 1 auto; }
+.se-answer-del {
+  flex: 0 0 auto; background: rgba(255, 255, 255, 0.08); border: none; color: #eef1ff;
+  border-radius: 8px; width: 34px; height: 34px; font-size: 16px; cursor: pointer;
+}
+.se-answer-del:hover:not(:disabled) { background: rgba(220, 60, 80, 0.4); }
+.se-answer-del:disabled { opacity: 0.35; cursor: default; }

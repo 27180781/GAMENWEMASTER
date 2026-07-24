@@ -107,4 +107,12 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
     ipcRenderer.on('control:msg', listener);
     return () => ipcRenderer.removeListener('control:msg', listener);
   },
+  /** שמירת קובץ מדיה (עריכה חיה) לדיסק; מחזיר trivia-media:// או null. */
+  mediaAddFile(/** @type {string} */ name, /** @type {Uint8Array} */ bytes) {
+    return ipcRenderer.invoke('media:addFile', name, bytes);
+  },
+  /** מעבר לתצוגת מסכים מורחבת (Windows). */
+  extendDisplay() {
+    void ipcRenderer.invoke('display:extend');
+  },
 });

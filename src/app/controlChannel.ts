@@ -10,6 +10,8 @@
  * להרחיב אותו בהמשך (עריכת שקופיות וכו').
  */
 
+import type { GameFile } from '../engine/index.ts';
+
 /** תמצית שקופית לרשימה במסך המנחה. */
 export interface SlideBrief {
   id: number;
@@ -37,15 +39,22 @@ export interface HostStateSnapshot {
   reveal: { questionShown: boolean; answersShown: number; revealCorrect: boolean };
 }
 
+/** המשחק המלא (לעריכה במסך המנחה) — נשלח מהתצוגה בנפרד מ-state התכוף. */
+export interface HostGameMessage {
+  t: 'game';
+  game: GameFile;
+}
+
 /** פקודות שמסך המנחה שולח לתצוגה. */
 export type HostCommand =
   | { t: 'hello' } // בקשה לתצוגה לפרסם מיד את מצבה הנוכחי
   | { t: 'cmd'; cmd: 'advance' | 'back' | 'nextSlide' }
   | { t: 'host'; n: number } // runHostCommand(n) — 0..6
   | { t: 'goto'; slideId: number }
-  | { t: 'roster' }; // המרשם (localStorage) עודכן במסך המנחה — לטעון מחדש
+  | { t: 'roster' } // המרשם (localStorage) עודכן במסך המנחה — לטעון מחדש
+  | { t: 'setGame'; game: GameFile }; // עריכה חיה — החלת משחק מעודכן (hot-swap)
 
-export type ControlMessage = HostStateSnapshot | HostCommand;
+export type ControlMessage = HostStateSnapshot | HostGameMessage | HostCommand;
 
 export interface ControlChannel {
   post: (msg: ControlMessage) => void;

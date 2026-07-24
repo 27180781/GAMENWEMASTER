@@ -30,6 +30,8 @@ protocol.registerSchemesAsPrivileged([
 let mainWindow = null;
 /** @type {BrowserWindow | null} חלון "מסך המנחה" הנפרד (שליטה ויזואלית). */
 let hostWindow = null;
+/** מזהה מטמון המדיה של המשחק הנוכחי — יעד לקבצי מדיה שנוספים בעריכה חיה. */
+let currentMediaCacheKey = '';
 
 // מופע יחיד: התוכנה מחזיקה שרת TCP (פורט 8090), תהליך ריסיבר וקובצי גיבוי
 // משותפים — שני מופעים במקביל היו מפצלים את זרם הקליקרים ביניהם בשקט. לחיצה
@@ -360,6 +362,7 @@ async function extractMediaCache(bytes) {
   const manifest = path.join(dir, '.manifest.json');
   if (fs.existsSync(manifest)) {
     pruneMediaCache(key); // כבר חולץ — רק מנקים מטמונים ישנים
+    currentMediaCacheKey = key;
     return key;
   }
   pruneMediaCache(key); // שומרים רק את המשחק הנוכחי
@@ -376,6 +379,7 @@ async function extractMediaCache(bytes) {
     names.push(rel);
   }
   fs.writeFileSync(manifest, JSON.stringify({ names, savedAt: Date.now() }));
+  currentMediaCacheKey = key;
   return key;
 }
 
@@ -576,6 +580,34 @@ app.whenReady().then(() => {
       if (!w.isDestroyed() && w.webContents.id !== e.sender.id) {
         w.webContents.send('control:msg', msg);
       }
+    }
+  });
+  // שמירת קובץ מדיה שנוסף בעריכה חיה — לתוך מטמון המדיה של המשחק הנוכחי,
+  // תחת _edits, ומוגש כ-trivia-media://. מחזיר את הכתובת או null.
+  ipcMain.handle('media:addFile', (_e, name, bytes) => {
+    try {
+      if (!currentMediaCacheKey) return null;
+      const raw = String(name || '');
+      const ext = raw.includes('.') ? raw.split('.').pop() : '';
+      const safeExt = ext && /^[a-z0-9]{1,5}$/i.test(ext) ? `.${ext.toLowerCase()}` : '';
+      const file = `${crypto.randomUUID()}${safeExt}`;
+      const dir = path.join(mediaCacheDir(currentMediaCacheKey), '_edits');
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, file), Buffer.from(bytes));
+      return `trivia-media://${currentMediaCacheKey}/_edits/${file}`;
+    } catch (err) {
+      console.error('[media] שמירת קובץ עריכה נכשלה:', /** @type {Error} */ (err).message);
+      return null;
+    }
+  });
+  // מעבר לתצוגה מורחבת (Windows) — הכלי המובנה DisplaySwitch.exe /extend.
+  ipcMain.handle('display:extend', () => {
+    if (process.platform !== 'win32') return;
+    try {
+      const p = spawn('DisplaySwitch.exe', ['/extend'], { windowsHide: true, stdio: 'ignore' });
+      p.on('error', (err) => console.error('[display] הרחבת תצוגה נכשלה:', err.message));
+    } catch (err) {
+      console.error('[display] הרחבת תצוגה נכשלה:', /** @type {Error} */ (err).message);
     }
   });
 
