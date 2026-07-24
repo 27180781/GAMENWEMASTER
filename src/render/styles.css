@@ -2081,6 +2081,54 @@ body {
 .clicker-choice-sub { font-size: 19px; line-height: 1.4; color: #4a4f63; }
 .clicker-intro-advanced { margin-top: 8px; }
 
+/* ---- מסך פתיחה אופליין (EXE) — טעינת ZIP בלבד ---- */
+.settings-screen.offline-open-screen {
+  background: radial-gradient(ellipse at 50% -10%, #ffffff, #eef0f4 60%, #e6e9ef);
+  color: #171a2b;
+}
+.offline-open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+.offline-open-card {
+  background: #fff;
+  border: 1px solid #e3e5ea;
+  border-radius: 44px;
+  box-shadow: 0 26px 64px rgba(20, 20, 40, 0.14);
+  padding: 72px 90px 60px;
+  max-width: 92%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+}
+.offline-open-icon { font-size: 68px; line-height: 1; }
+.offline-open-title { font-size: 52px; font-weight: 900; margin: 0; }
+.offline-open-lead { font-size: 26px; margin: 0 0 8px; color: #3a3f52; text-align: center; }
+.offline-open-load {
+  background: #141414;
+  color: #fff;
+  border: 3px solid #e5326b;
+  border-radius: 44px;
+  font-weight: 800;
+  font-size: 28px;
+  padding: 16px 52px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+}
+.offline-open-load:hover { transform: translateY(-2px); }
+.offline-open-error {
+  color: #c0263f;
+  font-size: 20px;
+  font-weight: 600;
+  margin: 4px 0 0;
+  text-align: center;
+  max-width: 640px;
+  white-space: pre-wrap;
+}
+
 /* חלון קופץ (מודאל) של ההגדרות המתקדמות — גלילה פנימית בלבד */
 .settings-modal-overlay {
   position: absolute;
