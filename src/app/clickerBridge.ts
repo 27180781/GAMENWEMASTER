@@ -30,6 +30,8 @@ interface TriviaDesktop {
   platform?: string;
   onClicker?: (cb: (ev: ClickerEvent) => void) => () => void;
   onReceiver?: (cb: (info: ReceiverClient) => void) => () => void;
+  /** הפעלת תוכנת הריסיבר (RF317SocketForm) שמצורפת ל-EXE — מתחברת לשרת המקומי. */
+  launchReceiver?: () => void;
 }
 
 function desktop(): TriviaDesktop | undefined {
@@ -55,4 +57,13 @@ export function onReceiverClient(cb: (info: ReceiverClient) => void): () => void
   const d = desktop();
   if (typeof d?.onReceiver !== 'function') return () => {};
   return d.onReceiver(cb);
+}
+
+/**
+ * הפעלת תוכנת הריסיבר (RF317SocketForm) המצורפת ל-EXE, שמתחברת לשרת המקומי
+ * (פורט 8090) ומזרימה את לחיצות השלטים. no-op אם אין גשר (דפדפן) או אם
+ * ה-preload אינו חושף את הפעולה (גרסת EXE ישנה).
+ */
+export function launchReceiver(): void {
+  desktop()?.launchReceiver?.();
 }

@@ -71,7 +71,26 @@ export class VoteWindow {
 
 type Status = 'connected' | 'reconnecting' | 'offline';
 
-export class SocketVoteAdapter implements VoteAdapter {
+/**
+ * מקור הצבעות "חי" (אמיתי) — מעבר ל-VoteAdapter הבסיסי מספק גם אירועי הקשה
+ * גולמיים (לשלט המנחה), חיבור/זיהוי שחקנים, ופתיחת/סגירת חלון הצבעה לשקופית.
+ * גם הסוקט (טלפונים) וגם הקליקרים (RF317, ב-EXE) ממשים אותו — כך GameHost
+ * מטפל בשניהם באותו מסלול, במקום instanceof לכל מחלקה.
+ */
+export interface LiveVoteAdapter extends VoteAdapter {
+  onPlayerIdentified(cb: (phone: string, name: string) => void): void;
+  onPlayerJoined(cb: (phone: string, name?: string) => void): void;
+  onRawVote(cb: (vote: RawVote) => void): void;
+  setActiveSlide(slideId: number | null): void;
+}
+
+/** האם ה-adapter הוא מקור הצבעות "חי" (סוקט/קליקרים) ולא ReplayAdapter. */
+export function isLiveVoteAdapter(adapter: VoteAdapter): adapter is LiveVoteAdapter {
+  const a = adapter as Partial<LiveVoteAdapter>;
+  return typeof a.setActiveSlide === 'function' && typeof a.onRawVote === 'function';
+}
+
+export class SocketVoteAdapter implements LiveVoteAdapter {
   private socket: Socket | null = null;
   private snapshotListener: ((snapshot: VoteSnapshot) => void) | null = null;
   private statusListener: ((status: Status) => void) | null = null;
