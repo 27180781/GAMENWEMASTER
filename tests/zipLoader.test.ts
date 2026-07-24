@@ -91,3 +91,48 @@ describe('loadGameFromZip', () => {
     expect(missing).toEqual([]);
   });
 });
+
+describe('loadGameFromZip — מצב זרימה מהדיסק (EXE)', () => {
+  const realWindow = (globalThis as { window?: unknown }).window;
+  afterEach(() => {
+    (globalThis as { window?: unknown }).window = realWindow;
+  });
+
+  /** מזריק גשר EXE מדומה עם mediaExtract שמחזיר cacheKey (או null לכשל). */
+  function stubDesktop(mediaExtract: unknown) {
+    (globalThis as { window?: unknown }).window = {
+      triviaDesktop: { isDesktop: true, mediaExtract },
+    };
+  }
+
+  it('מחלץ פעם אחת ומחזיר כתובות trivia-media:// במקום Blob', async () => {
+    const extract = vi.fn(async () => ({ cacheKey: 'abc123' }));
+    stubDesktop(extract);
+    const { game, missing, revoke } = await loadGameFromZip(await buildZip(), { stream: true });
+
+    expect(extract).toHaveBeenCalledTimes(1);
+    expect(game.setting.logo.src).toBe('trivia-media://abc123/Assets/logo.png');
+    expect(game.setting.gameMedia.src).toBe('trivia-media://abc123/Assets/intro.mp4');
+    // סוג המדיה נגזר מהסיומת שבכתובת
+    expect(classifyMediaUrl(game.setting.logo.src)).toBe('image');
+    expect(classifyMediaUrl(game.setting.gameMedia.src)).toBe('video');
+    // URL מוחלט לא נוגעים בו
+    expect(game.setting.triviaMedia.src).toBe('https://cdn/keep.mp4');
+    expect(missing).toEqual([]);
+    // אין Blob — revoke הוא no-op ולא נוצרו object URLs
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    revoke();
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+  });
+
+  it('כשל חילוץ (null) — נפילה חזרה ל-Blob', async () => {
+    stubDesktop(vi.fn(async () => null));
+    const { game } = await loadGameFromZip(await buildZip(), { stream: true });
+    expect(game.setting.logo.src).toMatch(/^blob:mock-/);
+  });
+
+  it('בלי גשר (דפדפן) — stream:true נופל ל-Blob', async () => {
+    const { game } = await loadGameFromZip(await buildZip(), { stream: true });
+    expect(game.setting.logo.src).toMatch(/^blob:mock-/);
+  });
+});

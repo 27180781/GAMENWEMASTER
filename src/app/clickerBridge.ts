@@ -70,6 +70,10 @@ interface TriviaDesktop {
   openReports?: () => void;
   /** יציאה מהמשחק (סגירת ה-EXE). */
   quit?: () => void;
+  /** חילוץ מדיית ה-ZIP לדיסק (מצב זרימה) — מחזיר { cacheKey } או null. */
+  mediaExtract?: (bytes: Uint8Array) => Promise<{ cacheKey: string } | null>;
+  /** ניקוי מדיה זמנית מהדיסק (לא נוגע בגיבויים/בתוצאות). */
+  mediaClear?: (cacheKey?: string) => Promise<boolean>;
 }
 
 function desktop(): TriviaDesktop | undefined {
@@ -222,4 +226,33 @@ export function canQuit(): boolean {
 /** יציאה מהמשחק (סגירת ה-EXE). no-op בדפדפן. */
 export function desktopQuit(): void {
   desktop()?.quit?.();
+}
+
+/** האם ה-EXE תומך בזרימת מדיה מהדיסק (trivia-media://) במקום Blob בזיכרון. */
+export function canStreamMedia(): boolean {
+  return typeof desktop()?.mediaExtract === 'function';
+}
+
+/** חילוץ מדיית ה-ZIP לדיסק לזרימה; מחזיר { cacheKey } או null (בדפדפן/שגיאה). */
+export async function desktopMediaExtract(
+  bytes: Uint8Array,
+): Promise<{ cacheKey: string } | null> {
+  const fn = desktop()?.mediaExtract;
+  if (typeof fn !== 'function') return null;
+  try {
+    return await fn(bytes);
+  } catch {
+    return null;
+  }
+}
+
+/** ניקוי מדיה זמנית מהדיסק (cacheKey חסר = כל המטמון). no-op בדפדפן. */
+export async function desktopMediaClear(cacheKey?: string): Promise<boolean> {
+  const fn = desktop()?.mediaClear;
+  if (typeof fn !== 'function') return false;
+  try {
+    return await fn(cacheKey);
+  } catch {
+    return false;
+  }
 }
