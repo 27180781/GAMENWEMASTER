@@ -65,4 +65,12 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
   backupClear(/** @type {string} */ id) {
     void ipcRenderer.invoke('backup:clear', id);
   },
+  /** שמירת קובץ תוצאות (אקסל) לדיסק; מחזיר את הנתיב המלא. */
+  saveReport(/** @type {string} */ name, /** @type {Uint8Array} */ bytes) {
+    return ipcRenderer.invoke('report:save', name, bytes);
+  },
+  /** פתיחת תיקיית התוצאות בסייר הקבצים. */
+  openReports() {
+    void ipcRenderer.invoke('report:open');
+  },
 });

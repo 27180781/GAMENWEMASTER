@@ -26,7 +26,14 @@ import {
 } from '../engine/index.ts';
 import { SocketVoteAdapter, isLiveVoteAdapter, type RawVote } from './socketAdapter.ts';
 import { ClickerVoteAdapter } from './clickerAdapter.ts';
-import { isDesktopClicker, showReceiver, canShowReceiver } from './clickerBridge.ts';
+import {
+  isDesktopClicker,
+  showReceiver,
+  canShowReceiver,
+  canSaveReport,
+  desktopSaveReport,
+  desktopOpenReports,
+} from './clickerBridge.ts';
 import { avatarColor, railInitial } from '../render/avatar.ts';
 import { AllScoresScreen, LobbyScreen, WinnersListScreen, WinnersScreen } from '../render/screens.tsx';
 import { OperatorMenu } from '../render/OperatorMenu.tsx';
@@ -67,7 +74,7 @@ import {
 } from './backup.ts';
 import { backupToSnapshot, buildBackupPayload, rosterFromBackup } from './backupState.ts';
 import { canDiskBackup, loadDiskBackup, saveDiskBackup } from './diskBackup.ts';
-import { downloadGameReport } from './gameReport.ts';
+import { downloadGameReport, buildGameReportBytes, reportFilename } from './gameReport.ts';
 import { buildFunctionPayload, sendFunctionApi } from './functionApi.ts';
 import { useConnectionHealth } from './useConnectionHealth.ts';
 import { planCrowdVotes, snapshotAt } from './syntheticVotes.ts';
@@ -512,16 +519,29 @@ export function GameHost({
     })();
   }, [backupCfg, diskBackup, stage, game.id, engine, nameOf]);
 
-  // סוף משחק אונליין → הורדה אוטומטית של קובץ אקסל סיכום (משתתפים/שאלות/קבוצות).
-  // פעם אחת בלבד, ורק במסך המנצחים האמיתי (לא תצוגה מקדימה של W). לא באופליין.
+  // סוף משחק → קובץ אקסל סיכום (משתתפים/שאלות/קבוצות). פעם אחת בלבד, ורק במסך
+  // המנצחים האמיתי (לא תצוגה מקדימה של W). אונליין: הורדה בדפדפן. אופליין (EXE):
+  // שמירה לדיסק בתיקיית התוצאות. הנתונים = מצב הסיום, שהוא גם הגיבוי האחרון.
+  const canReportToDisk = offline && canSaveReport();
   useEffect(() => {
-    if (offline || stage !== 'winners' || winnersPreviewRef.current !== null) return;
+    if (stage !== 'winners' || winnersPreviewRef.current !== null) return;
+    if (!canReportToDisk && offline) return; // אופליין בדפדפן (לא EXE) — אין לאן
     if (reportDownloadedRef.current) return;
     reportDownloadedRef.current = true;
-    void downloadGameReport(engine.getGame(), engine.getState(), rosterRef.current, nameOf).catch(
-      (err) => debugLog('game', `יצירת קובץ סיכום נכשלה (${String(err)})`),
-    );
-  }, [offline, stage, engine, nameOf]);
+    const g = engine.getGame();
+    if (canReportToDisk) {
+      void buildGameReportBytes(g, engine.getState(), rosterRef.current, nameOf)
+        .then((bytes) => desktopSaveReport(reportFilename(g), bytes))
+        .then((saved) => {
+          if (saved !== null) debugLog('game', `קובץ תוצאות נשמר: ${saved}`);
+        })
+        .catch((err) => debugLog('game', `שמירת קובץ תוצאות נכשלה (${String(err)})`));
+    } else {
+      void downloadGameReport(g, engine.getState(), rosterRef.current, nameOf).catch((err) =>
+        debugLog('game', `יצירת קובץ סיכום נכשלה (${String(err)})`),
+      );
+    }
+  }, [canReportToDisk, offline, stage, engine, nameOf]);
 
   // שקופית "פונקציה" (type: "function") — כשמגיעים אליה, שולחים את כל נתוני
   // המשחק ל-webhook שהוגדר בעורך (function.api). פעם אחת בכל כניסה לשקופית.
@@ -1877,6 +1897,7 @@ export function GameHost({
             {...(useClicker && canShowReceiver()
               ? { onShowReceiver: () => showReceiver() }
               : {})}
+            {...(canReportToDisk ? { onOpenReports: () => desktopOpenReports() } : {})}
             onEndGame={() => {
               setLeadersOverlay(false);
               setStage('winners');

@@ -149,3 +149,14 @@ export async function downloadGameReport(
   const blob = await buildXlsxBlob(buildReportSheets(game, state, roster, nameOf));
   downloadBlob(blob, reportFilename(game));
 }
+
+/** בונה את קובץ הסיכום כבייטים (לשמירה לדיסק ב-EXE, במקום הורדה בדפדפן). */
+export async function buildGameReportBytes(
+  game: GameFile,
+  state: GameState,
+  roster: RosterData,
+  nameOf: (voterId: string) => string,
+): Promise<Uint8Array> {
+  const blob = await buildXlsxBlob(buildReportSheets(game, state, roster, nameOf));
+  return new Uint8Array(await blob.arrayBuffer());
+}

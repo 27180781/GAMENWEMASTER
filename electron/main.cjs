@@ -7,7 +7,7 @@
  * שליטה: F11 מסך מלא/יציאה · Ctrl+Shift+I כלי פיתוח · Ctrl+Q יציאה.
  */
 
-const { app, BrowserWindow, globalShortcut, ipcMain } = require('electron');
+const { app, BrowserWindow, globalShortcut, ipcMain, shell } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { spawn } = require('node:child_process');
@@ -212,6 +212,22 @@ function backupPath(id) {
   return path.join(backupsDir(), `${safeGameId(id)}.json`);
 }
 
+/** תיקיית קבצי התוצאות (אקסל) — נוצרת אם חסרה. */
+function reportsDir() {
+  const dir = path.join(app.getPath('userData'), 'reports');
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+  } catch {
+    /* קיימת כבר */
+  }
+  return dir;
+}
+/** שם קובץ בטוח לתוצאות. */
+function safeReportName(name) {
+  const base = String(name ?? '').replace(/[\\/:*?"<>|]/g, ' ').trim() || 'results';
+  return base.toLowerCase().endsWith('.xlsx') ? base : `${base}.xlsx`;
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -281,6 +297,22 @@ app.whenReady().then(() => {
     } catch {
       /* התעלמות */
     }
+  });
+  // שמירת קובץ תוצאות (אקסל) לתיקיית reports; מחזיר את הנתיב המלא.
+  ipcMain.handle('report:save', (_e, name, bytes) => {
+    try {
+      const full = path.join(reportsDir(), safeReportName(name));
+      fs.writeFileSync(full, Buffer.from(bytes));
+      console.log('[report] נשמר קובץ תוצאות:', full);
+      return full;
+    } catch (err) {
+      console.error('[report] שמירת תוצאות נכשלה:', /** @type {Error} */ (err).message);
+      return null;
+    }
+  });
+  // פתיחת תיקיית התוצאות בסייר הקבצים.
+  ipcMain.handle('report:open', () => {
+    void shell.openPath(reportsDir());
   });
 
   // קיצורי מקלדת גלובליים למפעיל
