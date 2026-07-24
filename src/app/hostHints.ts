@@ -25,6 +25,8 @@ export interface HostHintInput {
   revealCorrect: boolean;
   /** האם יש שקופית הבאה (אחרת "רווח" מסיים למסך המנצחים). */
   hasNextSlide: boolean;
+  /** האם יש חלוקה לקבוצות — אז מקש 4 בחשיפת התשובה פותח את דירוג הקבוצות. */
+  hasGroups?: boolean;
 }
 
 /** מה עושה הרווח (מקש 0) בשלב הנוכחי. */
@@ -54,9 +56,11 @@ export function hostKeyHints(a: HostHintInput): HostHint[] {
     hints.push({ key: '4/5', label: '‎+10 / ‎−10 שניות' });
     hints.push({ key: '6', label: 'השהיה / המשך' });
   }
-  // בשלב חשיפת התשובה — מקש 5 פותח את פירוט הצבעות השחקנים.
-  if (a.phase === 'results' && a.votable) {
-    hints.push({ key: '5', label: 'פירוט הצבעות' });
+  // בשלב חשיפת התשובה — מקש 4 פותח דירוג קבוצות (אם יש חלוקה לקבוצות),
+  // ומקש 5 פותח את פירוט הצבעות השחקנים.
+  if (a.phase === 'results') {
+    if (a.hasGroups) hints.push({ key: '4', label: 'דירוג קבוצות' });
+    if (a.votable) hints.push({ key: '5', label: 'פירוט הצבעות' });
   }
   hints.push({ key: '1', label: 'טבלת מובילים' });
   hints.push({ key: '2', label: 'צעד אחורה' });

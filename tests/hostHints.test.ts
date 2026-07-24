@@ -64,4 +64,27 @@ describe('hostKeyHints — מקשי מספרים לפי הקשר', () => {
     // שקופית לא-מצביעה — בלי 5
     expect(keys({ phase: 'results', votable: false })).toEqual(['רווח', '1', '2', '3', 'N']);
   });
+
+  it('בחשיפת התשובה עם חלוקה לקבוצות — מקש 4 (דירוג קבוצות) מופיע לפני 5', () => {
+    expect(keys({ phase: 'results', votable: true, hasGroups: true })).toEqual([
+      'רווח',
+      '4',
+      '5',
+      '1',
+      '2',
+      '3',
+      'N',
+    ]);
+    // גם בשקופית לא-מצביעה מקש 4 עדיין רלוונטי (דירוג מצטבר), בלי 5
+    expect(keys({ phase: 'results', votable: false, hasGroups: true })).toEqual([
+      'רווח',
+      '4',
+      '1',
+      '2',
+      '3',
+      'N',
+    ]);
+    // בזמן הצבעה 4/5 נשארים קיצורי הטיימר (לא דירוג קבוצות)
+    expect(keys({ phase: 'voting', hasGroups: true })).toEqual(['רווח', '4/5', '6', '1', '2', '3', 'N']);
+  });
 });

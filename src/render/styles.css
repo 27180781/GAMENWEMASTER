@@ -3256,6 +3256,204 @@ body {
   opacity: 0.55;
 }
 
+/* ---- מסך דירוג הקבוצות (פקודת מנחה 4) ---- */
+.gs-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 56;
+  background: rgba(4, 2, 10, 0.86);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  animation: screen-fade 0.3s ease;
+}
+.gs-panel {
+  width: 1780px;
+  max-width: 100%;
+  height: 100%;
+  max-height: 1000px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, rgb(var(--main-rgb, 34, 43, 69)) 62%, #05030c),
+    color-mix(in srgb, rgb(var(--main-rgb, 34, 43, 69)) 30%, #05030c)
+  );
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  border-radius: 26px;
+  padding: 26px 32px;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.6);
+}
+.gs-head {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex: 0 0 auto;
+}
+.gs-title {
+  flex: 0 0 auto;
+  margin: 0;
+  font-size: 40px;
+  font-weight: 900;
+  color: var(--secondary-color, #fff);
+}
+.gs-cat {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 30px;
+  font-weight: 800;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 8px 24px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gs-cat-idx {
+  opacity: 0.6;
+  font-size: 24px;
+}
+.gs-close {
+  flex: 0 0 auto;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 24px;
+  cursor: pointer;
+}
+.gs-close:hover {
+  background: rgba(255, 255, 255, 0.26);
+}
+.gs-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 18px;
+  align-content: start;
+}
+.gs-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 18px 20px;
+}
+.gs-card--lead {
+  border-color: var(--secondary-color, #ffd23f);
+  background: color-mix(in srgb, var(--secondary-color, #ffd23f) 14%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--secondary-color, #ffd23f) 40%, transparent) inset;
+}
+.gs-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.gs-rank {
+  flex: 0 0 auto;
+  font-size: 34px;
+  font-weight: 900;
+  min-width: 48px;
+  text-align: center;
+}
+.gs-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 34px;
+  font-weight: 900;
+  color: #fff;
+  max-height: 84px;
+  text-align: right;
+}
+.gs-score {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.gs-score-num {
+  font-size: 52px;
+  font-weight: 900;
+  color: var(--secondary-color, #ffd23f);
+  line-height: 1;
+}
+.gs-score-lbl {
+  font-size: 22px;
+  font-weight: 700;
+  opacity: 0.7;
+  color: #fff;
+}
+.gs-meta {
+  font-size: 20px;
+  font-weight: 600;
+  opacity: 0.7;
+  color: #fff;
+}
+.gs-leaders {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.gs-leader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 24px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 7px 14px;
+}
+.gs-leader-rank {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 18px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gs-leader-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gs-leader-score {
+  flex: 0 0 auto;
+  font-weight: 900;
+  color: var(--secondary-color, #ffd23f);
+}
+.gs-leader--empty {
+  justify-content: center;
+  opacity: 0.4;
+  background: transparent;
+}
+.gs-foot {
+  flex: 0 0 auto;
+  text-align: center;
+  font-size: 20px;
+  opacity: 0.55;
+  color: #fff;
+}
+
 /* ---- חלונית דיבוג (F12) ---- */
 
 .debug-overlay {

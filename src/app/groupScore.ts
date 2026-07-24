@@ -72,3 +72,35 @@ export function hasGroupData(roster: RosterData): boolean {
     roster.categories.some((c) => c.groups.length > 0) && Object.keys(roster.memberships).length > 0
   );
 }
+
+/** הקטגוריות שיש בהן קבוצות (הרלוונטיות לתצוגת דירוג הקבוצות). */
+export function groupCategories(roster: RosterData) {
+  return roster.categories.filter((c) => c.groups.length > 0);
+}
+
+export interface GroupMember {
+  id: string;
+  score: number;
+  /** זמן תגובה ממוצע (ms) — שובר-שוויון, נמוך = מהיר. */
+  avgMs: number;
+}
+
+/**
+ * חברי קבוצה מסוימת בקטגוריה, ממוינים לפי ניקוד (שובר-שוויון: מהירות, ואז
+ * מזהה ליציבות) — כדי להציג את המובילים בתוך הקבוצה עצמה.
+ */
+export function groupMembers(
+  roster: RosterData,
+  categoryId: string,
+  groupId: string,
+  scores: Record<string, number>,
+  answerTimes: AnswerTimes,
+): GroupMember[] {
+  const out: GroupMember[] = [];
+  for (const [playerId, byCat] of Object.entries(roster.memberships)) {
+    if (byCat[categoryId] !== groupId) continue;
+    out.push({ id: playerId, score: scores[playerId] ?? 0, avgMs: avgResponseMs(answerTimes, playerId) });
+  }
+  out.sort((a, b) => b.score - a.score || a.avgMs - b.avgMs || a.id.localeCompare(b.id));
+  return out;
+}
