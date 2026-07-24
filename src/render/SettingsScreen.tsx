@@ -54,6 +54,8 @@ export function SettingsScreen({
   // מסך בחירת מצב הפעלה (אופליין/EXE בלבד): "האם הריסיבר מחובר?" — כן ⇒ שלטים,
   // לא ⇒ מצב דמה. באונליין אין ריסיבר, ולכן המסך הזה אינו מוצג כלל.
   const clickerCapable = offline && isDesktopClicker();
+  // טלפונים זמינים כשלמשחק יש קוד חדר (room) — גם ב-EXE סגור עם קוד מוטבע.
+  const phonesCapable = (game.room ?? '') !== '';
   const [voterCount, setVoterCount] = useState(initial.voterCount);
   const [intervalMs, setIntervalMs] = useState(initial.intervalMs);
   const [hostVoterId, setHostVoterId] = useState(initial.hostVoterId);
@@ -84,8 +86,11 @@ export function SettingsScreen({
   const demoIntro = allowDemo && !offline;
   const onlinePhone = !allowDemo && qrAvailable;
 
-  const buildSettings = (crowdOverride?: boolean): GameSettings => ({
-    crowdEnabled: crowdOverride ?? crowdEnabled,
+  type SourceOverride = Partial<
+    Pick<GameSettings, 'crowdEnabled' | 'voteClickers' | 'votePhones'>
+  >;
+  const buildSettings = (over?: SourceOverride): GameSettings => ({
+    crowdEnabled: over?.crowdEnabled ?? crowdEnabled,
     voterCount: clampedVoters,
     // מהירות ההצבעה ואחוז העונים-נכון של הקהל המדומה אינם נערכים יותר במסך —
     // נשמרים על ברירת המחדל מה-URL/JSON כדי שסימולציית הדמה תמשיך לעבוד.
@@ -98,15 +103,24 @@ export function SettingsScreen({
     showBottomInstructions,
     showBottomButtons,
     allowStartBeforeLoad,
+    voteClickers: over?.voteClickers ?? initial.voteClickers,
+    votePhones: over?.votePhones ?? initial.votePhones,
   });
   const save = () => onSave(buildSettings());
-  // "כן, הריסיבר מחובר" — מפעילים את תוכנת הריסיבר המצורפת ומתחילים במצב שלטים
-  // (קהל דמה כבוי). "לא" — מתחילים במצב דמה (קהל דמה דלוק).
+  // בחירת מקור ההצבעות (אופליין/EXE): שלטים בלבד (מפעיל את תוכנת הקליטה),
+  // טלפונים בלבד, שניהם יחד, או מצב דמה. כל מצב מדליק/מכבה את המקורות המתאימים.
   const startWithClicker = () => {
     launchReceiver();
-    onSave(buildSettings(false));
+    onSave(buildSettings({ crowdEnabled: false, voteClickers: true, votePhones: false }));
   };
-  const startWithDemo = () => onSave(buildSettings(true));
+  const startWithPhones = () =>
+    onSave(buildSettings({ crowdEnabled: false, voteClickers: false, votePhones: true }));
+  const startWithBoth = () => {
+    launchReceiver();
+    onSave(buildSettings({ crowdEnabled: false, voteClickers: true, votePhones: true }));
+  };
+  const startWithDemo = () =>
+    onSave(buildSettings({ crowdEnabled: true, voteClickers: false, votePhones: false }));
 
   // הגדרת חסימת-הטעינה — מוצגת בשני סוגי המסכים המתקדמים (className שונה).
   const loadBlockField = (cls: string) => (
@@ -497,17 +511,35 @@ export function SettingsScreen({
                 <span className="clicker-choice-emoji" aria-hidden="true">
                   📡
                 </span>
-                <span className="clicker-choice-title">הריסיבר מחובר — שחק עם שלטים</span>
+                <span className="clicker-choice-title">שחק עם שלטים</span>
                 <span className="clicker-choice-sub">
                   נפעיל את תוכנת הקליטה (RF317) ונתחבר לשלטים אוטומטית
                 </span>
               </button>
+              {phonesCapable && (
+                <button className="clicker-choice clicker-choice--phones" onClick={startWithPhones}>
+                  <span className="clicker-choice-emoji" aria-hidden="true">
+                    📱
+                  </span>
+                  <span className="clicker-choice-title">שחק עם טלפונים</span>
+                  <span className="clicker-choice-sub">השחקנים מצביעים מהטלפון (אונליין)</span>
+                </button>
+              )}
+              {phonesCapable && (
+                <button className="clicker-choice clicker-choice--both" onClick={startWithBoth}>
+                  <span className="clicker-choice-emoji" aria-hidden="true">
+                    📡📱
+                  </span>
+                  <span className="clicker-choice-title">שלטים + טלפונים</span>
+                  <span className="clicker-choice-sub">שני המקורות יחד — ההצבעות ממוזגות</span>
+                </button>
+              )}
               <button className="clicker-choice clicker-choice--demo" onClick={startWithDemo}>
                 <span className="clicker-choice-emoji" aria-hidden="true">
                   🎭
                 </span>
-                <span className="clicker-choice-title">אין ריסיבר — מצב דמה</span>
-                <span className="clicker-choice-sub">הרצה עם שחקני דמה, בלי שלטים</span>
+                <span className="clicker-choice-title">מצב דמה</span>
+                <span className="clicker-choice-sub">הרצה עם שחקני דמה, בלי שלטים/טלפונים</span>
               </button>
             </div>
 

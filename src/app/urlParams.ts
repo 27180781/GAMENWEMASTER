@@ -121,6 +121,13 @@ export interface GameSettings {
    * על כשל) ואז ספירה-לאחור קצרה לפני מסך ההתחברות. true = ההתנהגות הישנה.
    */
   allowStartBeforeLoad: boolean;
+  /**
+   * מקורות הצבעה פעילים (כשהקהל המדומה כבוי). ניתן לבחור קליקרים (RF317, EXE),
+   * טלפונים (סוקט אונליין, לפי קוד חדר), או שניהם יחד — אז ההצבעות ממוזגות.
+   * ברירת המחדל: טלפונים דלוקים, קליקרים כבויים — כך המשחק האונליין לא משתנה.
+   */
+  voteClickers: boolean;
+  votePhones: boolean;
 }
 
 /** כתובת ההתחברות מהטלפון עבור קוד QR — לפי קוד המשחק (room). */
@@ -154,6 +161,9 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   showBottomInstructions: false,
   showBottomButtons: false,
   allowStartBeforeLoad: false,
+  // ברירת מחדל: טלפונים (סוקט) דלוקים, קליקרים כבויים — המשחק האונליין כשהיה.
+  voteClickers: false,
+  votePhones: true,
 };
 
 /**
