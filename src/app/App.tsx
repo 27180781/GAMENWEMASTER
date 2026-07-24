@@ -21,6 +21,7 @@ import { useMediaPreload } from './useMediaPreload.ts';
 import { MediaLoadBar, MediaLoadDot } from '../render/MediaLoadBar.tsx';
 import { StartupOverlay } from '../render/StartupOverlay.tsx';
 import { ErrorScreen } from '../render/ErrorScreen.tsx';
+import { ClickerDiagnostic } from '../render/ClickerDiagnostic.tsx';
 import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.ts';
 import { decodeInitialMedia } from './mediaDecode.ts';
 import { openPushChannel } from './pushChannel.ts';
@@ -76,6 +77,7 @@ function Shell({ children, style }: { children: ReactNode; style?: Record<string
   return (
     <div className="game-root" dir="rtl" style={style}>
       <Stage>{children}</Stage>
+      <ClickerDiagnostic />
     </div>
   );
 }
