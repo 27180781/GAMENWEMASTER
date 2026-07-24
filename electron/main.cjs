@@ -57,33 +57,33 @@ function receiverDir() {
 
 /**
  * הפעלת תוכנת הקליטה RF317SocketForm המצורפת. זו תוכנת Windows (.NET) שמתחברת
- * כלקוח לשרת המקומי (פורט 8090) ומזרימה את לחיצות השלטים. מופעלת **ממוזערת**
- * (‏start /min) כדי שלא תכסה את המסך הגדול באירוע — ואפשר להקפיץ אותה לחזית
- * דרך showReceiver כשצריך להגדיר טווח שלטים או ללחוץ Connect. no-op מחוץ
- * ל-Windows, ואם כבר הופעלה — לא מפעילים שוב.
+ * כלקוח לשרת המקומי (פורט 8090) ומזרימה את לחיצות השלטים. מופעלת **ישירות**
+ * (‏spawn של ה-exe עצמו) עם תיקיית עבודה נכונה — כך שתמצא את ה-DLL ותתחבר.
+ * (הפעלה דרך cmd/‏start /min נכשלה כשנתיב המשתמש כלל תווים לא-לטיניים.)
+ * no-op מחוץ ל-Windows, ואם כבר רצה — לא מפעילים שוב.
  */
 function launchReceiver() {
   if (process.platform !== 'win32') return; // התוכנה היא Windows בלבד
-  if (receiverStarted) return; // כבר הופעלה בהרצה הזו
+  if (receiverStarted && receiverProc !== null && receiverProc.exitCode === null) return; // כבר רצה
   const base = receiverDir();
   const exe = path.join(base, RECEIVER_EXE);
   try {
-    // start "" /min /d <dir> "<exe>" — פותח את התוכנה ממוזערת, עם תיקיית עבודה
-    // נכונה כדי שתמצא את ה-DLL (gsp-api.dll וכו').
-    receiverProc = spawn('cmd.exe', ['/c', `start "" /min /d "${base}" "${exe}"`], {
-      cwd: base,
-      stdio: 'ignore',
-      windowsHide: true,
-    });
+    receiverProc = spawn(exe, [], { cwd: base, stdio: 'ignore', windowsHide: false });
     receiverProc.on('error', (err) => {
       console.error('[RF317] הפעלת תוכנת הקליטה נכשלה:', err.message);
       receiverStarted = false;
+      receiverProc = null;
+    });
+    receiverProc.on('exit', () => {
+      receiverStarted = false;
+      receiverProc = null;
     });
     receiverStarted = true;
-    console.log('[RF317] תוכנת הקליטה הופעלה (ממוזערת):', exe);
+    console.log('[RF317] תוכנת הקליטה הופעלה:', exe);
   } catch (err) {
     console.error('[RF317] הפעלת תוכנת הקליטה נכשלה:', /** @type {Error} */ (err).message);
     receiverStarted = false;
+    receiverProc = null;
   }
 }
 
