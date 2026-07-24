@@ -2074,6 +2074,10 @@ body {
 .clicker-choice:hover { transform: translateY(-3px); box-shadow: 0 18px 38px rgba(20, 20, 40, 0.16); }
 .clicker-choice--remotes { border-color: #2e8b57; background: linear-gradient(180deg, #f0fbf4, #e6f7ee); }
 .clicker-choice--remotes:hover { border-color: #1f6b41; }
+.clicker-choice--phones { border-color: #1e6fd0; background: linear-gradient(180deg, #eef5fd, #e2eefb); }
+.clicker-choice--phones:hover { border-color: #1657a8; }
+.clicker-choice--both { border-color: #d98a1e; background: linear-gradient(180deg, #fdf6ea, #faedd8); }
+.clicker-choice--both:hover { border-color: #b06d12; }
 .clicker-choice--demo { border-color: #8B2FC9; background: linear-gradient(180deg, #f7f0fc, #efe4f8); }
 .clicker-choice--demo:hover { border-color: #6f1fa8; }
 .clicker-choice-emoji { font-size: 52px; line-height: 1; }
@@ -2164,6 +2168,22 @@ body {
   transition: opacity 0.15s ease, background 0.15s ease;
 }
 .operator-menu-fab:hover { opacity: 1; background: rgba(20, 20, 40, 0.6); }
+
+/* חיווי כפול למקורות הצבעה (שלטים + טלפונים) — כשנבחרו שניהם יחד */
+.vote-sources {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.vote-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 700;
+  opacity: 0.85;
+}
+.vote-source .status-dot { position: static; display: inline-block; }
 
 /* חלון קופץ (מודאל) של ההגדרות המתקדמות — גלילה פנימית בלבד */
 .settings-modal-overlay {

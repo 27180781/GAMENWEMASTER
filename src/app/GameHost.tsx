@@ -25,6 +25,7 @@ import {
   type VoteSnapshot,
 } from '../engine/index.ts';
 import { SocketVoteAdapter, isLiveVoteAdapter, type RawVote } from './socketAdapter.ts';
+import { CompositeVoteAdapter } from './compositeAdapter.ts';
 import { ClickerVoteAdapter } from './clickerAdapter.ts';
 import {
   isDesktopClicker,
@@ -91,6 +92,15 @@ type HostStage = 'opening' | 'playing' | 'winners' | 'scoreboard';
 
 const NO_REVEAL: RevealState = { questionShown: false, answersShown: 0, revealCorrect: false };
 
+/** טקסט חיווי חיבור למקור הצבעות (ריסיבר/טלפונים) לפי הסטטוס. */
+function connStatusText(
+  status: 'connected' | 'reconnecting' | 'offline',
+  subject: string,
+): string {
+  const word = status === 'connected' ? 'מחובר' : status === 'reconnecting' ? 'מתחבר…' : 'מנותק';
+  return `${subject} ${word}`;
+}
+
 /** מספר המצטרפים המרבי שמוצג במסילה בכל רגע. */
 const RAIL_MAX = 9;
 /**
@@ -134,32 +144,33 @@ export function GameHost({
   // אחרת ReplayAdapter (דמו/סינתטי, וגם אופליין — בלי רשת).
   const roomId = game.room ?? '';
   const hasRoom = roomId !== '';
-  // מצב קליקרים — אך ורק במשחק אופליין (EXE): כשגשר הקליקרים זמין ולא נבחר
-  // קהל-דמה, הקליקרים (RF317, מקומי) הם מקור ההצבעות. באונליין אין ריסיבר —
-  // התנאי `offline` מבטיח שהמשחק האונליין (טלפונים) נשאר בדיוק כפי שהיה.
-  const useClicker = offline && isDesktopClicker() && !settings.crowdEnabled;
-  const useSocket = !useClicker && !settings.crowdEnabled && roomId !== '';
-  // באנר הצטרפות (חיוג + קוד): רק כשמצביעים שחקנים אמיתיים — משחק אונליין עם קוד
-  // חדר, ולא במצב דמו. בדמו (‎?demo=1‎) ההרצה מקומית עם שחקני דמה גם אם יש רישיון
-  // טלפונים פעיל, ולכן אין להציג הזמנה לחייג. אזהרת רישיון: אונליין בלי קוד חדר.
-  const showJoinBanner = !offline && hasRoom && !settings.crowdEnabled;
-  // אזהרת "אין רישיון" רלוונטית רק כשאין כלל מקור הצבעות: אונליין בלי קוד חדר
-  // ובלי קליקרים. במצב קליקרים (EXE) יש מקור הצבעות (השלטים) — אין אזהרה.
+  // מקורות ההצבעה (כשהקהל המדומה כבוי): קליקרים (RF317, EXE אופליין) ו/או
+  // טלפונים (סוקט, לפי קוד חדר). ניתן לבחור אחד, השני, או שניהם יחד. הקליקרים
+  // זמינים רק ב-EXE (`offline && isDesktopClicker`), כך שהמשחק האונליין —
+  // שבו useClicker תמיד false — נשאר בדיוק כפי שהיה.
+  const clickersAvailable = offline && isDesktopClicker();
+  const phonesAvailable = hasRoom;
+  const useClicker = !settings.crowdEnabled && settings.voteClickers && clickersAvailable;
+  const useSocket = !settings.crowdEnabled && settings.votePhones && phonesAvailable;
+  const isComposite = useClicker && useSocket; // שני המקורות יחד → מיזוג
+  // באנר הצטרפות (חיוג + קוד): כשהטלפונים הם מקור הצבעות פעיל (גם ב-EXE סגור
+  // עם קוד חדר). בדמו אין הזמנה לחייג. אזהרת רישיון: אין כלל מקור הצבעות.
+  const showJoinBanner = useSocket;
   const showLicenseWarning = !offline && !hasRoom && !useClicker;
-  // QR להתחברות מהטלפון — רק במשחק אונליין מורשה (קוד חדר) ושאינו דמו, וכשסומן
-  // בהגדרות. הקוד מוביל ל-clicker.clicker.co.il/?game=<קוד המשחק>.
-  const qrAvailable = showJoinBanner;
-  const showQrCode = settings.showQr && qrAvailable && !settings.crowdEnabled;
+  // QR להתחברות מהטלפון — כשהטלפונים פעילים וסומן בהגדרות.
+  const qrAvailable = useSocket;
+  const showQrCode = settings.showQr && qrAvailable;
   const qrUrl = joinQrUrl(roomId);
-  const adapter = useMemo<VoteAdapter>(
-    () =>
-      useClicker
-        ? new ClickerVoteAdapter()
-        : useSocket
-          ? new SocketVoteAdapter(voteServerUrl)
-          : new ReplayAdapter(),
-    [useClicker, useSocket, voteServerUrl],
-  );
+  const adapter = useMemo<VoteAdapter>(() => {
+    if (isComposite)
+      return new CompositeVoteAdapter([
+        { kind: 'clicker', adapter: new ClickerVoteAdapter() },
+        { kind: 'socket', adapter: new SocketVoteAdapter(voteServerUrl) },
+      ]);
+    if (useClicker) return new ClickerVoteAdapter();
+    if (useSocket) return new SocketVoteAdapter(voteServerUrl);
+    return new ReplayAdapter();
+  }, [isComposite, useClicker, useSocket, voteServerUrl]);
   const audio = useMemo(() => new AudioManager(), []);
   const state = useEngineState(engine);
 
@@ -243,15 +254,23 @@ export function GameHost({
   /** שמות שהגיעו מהשרת (טלפון → שם שחקן) — מיפוי אוטומטי במשחק טלפונים. */
   const [serverNames, setServerNames] = useState<Record<string, string>>({});
   /** סטטוס החיבור לשרת ההצבעות (רלוונטי רק במשחק אונליין אמיתי). */
-  const [voteStatus, setVoteStatus] = useState<'connected' | 'reconnecting' | 'offline'>(
-    'offline',
-  );
-  /** אזהרות איכות חיבור — רק כשהמשחק תלוי בסוקט (אונליין אמיתי). */
-  const connectionWarnings = useConnectionHealth({ enabled: useSocket, socketStatus: voteStatus });
-  // דיבוג: סטטוס חיבור הסוקט (רק במשחק אונליין אמיתי) + אזהרות איכות
+  type VoteConnStatus = 'connected' | 'reconnecting' | 'offline';
+  // מקור בודד — סטטוס אחד. מקור מרוכב (קליקרים+טלפונים) — סטטוס נפרד לכל אחד,
+  // לחיווי ברור. ה-eff מאחד: במרוכב לפי המקור, אחרת הסטטוס הבודד.
+  const [voteStatus, setVoteStatus] = useState<VoteConnStatus>('offline');
+  const [clickerStatus, setClickerStatus] = useState<VoteConnStatus>('offline');
+  const [socketStatus, setSocketStatus] = useState<VoteConnStatus>('offline');
+  const effClickerStatus: VoteConnStatus = isComposite ? clickerStatus : voteStatus;
+  const effSocketStatus: VoteConnStatus = isComposite ? socketStatus : voteStatus;
+  /** אזהרות איכות חיבור — רק כשהמשחק תלוי בסוקט (טלפונים). */
+  const connectionWarnings = useConnectionHealth({
+    enabled: useSocket,
+    socketStatus: effSocketStatus,
+  });
+  // דיבוג: סטטוס חיבור הסוקט (טלפונים) + אזהרות איכות
   useEffect(() => {
-    if (useSocket) debugLog('socket', `סטטוס חיבור: ${voteStatus}`);
-  }, [voteStatus, useSocket]);
+    if (useSocket) debugLog('socket', `סטטוס חיבור: ${effSocketStatus}`);
+  }, [effSocketStatus, useSocket]);
   useEffect(() => {
     for (const w of connectionWarnings) {
       debugLog('socket', `אזהרת חיבור: ${w.message}`, { code: w.code, severity: w.severity });
@@ -1183,8 +1202,14 @@ export function GameHost({
       scheduleVoteFlushRef.current();
     });
     if (isLiveVoteAdapter(adapter)) {
-      // מקור חי (סוקט/קליקרים): סטטוס חיבור + מיפוי שם השחקן + לובי + אירועי הקשה
-      adapter.onStatusChange(setVoteStatus);
+      // מקור חי (סוקט/קליקרים): סטטוס חיבור + מיפוי שם השחקן + לובי + אירועי הקשה.
+      // מקור מרוכב — סטטוס נפרד לכל מקור (ריסיבר/טלפונים) לחיווי ברור.
+      if (adapter instanceof CompositeVoteAdapter) {
+        adapter.onSourceStatus('clicker', setClickerStatus);
+        adapter.onSourceStatus('socket', setSocketStatus);
+      } else {
+        adapter.onStatusChange(setVoteStatus);
+      }
       adapter.onPlayerIdentified((phone, name) =>
         setServerNames((prev) => (prev[phone] === name ? prev : { ...prev, [phone]: name })),
       );
@@ -1702,7 +1727,7 @@ export function GameHost({
           </div>
         )}
         {/* מצב קליקרים: כשהריסיבר לא מחובר — אזהרה (לא מציגים דמו במקום). */}
-        {useClicker && voteStatus !== 'connected' && (
+        {useClicker && effClickerStatus !== 'connected' && (
           <div className="conn-warnings">
             <div className="conn-warning conn-warning--error">
               ⛔ אין חיבור לריסיבר — ודאו ש-RF317SocketForm פועל (פורט 8090) והדונגל מחובר
@@ -1845,30 +1870,38 @@ export function GameHost({
           </div>
         )}
 
-        <span
-          className={`status-dot status-dot--${useSocket || useClicker ? voteStatus : 'connected'}`}
-          title={
-            syntheticCrowd
-              ? `מצב דמו: ${crowdConfig.voterCount} שחקני דמה`
-              : useClicker
-                ? `קליקרים (RF317) · ${
-                    voteStatus === 'connected'
-                      ? 'הריסיבר מחובר'
-                      : voteStatus === 'reconnecting'
-                        ? 'ממתין לריסיבר…'
-                        : 'הריסיבר מנותק'
-                  }`
-                : useSocket
-                  ? `שרת הצבעות · חדר ${roomId} · ${
-                      voteStatus === 'connected'
-                        ? 'מחובר'
-                        : voteStatus === 'reconnecting'
-                          ? 'מתחבר מחדש…'
-                          : 'מנותק'
-                    }`
-                  : 'אין מקור הצבעות (אין קוד חדר במשחק)'
-          }
-        />
+        {isComposite ? (
+          // שני מקורות יחד — חיווי נפרד וברור לכל אחד (ריסיבר + טלפונים).
+          <span className="vote-sources">
+            <span
+              className="vote-source"
+              title={`שלטים (RF317) · ${connStatusText(effClickerStatus, 'הריסיבר')}`}
+            >
+              <i className={`status-dot status-dot--${effClickerStatus}`} />
+              🎛️ שלטים
+            </span>
+            <span
+              className="vote-source"
+              title={`טלפונים · חדר ${roomId} · ${connStatusText(effSocketStatus, 'החיבור')}`}
+            >
+              <i className={`status-dot status-dot--${effSocketStatus}`} />
+              📱 טלפונים
+            </span>
+          </span>
+        ) : (
+          <span
+            className={`status-dot status-dot--${useSocket || useClicker ? voteStatus : 'connected'}`}
+            title={
+              syntheticCrowd
+                ? `מצב דמו: ${crowdConfig.voterCount} שחקני דמה`
+                : useClicker
+                  ? `קליקרים (RF317) · ${connStatusText(voteStatus, 'הריסיבר')}`
+                  : useSocket
+                    ? `שרת הצבעות · חדר ${roomId} · ${connStatusText(voteStatus, 'החיבור')}`
+                    : 'אין מקור הצבעות (אין קוד חדר במשחק)'
+            }
+          />
+        )}
         {syntheticCrowd && (
           <span className="demo-badge">
             דמו · {crowdConfig.voterCount.toLocaleString()} שחקנים
@@ -1973,7 +2006,18 @@ export function GameHost({
                     ? `אונליין · חדר ${roomId}`
                     : 'אין',
               },
-              { label: 'חיבור', value: useSocket ? voteStatus : syntheticCrowd ? 'דמו (מקומי)' : '—' },
+              {
+                label: 'חיבור',
+                value: isComposite
+                  ? `ריסיבר ${effClickerStatus} · טלפונים ${effSocketStatus}`
+                  : useSocket
+                    ? effSocketStatus
+                    : useClicker
+                      ? effClickerStatus
+                      : syntheticCrowd
+                        ? 'דמו (מקומי)'
+                        : '—',
+              },
             ]}
           />
         )}
