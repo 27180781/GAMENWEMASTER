@@ -41,6 +41,11 @@ function desktop(): TriviaDesktop | undefined {
   return (window as unknown as { triviaDesktop?: TriviaDesktop }).triviaDesktop;
 }
 
+/** האם רצים ב-EXE (אפליקציית שולחן עבודה — Electron), ללא תלות בקליקרים. */
+export function isDesktopApp(): boolean {
+  return desktop()?.isDesktop === true;
+}
+
 /** האם רצים ב-EXE עם גשר קליקרים זמין. */
 export function isDesktopClicker(): boolean {
   const d = desktop();

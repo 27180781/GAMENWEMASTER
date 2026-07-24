@@ -22,7 +22,7 @@ import { MediaLoadBar, MediaLoadDot } from '../render/MediaLoadBar.tsx';
 import { StartupOverlay } from '../render/StartupOverlay.tsx';
 import { ErrorScreen } from '../render/ErrorScreen.tsx';
 import { ClickerDiagnostic } from '../render/ClickerDiagnostic.tsx';
-import { isDesktopClicker } from './clickerBridge.ts';
+import { isDesktopClicker, isDesktopApp } from './clickerBridge.ts';
 import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.ts';
 import { decodeInitialMedia } from './mediaDecode.ts';
 import { openPushChannel } from './pushChannel.ts';
@@ -532,6 +532,46 @@ export function App() {
       .catch((e: unknown) => setError(`טעינת ה-ZIP נכשלה:\n${(e as Error).message}`));
   };
 
+  // מסך פתיחה. ב-EXE (אופליין) — רק טעינת ZIP, מעוצב כמו מסכי האונליין; משחקי
+  // הדוגמה וטעינת ה-JSON שייכים לפיתוח/אונליין ואינם מוצגים ב-EXE.
+  const desktopApp = isDesktopApp();
+  const zipInput = (
+    <input
+      type="file"
+      accept=".zip,application/zip"
+      hidden
+      onChange={(event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        setError(null);
+        loadZipFile(file);
+      }}
+    />
+  );
+
+  if (desktopApp) {
+    return (
+      <Shell>
+        <div className="screen settings-screen offline-open-screen">
+          <div className="screen-content offline-open">
+            <div className="offline-open-card">
+              <div className="offline-open-icon" aria-hidden="true">
+                🎯
+              </div>
+              <h1 className="offline-open-title">מנוע הטריוויה</h1>
+              <p className="offline-open-lead">בחרו את קובץ המשחק (ZIP) כדי להתחיל</p>
+              <label className="picker-button offline-open-load">
+                📦 טעינת משחק (ZIP)
+                {zipInput}
+              </label>
+              {error !== null && <p className="offline-open-error">{error}</p>}
+            </div>
+          </div>
+        </div>
+      </Shell>
+    );
+  }
+
   return (
     <Shell>
       <div className="screen">
@@ -547,17 +587,7 @@ export function App() {
           </div>
           <label className="picker-button picker-upload">
             📦 טעינת משחק אופליין (ZIP)
-            <input
-              type="file"
-              accept=".zip,application/zip"
-              hidden
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (!file) return;
-                setError(null);
-                loadZipFile(file);
-              }}
-            />
+            {zipInput}
           </label>
           <label className="picker-button picker-upload picker-upload--secondary">
             העלאת game.json...

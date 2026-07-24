@@ -179,7 +179,22 @@ export function SettingsScreen({
           </label>
         ) : clickerMode ? (
           // EXE עם קליקרים — ההצבעות מגיעות מהשלטים (RF317) דרך השרת המקומי.
-          <p className="demo-hint">מצב קליקרים — ההצבעות מגיעות מהשלטים (RF317, פורט 8090).</p>
+          <>
+            <p className="demo-hint">מצב קליקרים — ההצבעות מגיעות מהשלטים (RF317, פורט 8090).</p>
+            <label className="demo-field">
+              <span>מספר שלט מנחה (אופציונלי)</span>
+              <input
+                type="text"
+                dir="ltr"
+                placeholder="למשל: 305"
+                value={hostVoterId}
+                onChange={(e) => setHostVoterId(e.target.value)}
+              />
+              <span className="demo-hint">
+                הקשות השלט הזה הן פקודות מנחה (0 קדימה, 2 אחורה, 1 מובילים...) — לא משתתף בהצבעות
+              </span>
+            </label>
+          </>
         ) : (
           <>
             <p className="demo-hint">משחק אונליין — השחקנים מצביעים מהטלפון/קליקר האמיתי.</p>
