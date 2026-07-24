@@ -55,23 +55,29 @@ function main() {
   const exePath = args.exe;
   const gamePath = args.game;
   const outPath = args.out;
-  if (!exePath || !gamePath || !outPath) {
+  // typeof — דגל בלי ערך (--exe --game g.zip) נקלט כ-true; בלי הבדיקה הזו הוא
+  // היה חומק מהודעת-השימוש וקורס בהמשך עם שגיאה לא מובנת.
+  if (typeof exePath !== 'string' || typeof gamePath !== 'string' || typeof outPath !== 'string') {
     console.error('חסרים פרמטרים. חובה: --exe <generic.exe> --game <game.zip> --out <out.exe>');
     console.error('אופציונלי: --room <code> --clickers true|false --phones true|false --limit <n> --name <name>');
     process.exit(2);
   }
 
   const room = args.room !== undefined && args.room !== true ? String(args.room) : '';
-  const limit =
-    args.limit !== undefined && args.limit !== true && String(args.limit).trim() !== ''
-      ? Number(args.limit)
-      : null;
+  let limit = null;
+  if (args.limit !== undefined && args.limit !== true && String(args.limit).trim() !== '') {
+    limit = Number(args.limit);
+    if (!Number.isInteger(limit) || limit <= 0) {
+      console.error(`⚠ ערך --limit לא תקין ("${args.limit}") — חייב מספר שלם חיובי. מתעלם מהמגבלה.`);
+      limit = null;
+    }
+  }
   const config = {
     room,
     allowClickers: asBool(args.clickers, true),
     // טלפונים מותרים כברירת מחדל רק אם יש קוד חדר; --phones דורס.
     allowPhones: asBool(args.phones, room !== ''),
-    limit: Number.isFinite(limit) ? limit : null,
+    limit,
     name: args.name !== undefined && args.name !== true ? String(args.name) : '',
   };
   if (config.allowPhones && room === '') {

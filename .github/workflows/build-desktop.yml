@@ -9,12 +9,14 @@ on:
     branches: [main]
     paths:
       - 'src/**'
+      - 'public/**'
       - 'fixtures/**'
       - 'electron/**'
       - 'index.html'
       - 'package.json'
       - 'package-lock.json'
       - 'vite.config.ts'
+      - 'tsconfig*.json'
       - 'electron-builder.yml'
       - '.github/workflows/build-desktop.yml'
   workflow_dispatch:

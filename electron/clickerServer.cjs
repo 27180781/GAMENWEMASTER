@@ -44,8 +44,12 @@ function parseClickerStream(buffer) {
   while (i < buffer.length) {
     const a = buffer[i];
     if (a >= 9) {
-      // סטטוס — בית אחד
-      events.push({ type: 'status', code: a, status: STATUS_BY_CODE[a] ?? 'unknown' });
+      // סטטוס — בית אחד. בייטים מחוץ לפרוטוקול (13–255, למשל תהליך זר שכתב
+      // טקסט לפורט) לא מפורשים ולא מוזרמים — כדי שלא יציפו את ה-IPC ויבלבלו
+      // את חיווי החיבור.
+      if (STATUS_BY_CODE[a] !== undefined) {
+        events.push({ type: 'status', code: a, status: STATUS_BY_CODE[a] });
+      }
       i += 1;
     } else {
       // לחיצת כפתור — 3 בתים; אם עדיין לא הגיעו כולם, עוצרים ומחזירים כשארית
