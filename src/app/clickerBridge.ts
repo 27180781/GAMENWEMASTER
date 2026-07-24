@@ -74,6 +74,11 @@ interface TriviaDesktop {
   mediaExtract?: (bytes: Uint8Array) => Promise<{ cacheKey: string } | null>;
   /** ניקוי מדיה זמנית מהדיסק (לא נוגע בגיבויים/בתוצאות). */
   mediaClear?: (cacheKey?: string) => Promise<boolean>;
+  /** פתיחת חלון "מסך המנחה" הנפרד (EXE). */
+  openHostWindow?: () => void;
+  /** ממסר הודעות שליטה בין החלונות (ראו controlChannel.ts). */
+  controlPost?: (msg: unknown) => void;
+  onControl?: (cb: (msg: unknown) => void) => () => void;
 }
 
 function desktop(): TriviaDesktop | undefined {
@@ -255,4 +260,14 @@ export async function desktopMediaClear(cacheKey?: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/** האם ה-EXE יודע לפתוח חלון "מסך מנחה" נפרד. */
+export function canOpenHostWindow(): boolean {
+  return typeof desktop()?.openHostWindow === 'function';
+}
+
+/** פתיחת חלון "מסך המנחה" הנפרד (EXE). no-op בדפדפן. */
+export function openHostWindow(): void {
+  desktop()?.openHostWindow?.();
 }

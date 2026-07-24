@@ -28,6 +28,8 @@ protocol.registerSchemesAsPrivileged([
 
 /** @type {BrowserWindow | null} */
 let mainWindow = null;
+/** @type {BrowserWindow | null} חלון "מסך המנחה" הנפרד (שליטה ויזואלית). */
+let hostWindow = null;
 
 // מופע יחיד: התוכנה מחזיקה שרת TCP (פורט 8090), תהליך ריסיבר וקובצי גיבוי
 // משותפים — שני מופעים במקביל היו מפצלים את זרם הקליקרים ביניהם בשקט. לחיצה
@@ -417,6 +419,35 @@ function createWindow() {
   });
 }
 
+/**
+ * פותח את חלון "מסך המנחה" — חלון Electron רגיל (לא קיוסק) שטוען את אותה
+ * אפליקציה עם ‎#host, ומציג קונסולת שליטה ויזואלית. אם כבר פתוח — מביא לחזית.
+ * הסנכרון מול המסך הגדול עובר דרך ממסר control:post/control:msg שב-main.
+ */
+function openHostWindow() {
+  if (hostWindow !== null && !hostWindow.isDestroyed()) {
+    if (hostWindow.isMinimized()) hostWindow.restore();
+    hostWindow.focus();
+    return;
+  }
+  hostWindow = new BrowserWindow({
+    width: 1240,
+    height: 840,
+    backgroundColor: '#0b0e1a',
+    autoHideMenuBar: true,
+    title: 'מסך מנחה',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  void hostWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), { hash: 'host' });
+  hostWindow.on('closed', () => {
+    hostWindow = null;
+  });
+}
+
 app.whenReady().then(() => {
   if (!gotSingleInstanceLock) return; // מופע משני — נסגר; לא מרימים כלום
   loadSealedGame(); // משחק מוטבע (EXE סגור) — אם קיים, ייטען אוטומטית ב-renderer
@@ -533,6 +564,19 @@ app.whenReady().then(() => {
   // יציאה מהמשחק (סגירת ה-EXE) — נקרא אחרי אישור המשתמש ב-renderer.
   ipcMain.handle('app:quit', () => {
     app.quit();
+  });
+
+  // מסך המנחה: פתיחת החלון הנפרד + ממסר הודעות שליטה בין החלונות. משדרים רק
+  // לחלונות *האחרים* (בלי הד לשולח) — כך התצוגה ומסך המנחה מדברים בלי לולאות.
+  ipcMain.handle('host:open', () => {
+    openHostWindow();
+  });
+  ipcMain.on('control:post', (e, msg) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w.isDestroyed() && w.webContents.id !== e.sender.id) {
+        w.webContents.send('control:msg', msg);
+      }
+    }
   });
 
   // קיצורי מקלדת גלובליים למפעיל

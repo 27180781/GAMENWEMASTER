@@ -70,6 +70,12 @@ import {
 } from './roster.ts';
 import { selectPlayersToRemove } from './functionPlayers.ts';
 import { hasGroupData } from './groupScore.ts';
+import {
+  openControlChannel,
+  type ControlChannel,
+  type HostCommand,
+  type HostStateSnapshot,
+} from './controlChannel.ts';
 import { GroupConnectScreen } from '../render/GroupConnectScreen.tsx';
 import {
   endGame,
@@ -1194,6 +1200,93 @@ export function GameHost({
     },
     [advance],
   );
+
+  // -------------------------------------------------------------------------
+  // גשר "מסך המנחה": התצוגה (מקור-האמת) מפרסמת תמונת-מצב למסך הנפרד ומבצעת את
+  // הפקודות שמגיעות ממנו. המסך הנפרד עצמו מרונדר מ-main.tsx לפי ‎#host.
+  // -------------------------------------------------------------------------
+  const buildSnapshot = useCallback((): HostStateSnapshot => {
+    const g = engine.getGame();
+    const st = engine.getState();
+    const votes = st.votesBySlide[st.currentSlideId] ?? {};
+    const leaders = Object.entries(st.scores)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([id, score]) => ({ name: nameOfRef.current(id), score }));
+    return {
+      t: 'state',
+      gameId: g.id,
+      gameName: g.name,
+      stage: stageRef.current,
+      phase: st.phase,
+      currentSlideId: st.currentSlideId,
+      currentSlideIndex: st.currentSlideIndex,
+      slides: g.questions.map((q, i) => ({
+        id: q.id,
+        index: i,
+        type: q.type,
+        que: q.question.que,
+        votable: isVotableSlide(q),
+      })),
+      votesTotal: Object.keys(votes).length,
+      connected: connectedIdsRef.current.length,
+      leaders,
+      reveal: { ...revealRef.current },
+    };
+  }, [engine]);
+
+  const onHostControl = useCallback(
+    (msg: HostCommand) => {
+      switch (msg.t) {
+        case 'cmd':
+          if (msg.cmd === 'advance') advanceRef.current();
+          else if (msg.cmd === 'back') goBack();
+          else if (msg.cmd === 'nextSlide') {
+            if (stageRef.current === 'playing') fastNextSlideRef.current();
+          }
+          break;
+        case 'host':
+          runHostCommandRef.current(msg.n);
+          break;
+        case 'goto':
+          if (stageRef.current === 'playing')
+            engine.dispatch({ type: 'GOTO', slideId: msg.slideId, at: Date.now() });
+          break;
+        case 'roster':
+          setRoster(loadRoster(game.id)); // המרשם עודכן במסך המנחה — טעינה מחדש
+          break;
+      }
+    },
+    [engine, goBack, game.id],
+  );
+
+  const buildSnapshotRef = useRef(buildSnapshot);
+  buildSnapshotRef.current = buildSnapshot;
+  const onHostControlRef = useRef(onHostControl);
+  onHostControlRef.current = onHostControl;
+  const controlRef = useRef<ControlChannel | null>(null);
+
+  useEffect(() => {
+    const ch = openControlChannel((msg) => {
+      if (msg.t === 'state') return; // התצוגה מתעלמת מתמונות-מצב (הד/הצד השני)
+      if (msg.t === 'hello') {
+        ch.post(buildSnapshotRef.current());
+        return;
+      }
+      onHostControlRef.current(msg);
+    });
+    controlRef.current = ch;
+    ch.post(buildSnapshotRef.current()); // מצב ראשוני לכל מסך מנחה שכבר פתוח
+    return () => {
+      ch.close();
+      controlRef.current = null;
+    };
+  }, []);
+
+  // פרסום-מחדש בכל שינוי רלוונטי (שלב/שקופית/הצבעות חיות/מרשם/מחוברים).
+  useEffect(() => {
+    controlRef.current?.post(buildSnapshot());
+  }, [stage, state, reveal, connectedIds, roster, buildSnapshot]);
 
   // חיבור ה-ReplayAdapter כמקור הצבעות: סינון שלט המנחה + הקפאה בעצירה
   const hostVoterIdRef = useRef(hostVoterId);

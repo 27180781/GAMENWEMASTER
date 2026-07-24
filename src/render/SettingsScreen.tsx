@@ -10,7 +10,13 @@
 import { useEffect, useState } from 'react';
 import type { GameFile } from '../engine/index.ts';
 import { type AutoTransition, type GameSettings } from '../app/urlParams.ts';
-import { isDesktopClicker, launchReceiver, type SealConfig } from '../app/clickerBridge.ts';
+import {
+  canOpenHostWindow,
+  isDesktopClicker,
+  launchReceiver,
+  openHostWindow,
+  type SealConfig,
+} from '../app/clickerBridge.ts';
 import { MediaCachePanel } from './MediaCachePanel.tsx';
 
 interface SettingsScreenProps {
@@ -151,25 +157,47 @@ export function SettingsScreen({
     'התחילו לשחק!',
   ];
 
+  // קישור/כפתור ל"מסך המנחה" הנפרד: ב-EXE — כפתור שפותח חלון נוסף; באונליין —
+  // קישור שנפתח בטאב חדש (‏?host=1). זמין רק אם יש תשתית לפתיחה.
+  const hostScreenLink = canOpenHostWindow() ? (
+    <button className="settings-host-link" onClick={() => openHostWindow()}>
+      🎛 פתח מסך מנחה (חלון נפרד)
+    </button>
+  ) : (
+    <a
+      className="settings-host-link"
+      href={`${window.location.pathname}?host=1`}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      🎛 פתח מסך מנחה (טאב נפרד)
+    </a>
+  );
+
   // כפתורי הפעולה: במסך פתיחה — "התחל משחק"; באמצע משחק — "התחל מחדש" + "המשך".
-  const actionButtons =
-    mode === 'ingame' ? (
-      <div className="settings-dual-actions">
-        <button
-          className="picker-button demo-start settings-restart"
-          onClick={() => onRestart?.(buildSettings())}
-        >
-          🔄 התחלת המשחק מחדש
-        </button>
+  // מתחתם — קישור למסך המנחה (זמין בכל המצבים).
+  const actionButtons = (
+    <>
+      {mode === 'ingame' ? (
+        <div className="settings-dual-actions">
+          <button
+            className="picker-button demo-start settings-restart"
+            onClick={() => onRestart?.(buildSettings())}
+          >
+            🔄 התחלת המשחק מחדש
+          </button>
+          <button className="picker-button demo-start" onClick={save}>
+            ▶ המשך משחק
+          </button>
+        </div>
+      ) : (
         <button className="picker-button demo-start" onClick={save}>
-          ▶ המשך משחק
+          ▶ התחל משחק
         </button>
-      </div>
-    ) : (
-      <button className="picker-button demo-start" onClick={save}>
-        ▶ התחל משחק
-      </button>
-    );
+      )}
+      {hostScreenLink}
+    </>
+  );
 
   // הטופס המפורט — שתי עמודות (שחקנים והצבעה · מעברים אוטומטיים והתחברות)
   const columns = (
@@ -552,6 +580,7 @@ export function SettingsScreen({
 
             <div className="clicker-intro-advanced">
               {advancedButton}
+              {hostScreenLink}
               {pickAnotherLink}
             </div>
           </div>
