@@ -49,6 +49,10 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
   getLastGame() {
     return ipcRenderer.invoke('game:getLast');
   },
+  /** משחק מוטבע ("סגור") ב-EXE — { bytes, config } או null. */
+  getSealedGame() {
+    return ipcRenderer.invoke('game:sealed');
+  },
   /** מחיקת המשחק האחרון השמור ("טען משחק אחר"). */
   forgetGame() {
     void ipcRenderer.invoke('game:forget');

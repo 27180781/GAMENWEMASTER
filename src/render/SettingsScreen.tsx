@@ -10,7 +10,7 @@
 import { useEffect, useState } from 'react';
 import type { GameFile } from '../engine/index.ts';
 import { type AutoTransition, type GameSettings } from '../app/urlParams.ts';
-import { isDesktopClicker, launchReceiver } from '../app/clickerBridge.ts';
+import { isDesktopClicker, launchReceiver, type SealConfig } from '../app/clickerBridge.ts';
 import { MediaCachePanel } from './MediaCachePanel.tsx';
 
 interface SettingsScreenProps {
@@ -30,6 +30,8 @@ interface SettingsScreenProps {
   offline?: boolean;
   /** EXE בלבד — "טען משחק אחר": שכחת המשחק השמור וחזרה לבורר קובץ ה-ZIP. */
   onPickAnother?: () => void;
+  /** משחק מוטבע ("סגור") ב-EXE — מגביל את מקורות ההצבעה שמותר לבחור. */
+  sealConfig?: SealConfig;
 }
 
 export function SettingsScreen({
@@ -42,6 +44,7 @@ export function SettingsScreen({
   allowDemo = false,
   offline = false,
   onPickAnother,
+  sealConfig,
 }: SettingsScreenProps) {
   // אונליין-דמו (‎?demo=1‎, לא אופליין): הקהל המדומה תמיד פעיל. אופליין: תלוי
   // בהקשר — ב-EXE עם קליקרים (RF317) הקהל כבוי (מקור ההצבעות הוא הקליקרים);
@@ -53,9 +56,11 @@ export function SettingsScreen({
   const clickerMode = offline && isDesktopClicker() && !crowdEnabled;
   // מסך בחירת מצב הפעלה (אופליין/EXE בלבד): "האם הריסיבר מחובר?" — כן ⇒ שלטים,
   // לא ⇒ מצב דמה. באונליין אין ריסיבר, ולכן המסך הזה אינו מוצג כלל.
+  // מסך בחירת מקור ההצבעה מוצג ב-EXE (אופליין) לפני התחלת המשחק.
   const clickerCapable = offline && isDesktopClicker();
-  // טלפונים זמינים כשלמשחק יש קוד חדר (room) — גם ב-EXE סגור עם קוד מוטבע.
-  const phonesCapable = (game.room ?? '') !== '';
+  // אילו כרטיסים להציג — במשחק מוטבע ("סגור") מוגבל לפי כלי החותמת.
+  const canPickClickers = sealConfig?.allowClickers ?? true;
+  const canPickPhones = (game.room ?? '') !== '' && (sealConfig?.allowPhones ?? true);
   const [voterCount, setVoterCount] = useState(initial.voterCount);
   const [intervalMs, setIntervalMs] = useState(initial.intervalMs);
   const [hostVoterId, setHostVoterId] = useState(initial.hostVoterId);
@@ -507,16 +512,18 @@ export function SettingsScreen({
             </p>
 
             <div className="clicker-intro-actions">
-              <button className="clicker-choice clicker-choice--remotes" onClick={startWithClicker}>
-                <span className="clicker-choice-emoji" aria-hidden="true">
-                  📡
-                </span>
-                <span className="clicker-choice-title">שחק עם שלטים</span>
-                <span className="clicker-choice-sub">
-                  נפעיל את תוכנת הקליטה (RF317) ונתחבר לשלטים אוטומטית
-                </span>
-              </button>
-              {phonesCapable && (
+              {canPickClickers && (
+                <button className="clicker-choice clicker-choice--remotes" onClick={startWithClicker}>
+                  <span className="clicker-choice-emoji" aria-hidden="true">
+                    📡
+                  </span>
+                  <span className="clicker-choice-title">שחק עם שלטים</span>
+                  <span className="clicker-choice-sub">
+                    נפעיל את תוכנת הקליטה (RF317) ונתחבר לשלטים אוטומטית
+                  </span>
+                </button>
+              )}
+              {canPickPhones && (
                 <button className="clicker-choice clicker-choice--phones" onClick={startWithPhones}>
                   <span className="clicker-choice-emoji" aria-hidden="true">
                     📱
@@ -525,7 +532,7 @@ export function SettingsScreen({
                   <span className="clicker-choice-sub">השחקנים מצביעים מהטלפון (אונליין)</span>
                 </button>
               )}
-              {phonesCapable && (
+              {canPickClickers && canPickPhones && (
                 <button className="clicker-choice clicker-choice--both" onClick={startWithBoth}>
                   <span className="clicker-choice-emoji" aria-hidden="true">
                     📡📱

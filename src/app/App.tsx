@@ -28,6 +28,8 @@ import {
   rememberGame,
   getLastGame,
   forgetGame,
+  getSealedGame,
+  type SealConfig,
 } from './clickerBridge.ts';
 import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.ts';
 import { decodeInitialMedia } from './mediaDecode.ts';
@@ -128,6 +130,8 @@ export function App() {
   const params = useMemo(() => parseAppParams(window.location.search), []);
   /** האם רצים ב-EXE (אפליקציית שולחן עבודה) — משפיע על מסך הפתיחה וזכירת המשחק. */
   const desktopApp = isDesktopApp();
+  /** הגדרות משחק מוטבע ("סגור") ב-EXE — או null אם ה-EXE גנרי. */
+  const [sealConfig, setSealConfig] = useState<SealConfig | null>(null);
   /** עקיפת כתובת הגיבוי דרך ‎?backupUrl=‎ (לבדיקות מול שרת מקומי), או null. */
   const backupUrlOverride = useMemo(() => {
     const value = new URLSearchParams(window.location.search).get('backupUrl');
@@ -250,12 +254,19 @@ export function App() {
     if (autoLoadTriedRef.current) return;
     autoLoadTriedRef.current = true;
     if (!isDesktopApp() || params.gameUrl !== null) return;
-    void getLastGame().then((last) => {
-      if (last === null || last.bytes.byteLength === 0) return;
-      const b = last.bytes;
-      const buffer = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
-      void loadZipBuffer(buffer);
-    });
+    const toBuffer = (b: Uint8Array) => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+    void (async () => {
+      // עדיפות ראשונה: משחק מוטבע ("סגור") ב-EXE — נטען אוטומטית, לא ניתן להחלפה.
+      const sealed = await getSealedGame();
+      if (sealed !== null && sealed.bytes.byteLength > 0) {
+        setSealConfig(sealed.config);
+        await loadZipBuffer(toBuffer(sealed.bytes), sealed.config);
+        return;
+      }
+      // אחרת: המשחק האחרון שנשמר (זכירה).
+      const last = await getLastGame();
+      if (last !== null && last.bytes.byteLength > 0) await loadZipBuffer(toBuffer(last.bytes));
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- ריצה חד-פעמית בעליית התוכנה
   }, []);
 
@@ -327,9 +338,18 @@ export function App() {
     setError(null);
   };
 
-  const loadZipBuffer = (buffer: ArrayBuffer) =>
+  const loadZipBuffer = (buffer: ArrayBuffer, seal?: SealConfig) =>
     loadGameFromZip(buffer)
-      .then(applyLoadedZip)
+      .then((res) => {
+        // משחק מוטבע ("סגור"): מחילים את ההגדרות שנקבעו בכלי החותמת —
+        // קוד חדר לטלפונים ומגבלת משתתפים.
+        if (seal) {
+          if (seal.room !== undefined && seal.room !== '') res.game.room = seal.room;
+          if (seal.limit !== undefined && seal.limit !== null)
+            res.game.setting.limit.number = seal.limit;
+        }
+        applyLoadedZip(res);
+      })
       .catch((e: unknown) => setError(`טעינת ה-ZIP נכשלה:\n${(e as Error).message}`));
 
   const loadZipFile = (file: File) => {
@@ -517,7 +537,8 @@ export function App() {
           allowDemo={params.demo || offline}
           offline={offline}
           qrAvailable={!offline && (pendingGame.room ?? '') !== ''}
-          {...(desktopApp ? { onPickAnother: () => pickAnotherGame() } : {})}
+          {...(sealConfig !== null ? { sealConfig } : {})}
+          {...(desktopApp && sealConfig === null ? { onPickAnother: () => pickAnotherGame() } : {})}
           onSave={(saved) => {
             persistAndSetSettings(saved);
             // ברירת מחדל — חוסמים עד סיום טעינה (מסך פתיחה + ספירה); עם ההגדרה
