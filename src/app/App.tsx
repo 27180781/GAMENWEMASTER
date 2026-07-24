@@ -22,7 +22,13 @@ import { MediaLoadBar, MediaLoadDot } from '../render/MediaLoadBar.tsx';
 import { StartupOverlay } from '../render/StartupOverlay.tsx';
 import { ErrorScreen } from '../render/ErrorScreen.tsx';
 import { ClickerDiagnostic } from '../render/ClickerDiagnostic.tsx';
-import { isDesktopClicker, isDesktopApp } from './clickerBridge.ts';
+import {
+  isDesktopClicker,
+  isDesktopApp,
+  rememberGame,
+  getLastGame,
+  forgetGame,
+} from './clickerBridge.ts';
 import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.ts';
 import { decodeInitialMedia } from './mediaDecode.ts';
 import { openPushChannel } from './pushChannel.ts';
@@ -120,6 +126,8 @@ function MediaIssuesAlert({ issues, onClose }: { issues: MediaIssue[]; onClose: 
 export function App() {
   const hash = useHash();
   const params = useMemo(() => parseAppParams(window.location.search), []);
+  /** האם רצים ב-EXE (אפליקציית שולחן עבודה) — משפיע על מסך הפתיחה וזכירת המשחק. */
+  const desktopApp = isDesktopApp();
   /** עקיפת כתובת הגיבוי דרך ‎?backupUrl=‎ (לבדיקות מול שרת מקומי), או null. */
   const backupUrlOverride = useMemo(() => {
     const value = new URLSearchParams(window.location.search).get('backupUrl');
@@ -235,6 +243,22 @@ export function App() {
     };
   }, [params]);
 
+  // טעינה אוטומטית של המשחק האחרון (EXE בלבד): בפתיחה מחדש של התוכנה, אם נשמר
+  // משחק אחרון — טוענים אותו ישר למסך ההגדרות, כך שאפשר מיד "התחל משחק".
+  const autoLoadTriedRef = useRef(false);
+  useEffect(() => {
+    if (autoLoadTriedRef.current) return;
+    autoLoadTriedRef.current = true;
+    if (!isDesktopApp() || params.gameUrl !== null) return;
+    void getLastGame().then((last) => {
+      if (last === null || last.bytes.byteLength === 0) return;
+      const b = last.bytes;
+      const buffer = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+      void loadZipBuffer(buffer);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ריצה חד-פעמית בעליית התוכנה
+  }, []);
+
   // בדיקת מדיה למשחק אונליין — מזהה קישורים שבורים (אופליין נבדק ב-zipLoader)
   useEffect(() => {
     if (pendingGame === null || offline) return;
@@ -266,6 +290,70 @@ export function App() {
     zipRevokeRef.current = null;
   }, []);
   useEffect(() => revokeZip, [revokeZip]);
+
+  // --- טעינת קבצי משחק (מוגדרות מוקדם כדי שיהיו זמינות גם בענפי-החזרה למעלה) ---
+  const loadRaw = (raw: unknown) => {
+    try {
+      revokeZip(); // עוזבים אופליין (אם היה) — משחררים את ה-Blob URLs שלו
+      setOffline(false); // בחירת fixture / העלאת JSON — משחק אונליין
+      setMediaIssues([]);
+      setMediaAlertDismissed(false);
+      const { game, dropped } = parseGameFileLenient(raw);
+      if (dropped.length > 0) setLoadNotice({ game, dropped });
+      else setPendingGame(game);
+      setError(null);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  // החלת משחק אופליין שנטען מ-ZIP (משותף לבחירת קובץ ולטעינה-אוטומטית מהזיכרון).
+  const applyLoadedZip = ({
+    game,
+    missing,
+    revoke,
+    dropped,
+  }: Awaited<ReturnType<typeof loadGameFromZip>>) => {
+    zipRevokeRef.current?.(); // שחרור משחק אופליין קודם (אם נטען אחד)
+    zipRevokeRef.current = revoke;
+    setOffline(true); // ZIP — משחק אופליין
+    // אופליין: ב-EXE עם קליקרים (RF317) — הקליקרים הם מקור ההצבעות, לכן קהל
+    // הדמה כבוי כברירת מחדל. בדפדפן רגיל (בלי קליקרים) — מדליקים קהל דמה.
+    setSettings((prev) => ({ ...prev, crowdEnabled: !isDesktopClicker() }));
+    setMediaIssues(missing); // נכסים חסרים בתיקיית ה-ZIP
+    setMediaAlertDismissed(false);
+    if (dropped.length > 0) setLoadNotice({ game, dropped });
+    else setPendingGame(game);
+    setError(null);
+  };
+
+  const loadZipBuffer = (buffer: ArrayBuffer) =>
+    loadGameFromZip(buffer)
+      .then(applyLoadedZip)
+      .catch((e: unknown) => setError(`טעינת ה-ZIP נכשלה:\n${(e as Error).message}`));
+
+  const loadZipFile = (file: File) => {
+    file
+      .arrayBuffer()
+      .then((buffer) => {
+        // ב-EXE — זוכרים את המשחק האחרון (בייטים + שם) לטעינה אוטומטית בהמשך.
+        rememberGame(file.name, new Uint8Array(buffer));
+        return loadZipBuffer(buffer);
+      })
+      .catch((e: unknown) => setError(`קריאת הקובץ נכשלה: ${(e as Error).message}`));
+  };
+
+  // "טען משחק אחר" (EXE) — שכחת המשחק השמור וחזרה לבורר קובץ ה-ZIP.
+  const pickAnotherGame = () => {
+    forgetGame();
+    zipRevokeRef.current?.();
+    zipRevokeRef.current = null;
+    setOffline(false);
+    setGame(null);
+    setPendingGame(null);
+    setLoadNotice(null);
+    setError(null);
+  };
 
   /** החלת קובץ משחק מעודכן: רענון חם באמצע משחק, או עדכון התצוגה לפני התחלה. */
   const applyGame = useCallback((loaded: GameFile) => {
@@ -429,6 +517,7 @@ export function App() {
           allowDemo={params.demo || offline}
           offline={offline}
           qrAvailable={!offline && (pendingGame.room ?? '') !== ''}
+          {...(desktopApp ? { onPickAnother: () => pickAnotherGame() } : {})}
           onSave={(saved) => {
             persistAndSetSettings(saved);
             // ברירת מחדל — חוסמים עד סיום טעינה (מסך פתיחה + ספירה); עם ההגדרה
@@ -497,44 +586,8 @@ export function App() {
     );
   }
 
-  const loadRaw = (raw: unknown) => {
-    try {
-      revokeZip(); // עוזבים אופליין (אם היה) — משחררים את ה-Blob URLs שלו
-      setOffline(false); // בחירת fixture / העלאת JSON — משחק אונליין
-      setMediaIssues([]);
-      setMediaAlertDismissed(false);
-      const { game, dropped } = parseGameFileLenient(raw);
-      if (dropped.length > 0) setLoadNotice({ game, dropped });
-      else setPendingGame(game);
-      setError(null);
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  };
-
-  const loadZipFile = (file: File) => {
-    file
-      .arrayBuffer()
-      .then((buffer) => loadGameFromZip(buffer))
-      .then(({ game, missing, revoke, dropped }) => {
-        zipRevokeRef.current?.(); // שחרור משחק אופליין קודם (אם נטען אחד)
-        zipRevokeRef.current = revoke;
-        setOffline(true); // ZIP — משחק אופליין
-        // אופליין: ב-EXE עם קליקרים (RF317) — הקליקרים הם מקור ההצבעות, לכן קהל
-        // הדמה כבוי כברירת מחדל. בדפדפן רגיל (בלי קליקרים) — מדליקים קהל דמה.
-        setSettings((prev) => ({ ...prev, crowdEnabled: !isDesktopClicker() }));
-        setMediaIssues(missing); // נכסים חסרים בתיקיית ה-ZIP
-        setMediaAlertDismissed(false);
-        if (dropped.length > 0) setLoadNotice({ game, dropped });
-        else setPendingGame(game);
-        setError(null);
-      })
-      .catch((e: unknown) => setError(`טעינת ה-ZIP נכשלה:\n${(e as Error).message}`));
-  };
-
   // מסך פתיחה. ב-EXE (אופליין) — רק טעינת ZIP, מעוצב כמו מסכי האונליין; משחקי
   // הדוגמה וטעינת ה-JSON שייכים לפיתוח/אונליין ואינם מוצגים ב-EXE.
-  const desktopApp = isDesktopApp();
   const zipInput = (
     <input
       type="file"

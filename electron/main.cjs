@@ -9,6 +9,7 @@
 
 const { app, BrowserWindow, globalShortcut, ipcMain } = require('electron');
 const path = require('node:path');
+const fs = require('node:fs');
 const { spawn } = require('node:child_process');
 const { createClickerServer, DEFAULT_PORT } = require('./clickerServer.cjs');
 
@@ -132,6 +133,61 @@ function stopReceiver() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// זכירת המשחק האחרון: שומרים את בייטי ה-ZIP האחרון שנטען ב-userData, כדי
+// שבפתיחה הבאה של ה-EXE המשחק כבר יהיה טעון (בלי לבחור קובץ שוב). שמירת
+// הבייטים עצמם (ולא נתיב) — עמיד גם אם קובץ המקור הוזז/נמחק.
+// ---------------------------------------------------------------------------
+/** נתיב קובץ ה-ZIP השמור של המשחק האחרון. */
+function lastGameZipPath() {
+  return path.join(app.getPath('userData'), 'last-game.zip');
+}
+/** נתיב קובץ המטא (שם המשחק) של המשחק האחרון. */
+function lastGameMetaPath() {
+  return path.join(app.getPath('userData'), 'last-game.json');
+}
+
+/** שמירת המשחק האחרון (בייטי ZIP + שם) לטעינה אוטומטית בפתיחה הבאה. */
+function rememberLastGame(name, bytes) {
+  try {
+    fs.writeFileSync(lastGameZipPath(), Buffer.from(bytes));
+    fs.writeFileSync(lastGameMetaPath(), JSON.stringify({ name: String(name ?? ''), savedAt: Date.now() }));
+  } catch (err) {
+    console.error('[game] שמירת המשחק האחרון נכשלה:', /** @type {Error} */ (err).message);
+  }
+}
+
+/** שליפת המשחק האחרון שנשמר, או null אם אין. מחזיר בייטים + שם. */
+function getLastGame() {
+  try {
+    const zip = lastGameZipPath();
+    if (!fs.existsSync(zip)) return null;
+    const bytes = fs.readFileSync(zip);
+    let name = '';
+    try {
+      name = String(JSON.parse(fs.readFileSync(lastGameMetaPath(), 'utf8')).name ?? '');
+    } catch {
+      /* מטא חסר — שם ריק */
+    }
+    // מחזירים Uint8Array (עובר דרך contextBridge/structured-clone).
+    return { name, bytes: new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength) };
+  } catch (err) {
+    console.error('[game] שליפת המשחק האחרון נכשלה:', /** @type {Error} */ (err).message);
+    return null;
+  }
+}
+
+/** מחיקת המשחק האחרון השמור ("טען משחק אחר"). */
+function forgetLastGame() {
+  for (const p of [lastGameZipPath(), lastGameMetaPath()]) {
+    try {
+      if (fs.existsSync(p)) fs.unlinkSync(p);
+    } catch {
+      /* התעלמות */
+    }
+  }
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -166,6 +222,14 @@ app.whenReady().then(() => {
   // בקשה להקפיץ את חלון הקליטה לחזית (להגדרת טווח שלטים / לחיצת Connect).
   ipcMain.handle('rf317:show', () => {
     showReceiver();
+  });
+  // זכירת המשחק האחרון (בייטי ZIP + שם) + שליפה/מחיקה.
+  ipcMain.handle('game:remember', (_e, name, bytes) => {
+    rememberLastGame(name, bytes);
+  });
+  ipcMain.handle('game:getLast', () => getLastGame());
+  ipcMain.handle('game:forget', () => {
+    forgetLastGame();
   });
 
   // קיצורי מקלדת גלובליים למפעיל

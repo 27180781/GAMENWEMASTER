@@ -2129,6 +2129,22 @@ body {
   white-space: pre-wrap;
 }
 
+/* "טען משחק אחר" — קישור משני עדין במסך הפתיחה של המשחק השמור */
+.settings-pick-another {
+  background: transparent;
+  border: none;
+  color: inherit;
+  opacity: 0.62;
+  font-size: 19px;
+  font-weight: 600;
+  padding: 8px 16px;
+  margin-top: 6px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.settings-pick-another:hover { opacity: 1; }
+
 /* חלון קופץ (מודאל) של ההגדרות המתקדמות — גלילה פנימית בלבד */
 .settings-modal-overlay {
   position: absolute;

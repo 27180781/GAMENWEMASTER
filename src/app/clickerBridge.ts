@@ -34,6 +34,12 @@ interface TriviaDesktop {
   launchReceiver?: () => void;
   /** הקפצת חלון הריסיבר לחזית — להגדרת טווח שלטים / לחיצת Connect. */
   showReceiver?: () => void;
+  /** זכירת המשחק האחרון (בייטי ZIP + שם) לטעינה אוטומטית בפתיחה הבאה. */
+  rememberGame?: (name: string, bytes: Uint8Array) => void;
+  /** שליפת המשחק האחרון שנשמר — { name, bytes } או null. */
+  getLastGame?: () => Promise<{ name: string; bytes: Uint8Array } | null>;
+  /** מחיקת המשחק האחרון השמור ("טען משחק אחר"). */
+  forgetGame?: () => void;
 }
 
 function desktop(): TriviaDesktop | undefined {
@@ -86,4 +92,25 @@ export function showReceiver(): void {
 /** האם קיים גשר קליטה שיודע להקפיץ את חלון הריסיבר (EXE עם תמיכה). */
 export function canShowReceiver(): boolean {
   return typeof desktop()?.showReceiver === 'function';
+}
+
+/** זכירת המשחק האחרון (בייטי ZIP + שם) לטעינה אוטומטית בפתיחה הבאה. no-op בדפדפן. */
+export function rememberGame(name: string, bytes: Uint8Array): void {
+  desktop()?.rememberGame?.(name, bytes);
+}
+
+/** שליפת המשחק האחרון שנשמר (EXE) — { name, bytes } או null. */
+export async function getLastGame(): Promise<{ name: string; bytes: Uint8Array } | null> {
+  const fn = desktop()?.getLastGame;
+  if (typeof fn !== 'function') return null;
+  try {
+    return await fn();
+  } catch {
+    return null;
+  }
+}
+
+/** מחיקת המשחק האחרון השמור (EXE) — "טען משחק אחר". no-op בדפדפן. */
+export function forgetGame(): void {
+  desktop()?.forgetGame?.();
 }
