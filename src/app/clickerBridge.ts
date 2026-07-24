@@ -46,6 +46,10 @@ interface TriviaDesktop {
   backupLoad?: (id: string) => Promise<string | null>;
   /** מחיקת גיבוי אופליין לפי מזהה. */
   backupClear?: (id: string) => void;
+  /** שמירת קובץ תוצאות (אקסל) לדיסק; מחזיר את הנתיב המלא או null. */
+  saveReport?: (name: string, bytes: Uint8Array) => Promise<string | null>;
+  /** פתיחת תיקיית התוצאות בסייר הקבצים. */
+  openReports?: () => void;
 }
 
 function desktop(): TriviaDesktop | undefined {
@@ -151,4 +155,25 @@ export async function desktopBackupLoad(id: string): Promise<string | null> {
 /** מחיקת גיבוי אופליין לפי מזהה משחק. */
 export function desktopBackupClear(id: string): void {
   desktop()?.backupClear?.(id);
+}
+
+/** האם קיים גשר שיודע לשמור קבצי תוצאות לדיסק (EXE). */
+export function canSaveReport(): boolean {
+  return typeof desktop()?.saveReport === 'function';
+}
+
+/** שמירת קובץ תוצאות (אקסל) לדיסק; מחזיר את הנתיב המלא או null. */
+export async function desktopSaveReport(name: string, bytes: Uint8Array): Promise<string | null> {
+  const fn = desktop()?.saveReport;
+  if (typeof fn !== 'function') return null;
+  try {
+    return await fn(name, bytes);
+  } catch {
+    return null;
+  }
+}
+
+/** פתיחת תיקיית התוצאות בסייר הקבצים (EXE). */
+export function desktopOpenReports(): void {
+  desktop()?.openReports?.();
 }

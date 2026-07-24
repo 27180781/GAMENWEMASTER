@@ -16,6 +16,8 @@ interface OperatorMenuProps {
   hostVoterId?: string;
   /** מצב קליקרים (EXE): הקפצת חלון תוכנת הקליטה לחזית — הגדרת טווח / Connect. */
   onShowReceiver?: () => void;
+  /** אופליין (EXE): פתיחת תיקיית קבצי התוצאות (אקסל). */
+  onOpenReports?: () => void;
   onEndGame: () => void;
   onClose: () => void;
 }
@@ -29,6 +31,7 @@ export function OperatorMenu({
   onSyntheticCrowdChange,
   hostVoterId = '',
   onShowReceiver,
+  onOpenReports,
   onEndGame,
   onClose,
 }: OperatorMenuProps) {
@@ -54,6 +57,11 @@ export function OperatorMenu({
           {onShowReceiver && (
             <button className="operator-clicker-btn" onClick={onShowReceiver}>
               🎛️ חלון קליטת שלטים (טווח / Connect)
+            </button>
+          )}
+          {onOpenReports && (
+            <button className="operator-clicker-btn" onClick={onOpenReports}>
+              📊 פתח תיקיית תוצאות (אקסל)
             </button>
           )}
           <label>
