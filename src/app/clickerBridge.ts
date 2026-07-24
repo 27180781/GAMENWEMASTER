@@ -48,6 +48,8 @@ interface TriviaDesktop {
   launchReceiver?: () => void;
   /** הקפצת חלון הריסיבר לחזית — להגדרת טווח שלטים / לחיצת Connect. */
   showReceiver?: () => void;
+  /** סגירת תוכנת הריסיבר — במעבר לדמה/טלפונים (אין בה צורך). */
+  stopReceiver?: () => void;
   /** זכירת המשחק האחרון (בייטי ZIP + שם) לטעינה אוטומטית בפתיחה הבאה. */
   rememberGame?: (name: string, bytes: Uint8Array) => void;
   /** שליפת המשחק האחרון שנשמר — { name, bytes } או null. */
@@ -120,6 +122,11 @@ export function showReceiver(): void {
 /** האם קיים גשר קליטה שיודע להקפיץ את חלון הריסיבר (EXE עם תמיכה). */
 export function canShowReceiver(): boolean {
   return typeof desktop()?.showReceiver === 'function';
+}
+
+/** סגירת תוכנת הריסיבר (EXE) — במעבר לדמה/טלפונים. no-op בדפדפן. */
+export function desktopStopReceiver(): void {
+  desktop()?.stopReceiver?.();
 }
 
 /** זכירת המשחק האחרון (בייטי ZIP + שם) לטעינה אוטומטית בפתיחה הבאה. no-op בדפדפן. */

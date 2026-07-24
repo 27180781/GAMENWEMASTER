@@ -322,6 +322,10 @@ app.whenReady().then(() => {
   ipcMain.handle('rf317:show', () => {
     showReceiver();
   });
+  // סגירת תוכנת הקליטה — במעבר לדמה/טלפונים אין בה צורך והחלון רק מפריע.
+  ipcMain.handle('rf317:stop', () => {
+    stopReceiver();
+  });
   // זכירת המשחק האחרון (בייטי ZIP + שם) + שליפה/מחיקה.
   ipcMain.handle('game:remember', (_e, name, bytes) => {
     rememberLastGame(name, bytes);
