@@ -52,7 +52,8 @@ export type HostCommand =
   | { t: 'host'; n: number } // runHostCommand(n) — 0..6
   | { t: 'goto'; slideId: number }
   | { t: 'roster' } // המרשם (localStorage) עודכן במסך המנחה — לטעון מחדש
-  | { t: 'setGame'; game: GameFile }; // עריכה חיה — החלת משחק מעודכן (hot-swap)
+  | { t: 'setGame'; game: GameFile } // עריכה חיה — החלת משחק מעודכן (hot-swap)
+  | { t: 'connect'; categoryId: string | null }; // מסך התחברות לקבוצות בתצוגה (null = סגירה)
 
 export type ControlMessage = HostStateSnapshot | HostGameMessage | HostCommand;
 

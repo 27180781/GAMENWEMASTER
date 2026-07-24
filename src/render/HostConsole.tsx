@@ -68,6 +68,8 @@ export function HostConsole() {
   const [editGame, setEditGame] = useState<GameFile | null>(null);
   const [view, setView] = useState<'control' | 'roster' | 'edit'>('control');
   const [showGuide, setShowGuide] = useState(false);
+  /** מסך התחברות לקבוצות פתוח בתצוגה (נפתח מכאן) — לחיווי + כפתור סגירה. */
+  const [connectOpen, setConnectOpen] = useState(false);
   const [roster, setRosterState] = useState<RosterData>({ players: [], categories: [], memberships: {} });
   const chRef = useRef<ControlChannel | null>(null);
   const gameIdRef = useRef<string>('');
@@ -171,7 +173,39 @@ export function HostConsole() {
       )}
 
       {view === 'roster' && (
-        <RosterPanel roster={roster} onChange={updateRoster} onClose={() => setView('control')} onOpenConnect={() => {}} />
+        <>
+          {connectOpen && (
+            <div className="hc-connect-banner">
+              מסך ההתחברות לקבוצות מוצג עכשיו על המסך הגדול
+              <button
+                className="hc-connect-close"
+                onClick={() => {
+                  post({ t: 'connect', categoryId: null });
+                  setConnectOpen(false);
+                }}
+              >
+                ✕ סגור אותו
+              </button>
+            </div>
+          )}
+          <RosterPanel
+            roster={roster}
+            onChange={updateRoster}
+            onClose={() => {
+              setView('control');
+              if (connectOpen) {
+                post({ t: 'connect', categoryId: null });
+                setConnectOpen(false);
+              }
+            }}
+            onOpenConnect={(categoryId) => {
+              // פותח את מסך ההתחברות על המסך הגדול (התצוגה) — השחקנים מקישים
+              // את מספר הקבוצה; סוגרים מהבאנר כאן או מה-✕ שבתצוגה.
+              post({ t: 'connect', categoryId });
+              setConnectOpen(true);
+            }}
+          />
+        </>
       )}
 
       {view === 'edit' &&
@@ -238,7 +272,7 @@ export function HostConsole() {
                   <li key={`${l.name}-${i}`} className="hc-leader">
                     <span className="hc-leader-rank">{i + 1}</span>
                     <span className="hc-leader-name">{l.name}</span>
-                    <span className="hc-leader-score">{l.score}</span>
+                    <span className="hc-leader-score">{Math.round(l.score)}</span>
                   </li>
                 ))}
               </ol>

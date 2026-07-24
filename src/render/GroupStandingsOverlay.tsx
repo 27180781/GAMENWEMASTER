@@ -79,14 +79,14 @@ export function GroupStandingsOverlay({
                   <span className="gs-score-lbl">ממוצע</span>
                 </div>
                 <div className="gs-meta">
-                  {st.memberCount} משתתפים · {st.totalScore} נק׳ סה״כ
+                  {st.memberCount} משתתפים · {Math.round(st.totalScore)} נק׳ סה״כ
                 </div>
                 <ul className="gs-leaders">
                   {leaders.map((m, j) => (
                     <li key={m.id} className="gs-leader">
                       <span className="gs-leader-rank">{j + 1}</span>
                       <span className="gs-leader-name">{nameOf(m.id)}</span>
-                      <span className="gs-leader-score">{m.score}</span>
+                      <span className="gs-leader-score">{Math.round(m.score)}</span>
                     </li>
                   ))}
                   {leaders.length === 0 && <li className="gs-leader gs-leader--empty">—</li>}
