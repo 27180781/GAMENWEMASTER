@@ -93,4 +93,18 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
   mediaClear(/** @type {string=} */ cacheKey) {
     return ipcRenderer.invoke('media:clear', cacheKey);
   },
+  /** פתיחת חלון "מסך המנחה" הנפרד. */
+  openHostWindow() {
+    void ipcRenderer.invoke('host:open');
+  },
+  /** שליחת הודעת שליטה לחלונות האחרים (ממסר דרך main). */
+  controlPost(/** @type {unknown} */ msg) {
+    ipcRenderer.send('control:post', msg);
+  },
+  /** מנוי להודעות שליטה מחלונות אחרים. מחזיר פונקציית ביטול-מנוי. */
+  onControl(/** @type {(msg: unknown) => void} */ cb) {
+    const listener = (/** @type {unknown} */ _e, /** @type {unknown} */ msg) => cb(msg);
+    ipcRenderer.on('control:msg', listener);
+    return () => ipcRenderer.removeListener('control:msg', listener);
+  },
 });
