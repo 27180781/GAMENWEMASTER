@@ -46,6 +46,7 @@ import type { RailPlayer, RevealState } from '../render/QuestionSlide.tsx';
 import { RosterPanel } from '../render/RosterPanel.tsx';
 import { SlideView } from '../render/SlideView.tsx';
 import { VotesBreakdown } from '../render/VotesBreakdown.tsx';
+import { GroupStandingsOverlay } from '../render/GroupStandingsOverlay.tsx';
 import { HostCommandBar } from '../render/HostCommandBar.tsx';
 import { ClickerDiagnostic } from '../render/ClickerDiagnostic.tsx';
 import { Stage } from '../render/Stage.tsx';
@@ -68,6 +69,7 @@ import {
   type RosterData,
 } from './roster.ts';
 import { selectPlayersToRemove } from './functionPlayers.ts';
+import { hasGroupData } from './groupScore.ts';
 import { GroupConnectScreen } from '../render/GroupConnectScreen.tsx';
 import {
   endGame,
@@ -313,6 +315,12 @@ export function GameHost({
   leadersOverlayRef.current = leadersOverlay;
   /** פירוט הצבעות השחקנים (פקודת מנחה 5, בשלב חשיפת התשובה). */
   const [votesOverlay, setVotesOverlay] = useState(false);
+  /** מסך דירוג קבוצות (פקודת מנחה 4, בשלב חשיפת התשובה). */
+  const [groupsOverlay, setGroupsOverlay] = useState(false);
+  const groupsOverlayRef = useRef(false);
+  groupsOverlayRef.current = groupsOverlay;
+  /** איזה סוג קבוצות (קטגוריה) מוצג במסך הקבוצות — מקש 5 מחליף (מודולו). */
+  const [groupsCatIndex, setGroupsCatIndex] = useState(0);
   /** מספר השאלות שהושלמו כשהוצגה לאחרונה טבלת המובילים האוטומטית — למניעת כפילות. */
   const autoLeadersShownAtRef = useRef(0);
   /** כמה מקומות פודיום כבר נחשפו במסך המנצחים (חשיפה אחד-אחד מהאחרון לראשון). */
@@ -1087,6 +1095,11 @@ export function GameHost({
       setLeadersOverlay(false);
       return;
     }
+    // מסך דירוג הקבוצות (מקש 4) פתוח — רווח סוגר אותו וממשיך, במקום לקדם.
+    if (groupsOverlayRef.current) {
+      setGroupsOverlay(false);
+      return;
+    }
     const stage = stageRef.current;
     if (stage === 'opening') setStage('playing');
     else if (stage === 'playing') advanceStep();
@@ -1135,14 +1148,23 @@ export function GameHost({
           break;
         }
         case 4:
-          adjustTimer(10);
+          // בשלב חשיפת התשובה (results) עם נתוני קבוצות — פותח/סוגר את מסך דירוג
+          // הקבוצות; אחרת (בזמן טיימר ההצבעה) נשאר קיצור להוספת 10 שניות.
+          if (engine.getState().phase === 'results' && hasGroupData(rosterRef.current)) {
+            setGroupsOverlay((open) => !open);
+          } else {
+            adjustTimer(10);
+          }
           break;
         case 5:
-          // בשלב חשיפת התשובה (results) — פותח/סוגר את פירוט הצבעות השחקנים;
-          // אחרת (בזמן טיימר) נשאר קיצור להורדת 10 שניות.
-          if (engine.getState().phase === 'results' && isVotableSlide(engine.getCurrentSlide())) {
+          if (groupsOverlayRef.current) {
+            // מסך הקבוצות פתוח — מקש 5 מעביר בין סוגי הקבוצות (קטגוריות).
+            setGroupsCatIndex((i) => i + 1);
+          } else if (engine.getState().phase === 'results' && isVotableSlide(engine.getCurrentSlide())) {
+            // בשלב חשיפת התשובה — פותח/סוגר את פירוט הצבעות השחקנים.
             setVotesOverlay((open) => !open);
           } else {
+            // בזמן טיימר — קיצור להורדת 10 שניות.
             adjustTimer(-10);
           }
           break;
@@ -1371,7 +1393,13 @@ export function GameHost({
   // שמות) — המשחק "נעצר": המעברים האוטומטיים לא מתקדמים והטיימר קופא, וממשיכים
   // מאותה נקודה בדיוק כשהיא נסגרת. כך לא "מפסידים שאלה" כשמוצג מסך אחר.
   const overlayActive =
-    leadersOverlay || votesOverlay || connectCategory !== null || settingsOpen || rosterOpen || menuOpen;
+    leadersOverlay ||
+    votesOverlay ||
+    groupsOverlay ||
+    connectCategory !== null ||
+    settingsOpen ||
+    rosterOpen ||
+    menuOpen;
 
   // הקפאת/הפשרת טיימר ההצבעה בזמן שכבה חוסמת. מכבדים עצירה ידנית (מקש 6): מפשירים
   // רק אם *אנחנו* הקפאנו בגלל השכבה, לא אם המנחה עצר בעצמו.
@@ -1510,10 +1538,13 @@ export function GameHost({
     return () => audio.stop('winnersList');
   }, [leadersOverlay, audio, sounds]);
 
-  // פירוט ההצבעות (פקודה 5) רלוונטי רק בשלב חשיפת התשובה — נסגר אוטומטית
-  // כשעוזבים את שלב ה-results או עוברים שקופית.
+  // פירוט ההצבעות (פקודה 5) ומסך הקבוצות (פקודה 4) רלוונטיים רק בשלב חשיפת
+  // התשובה — נסגרים אוטומטית כשעוזבים את שלב ה-results או עוברים שקופית.
   useEffect(() => {
-    if (state.phase !== 'results') setVotesOverlay(false);
+    if (state.phase !== 'results') {
+      setVotesOverlay(false);
+      setGroupsOverlay(false);
+    }
   }, [state.phase, state.currentSlideId]);
 
   // טבלת מובילים אוטומטית (setting.showWinnersListAfter) — פעם בכל N שאלות
@@ -1710,6 +1741,7 @@ export function GameHost({
               answersShown: reveal.answersShown,
               revealCorrect: reveal.revealCorrect,
               hasNextSlide: state.currentSlideIndex + 1 < engine.getGame().questions.length,
+              hasGroups: hasGroupData(roster),
             }).map((h) => (
               <span key={h.key} className="host-hint">
                 <b className="host-hint-key">{h.key}</b>
@@ -1733,6 +1765,7 @@ export function GameHost({
               answersShown: reveal.answersShown,
               revealCorrect: reveal.revealCorrect,
               hasNextSlide: state.currentSlideIndex + 1 < engine.getGame().questions.length,
+              hasGroups: hasGroupData(roster),
             })}
             onRun={runHintKey}
           />
@@ -1807,6 +1840,18 @@ export function GameHost({
             nameOf={nameOf}
             ansIsNumber={setting.ansIsNumber}
             onClose={() => setVotesOverlay(false)}
+          />
+        )}
+
+        {/* דירוג הקבוצות (פקודת מנחה 4) — קבוצה מובילה + מובילים בכל קבוצה; מקש 5 מחליף סוג */}
+        {stage === 'playing' && groupsOverlay && (
+          <GroupStandingsOverlay
+            roster={roster}
+            scores={state.scores}
+            answerTimes={state.answerTimes}
+            nameOf={nameOf}
+            categoryIndex={groupsCatIndex}
+            onClose={() => setGroupsOverlay(false)}
           />
         )}
 

@@ -11,7 +11,14 @@ import {
   EMPTY_ROSTER,
   type RosterData,
 } from '../src/app/roster.ts';
-import { avgResponseMs, groupStandings, hasGroupData, type AnswerTimes } from '../src/app/groupScore.ts';
+import {
+  avgResponseMs,
+  groupCategories,
+  groupMembers,
+  groupStandings,
+  hasGroupData,
+  type AnswerTimes,
+} from '../src/app/groupScore.ts';
 
 function twoGroupRoster(): RosterData {
   let r = addCategory(EMPTY_ROSTER, 'עיר', 'cat1');
@@ -70,5 +77,40 @@ describe('ניקוד קבוצתי לפי ממוצע', () => {
     expect(hasGroupData(r)).toBe(false); // יש קבוצה אבל אין שיוכים
     r = assignGroupByNumber(r, '1', 'cat1', 1);
     expect(hasGroupData(r)).toBe(true);
+  });
+
+  it('groupMembers: חברי הקבוצה ממוינים לפי ניקוד (המובילים ראשונים)', () => {
+    const r = twoGroupRoster();
+    const scores = { a: 3, b: 8, c: 5, d: 5, e: 1, f: 9 };
+    // הקבוצה הגדולה (g2): c,d,e,f — לפי ניקוד: f(9),c(5),d(5),e(1)
+    const members = groupMembers(r, 'cat1', 'g2', scores, {});
+    expect(members.map((m) => m.id)).toEqual(['f', 'c', 'd', 'e']);
+    expect(members[0]).toMatchObject({ id: 'f', score: 9 });
+    // הקטנה (g1): b(8) לפני a(3)
+    expect(groupMembers(r, 'cat1', 'g1', scores, {}).map((m) => m.id)).toEqual(['b', 'a']);
+  });
+
+  it('groupMembers: שובר-שוויון לפי מהירות כשהניקוד זהה', () => {
+    const r = twoGroupRoster();
+    const scores = { c: 5, d: 5, e: 5, f: 5 };
+    const times: AnswerTimes = {
+      c: { totalMs: 3000, count: 1 },
+      d: { totalMs: 1000, count: 1 }, // המהיר ביותר
+      e: { totalMs: 2000, count: 1 },
+      // f לא ענה → Infinity → אחרון
+    };
+    expect(groupMembers(r, 'cat1', 'g2', scores, times).map((m) => m.id)).toEqual([
+      'd',
+      'e',
+      'c',
+      'f',
+    ]);
+  });
+
+  it('groupCategories: רק קטגוריות שיש בהן קבוצות', () => {
+    let r = addCategory(EMPTY_ROSTER, 'עם קבוצות', 'c1');
+    r = addGroup(r, 'c1', 'א', 'g1');
+    r = addCategory(r, 'ריקה', 'c2'); // בלי קבוצות
+    expect(groupCategories(r).map((c) => c.id)).toEqual(['c1']);
   });
 });
