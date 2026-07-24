@@ -33,6 +33,7 @@ import { RosterPanel } from '../render/RosterPanel.tsx';
 import { SlideView } from '../render/SlideView.tsx';
 import { VotesBreakdown } from '../render/VotesBreakdown.tsx';
 import { HostCommandBar } from '../render/HostCommandBar.tsx';
+import { ClickerDiagnostic } from '../render/ClickerDiagnostic.tsx';
 import { Stage } from '../render/Stage.tsx';
 import { themeStyle } from '../render/theme.ts';
 import type { TimerView } from '../render/TimerRing.tsx';
@@ -1865,6 +1866,7 @@ export function GameHost({
             ]}
           />
         )}
+        <ClickerDiagnostic />
       </Stage>
     </div>
   );

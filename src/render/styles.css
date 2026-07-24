@@ -2321,6 +2321,46 @@ body {
 .host-cmd-icon { font-size: 18px; line-height: 1; }
 .host-cmd-label { white-space: nowrap; }
 
+/* ---- חיווי קליקרי RF317 (EXE) ---- */
+.clicker-badge {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 90;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(120, 30, 30, 0.82);
+  color: #ffd7d7;
+  border: 1.5px solid rgba(248, 113, 113, 0.6);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 17px;
+  font-weight: 700;
+}
+.clicker-badge--on {
+  background: rgba(20, 90, 45, 0.82);
+  color: #d6ffe4;
+  border-color: rgba(52, 211, 153, 0.6);
+}
+.clicker-toast {
+  position: fixed;
+  top: 52px;
+  left: 12px;
+  z-index: 90;
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  border-radius: 12px;
+  padding: 8px 16px;
+  font-size: 20px;
+  animation: clicker-pop 0.15s ease;
+}
+.clicker-toast b { color: var(--secondary-color, #ffd23f); }
+@keyframes clicker-pop {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .demo-badge {
   position: absolute;
   bottom: 14px;
