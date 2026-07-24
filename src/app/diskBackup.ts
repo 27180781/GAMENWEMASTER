@@ -6,9 +6,19 @@
  */
 
 import type { BackupData, BackupPayload } from './backup.ts';
+import type { GameFile } from '../engine/index.ts';
 import { canDiskBackup, desktopBackupSave, desktopBackupLoad } from './clickerBridge.ts';
 
 export { canDiskBackup };
+
+/**
+ * מפתח הגיבוי בדיסק: מזהה + שם המשחק. קבצי אופליין מגיעים לעיתים בלי id
+ * (הסכמה מתירה זאת) — מפתח לפי id בלבד היה גורם לכל המשחקים חסרי-ה-id לחלוק
+ * גיבוי אחד, ומציע למשחק אחד את המצב השמור של אחר. השם מבדל ביניהם.
+ */
+export function diskBackupKey(game: Pick<GameFile, 'id' | 'name'>): string {
+  return `${game.id}::${game.name}`;
+}
 
 /** שמירת מצב המשחק לדיסק (completed=true נועל את הגיבוי בסיום המשחק). */
 export async function saveDiskBackup(

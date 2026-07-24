@@ -76,7 +76,7 @@ import {
   type BackupData,
 } from './backup.ts';
 import { backupToSnapshot, buildBackupPayload, rosterFromBackup } from './backupState.ts';
-import { canDiskBackup, loadDiskBackup, saveDiskBackup } from './diskBackup.ts';
+import { canDiskBackup, diskBackupKey, loadDiskBackup, saveDiskBackup } from './diskBackup.ts';
 import { downloadGameReport, buildGameReportBytes, reportFilename } from './gameReport.ts';
 import { buildFunctionPayload, sendFunctionApi } from './functionApi.ts';
 import { useConnectionHealth } from './useConnectionHealth.ts';
@@ -92,13 +92,17 @@ type HostStage = 'opening' | 'playing' | 'winners' | 'scoreboard';
 
 const NO_REVEAL: RevealState = { questionShown: false, answersShown: 0, revealCorrect: false };
 
-/** טקסט חיווי חיבור למקור הצבעות (ריסיבר/טלפונים) לפי הסטטוס. */
+/**
+ * טקסט חיווי חיבור למקור הצבעות (ריסיבר/טלפונים) לפי הסטטוס. בלי subject —
+ * הנוסח המקורי של הסוקט ("מתחבר מחדש…"), כדי שהאונליין יישאר זהה מילה-במילה.
+ */
 function connStatusText(
   status: 'connected' | 'reconnecting' | 'offline',
-  subject: string,
+  subject = '',
 ): string {
-  const word = status === 'connected' ? 'מחובר' : status === 'reconnecting' ? 'מתחבר…' : 'מנותק';
-  return `${subject} ${word}`;
+  const word =
+    status === 'connected' ? 'מחובר' : status === 'reconnecting' ? 'מתחבר מחדש…' : 'מנותק';
+  return subject === '' ? word : `${subject} ${word}`;
 }
 
 /** מספר המצטרפים המרבי שמוצג במסילה בכל רגע. */
@@ -435,11 +439,15 @@ export function GameHost({
       [...removedRef.current], // הסרות משתתפים שורדות קריסה/רענון
     );
     if (backupCfg !== null) await saveBackup(backupCfg, engine.getGame().id, payload);
-    else await saveDiskBackup(engine.getGame().id, payload, false); // אופליין → דיסק
+    else await saveDiskBackup(diskBackupKey(engine.getGame()), payload, false); // אופליין → דיסק
     debugLog('game', 'גיבוי נשמר', { phase: payload.meta.phase, currentQueId: payload.meta.currentQueId });
   }, [backupCfg, diskBackup, engine, nameOf]);
   const saveBackupNowRef = useRef(saveBackupNow);
   saveBackupNowRef.current = saveBackupNow;
+
+  // מפתח גיבוי הדיסק — מחרוזת יציבה (id+שם), נגזרת מחוץ לאפקט כדי שהבדיקה לא
+  // תרוץ מחדש על כל רענון-תוכן של אותו משחק (זהות האובייקט משתנה, המפתח לא).
+  const diskKey = diskBackupKey(game);
 
   // טעינה: בדיקת גיבוי חי קיים למשחק (התאוששות מקריסה/רענון). getBackup מנצל
   // prefetch שכבר רץ במסך ההגדרות — כך שהתוצאה זמינה מיד עם הכניסה למשחק.
@@ -447,7 +455,7 @@ export function GameHost({
     if (backupCfg === null && !diskBackup) return;
     let cancelled = false;
     setBackupChecking(true);
-    const check = backupCfg !== null ? getBackup(backupCfg, game.id) : loadDiskBackup(game.id);
+    const check = backupCfg !== null ? getBackup(backupCfg, game.id) : loadDiskBackup(diskKey);
     void check
       .then((data) => {
         if (cancelled || data === null) return;
@@ -462,7 +470,7 @@ export function GameHost({
     return () => {
       cancelled = true;
     };
-  }, [backupCfg, diskBackup, game.id]);
+  }, [backupCfg, diskBackup, game.id, diskKey]);
 
   /** שחזור מגיבוי: הניקוד והמיקום למנוע, ומרשם מגיבוי אם אין מקומי. */
   const resumeFromBackup = useCallback(
@@ -535,7 +543,7 @@ export function GameHost({
             startedAtRef.current,
             [...removedRef.current],
           );
-          await saveDiskBackup(engine.getGame().id, payload, true);
+          await saveDiskBackup(diskBackupKey(engine.getGame()), payload, true);
         }
         debugLog('game', 'המשחק הסתיים — הגיבוי ננעל והועבר לתוצאות');
       } catch (err) {
@@ -1882,7 +1890,7 @@ export function GameHost({
             </span>
             <span
               className="vote-source"
-              title={`טלפונים · חדר ${roomId} · ${connStatusText(effSocketStatus, 'החיבור')}`}
+              title={`טלפונים · חדר ${roomId} · ${connStatusText(effSocketStatus)}`}
             >
               <i className={`status-dot status-dot--${effSocketStatus}`} />
               📱 טלפונים
@@ -1897,7 +1905,7 @@ export function GameHost({
                 : useClicker
                   ? `קליקרים (RF317) · ${connStatusText(voteStatus, 'הריסיבר')}`
                   : useSocket
-                    ? `שרת הצבעות · חדר ${roomId} · ${connStatusText(voteStatus, 'החיבור')}`
+                    ? `שרת הצבעות · חדר ${roomId} · ${connStatusText(voteStatus)}`
                     : 'אין מקור הצבעות (אין קוד חדר במשחק)'
             }
           />
@@ -2021,7 +2029,9 @@ export function GameHost({
             ]}
           />
         )}
-        <ClickerDiagnostic />
+        {/* חיווי הריסיבר — רק כשהשלטים הם מקור הצבעות; במצב טלפונים/דמה ב-EXE
+            תג "ממתין לריסיבר" היה מטעה. */}
+        {useClicker && <ClickerDiagnostic />}
       </Stage>
     </div>
   );

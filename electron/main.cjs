@@ -10,12 +10,28 @@
 const { app, BrowserWindow, globalShortcut, ipcMain, shell } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
-const { spawn } = require('node:child_process');
+const crypto = require('node:crypto');
+const { spawn, spawnSync } = require('node:child_process');
 const { createClickerServer, DEFAULT_PORT } = require('./clickerServer.cjs');
 const { readSealedFromFile } = require('./sealPayload.cjs');
 
 /** @type {BrowserWindow | null} */
 let mainWindow = null;
+
+// מופע יחיד: התוכנה מחזיקה שרת TCP (פורט 8090), תהליך ריסיבר וקובצי גיבוי
+// משותפים — שני מופעים במקביל היו מפצלים את זרם הקליקרים ביניהם בשקט. לחיצה
+// כפולה על ה-EXE (נפוץ כשהחילוץ איטי) רק מקפיצה את החלון של המופע הקיים.
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow !== null && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}
 /** @type {import('node:net').Server | null} */
 let clickerServer = null;
 /** @type {import('node:child_process').ChildProcess | null} */
@@ -87,6 +103,14 @@ function launchReceiver() {
   if (receiverStarted && receiverProc !== null && receiverProc.exitCode === null) return; // כבר רצה
   const base = receiverDir();
   const exe = path.join(base, RECEIVER_EXE);
+  // ניקוי עותק יתום מריצה קודמת שקרסה (המשחק נסגר בלי will-quit): בלי זה היו
+  // נוצרים שני ריסיברים במקביל — שני לקוחות על הסוקט ואירועים כפולים. ההרג
+  // סינכרוני-קצר כדי שלא ירוץ במקביל ל-spawn ויהרוג את העותק החדש.
+  try {
+    spawnSync('taskkill', ['/IM', RECEIVER_EXE, '/F', '/T'], { windowsHide: true, stdio: 'ignore', timeout: 3000 });
+  } catch {
+    /* אין עותק קודם — זה המצב הרגיל */
+  }
   try {
     receiverProc = spawn(exe, [], { cwd: base, stdio: 'ignore', windowsHide: false });
     receiverProc.on('error', (err) => {
@@ -132,10 +156,12 @@ function showReceiver() {
   ].join('\n');
   const encoded = Buffer.from(script, 'utf16le').toString('base64');
   try {
-    spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded], {
+    const ps = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded], {
       windowsHide: true,
       stdio: 'ignore',
     });
+    // בלי מאזין, שגיאת spawn אסינכרונית (ENOENT) הייתה מפילה את תהליך ה-main.
+    ps.on('error', (err) => console.error('[RF317] הצגת חלון הקליטה נכשלה:', err.message));
   } catch (err) {
     console.error('[RF317] הצגת חלון הקליטה נכשלה:', /** @type {Error} */ (err).message);
   }
@@ -147,7 +173,10 @@ function stopReceiver() {
   receiverProc = null;
   if (process.platform !== 'win32') return;
   try {
-    spawn('taskkill', ['/IM', RECEIVER_EXE, '/F', '/T'], { windowsHide: true, stdio: 'ignore' });
+    const tk = spawn('taskkill', ['/IM', RECEIVER_EXE, '/F', '/T'], { windowsHide: true, stdio: 'ignore' });
+    tk.on('error', () => {
+      /* taskkill לא זמין — אין מה לעשות */
+    });
   } catch {
     /* התהליך כבר נסגר */
   }
@@ -189,8 +218,9 @@ function getLastGame() {
     } catch {
       /* מטא חסר — שם ריק */
     }
-    // מחזירים Uint8Array (עובר דרך contextBridge/structured-clone).
-    return { name, bytes: new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength) };
+    // עותק מלא (לא view) — Buffer קטן עשוי לשבת ב-pool המשותף של Node, ו-view
+    // היה משדר ב-structured-clone את כל ה-ArrayBuffer שמתחתיו (כולל בייטים זרים).
+    return { name, bytes: new Uint8Array(bytes) };
   } catch (err) {
     console.error('[game] שליפת המשחק האחרון נכשלה:', /** @type {Error} */ (err).message);
     return null;
@@ -223,9 +253,16 @@ function backupsDir() {
   }
   return dir;
 }
-/** מזהה בטוח לשם קובץ (בלי תווים בעייתיים). */
+/**
+ * מזהה בטוח לשם קובץ. הסינון משאיר רק ASCII בטוח — ולכן מזהים בעברית (או
+ * ריקים) היו מתמפים לאותו שם קובץ ומתנגשים: גיבוי של משחק אחד היה מוצע
+ * למשחק אחר. לכן מוסיפים hash קצר של המזהה הגולמי — ייחודי לכל מזהה.
+ */
 function safeGameId(id) {
-  return String(id ?? '').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120) || 'game';
+  const raw = String(id ?? '');
+  const base = raw.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 100) || 'game';
+  const hash = crypto.createHash('sha256').update(raw, 'utf8').digest('hex').slice(0, 10);
+  return `${base}-${hash}`;
 }
 /** נתיב קובץ הגיבוי של משחק מסוים. */
 function backupPath(id) {
@@ -273,6 +310,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  if (!gotSingleInstanceLock) return; // מופע משני — נסגר; לא מרימים כלום
   loadSealedGame(); // משחק מוטבע (EXE סגור) — אם קיים, ייטען אוטומטית ב-renderer
   createWindow();
   startClickerServer(); // שרת קליקרי RF317 (מקומי, פורט 8090)
