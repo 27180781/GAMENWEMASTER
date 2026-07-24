@@ -33,4 +33,8 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
     clientSubs.add(cb);
     return () => clientSubs.delete(cb);
   },
+  /** הפעלת תוכנת הקליטה RF317SocketForm המצורפת (בבחירת "שחק עם שלטים"). */
+  launchReceiver() {
+    void ipcRenderer.invoke('rf317:launch');
+  },
 });
