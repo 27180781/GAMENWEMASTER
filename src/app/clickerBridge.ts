@@ -32,6 +32,8 @@ interface TriviaDesktop {
   onReceiver?: (cb: (info: ReceiverClient) => void) => () => void;
   /** הפעלת תוכנת הריסיבר (RF317SocketForm) שמצורפת ל-EXE — מתחברת לשרת המקומי. */
   launchReceiver?: () => void;
+  /** הקפצת חלון הריסיבר לחזית — להגדרת טווח שלטים / לחיצת Connect. */
+  showReceiver?: () => void;
 }
 
 function desktop(): TriviaDesktop | undefined {
@@ -66,4 +68,17 @@ export function onReceiverClient(cb: (info: ReceiverClient) => void): () => void
  */
 export function launchReceiver(): void {
   desktop()?.launchReceiver?.();
+}
+
+/**
+ * הקפצת חלון תוכנת הקליטה לחזית (משחזר ממוזער) — כדי להגדיר טווח שלטים
+ * (Min/Max Remote ID) וללחוץ Connect. no-op אם אין גשר או פעולה כזו.
+ */
+export function showReceiver(): void {
+  desktop()?.showReceiver?.();
+}
+
+/** האם קיים גשר קליטה שיודע להקפיץ את חלון הריסיבר (EXE עם תמיכה). */
+export function canShowReceiver(): boolean {
+  return typeof desktop()?.showReceiver === 'function';
 }

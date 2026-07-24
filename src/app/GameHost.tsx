@@ -26,7 +26,7 @@ import {
 } from '../engine/index.ts';
 import { SocketVoteAdapter, isLiveVoteAdapter, type RawVote } from './socketAdapter.ts';
 import { ClickerVoteAdapter } from './clickerAdapter.ts';
-import { isDesktopClicker } from './clickerBridge.ts';
+import { isDesktopClicker, showReceiver, canShowReceiver } from './clickerBridge.ts';
 import { avatarColor, railInitial } from '../render/avatar.ts';
 import { AllScoresScreen, LobbyScreen, WinnersListScreen, WinnersScreen } from '../render/screens.tsx';
 import { OperatorMenu } from '../render/OperatorMenu.tsx';
@@ -1854,6 +1854,9 @@ export function GameHost({
             syntheticCrowd={syntheticCrowd}
             onSyntheticCrowdChange={(on) => onSettingsChange({ ...settings, crowdEnabled: on })}
             hostVoterId={hostVoterId}
+            {...(useClicker && canShowReceiver()
+              ? { onShowReceiver: () => showReceiver() }
+              : {})}
             onEndGame={() => {
               setLeadersOverlay(false);
               setStage('winners');

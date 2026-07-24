@@ -42,46 +42,94 @@ function startClickerServer() {
   });
 }
 
+/** שם קובץ ההרצה של תוכנת הקליטה — לזיהוי/סגירה/הבאה-לחזית לפי שם התהליך. */
+const RECEIVER_EXE = 'RF317SocketForm.exe';
+/** האם כבר הפעלנו את תוכנת הקליטה בהרצה הנוכחית (מונע הפעלה כפולה). */
+let receiverStarted = false;
+
+/** נתיב תיקיית תוכנת הקליטה — בחבילה resources/receiver, בפיתוח electron/receiver. */
+function receiverDir() {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'receiver')
+    : path.join(__dirname, 'receiver');
+}
+
 /**
- * הפעלת תוכנת הקליטה RF317SocketForm המצורפת (resources/receiver). זו תוכנת
- * Windows (.NET) שמתחברת כלקוח לשרת המקומי (פורט 8090) ומזרימה את לחיצות
- * השלטים. נקראת מה-renderer בבחירת "שחק עם שלטים". no-op מחוץ ל-Windows,
- * ואם כבר רצה — לא מפעילים שוב.
+ * הפעלת תוכנת הקליטה RF317SocketForm המצורפת. זו תוכנת Windows (.NET) שמתחברת
+ * כלקוח לשרת המקומי (פורט 8090) ומזרימה את לחיצות השלטים. מופעלת **ממוזערת**
+ * (‏start /min) כדי שלא תכסה את המסך הגדול באירוע — ואפשר להקפיץ אותה לחזית
+ * דרך showReceiver כשצריך להגדיר טווח שלטים או ללחוץ Connect. no-op מחוץ
+ * ל-Windows, ואם כבר הופעלה — לא מפעילים שוב.
  */
 function launchReceiver() {
   if (process.platform !== 'win32') return; // התוכנה היא Windows בלבד
-  if (receiverProc !== null && receiverProc.exitCode === null) return; // כבר רצה
-  // בחבילה — resources/receiver; בפיתוח — electron/receiver לצד הקוד.
-  const base = app.isPackaged
-    ? path.join(process.resourcesPath, 'receiver')
-    : path.join(__dirname, 'receiver');
-  const exe = path.join(base, 'RF317SocketForm.exe');
+  if (receiverStarted) return; // כבר הופעלה בהרצה הזו
+  const base = receiverDir();
+  const exe = path.join(base, RECEIVER_EXE);
   try {
-    receiverProc = spawn(exe, [], { cwd: base, stdio: 'ignore', windowsHide: false });
+    // start "" /min /d <dir> "<exe>" — פותח את התוכנה ממוזערת, עם תיקיית עבודה
+    // נכונה כדי שתמצא את ה-DLL (gsp-api.dll וכו').
+    receiverProc = spawn('cmd.exe', ['/c', `start "" /min /d "${base}" "${exe}"`], {
+      cwd: base,
+      stdio: 'ignore',
+      windowsHide: true,
+    });
     receiverProc.on('error', (err) => {
       console.error('[RF317] הפעלת תוכנת הקליטה נכשלה:', err.message);
-      receiverProc = null;
+      receiverStarted = false;
     });
-    receiverProc.on('exit', () => {
-      receiverProc = null;
-    });
-    console.log('[RF317] תוכנת הקליטה הופעלה:', exe);
+    receiverStarted = true;
+    console.log('[RF317] תוכנת הקליטה הופעלה (ממוזערת):', exe);
   } catch (err) {
     console.error('[RF317] הפעלת תוכנת הקליטה נכשלה:', /** @type {Error} */ (err).message);
-    receiverProc = null;
+    receiverStarted = false;
   }
 }
 
-/** סוגר את תוכנת הקליטה אם היא רצה (ביציאה מהמשחק). */
-function stopReceiver() {
-  if (receiverProc !== null && receiverProc.exitCode === null) {
-    try {
-      receiverProc.kill();
-    } catch {
-      /* התהליך כבר נסגר */
-    }
+/**
+ * מקפיץ את חלון תוכנת הקליטה לחזית (משחזר ממוזער) — כדי להגדיר טווח שלטים
+ * (Min/Max Remote ID) וללחוץ Connect. משתמש ב-user32 דרך PowerShell מקודד
+ * (‏EncodedCommand — UTF-16LE base64) כדי להימנע מבעיות מרכאות/ציטוט.
+ */
+function showReceiver() {
+  if (process.platform !== 'win32') return;
+  const script = [
+    'Add-Type @"',
+    'using System;',
+    'using System.Runtime.InteropServices;',
+    'public static class WinR {',
+    '  [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr h, int c);',
+    '  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);',
+    '}',
+    '"@',
+    "Get-Process RF317SocketForm -ErrorAction SilentlyContinue | ForEach-Object {",
+    '  if ($_.MainWindowHandle -ne 0) {',
+    '    [WinR]::ShowWindowAsync($_.MainWindowHandle, 9) | Out-Null;', // 9 = SW_RESTORE
+    '    [WinR]::SetForegroundWindow($_.MainWindowHandle) | Out-Null;',
+    '  }',
+    '}',
+  ].join('\n');
+  const encoded = Buffer.from(script, 'utf16le').toString('base64');
+  try {
+    spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded], {
+      windowsHide: true,
+      stdio: 'ignore',
+    });
+  } catch (err) {
+    console.error('[RF317] הצגת חלון הקליטה נכשלה:', /** @type {Error} */ (err).message);
   }
+}
+
+/** סוגר את תוכנת הקליטה אם היא רצה (ביציאה מהמשחק) — לפי שם התהליך. */
+function stopReceiver() {
+  receiverStarted = false;
   receiverProc = null;
+  if (process.platform !== 'win32') return;
+  try {
+    spawn('taskkill', ['/IM', RECEIVER_EXE, '/F', '/T'], { windowsHide: true, stdio: 'ignore' });
+  } catch {
+    /* התהליך כבר נסגר */
+  }
 }
 
 function createWindow() {
@@ -114,6 +162,10 @@ app.whenReady().then(() => {
   // בקשת הפעלה של תוכנת הקליטה מה-renderer (בחירת "שחק עם שלטים").
   ipcMain.handle('rf317:launch', () => {
     launchReceiver();
+  });
+  // בקשה להקפיץ את חלון הקליטה לחזית (להגדרת טווח שלטים / לחיצת Connect).
+  ipcMain.handle('rf317:show', () => {
+    showReceiver();
   });
 
   // קיצורי מקלדת גלובליים למפעיל
