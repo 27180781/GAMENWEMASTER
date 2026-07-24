@@ -9,11 +9,21 @@ directories:
   output: release
   buildResources: build
 
-# מה נכנס לתוך ה-EXE: הבנייה הסטטית + תהליכי Electron
+# מה נכנס לתוך ה-EXE: הבנייה הסטטית + תהליכי Electron. תיקיית הריסיבר
+# (בינאריים של RF317SocketForm) לא נכנסת ל-asar — היא נארזת כ-extraResources
+# בלתי-דחוסה כדי שאפשר יהיה להריץ את ה-exe עצמו.
 files:
   - dist/**/*
   - electron/**/*
+  - '!electron/receiver/**'
   - package.json
+
+# תוכנת הקליטה RF317SocketForm (עם ה-DLL וקובץ ה-config) נארזת לצד האפליקציה,
+# ב-resources/receiver, ומופעלת אוטומטית בבחירת "שחק עם שלטים". כך הכול חבילה
+# אחת בהתקנה פשוטה — קובץ EXE בודד שכולל גם את תוכנת קליטת השלטים.
+extraResources:
+  - from: electron/receiver
+    to: receiver
 
 win:
   target:

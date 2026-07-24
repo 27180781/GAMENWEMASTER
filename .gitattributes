@@ -1,0 +1,4 @@
+# בינאריים של תוכנת הקליטה RF317 — קבצי בינארי, בלי המרת שורות/דיף
+electron/receiver/*.exe binary
+electron/receiver/*.dll binary
+electron/receiver/*.config -text
