@@ -25,6 +25,20 @@ export interface ReceiverClient {
   who: string | null;
 }
 
+/** הגדרות משחק מוטבע ("סגור") ב-EXE — נקבעות בכלי החותמת בשרת. */
+export interface SealConfig {
+  /** קוד חדר לטלפונים ('' = בלי טלפונים). */
+  room?: string;
+  /** לאפשר שלטים (RF317). */
+  allowClickers: boolean;
+  /** לאפשר טלפונים (סוקט אונליין). */
+  allowPhones: boolean;
+  /** מגבלת משתתפים (null/undefined = כמו ב-JSON של המשחק). */
+  limit?: number | null;
+  /** שם המשחק (מטא). */
+  name?: string;
+}
+
 interface TriviaDesktop {
   isDesktop?: boolean;
   platform?: string;
@@ -38,6 +52,8 @@ interface TriviaDesktop {
   rememberGame?: (name: string, bytes: Uint8Array) => void;
   /** שליפת המשחק האחרון שנשמר — { name, bytes } או null. */
   getLastGame?: () => Promise<{ name: string; bytes: Uint8Array } | null>;
+  /** משחק מוטבע ("סגור") ב-EXE — { bytes, config } או null. */
+  getSealedGame?: () => Promise<{ bytes: Uint8Array; config: SealConfig } | null>;
   /** מחיקת המשחק האחרון השמור ("טען משחק אחר"). */
   forgetGame?: () => void;
   /** גיבוי אופליין לדיסק — שמירת מצב המשחק (JSON) לפי מזהה. */
@@ -125,6 +141,17 @@ export async function getLastGame(): Promise<{ name: string; bytes: Uint8Array }
 /** מחיקת המשחק האחרון השמור (EXE) — "טען משחק אחר". no-op בדפדפן. */
 export function forgetGame(): void {
   desktop()?.forgetGame?.();
+}
+
+/** משחק מוטבע ("סגור") ב-EXE — { bytes, config } או null (בדפדפן/EXE גנרי). */
+export async function getSealedGame(): Promise<{ bytes: Uint8Array; config: SealConfig } | null> {
+  const fn = desktop()?.getSealedGame;
+  if (typeof fn !== 'function') return null;
+  try {
+    return await fn();
+  } catch {
+    return null;
+  }
 }
 
 /** האם קיים גשר עם גיבוי-דיסק (EXE) — לגיבוי אופליין. */

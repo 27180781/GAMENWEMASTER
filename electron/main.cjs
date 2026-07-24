@@ -12,6 +12,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { spawn } = require('node:child_process');
 const { createClickerServer, DEFAULT_PORT } = require('./clickerServer.cjs');
+const { readSealedFromFile } = require('./sealPayload.cjs');
 
 /** @type {BrowserWindow | null} */
 let mainWindow = null;
@@ -19,6 +20,25 @@ let mainWindow = null;
 let clickerServer = null;
 /** @type {import('node:child_process').ChildProcess | null} */
 let receiverProc = null;
+/** @type {{ bytes: Uint8Array, config: object } | null} משחק "סגור" מוטבע ב-EXE. */
+let sealedGame = null;
+
+/**
+ * טוען משחק מוטבע (אם ה-EXE נחתם ב-seal-game): קורא את הקובץ הנייד המקורי
+ * (‏PORTABLE_EXECUTABLE_FILE) ומחלץ ZIP + הגדרות. null אם ה-EXE גנרי.
+ */
+function loadSealedGame() {
+  const file = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath;
+  try {
+    const res = readSealedFromFile(file);
+    if (res !== null) {
+      sealedGame = { bytes: res.gameZip, config: res.config };
+      console.log('[seal] נמצא משחק מוטבע ב-EXE:', res.config && res.config.name ? res.config.name : '(ללא שם)');
+    }
+  } catch (err) {
+    console.error('[seal] קריאת המשחק המוטבע נכשלה:', /** @type {Error} */ (err).message);
+  }
+}
 
 /** שולח הודעה ל-renderer אם החלון קיים וטעון. */
 function sendToRenderer(channel, payload) {
@@ -253,6 +273,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  loadSealedGame(); // משחק מוטבע (EXE סגור) — אם קיים, ייטען אוטומטית ב-renderer
   createWindow();
   startClickerServer(); // שרת קליקרי RF317 (מקומי, פורט 8090)
   // בקשת הפעלה של תוכנת הקליטה מה-renderer (בחירת "שחק עם שלטים").
@@ -268,6 +289,8 @@ app.whenReady().then(() => {
     rememberLastGame(name, bytes);
   });
   ipcMain.handle('game:getLast', () => getLastGame());
+  // משחק מוטבע ("סגור") ב-EXE — { bytes, config } או null.
+  ipcMain.handle('game:sealed', () => sealedGame);
   ipcMain.handle('game:forget', () => {
     forgetLastGame();
   });
