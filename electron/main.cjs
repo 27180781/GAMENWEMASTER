@@ -314,6 +314,10 @@ app.whenReady().then(() => {
   ipcMain.handle('report:open', () => {
     void shell.openPath(reportsDir());
   });
+  // יציאה מהמשחק (סגירת ה-EXE) — נקרא אחרי אישור המשתמש ב-renderer.
+  ipcMain.handle('app:quit', () => {
+    app.quit();
+  });
 
   // קיצורי מקלדת גלובליים למפעיל
   globalShortcut.register('F11', () => {

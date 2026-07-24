@@ -73,4 +73,8 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
   openReports() {
     void ipcRenderer.invoke('report:open');
   },
+  /** יציאה מהמשחק (סגירת ה-EXE) — אחרי אישור המשתמש. */
+  quit() {
+    void ipcRenderer.invoke('app:quit');
+  },
 });

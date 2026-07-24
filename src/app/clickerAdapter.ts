@@ -42,9 +42,11 @@ export class ClickerVoteAdapter implements LiveVoteAdapter {
       else this.statusListener?.('offline'); // disconnected / not_connected
       return;
     }
-    // לחיצת כפתור → הצבעה גולמית
+    // לחיצת כפתור → הצבעה גולמית. כפתור F (השלט-אצבע) מגיע כ-7 ומשמעו 0:
+    // לשחקן — תשובה 0; למנחה — פקודת "הבא" (כמו 0 בטלפון / רווח במקלדת).
     const phone = String(ev.remoteId);
-    const raw: RawVote = { vote: String(ev.button), phone };
+    const button = ev.button === 7 ? 0 : ev.button;
+    const raw: RawVote = { vote: String(button), phone };
     this.joinedListener?.(phone); // הופעה בלובי (השם מהמרשם לפי המזהה)
     this.rawVoteListener?.(raw); // שלט מנחה / לוג אבחון
     if (this.window === null) return; // אין חלון הצבעה פתוח — לא נצבר
