@@ -41,4 +41,16 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
   showReceiver() {
     void ipcRenderer.invoke('rf317:show');
   },
+  /** זכירת המשחק האחרון (בייטי ZIP + שם) לטעינה אוטומטית בפתיחה הבאה. */
+  rememberGame(/** @type {string} */ name, /** @type {Uint8Array} */ bytes) {
+    void ipcRenderer.invoke('game:remember', name, bytes);
+  },
+  /** שליפת המשחק האחרון שנשמר — { name, bytes } או null. */
+  getLastGame() {
+    return ipcRenderer.invoke('game:getLast');
+  },
+  /** מחיקת המשחק האחרון השמור ("טען משחק אחר"). */
+  forgetGame() {
+    void ipcRenderer.invoke('game:forget');
+  },
 });

@@ -28,6 +28,8 @@ interface SettingsScreenProps {
   allowDemo?: boolean;
   /** המשחק נטען כאופליין (ZIP/EXE) — אז לא מציגים את מסך האינטרו "משחק לדוגמא". */
   offline?: boolean;
+  /** EXE בלבד — "טען משחק אחר": שכחת המשחק השמור וחזרה לבורר קובץ ה-ZIP. */
+  onPickAnother?: () => void;
 }
 
 export function SettingsScreen({
@@ -39,6 +41,7 @@ export function SettingsScreen({
   qrAvailable = false,
   allowDemo = false,
   offline = false,
+  onPickAnother,
 }: SettingsScreenProps) {
   // אונליין-דמו (‎?demo=1‎, לא אופליין): הקהל המדומה תמיד פעיל. אופליין: תלוי
   // בהקשר — ב-EXE עם קליקרים (RF317) הקהל כבוי (מקור ההצבעות הוא הקליקרים);
@@ -445,6 +448,14 @@ export function SettingsScreen({
     </button>
   );
 
+  // "טען משחק אחר" (EXE) — מוצג רק במסך הפתיחה, כשיש אפשרות לשכוח את המשחק השמור.
+  const pickAnotherLink =
+    onPickAnother && mode === 'start' ? (
+      <button className="settings-pick-another" onClick={onPickAnother}>
+        📂 טען משחק אחר
+      </button>
+    ) : null;
+
   // חלון קופץ (מודאל) של ההגדרות המתקדמות — גלילה פנימית, בלי גלילת עמוד
   const advancedModal = advancedOpen ? (
     <div className="settings-modal-overlay" onClick={() => setAdvancedOpen(false)}>
@@ -500,7 +511,10 @@ export function SettingsScreen({
               </button>
             </div>
 
-            <div className="clicker-intro-advanced">{advancedButton}</div>
+            <div className="clicker-intro-advanced">
+              {advancedButton}
+              {pickAnotherLink}
+            </div>
           </div>
         </div>
         {advancedModal}
@@ -584,6 +598,7 @@ export function SettingsScreen({
         </p>
         {columns}
         {actionButtons}
+        {pickAnotherLink}
       </div>
     </div>
   );
