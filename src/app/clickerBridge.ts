@@ -50,6 +50,8 @@ interface TriviaDesktop {
   saveReport?: (name: string, bytes: Uint8Array) => Promise<string | null>;
   /** פתיחת תיקיית התוצאות בסייר הקבצים. */
   openReports?: () => void;
+  /** יציאה מהמשחק (סגירת ה-EXE). */
+  quit?: () => void;
 }
 
 function desktop(): TriviaDesktop | undefined {
@@ -176,4 +178,14 @@ export async function desktopSaveReport(name: string, bytes: Uint8Array): Promis
 /** פתיחת תיקיית התוצאות בסייר הקבצים (EXE). */
 export function desktopOpenReports(): void {
   desktop()?.openReports?.();
+}
+
+/** האם ניתן לצאת מהמשחק (EXE — סגירת התוכנה). */
+export function canQuit(): boolean {
+  return typeof desktop()?.quit === 'function';
+}
+
+/** יציאה מהמשחק (סגירת ה-EXE). no-op בדפדפן. */
+export function desktopQuit(): void {
+  desktop()?.quit?.();
 }

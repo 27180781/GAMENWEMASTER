@@ -52,13 +52,15 @@ describe('ClickerVoteAdapter', () => {
     expect(last.slideId).toBe(1);
   });
 
-  it('כפתור F = 0 (ישיר)', async () => {
+  it('כפתור F (מגיע כ-7) ממופה ל-0', async () => {
     const adapter = new ClickerVoteAdapter();
     const raws: { vote: string; phone: string }[] = [];
     adapter.onRawVote((r) => raws.push(r));
     await adapter.connect('');
-    fireKey(0, 7);
+    fireKey(7, 7); // כפתור F של קליקר 7 → תשובה/פקודה 0
+    fireKey(0, 8); // כפתור 0 (אם קיים) נשאר 0
     expect(raws[0]).toEqual({ vote: '0', phone: '7' });
+    expect(raws[1]).toEqual({ vote: '0', phone: '8' });
   });
 
   it('ההצבעה האחרונה של אותו קליקר גוברת בחלון', async () => {

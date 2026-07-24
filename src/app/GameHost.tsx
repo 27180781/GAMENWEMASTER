@@ -33,6 +33,8 @@ import {
   canSaveReport,
   desktopSaveReport,
   desktopOpenReports,
+  canQuit,
+  desktopQuit,
 } from './clickerBridge.ts';
 import { avatarColor, railInitial } from '../render/avatar.ts';
 import { AllScoresScreen, LobbyScreen, WinnersListScreen, WinnersScreen } from '../render/screens.tsx';
@@ -163,6 +165,10 @@ export function GameHost({
 
   const [stage, setStage] = useState<HostStage>('opening');
   const [menuOpen, setMenuOpen] = useState(false);
+  /** אישור יציאה מהמשחק (EXE) — ESC מקפיץ אותו, ובאישור סוגר את התוכנה. */
+  const [exitConfirm, setExitConfirm] = useState(false);
+  /** ב-EXE ניתן לצאת מהמשחק (סגירת התוכנה) — ESC מבקש אישור ואז יוצא. */
+  const canExit = canQuit();
   /** מסך ההגדרות באמצע משחק (כפתור ⚙) — שכבה מעל; מצב המשחק נשמר. */
   const [settingsOpen, setSettingsOpen] = useState(false);
   /** לשונית "שמות וקבוצות" — מרשם השחקנים, נגיש לכל אורך המשחק. */
@@ -1528,12 +1534,16 @@ export function GameHost({
         return;
       }
       if (event.key === 'Escape') {
+        // ESC סוגר קודם שכבות פתוחות; אחרת: ב-EXE — אישור יציאה מהמשחק,
+        // באונליין/דפדפן — פתיחת/סגירת תפריט המפעיל (כמו קודם).
         if (rosterOpen) setRosterOpen(false);
         else if (settingsOpen) setSettingsOpen(false);
-        else setMenuOpen((open) => !open);
+        else if (menuOpen) setMenuOpen(false);
+        else if (canExit) setExitConfirm((open) => !open);
+        else setMenuOpen(true);
         return;
       }
-      if (menuOpen || settingsOpen || rosterOpen) return;
+      if (menuOpen || settingsOpen || rosterOpen || exitConfirm) return;
       if (event.key >= '0' && event.key <= '6') {
         debugLog('command', `שלט: מקש ${event.key}`, { stage });
         // 0/2 מטופלים בתוך advance/goBack לכל שלבי המשחק (כולל מסכי הסיום)
@@ -1581,7 +1591,7 @@ export function GameHost({
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [stage, menuOpen, settingsOpen, rosterOpen, leadersOverlay, connectCategory, engine, advance, goBack, onRequestRefresh]);
+  }, [stage, menuOpen, settingsOpen, rosterOpen, exitConfirm, canExit, leadersOverlay, connectCategory, engine, advance, goBack, onRequestRefresh]);
 
   // מסך מלא — כפתור בפינה (window resize מעדכן את סקייל הבמה אוטומטית)
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
@@ -1905,6 +1915,34 @@ export function GameHost({
             }}
             onClose={() => setMenuOpen(false)}
           />
+        )}
+
+        {/* אישור יציאה מהמשחק (EXE) — ESC מקפיץ, ובאישור סוגר את התוכנה */}
+        {exitConfirm && (
+          <div className="license-modal">
+            <div className="license-modal-box">
+              <div className="license-modal-icon">🚪</div>
+              <h2>יציאה מהמשחק</h2>
+              <p>האם ברצונך לצאת מהמשחק ולסגור את התוכנה?</p>
+              <div className="resume-actions">
+                <button onClick={() => desktopQuit()}>🚪 צא מהמשחק</button>
+                <button className="resume-new" onClick={() => setExitConfirm(false)}>
+                  ביטול
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* כפתור תפריט המפעיל (EXE) — כי ESC משמש ליציאה; עדין בפינה */}
+        {canExit && !menuOpen && !exitConfirm && (
+          <button
+            className="operator-menu-fab"
+            title="תפריט מפעיל"
+            onClick={() => setMenuOpen(true)}
+          >
+            ☰
+          </button>
         )}
 
         {debugOpen && (
