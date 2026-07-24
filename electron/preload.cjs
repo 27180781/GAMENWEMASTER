@@ -37,4 +37,8 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
   launchReceiver() {
     void ipcRenderer.invoke('rf317:launch');
   },
+  /** הקפצת חלון הקליטה לחזית — להגדרת טווח שלטים / לחיצת Connect. */
+  showReceiver() {
+    void ipcRenderer.invoke('rf317:show');
+  },
 });

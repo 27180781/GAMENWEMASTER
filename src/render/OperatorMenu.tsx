@@ -14,6 +14,8 @@ interface OperatorMenuProps {
   syntheticCrowd: boolean;
   onSyntheticCrowdChange: (on: boolean) => void;
   hostVoterId?: string;
+  /** מצב קליקרים (EXE): הקפצת חלון תוכנת הקליטה לחזית — הגדרת טווח / Connect. */
+  onShowReceiver?: () => void;
   onEndGame: () => void;
   onClose: () => void;
 }
@@ -26,6 +28,7 @@ export function OperatorMenu({
   syntheticCrowd,
   onSyntheticCrowdChange,
   hostVoterId = '',
+  onShowReceiver,
   onEndGame,
   onClose,
 }: OperatorMenuProps) {
@@ -48,6 +51,11 @@ export function OperatorMenu({
           </button>
           <button onClick={() => engine.dispatch({ type: 'BACK', at: Date.now() })}>שקופית קודמת</button>
           <button onClick={onEndGame}>סיום משחק ומעבר לזוכים</button>
+          {onShowReceiver && (
+            <button className="operator-clicker-btn" onClick={onShowReceiver}>
+              🎛️ חלון קליטת שלטים (טווח / Connect)
+            </button>
+          )}
           <label>
             ווליום:{' '}
             <input
