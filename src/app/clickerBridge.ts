@@ -40,6 +40,12 @@ interface TriviaDesktop {
   getLastGame?: () => Promise<{ name: string; bytes: Uint8Array } | null>;
   /** מחיקת המשחק האחרון השמור ("טען משחק אחר"). */
   forgetGame?: () => void;
+  /** גיבוי אופליין לדיסק — שמירת מצב המשחק (JSON) לפי מזהה. */
+  backupSave?: (id: string, json: string) => Promise<boolean>;
+  /** שליפת גיבוי אופליין (JSON) לפי מזהה, או null. */
+  backupLoad?: (id: string) => Promise<string | null>;
+  /** מחיקת גיבוי אופליין לפי מזהה. */
+  backupClear?: (id: string) => void;
 }
 
 function desktop(): TriviaDesktop | undefined {
@@ -113,4 +119,36 @@ export async function getLastGame(): Promise<{ name: string; bytes: Uint8Array }
 /** מחיקת המשחק האחרון השמור (EXE) — "טען משחק אחר". no-op בדפדפן. */
 export function forgetGame(): void {
   desktop()?.forgetGame?.();
+}
+
+/** האם קיים גשר עם גיבוי-דיסק (EXE) — לגיבוי אופליין. */
+export function canDiskBackup(): boolean {
+  return typeof desktop()?.backupSave === 'function';
+}
+
+/** שמירת גיבוי אופליין (JSON) לפי מזהה משחק. מחזיר האם הצליח. */
+export async function desktopBackupSave(id: string, json: string): Promise<boolean> {
+  const fn = desktop()?.backupSave;
+  if (typeof fn !== 'function') return false;
+  try {
+    return await fn(id, json);
+  } catch {
+    return false;
+  }
+}
+
+/** שליפת גיבוי אופליין (JSON) לפי מזהה משחק, או null. */
+export async function desktopBackupLoad(id: string): Promise<string | null> {
+  const fn = desktop()?.backupLoad;
+  if (typeof fn !== 'function') return null;
+  try {
+    return await fn(id);
+  } catch {
+    return null;
+  }
+}
+
+/** מחיקת גיבוי אופליין לפי מזהה משחק. */
+export function desktopBackupClear(id: string): void {
+  desktop()?.backupClear?.(id);
 }

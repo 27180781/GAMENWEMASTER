@@ -66,6 +66,7 @@ import {
   type BackupData,
 } from './backup.ts';
 import { backupToSnapshot, buildBackupPayload, rosterFromBackup } from './backupState.ts';
+import { canDiskBackup, loadDiskBackup, saveDiskBackup } from './diskBackup.ts';
 import { downloadGameReport } from './gameReport.ts';
 import { buildFunctionPayload, sendFunctionApi } from './functionApi.ts';
 import { useConnectionHealth } from './useConnectionHealth.ts';
@@ -377,6 +378,9 @@ export function GameHost({
       }),
     [offline, backupUrlOverride, hasRoom, syntheticCrowd, game.id],
   );
+  // גיבוי אופליין לדיסק (EXE): כשאין גיבוי אונליין (backupCfg) אבל רצים ב-EXE
+  // אופליין — שומרים את מצב המשחק לדיסק המקומי. כך גם באופליין שום נתון לא אובד.
+  const diskBackup = offline && canDiskBackup();
 
   /** גיבוי חי שנמצא בטעינה — מציג חלונית "להמשיך מאותה נקודה?". */
   const [resumePrompt, setResumePrompt] = useState<BackupData | null>(null);
@@ -389,7 +393,7 @@ export function GameHost({
 
   /** בונה ושומר את מצב המשחק הנוכחי לגיבוי (זורק כדי שהקורא יידע אם הצליח). */
   const saveBackupNow = useCallback(async () => {
-    if (backupCfg === null) return;
+    if (backupCfg === null && !diskBackup) return;
     const payload = buildBackupPayload(
       engine.getGame(),
       engine.getState(),
@@ -398,19 +402,21 @@ export function GameHost({
       startedAtRef.current,
       [...removedRef.current], // הסרות משתתפים שורדות קריסה/רענון
     );
-    await saveBackup(backupCfg, engine.getGame().id, payload);
+    if (backupCfg !== null) await saveBackup(backupCfg, engine.getGame().id, payload);
+    else await saveDiskBackup(engine.getGame().id, payload, false); // אופליין → דיסק
     debugLog('game', 'גיבוי נשמר', { phase: payload.meta.phase, currentQueId: payload.meta.currentQueId });
-  }, [backupCfg, engine, nameOf]);
+  }, [backupCfg, diskBackup, engine, nameOf]);
   const saveBackupNowRef = useRef(saveBackupNow);
   saveBackupNowRef.current = saveBackupNow;
 
   // טעינה: בדיקת גיבוי חי קיים למשחק (התאוששות מקריסה/רענון). getBackup מנצל
   // prefetch שכבר רץ במסך ההגדרות — כך שהתוצאה זמינה מיד עם הכניסה למשחק.
   useEffect(() => {
-    if (backupCfg === null) return;
+    if (backupCfg === null && !diskBackup) return;
     let cancelled = false;
     setBackupChecking(true);
-    void getBackup(backupCfg, game.id)
+    const check = backupCfg !== null ? getBackup(backupCfg, game.id) : loadDiskBackup(game.id);
+    void check
       .then((data) => {
         if (cancelled || data === null) return;
         // משחק שכבר הסתיים (game-over) — לא מציעים המשך; מתחילים חדש.
@@ -424,7 +430,7 @@ export function GameHost({
     return () => {
       cancelled = true;
     };
-  }, [backupCfg, game.id]);
+  }, [backupCfg, diskBackup, game.id]);
 
   /** שחזור מגיבוי: הניקוד והמיקום למנוע, ומרשם מגיבוי אם אין מקומי. */
   const resumeFromBackup = useCallback(
@@ -460,7 +466,7 @@ export function GameHost({
 
   // שמירה אוטומטית מדורגת (debounce ~1.5s) בשינויים משמעותיים במצב המשחק
   useEffect(() => {
-    if (backupCfg === null || resumePrompt !== null) return;
+    if ((backupCfg === null && !diskBackup) || resumePrompt !== null) return;
     // אחרי game-over הגיבוי ננעל — שמירה נוספת (completed:false) הייתה "פותחת"
     // אותו מחדש בשרת וגורמת להצעת המשך במשחק שכבר הסתיים. לכן לא שומרים יותר.
     if (gameEndedRef.current) return;
@@ -472,25 +478,39 @@ export function GameHost({
     return () => {
       if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
     };
-  }, [backupCfg, resumePrompt, stage, state.scores, state.phase, state.currentSlideId, state.votesBySlide, state.slidesCompleted]);
+  }, [backupCfg, diskBackup, resumePrompt, stage, state.scores, state.phase, state.currentSlideId, state.votesBySlide, state.slidesCompleted]);
 
   // סיום משחק: הגענו למסך המנצחים באמת (לא תצוגה מקדימה של W) → שמירה אחרונה
   // ואז נעילת הגיבוי והעברתו לתוצאות.
   useEffect(() => {
-    if (backupCfg === null || stage !== 'winners' || winnersPreviewRef.current !== null) return;
+    if ((backupCfg === null && !diskBackup) || stage !== 'winners' || winnersPreviewRef.current !== null)
+      return;
     if (gameEndedRef.current) return;
     gameEndedRef.current = true;
     void (async () => {
       try {
         if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
         await saveBackupNowRef.current(); // מוודאים שהניקוד הסופי נשמר לפני game-over
-        await endGame(backupCfg, game.id);
+        if (backupCfg !== null) {
+          await endGame(backupCfg, game.id);
+        } else {
+          // אופליין — נועלים את גיבוי הדיסק (completed) כדי שלא יוצע המשך אחרי סיום.
+          const payload = buildBackupPayload(
+            engine.getGame(),
+            engine.getState(),
+            rosterRef.current,
+            nameOf,
+            startedAtRef.current,
+            [...removedRef.current],
+          );
+          await saveDiskBackup(engine.getGame().id, payload, true);
+        }
         debugLog('game', 'המשחק הסתיים — הגיבוי ננעל והועבר לתוצאות');
       } catch (err) {
         debugLog('game', `סיום משחק (game-over) נכשל (${String(err)})`);
       }
     })();
-  }, [backupCfg, stage, game.id]);
+  }, [backupCfg, diskBackup, stage, game.id, engine, nameOf]);
 
   // סוף משחק אונליין → הורדה אוטומטית של קובץ אקסל סיכום (משתתפים/שאלות/קבוצות).
   // פעם אחת בלבד, ורק במסך המנצחים האמיתי (לא תצוגה מקדימה של W). לא באופליין.

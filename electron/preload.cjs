@@ -53,4 +53,16 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
   forgetGame() {
     void ipcRenderer.invoke('game:forget');
   },
+  /** גיבוי אופליין לדיסק — שמירת מצב המשחק (JSON) לפי מזהה. */
+  backupSave(/** @type {string} */ id, /** @type {string} */ json) {
+    return ipcRenderer.invoke('backup:save', id, json);
+  },
+  /** שליפת גיבוי אופליין (JSON) לפי מזהה, או null. */
+  backupLoad(/** @type {string} */ id) {
+    return ipcRenderer.invoke('backup:load', id);
+  },
+  /** מחיקת גיבוי אופליין לפי מזהה. */
+  backupClear(/** @type {string} */ id) {
+    void ipcRenderer.invoke('backup:clear', id);
+  },
 });

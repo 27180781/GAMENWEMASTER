@@ -188,6 +188,30 @@ function forgetLastGame() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// גיבוי אופליין לדיסק: מצב המשחק (שחקנים/קבוצות/הצבעות/ניקוד/מיקום) נשמר
+// כקובץ JSON לפי מזהה המשחק, ב-userData/backups. כך שום נתון לא הולך לאיבוד
+// גם באופליין — בטעינת אותו משחק מציעים "להמשיך מהגיבוי".
+// ---------------------------------------------------------------------------
+/** תיקיית הגיבויים (נוצרת אם חסרה). */
+function backupsDir() {
+  const dir = path.join(app.getPath('userData'), 'backups');
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+  } catch {
+    /* קיימת כבר */
+  }
+  return dir;
+}
+/** מזהה בטוח לשם קובץ (בלי תווים בעייתיים). */
+function safeGameId(id) {
+  return String(id ?? '').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120) || 'game';
+}
+/** נתיב קובץ הגיבוי של משחק מסוים. */
+function backupPath(id) {
+  return path.join(backupsDir(), `${safeGameId(id)}.json`);
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -230,6 +254,33 @@ app.whenReady().then(() => {
   ipcMain.handle('game:getLast', () => getLastGame());
   ipcMain.handle('game:forget', () => {
     forgetLastGame();
+  });
+  // גיבוי אופליין לדיסק — שמירה/שליפה/מחיקה לפי מזהה המשחק.
+  ipcMain.handle('backup:save', (_e, id, json) => {
+    try {
+      fs.writeFileSync(backupPath(id), String(json));
+      return true;
+    } catch (err) {
+      console.error('[backup] שמירת גיבוי נכשלה:', /** @type {Error} */ (err).message);
+      return false;
+    }
+  });
+  ipcMain.handle('backup:load', (_e, id) => {
+    try {
+      const p = backupPath(id);
+      return fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : null;
+    } catch (err) {
+      console.error('[backup] שליפת גיבוי נכשלה:', /** @type {Error} */ (err).message);
+      return null;
+    }
+  });
+  ipcMain.handle('backup:clear', (_e, id) => {
+    try {
+      const p = backupPath(id);
+      if (fs.existsSync(p)) fs.unlinkSync(p);
+    } catch {
+      /* התעלמות */
+    }
   });
 
   // קיצורי מקלדת גלובליים למפעיל
