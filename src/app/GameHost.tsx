@@ -31,6 +31,8 @@ import {
   isDesktopClicker,
   showReceiver,
   canShowReceiver,
+  launchReceiver,
+  desktopStopReceiver,
   canSaveReport,
   desktopSaveReport,
   desktopOpenReports,
@@ -177,6 +179,18 @@ export function GameHost({
   }, [isComposite, useClicker, useSocket, voteServerUrl]);
   const audio = useMemo(() => new AudioManager(), []);
   const state = useEngineState(engine);
+
+  // מחזור חיי הריסיבר צמוד למצב השלטים: מעבר לדמה/טלפונים (למשל הדלקת "קהל
+  // סינתטי" בתפריט המפעיל) סוגר את תוכנת הקליטה — אין בה צורך והחלון מפריע;
+  // חזרה למצב שלטים מפעילה אותה מחדש. פועל רק על מעבר (לא בכניסה למשחק, שם
+  // ההפעלה נעשית ממסך הבחירה). no-op בדפדפן.
+  const prevUseClickerRef = useRef(useClicker);
+  useEffect(() => {
+    const prev = prevUseClickerRef.current;
+    prevUseClickerRef.current = useClicker;
+    if (useClicker && !prev) launchReceiver();
+    else if (!useClicker && prev) desktopStopReceiver();
+  }, [useClicker]);
 
   const [stage, setStage] = useState<HostStage>('opening');
   const [menuOpen, setMenuOpen] = useState(false);

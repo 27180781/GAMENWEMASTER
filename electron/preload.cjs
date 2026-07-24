@@ -41,6 +41,10 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
   showReceiver() {
     void ipcRenderer.invoke('rf317:show');
   },
+  /** סגירת תוכנת הקליטה — במעבר לדמה/טלפונים (אין בה צורך). */
+  stopReceiver() {
+    void ipcRenderer.invoke('rf317:stop');
+  },
   /** זכירת המשחק האחרון (בייטי ZIP + שם) לטעינה אוטומטית בפתיחה הבאה. */
   rememberGame(/** @type {string} */ name, /** @type {Uint8Array} */ bytes) {
     void ipcRenderer.invoke('game:remember', name, bytes);
