@@ -1159,7 +1159,9 @@ export function GameHost({
         case 4:
           // בשלב חשיפת התשובה (results) עם נתוני קבוצות — פותח/סוגר את מסך דירוג
           // הקבוצות; אחרת (בזמן טיימר ההצבעה) נשאר קיצור להוספת 10 שניות.
+          // דירוג הקבוצות ופירוט ההצבעות הדדית-בלעדיים — פתיחת האחד סוגרת את השני.
           if (engine.getState().phase === 'results' && hasGroupData(rosterRef.current)) {
+            setVotesOverlay(false);
             setGroupsOverlay((open) => !open);
           } else {
             adjustTimer(10);
@@ -1260,6 +1262,11 @@ export function GameHost({
           break;
         case 'setGame':
           onApplyGameRef.current?.(msg.game); // עריכה חיה — פענוח סלחני + hot-swap
+          break;
+        case 'connect':
+          // פתיחת/סגירת מסך ההתחברות לקבוצות בתצוגה — ממסך המנחה.
+          if (msg.categoryId === null) setConnectCategory(null);
+          else if (stageRef.current === 'playing') setConnectCategory(msg.categoryId);
           break;
       }
     },
