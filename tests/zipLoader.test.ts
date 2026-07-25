@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import JSZip from 'jszip';
-import { isRelativeAsset, loadGameFromZip } from '../src/app/zipLoader.ts';
+import { isRelativeAsset, loadGameFromExtracted, loadGameFromZip } from '../src/app/zipLoader.ts';
 import { classifyMediaUrl, clearMediaKindRegistry } from '../src/engine/index.ts';
 import { fourAnswers, rawGame, rawSlide } from './helpers.ts';
 
@@ -134,5 +134,82 @@ describe('loadGameFromZip — מצב זרימה מהדיסק (EXE)', () => {
   it('בלי גשר (דפדפן) — stream:true נופל ל-Blob', async () => {
     const { game } = await loadGameFromZip(await buildZip(), { stream: true });
     expect(game.setting.logo.src).toMatch(/^blob:mock-/);
+  });
+});
+
+describe('loadGameFromExtracted — טעינה ממטמון שחולץ ב-main (בלי בייטי ZIP)', () => {
+  /** data.json דק כמו בפורמט האופליין, עם נתיבי מדיה יחסיים. */
+  function slimData() {
+    const slim = rawGame([
+      rawSlide({ id: 1, type: 'trivia', answers: fourAnswers(2), scoreForQue: 3 }),
+    ]);
+    for (const k of ['id', 'assets', 'createdAt', 'baseUrl']) delete slim[k];
+    (slim.setting as { logo: { src: string } }).logo = { src: 'Assets/logo.png' };
+    (slim.setting as { gameMedia: { src: string } }).gameMedia = { src: 'Assets/intro.mp4' };
+    (slim.setting as { triviaMedia: { src: string } }).triviaMedia = { src: 'https://cdn/keep.mp4' };
+    return JSON.stringify(slim);
+  }
+
+  it('ממפה נתיבים יחסיים ל-trivia-media:// ורושם סוג מדיה, בלי Blob', () => {
+    const { game, revoke, missing } = loadGameFromExtracted({
+      cacheKey: 'abc123',
+      dataPath: 'data.json',
+      dataJson: slimData(),
+      names: ['data.json', 'Assets/logo.png', 'Assets/intro.mp4'],
+    });
+
+    expect(game.setting.logo.src).toBe('trivia-media://abc123/Assets/logo.png');
+    expect(game.setting.gameMedia.src).toBe('trivia-media://abc123/Assets/intro.mp4');
+    expect(classifyMediaUrl(game.setting.logo.src)).toBe('image');
+    expect(classifyMediaUrl(game.setting.gameMedia.src)).toBe('video');
+    expect(game.setting.triviaMedia.src).toBe('https://cdn/keep.mp4'); // URL מוחלט נשמר
+    expect(missing).toEqual([]);
+    // לא נוצרו Blob URLs, ו-revoke הוא no-op
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    revoke();
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+  });
+
+  it('עובד עם data.json בתוך תיקיית עטיפה (נתיבים יחסיים אליו)', () => {
+    const { game } = loadGameFromExtracted({
+      cacheKey: 'k1',
+      dataPath: 'game-folder/data.json',
+      dataJson: slimData(),
+      names: ['game-folder/data.json', 'game-folder/Assets/logo.png', 'game-folder/Assets/intro.mp4'],
+    });
+    expect(game.setting.logo.src).toBe('trivia-media://k1/game-folder/Assets/logo.png');
+  });
+
+  it('נכס חסר — הנתיב נשאר ומדווח כחסר', () => {
+    const { game, missing } = loadGameFromExtracted({
+      cacheKey: 'k2',
+      dataPath: 'data.json',
+      dataJson: slimData(),
+      names: ['data.json', 'Assets/intro.mp4'], // בלי הלוגו
+    });
+    expect(game.setting.logo.src).toBe('Assets/logo.png');
+    expect(missing).toHaveLength(1);
+    expect(missing[0]!.reason).toBe('missing');
+    expect(missing[0]!.context).toBe('לוגו');
+  });
+
+  it('שמות עם תווים מיוחדים מקודדים בכתובת', () => {
+    const slim = rawGame([rawSlide({ id: 1, type: 'trivia', answers: fourAnswers(2), scoreForQue: 3 })]);
+    (slim.setting as { logo: { src: string } }).logo = { src: 'נכסים/לוגו של המשחק.png' };
+    const { game } = loadGameFromExtracted({
+      cacheKey: 'k3',
+      dataPath: 'data.json',
+      dataJson: JSON.stringify(slim),
+      names: ['data.json', 'נכסים/לוגו של המשחק.png'],
+    });
+    expect(game.setting.logo.src.startsWith('trivia-media://k3/')).toBe(true);
+    expect(game.setting.logo.src).toContain('%20'); // רווחים מקודדים
+    expect(decodeURIComponent(game.setting.logo.src)).toBe('trivia-media://k3/נכסים/לוגו של המשחק.png');
+  });
+
+  it('JSON פגום — שגיאה ברורה', () => {
+    expect(() =>
+      loadGameFromExtracted({ cacheKey: 'k4', dataPath: 'data.json', dataJson: '{oops', names: [] }),
+    ).toThrow(/JSON/);
   });
 });

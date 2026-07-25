@@ -351,20 +351,44 @@ function pruneMediaCache(keepKey) {
     /* אין תיקייה */
   }
 }
+/** איתור data.json בתוך רשימת שמות (בכל עומק, ללא תלות ברישיות). */
+function findDataPath(names) {
+  return (
+    names.find((n) => (n.split('/').pop() ?? '').toLowerCase() === 'data.json') ??
+    names.find((n) => n.toLowerCase().endsWith('.json')) ??
+    null
+  );
+}
+
 /**
- * חילוץ מדיית ה-ZIP לדיסק (פעם אחת לכל משחק — לפי hash התוכן). אם כבר חולץ
- * (יש manifest) — שימוש חוזר בלי חילוץ מחדש. מחזיר את מזהה המטמון.
+ * חילוץ ה-ZIP לדיסק (פעם אחת לכל משחק — לפי hash התוכן). אם כבר חולץ (יש
+ * manifest) — שימוש חוזר בלי חילוץ מחדש ובלי לפתוח את הארכיון כלל.
+ *
+ * מחזיר את מזהה המטמון יחד עם `data.json` (טקסט זעיר) ורשימת שמות הקבצים —
+ * כך שה-renderer יכול לבנות את המשחק בלי לקבל את בייטי ה-ZIP המלאים.
  */
-async function extractMediaCache(bytes) {
+async function extractGameToCache(bytes) {
   const buf = Buffer.from(bytes);
   const key = mediaCacheKey(buf);
   const dir = mediaCacheDir(key);
-  const manifest = path.join(dir, '.manifest.json');
-  if (fs.existsSync(manifest)) {
-    pruneMediaCache(key); // כבר חולץ — רק מנקים מטמונים ישנים
-    currentMediaCacheKey = key;
-    return key;
+  const manifestPath = path.join(dir, '.manifest.json');
+
+  // מטמון קיים: קוראים את המניפסט ואת data.json מהדיסק — בלי לפתוח ZIP.
+  if (fs.existsSync(manifestPath)) {
+    try {
+      const m = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      const names = Array.isArray(m.names) ? m.names : [];
+      const dataPath = typeof m.dataPath === 'string' ? m.dataPath : findDataPath(names);
+      if (dataPath !== null && fs.existsSync(path.join(dir, dataPath))) {
+        pruneMediaCache(key);
+        currentMediaCacheKey = key;
+        return { cacheKey: key, dataPath, dataJson: fs.readFileSync(path.join(dir, dataPath), 'utf8'), names };
+      }
+    } catch {
+      /* מניפסט פגום/ישן — מחלצים מחדש */
+    }
   }
+
   pruneMediaCache(key); // שומרים רק את המשחק הנוכחי
   fs.mkdirSync(dir, { recursive: true });
   const zip = await JSZip.loadAsync(buf);
@@ -378,9 +402,16 @@ async function extractMediaCache(bytes) {
     fs.writeFileSync(dest, await entry.async('nodebuffer'));
     names.push(rel);
   }
-  fs.writeFileSync(manifest, JSON.stringify({ names, savedAt: Date.now() }));
+  const dataPath = findDataPath(names);
+  fs.writeFileSync(manifestPath, JSON.stringify({ names, dataPath, savedAt: Date.now() }));
   currentMediaCacheKey = key;
-  return key;
+  const dataJson = dataPath !== null ? fs.readFileSync(path.join(dir, dataPath), 'utf8') : '';
+  return { cacheKey: key, dataPath, dataJson, names };
+}
+
+/** תאימות: חילוץ שמחזיר את מזהה המטמון בלבד (נתיב ה-ZIP-מה-renderer). */
+async function extractMediaCache(bytes) {
+  return (await extractGameToCache(bytes)).cacheKey;
 }
 
 /** תיקיית קבצי התוצאות (אקסל) — נוצרת אם חסרה. */
@@ -550,6 +581,37 @@ app.whenReady().then(() => {
       return { cacheKey: await extractMediaCache(bytes) };
     } catch (err) {
       console.error('[media] חילוץ מדיה נכשל:', /** @type {Error} */ (err).message);
+      return null;
+    }
+  });
+  // טעינת משחק שמור/מוטבע *בלי* להעביר את ה-ZIP ל-renderer וחזרה: ה-main קורא
+  // אותו ישירות מהדיסק (או מהמטען המוטבע), מחלץ, ומחזיר רק את data.json
+  // ורשימת השמות — כמה עשרות KB במקום גיגה-בייטים בצינור.
+  ipcMain.handle('game:loadSaved', async (_e, source) => {
+    try {
+      let bytes = null;
+      let config = null;
+      if (source === 'sealed') {
+        if (sealedGame === null) return null;
+        bytes = sealedGame.bytes;
+        config = sealedGame.config;
+      } else {
+        const zipPath = lastGameZipPath();
+        if (!fs.existsSync(zipPath)) return null;
+        bytes = fs.readFileSync(zipPath);
+      }
+      if (!bytes || bytes.length === 0) return null;
+      const res = await extractGameToCache(bytes);
+      if (res.dataPath === null || res.dataJson === '') return null;
+      let name = '';
+      try {
+        name = String(JSON.parse(fs.readFileSync(lastGameMetaPath(), 'utf8')).name ?? '');
+      } catch {
+        /* אין מטא — שם ריק */
+      }
+      return config !== null ? { ...res, config, name } : { ...res, name };
+    } catch (err) {
+      console.error('[game] טעינת משחק שמור נכשלה:', /** @type {Error} */ (err).message);
       return null;
     }
   });
