@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GameFile } from '../engine/index.ts';
 import {
+  HOST_STALE_MS,
   openControlChannel,
   type ControlChannel,
   type HostStateSnapshot,
@@ -70,6 +71,9 @@ export function HostConsole() {
   const [showGuide, setShowGuide] = useState(false);
   /** מסך התחברות לקבוצות פתוח בתצוגה (נפתח מכאן) — לחיווי + כפתור סגירה. */
   const [connectOpen, setConnectOpen] = useState(false);
+  /** אין קשר עם המסך הראשי (אין פעימת-לב) — המצב המוצג עלול להיות ישן. */
+  const [stale, setStale] = useState(false);
+  const lastSeenRef = useRef(Date.now());
   const [roster, setRosterState] = useState<RosterData>({ players: [], categories: [], memberships: {} });
   const chRef = useRef<ControlChannel | null>(null);
   const gameIdRef = useRef<string>('');
@@ -81,6 +85,9 @@ export function HostConsole() {
         return;
       }
       if (msg.t !== 'state') return;
+      // כל מצב שמגיע (כולל פעימת-לב) מוכיח שהמסך הראשי חי.
+      lastSeenRef.current = Date.now();
+      setStale(false);
       setSnap(msg);
       if (msg.gameId !== gameIdRef.current) {
         gameIdRef.current = msg.gameId;
@@ -89,7 +96,17 @@ export function HostConsole() {
     });
     chRef.current = ch;
     ch.post({ t: 'hello' });
+    // גלאי שקט: אם לא הגיעה פעימה זמן רב — מתריעים שהמצב המוצג אינו עדכני,
+    // ומבקשים מצב מחדש (למקרה שהמסך הראשי פשוט נטען מחדש).
+    const watch = window.setInterval(() => {
+      const quiet = Date.now() - lastSeenRef.current;
+      if (quiet > HOST_STALE_MS) {
+        setStale(true);
+        chRef.current?.post({ t: 'hello' });
+      }
+    }, 2000);
     return () => {
+      window.clearInterval(watch);
       ch.close();
       chRef.current = null;
     };
@@ -130,7 +147,13 @@ export function HostConsole() {
   }
 
   return (
-    <div className="hc-root" dir="rtl">
+    <div className={`hc-root${stale ? ' hc-root--stale' : ''}`} dir="rtl">
+      {stale && (
+        <div className="hc-stale-bar" role="alert">
+          ⚠️ אין קשר עם המסך הראשי — ייתכן שהמשחק נסגר או נטען מחדש. הנתונים
+          שמוצגים כאן אינם מעודכנים, ופקודות לא יגיעו.
+        </div>
+      )}
       <header className="hc-head">
         <div className="hc-title">
           <span className="hc-title-name">{snap.gameName || 'משחק'}</span>
@@ -210,7 +233,12 @@ export function HostConsole() {
 
       {view === 'edit' &&
         (editGame ? (
-          <SlideEditor game={editGame} currentSlideId={snap.currentSlideId} onChange={applyGameEdit} />
+          <SlideEditor
+            game={editGame}
+            currentSlideId={snap.currentSlideId}
+            phase={snap.stage === 'playing' ? snap.phase : ''}
+            onChange={applyGameEdit}
+          />
         ) : (
           <p className="se-empty">טוען את השקופיות…</p>
         ))}

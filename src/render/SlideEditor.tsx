@@ -27,6 +27,12 @@ const MAX_INLINE_IMAGE = 1_800_000;
 interface SlideEditorProps {
   game: GameFile;
   currentSlideId: number;
+  /**
+   * שלב המשחק בתצוגה. בזמן הצבעה פעילה השקופית הנוכחית נעולה לעריכה: שינוי
+   * תשובות באמצע ההצבעה היה מבלבל את ספירת הקולות של אותה שאלה (הקולות מוצלבים
+   * לפי מיקום התשובה). שאר השקופיות פתוחות לעריכה כרגיל.
+   */
+  phase?: string;
   onChange: (game: GameFile) => void;
 }
 
@@ -89,7 +95,7 @@ function MediaField({ label, value, onSet }: { label: string; value: string; onS
   );
 }
 
-export function SlideEditor({ game, currentSlideId, onChange }: SlideEditorProps) {
+export function SlideEditor({ game, currentSlideId, phase, onChange }: SlideEditorProps) {
   const [selected, setSelected] = useState(0);
   // כשמתחלף המשחק (הד מהתצוגה) — משאירים את הבחירה בטווח.
   useEffect(() => {
@@ -98,7 +104,15 @@ export function SlideEditor({ game, currentSlideId, onChange }: SlideEditorProps
 
   const slide: Slide | undefined = game.questions[selected];
   const votable = slide ? VOTABLE.has(slide.type) : false;
-  const patch = (updater: (s: Slide) => Slide) => onChange(updateSlide(game, selected, updater));
+  /** השקופית שמוצגת כרגע בהצבעה פעילה — נעולה לעריכה עד סיום ההצבעה. */
+  const locked = phase === 'voting' && slide !== undefined && slide.id === currentSlideId;
+  const patch = (updater: (s: Slide) => Slide) => {
+    if (locked) return;
+    onChange(updateSlide(game, selected, updater));
+  };
+  /** מחיקה/סדר של השקופית שבהצבעה חסומים גם הם. */
+  const lockedAt = (i: number) =>
+    phase === 'voting' && game.questions[i]?.id === currentSlideId;
 
   return (
     <div className="se-root">
@@ -118,13 +132,25 @@ export function SlideEditor({ game, currentSlideId, onChange }: SlideEditorProps
                 {q.id === currentSlideId && <span className="se-item-now">עכשיו</span>}
               </button>
               <div className="se-item-ops">
-                <button title="למעלה" onClick={() => onChange(moveSlide(game, i, -1))}>⬆</button>
-                <button title="למטה" onClick={() => onChange(moveSlide(game, i, 1))}>⬇</button>
+                <button
+                  title={lockedAt(i) ? 'נעול — השקופית בהצבעה' : 'למעלה'}
+                  disabled={lockedAt(i)}
+                  onClick={() => onChange(moveSlide(game, i, -1))}
+                >
+                  ⬆
+                </button>
+                <button
+                  title={lockedAt(i) ? 'נעול — השקופית בהצבעה' : 'למטה'}
+                  disabled={lockedAt(i)}
+                  onClick={() => onChange(moveSlide(game, i, 1))}
+                >
+                  ⬇
+                </button>
                 <button title="שכפול" onClick={() => onChange(duplicateSlide(game, i))}>⧉</button>
                 <button
-                  title="מחיקה"
+                  title={lockedAt(i) ? 'נעול — השקופית בהצבעה' : 'מחיקה'}
                   className="se-del"
-                  disabled={game.questions.length <= 1}
+                  disabled={game.questions.length <= 1 || lockedAt(i)}
                   onClick={() => {
                     if (window.confirm('למחוק את השקופית?')) onChange(removeSlide(game, i));
                   }}
@@ -141,7 +167,13 @@ export function SlideEditor({ game, currentSlideId, onChange }: SlideEditorProps
         {slide === undefined ? (
           <p className="se-empty">בחרו שקופית לעריכה</p>
         ) : (
-          <div className="se-form" key={slide.id}>
+          <fieldset className="se-form" key={slide.id} disabled={locked}>
+            {locked && (
+              <p className="se-locked" role="status">
+                🔒 השקופית הזו נמצאת כרגע בהצבעה — העריכה ננעלה כדי לא לשבש את
+                ספירת הקולות. אפשר לערוך אותה מיד בסיום ההצבעה, או לערוך שקופית אחרת.
+              </p>
+            )}
             <label className="se-label">שאלה / כותרת</label>
             <textarea
               className="se-input se-textarea"
@@ -232,7 +264,7 @@ export function SlideEditor({ game, currentSlideId, onChange }: SlideEditorProps
                 </button>
               </div>
             )}
-          </div>
+          </fieldset>
         )}
       </div>
     </div>

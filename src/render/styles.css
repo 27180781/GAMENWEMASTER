@@ -4056,3 +4056,39 @@ body {
 }
 .se-answer-del:hover:not(:disabled) { background: rgba(220, 60, 80, 0.4); }
 .se-answer-del:disabled { opacity: 0.35; cursor: default; }
+
+/* חיווי "אין קשר עם המסך הראשי" בקונסולת המנחה */
+.hc-stale-bar {
+  background: #4a1d22;
+  border: 1px solid rgba(230, 90, 110, 0.6);
+  color: #ffd9de;
+  border-radius: 12px;
+  padding: 12px 18px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+/* כשאין קשר — מעמעמים את התוכן כדי שלא ייקרא כמצב חי */
+.hc-root--stale .hc-body,
+.hc-root--stale .se-root {
+  opacity: 0.55;
+}
+
+/* נעילת עריכה לשקופית שנמצאת בהצבעה */
+.se-locked {
+  background: rgba(255, 210, 63, 0.12);
+  border: 1px solid rgba(255, 210, 63, 0.45);
+  color: #ffe9a8;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.5;
+  margin: 0;
+}
+.se-form { border: none; padding: 0; margin: 0; min-width: 0; }
+.se-form:disabled .se-input,
+.se-form:disabled .se-file-btn,
+.se-form:disabled .se-add-answer,
+.se-form:disabled .se-answer-del { opacity: 0.5; cursor: default; }

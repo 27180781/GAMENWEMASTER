@@ -64,6 +64,11 @@ export interface ControlChannel {
 
 const CHANNEL_NAME = 'trivia-control';
 
+/** כל כמה זמן התצוגה מפרסמת פעימת-לב (מצב) גם בלי שינוי. */
+export const HOST_HEARTBEAT_MS = 3000;
+/** אחרי כמה שקט מסך המנחה מכריז על ניתוק (2.5 פעימות — סובלני לעיכוב). */
+export const HOST_STALE_MS = 8000;
+
 interface DesktopControlBridge {
   controlPost?: (msg: unknown) => void;
   onControl?: (cb: (msg: unknown) => void) => () => void;

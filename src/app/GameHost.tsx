@@ -71,6 +71,7 @@ import {
 import { selectPlayersToRemove } from './functionPlayers.ts';
 import { hasGroupData } from './groupScore.ts';
 import {
+  HOST_HEARTBEAT_MS,
   openControlChannel,
   type ControlChannel,
   type HostCommand,
@@ -1309,6 +1310,16 @@ export function GameHost({
   useEffect(() => {
     controlRef.current?.post({ t: 'game', game });
   }, [game]);
+
+  // פעימת-לב לערוץ השליטה: התצוגה מפרסמת מצב רק כשמשהו משתנה, ולכן בשקופית
+  // סטטית מסך המנחה לא היה יודע אם הקשר נותק (או שהמשחק נסגר) — הוא היה מציג
+  // מצב ישן בשקט. פעימה קבועה מאפשרת לו לזהות שקט ולהתריע.
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      controlRef.current?.post(buildSnapshotRef.current());
+    }, HOST_HEARTBEAT_MS);
+    return () => window.clearInterval(id);
+  }, []);
 
   // חיבור ה-ReplayAdapter כמקור הצבעות: סינון שלט המנחה + הקפאה בעצירה
   const hostVoterIdRef = useRef(hostVoterId);
