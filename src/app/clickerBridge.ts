@@ -39,6 +39,23 @@ export interface SealConfig {
   name?: string;
 }
 
+/**
+ * משחק שנטען ב-main ישירות מהדיסק: המדיה כבר חולצה למטמון, וה-renderer מקבל
+ * רק את data.json (טקסט זעיר) ואת רשימת שמות הקבצים — בלי בייטי ה-ZIP.
+ */
+export interface SavedGamePayload {
+  cacheKey: string;
+  /** נתיב data.json בתוך הארכיון (לחישוב נתיבים יחסיים). */
+  dataPath: string;
+  dataJson: string;
+  /** כל שמות הקבצים שחולצו (נתיבים יחסיים, קדימה-סלאש). */
+  names: string[];
+  /** שם קובץ המשחק שנשמר (מטא), אם קיים. */
+  name?: string;
+  /** הגדרות משחק מוטבע — רק כשמקור הטעינה הוא 'sealed'. */
+  config?: SealConfig;
+}
+
 interface TriviaDesktop {
   isDesktop?: boolean;
   platform?: string;
@@ -81,6 +98,8 @@ interface TriviaDesktop {
   onControl?: (cb: (msg: unknown) => void) => () => void;
   /** שמירת קובץ מדיה (עריכה חיה) לתיקיית המדיה; מחזיר trivia-media:// או null. */
   mediaAddFile?: (name: string, bytes: Uint8Array) => Promise<string | null>;
+  /** טעינת המשחק השמור/המוטבע ישירות מהדיסק ב-main (בלי בייטי ZIP בצינור). */
+  loadSavedGame?: (source: 'last' | 'sealed') => Promise<SavedGamePayload | null>;
   /** מעבר לתצוגת מסכים מורחבת (Windows DisplaySwitch /extend). */
   extendDisplay?: () => void;
 }
@@ -274,6 +293,22 @@ export function canOpenHostWindow(): boolean {
 /** פתיחת חלון "מסך המנחה" הנפרד (EXE). no-op בדפדפן. */
 export function openHostWindow(): void {
   desktop()?.openHostWindow?.();
+}
+
+/**
+ * טעינת המשחק השמור ('last') או המוטבע ('sealed') ישירות מהדיסק ב-main —
+ * בלי להעביר את ה-ZIP המלא בצינור. null בדפדפן, כשאין משחק, או בכשל.
+ */
+export async function desktopLoadSavedGame(
+  source: 'last' | 'sealed',
+): Promise<SavedGamePayload | null> {
+  const fn = desktop()?.loadSavedGame;
+  if (typeof fn !== 'function') return null;
+  try {
+    return await fn(source);
+  } catch {
+    return null;
+  }
 }
 
 /** האם ה-EXE יודע לשמור קובץ מדיה לדיסק (עריכה חיה של מדיה). */

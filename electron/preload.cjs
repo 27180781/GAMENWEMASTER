@@ -93,6 +93,13 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
   mediaClear(/** @type {string=} */ cacheKey) {
     return ipcRenderer.invoke('media:clear', cacheKey);
   },
+  /**
+   * טעינת המשחק השמור ('last') או המוטבע ('sealed') ישירות מהדיסק ב-main:
+   * מחזיר { cacheKey, dataPath, dataJson, names, name, config? } — בלי בייטי ZIP.
+   */
+  loadSavedGame(/** @type {'last'|'sealed'} */ source) {
+    return ipcRenderer.invoke('game:loadSaved', source);
+  },
   /** פתיחת חלון "מסך המנחה" הנפרד. */
   openHostWindow() {
     void ipcRenderer.invoke('host:open');

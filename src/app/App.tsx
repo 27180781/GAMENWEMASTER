@@ -31,6 +31,7 @@ import {
   getSealedGame,
   canStreamMedia,
   desktopMediaClear,
+  desktopLoadSavedGame,
   type SealConfig,
 } from './clickerBridge.ts';
 import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.ts';
@@ -47,7 +48,7 @@ import {
   shouldRedirectHome,
   type GameSettings,
 } from './urlParams.ts';
-import { loadGameFromZip } from './zipLoader.ts';
+import { loadGameFromExtracted, loadGameFromZip } from './zipLoader.ts';
 
 import hadassah from '../../fixtures/hadassah-ozen.json';
 import masaa from '../../fixtures/masaa-sync-manual-link.json';
@@ -259,15 +260,39 @@ export function App() {
     autoLoadTriedRef.current = true;
     if (!isDesktopApp() || params.gameUrl !== null) return;
     const toBuffer = (b: Uint8Array) => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+    /**
+     * מסלול מהיר (EXE עם זרימת מדיה): ה-main קורא את ה-ZIP מהדיסק, מחלץ, ומחזיר
+     * רק את data.json ורשימת השמות — בייטי הארכיון (שיכולים להיות גיגה-בייטים)
+     * לא עוברים בצינור ולא מועתקים לזיכרון כאן. מחזיר true אם הצליח.
+     */
+    const loadSavedFast = async (source: 'last' | 'sealed'): Promise<boolean> => {
+      const saved = await desktopLoadSavedGame(source);
+      if (saved === null || saved.dataJson === '') return false;
+      try {
+        const res = loadGameFromExtracted(saved);
+        if (saved.config !== undefined) {
+          setSealConfig(saved.config);
+          applySeal(res.game, saved.config);
+        }
+        applyLoadedZip(res);
+        return true;
+      } catch (e) {
+        setError(`טעינת המשחק השמור נכשלה:\n${(e as Error).message}`);
+        return true; // דווח — לא נופלים למסלול האיטי כדי לא להציג שגיאה כפולה
+      }
+    };
+
     void (async () => {
       // עדיפות ראשונה: משחק מוטבע ("סגור") ב-EXE — נטען אוטומטית, לא ניתן להחלפה.
       const sealed = await getSealedGame();
       if (sealed !== null && sealed.bytes.byteLength > 0) {
-        setSealConfig(sealed.config);
+        if (await loadSavedFast('sealed')) return;
+        setSealConfig(sealed.config); // נפילה אחורה: EXE ישן בלי המסלול המהיר
         await loadZipBuffer(toBuffer(sealed.bytes), sealed.config);
         return;
       }
       // אחרת: המשחק האחרון שנשמר (זכירה).
+      if (await loadSavedFast('last')) return;
       const last = await getLastGame();
       if (last !== null && last.bytes.byteLength > 0) await loadZipBuffer(toBuffer(last.bytes));
     })();
@@ -342,18 +367,19 @@ export function App() {
     setError(null);
   };
 
+  /** החלת הגדרות משחק מוטבע ("סגור") — קוד חדר ומגבלת משתתפים. */
+  const applySeal = (loaded: GameFile, seal?: SealConfig) => {
+    if (!seal) return;
+    if (seal.room !== undefined && seal.room !== '') loaded.room = seal.room;
+    if (seal.limit !== undefined && seal.limit !== null) loaded.setting.limit.number = seal.limit;
+  };
+
   const loadZipBuffer = (buffer: ArrayBuffer, seal?: SealConfig) =>
     // ב-EXE — המדיה נזרמת מהדיסק (‏trivia-media://) במקום Blob בזיכרון, כדי
     // שהזיכרון יישאר נמוך גם למשחקים כבדי-וידאו. בדפדפן — נופל חזרה ל-Blob.
     loadGameFromZip(buffer, { stream: desktopApp })
       .then((res) => {
-        // משחק מוטבע ("סגור"): מחילים את ההגדרות שנקבעו בכלי החותמת —
-        // קוד חדר לטלפונים ומגבלת משתתפים.
-        if (seal) {
-          if (seal.room !== undefined && seal.room !== '') res.game.room = seal.room;
-          if (seal.limit !== undefined && seal.limit !== null)
-            res.game.setting.limit.number = seal.limit;
-        }
+        applySeal(res.game, seal);
         applyLoadedZip(res);
       })
       .catch((e: unknown) => setError(`טעינת ה-ZIP נכשלה:\n${(e as Error).message}`));

@@ -83,6 +83,73 @@ function extensionOf(path: string): string {
   return i === -1 ? '' : base.slice(i + 1);
 }
 
+/** בניית כתובת trivia-media:// לנתיב שחולץ (כל מקטע מקודד בנפרד). */
+function mediaUrl(cacheKey: string, name: string): string {
+  const rel = normalizePath(name)
+    .split('/')
+    .map((seg) => encodeURIComponent(seg))
+    .join('/');
+  return `trivia-media://${cacheKey}/${rel}`;
+}
+
+/**
+ * טעינת משחק שכבר חולץ לדיסק ע"י תהליך ה-main (טעינה אוטומטית ב-EXE): מקבלים
+ * רק את `data.json` ואת רשימת שמות הקבצים, ולכן בייטי ה-ZIP (שיכולים להיות
+ * גיגה-בייטים) אינם עוברים בצינור ואינם מועתקים לזיכרון ה-renderer כלל.
+ * המדיה מוגשת מהדיסק בזרימה, בדיוק כמו במסלול ה-stream הרגיל.
+ */
+export function loadGameFromExtracted(src: {
+  cacheKey: string;
+  dataPath: string;
+  dataJson: string;
+  names: string[];
+}): LoadedZipGame {
+  let data: unknown;
+  try {
+    data = JSON.parse(src.dataJson);
+  } catch (e) {
+    throw new Error(`data.json אינו JSON תקין: ${(e as Error).message}`);
+  }
+  const { game, dropped } = parseGameFileLenient(data);
+
+  const baseDir = dirOf(src.dataPath);
+  // אינדקסים לחיפוש: לפי נתיב מלא (ללא רישיות) ולפי שם קובץ בלבד (נפילה אחורה).
+  const byPath = new Map<string, string>();
+  const byBase = new Map<string, string>();
+  for (const name of src.names) {
+    byPath.set(normalizePath(name).toLowerCase(), name);
+    const base = (name.split('/').pop() ?? '').toLowerCase();
+    if (base !== '' && !byBase.has(base)) byBase.set(base, name);
+  }
+
+  const cache = new Map<string, string>();
+  const resolve = (relSrc: string): string | null => {
+    const resolvedPath = normalizePath(baseDir + relSrc);
+    const cached = cache.get(resolvedPath);
+    if (cached !== undefined) return cached;
+    const match =
+      byPath.get(resolvedPath.toLowerCase()) ??
+      byBase.get((relSrc.split('/').pop() ?? '').toLowerCase());
+    if (match === undefined) return null;
+    const url = mediaUrl(src.cacheKey, match);
+    registerMediaKind(url, classifyMediaUrl(relSrc));
+    cache.set(resolvedPath, url);
+    return url;
+  };
+
+  const missing: MediaIssue[] = [];
+  for (const field of mediaFields(game)) {
+    const rel = field.get();
+    if (!isRelativeAsset(rel)) continue;
+    const url = resolve(rel);
+    if (url !== null) field.set(url);
+    else missing.push({ src: rel, context: field.label, reason: 'missing' });
+  }
+
+  // אין Blob URLs במסלול הזה — אין מה לשחרר.
+  return { game, revoke: () => {}, missing, dropped };
+}
+
 /** טעינת ZIP והמרתו למשחק. ב-EXE (stream) המדיה נזרמת מהדיסק; אחרת Blob בזיכרון. */
 export async function loadGameFromZip(
   input: ArrayBuffer | Uint8Array | Blob,
@@ -147,11 +214,7 @@ export async function loadGameFromZip(
     // מצב זרימה: הקובץ כבר חולץ לדיסק — מחזירים כתובת שמצביעה אליו (נטענת לפי
     // דרישה, בלי לקרוא בייטים לזיכרון). הנתיב זהה לזה שבו ה-main חילץ (safeRelPath).
     if (cacheKey !== null) {
-      const rel = normalizePath(entry.name)
-        .split('/')
-        .map((seg) => encodeURIComponent(seg))
-        .join('/');
-      const url = `trivia-media://${cacheKey}/${rel}`;
+      const url = mediaUrl(cacheKey, entry.name);
       registerMediaKind(url, classifyMediaUrl(relSrc));
       cache.set(resolvedPath, url);
       return url;
