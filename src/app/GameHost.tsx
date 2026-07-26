@@ -71,6 +71,11 @@ import {
 import { selectPlayersToRemove } from './functionPlayers.ts';
 import { hasGroupData } from './groupScore.ts';
 import {
+  eligibleCount,
+  restrictSnapshotToGroup,
+  slideGroupRestriction,
+} from './groupRestriction.ts';
+import {
   HOST_HEARTBEAT_MS,
   openControlChannel,
   type ControlChannel,
@@ -1215,6 +1220,7 @@ export function GameHost({
     const g = engine.getGame();
     const st = engine.getState();
     const votes = st.votesBySlide[st.currentSlideId] ?? {};
+    const restricted = slideGroupRestriction(engine.getCurrentSlide());
     const leaders = Object.entries(st.scores)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 8)
@@ -1235,9 +1241,12 @@ export function GameHost({
         votable: isVotableSlide(q),
       })),
       votesTotal: Object.keys(votes).length,
-      connected: connectedIdsRef.current.length,
+      // בשקופית המוגבלת לקבוצה — "מתוך" סופר רק את המורשים להצביע, אחרת
+      // המנחה היה רואה יחס מטעה (למשל 4/40 כשרק 5 רשאים לענות).
+      connected: eligibleCount(rosterRef.current, connectedIdsRef.current, restricted),
       leaders,
       reveal: { ...revealRef.current },
+      ...(restricted !== null ? { restrictedGroup: restricted } : {}),
     };
   }, [engine]);
 
@@ -1367,6 +1376,14 @@ export function GameHost({
       }
       // בזמן עצירה (פקודה 6) אין קליטת הצבעות
       if (pausedRef.current) return;
+      // שקופית המוגבלת לקבוצה: הקשות של מי שאינו בקבוצה המורשית נזרקות כאן —
+      // לפני המנוע — ולכן אינן נספרות, אינן מזכות בניקוד ואינן מופיעות בפירוט.
+      // הניקוד הקיים שלהם לא משתנה; הם פשוט מדלגים על השאלה. (הסינון אחרי
+      // מסך ההתחברות לקבוצות, כדי שהצטרפות לקבוצה תמשיך לעבוד לכולם.)
+      const restrictTo = slideGroupRestriction(engine.getCurrentSlide());
+      if (restrictTo !== null) {
+        snapshot = restrictSnapshotToGroup(snapshot, rosterRef.current, restrictTo);
+      }
       // צובר את ה-snapshot המצטבר; העדכון למנוע/UI מוגבל בקצב (leading+trailing)
       pendingVoteRef.current = snapshot;
       scheduleVoteFlushRef.current();

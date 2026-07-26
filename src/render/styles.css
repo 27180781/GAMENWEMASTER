@@ -372,7 +372,10 @@ body {
   transform: translateX(-50%);
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 20px;
+  /* תג "שאלה לקבוצה" מקבל שורה משלו מתחת ללוגו/לכותרת (ראו flex-basis שלו). */
+  flex-wrap: wrap;
 }
 .q-logo {
   width: 100px;
@@ -4092,3 +4095,20 @@ body {
 .se-form:disabled .se-file-btn,
 .se-form:disabled .se-add-answer,
 .se-form:disabled .se-answer-del { opacity: 0.5; cursor: default; }
+
+/* חיווי "שאלה לקבוצה בלבד" — שורה משלו מתחת ללוגו/לכותרת */
+.q-group-pill {
+  flex-basis: 100%;
+  margin: 6px auto 0;
+  display: block;
+  width: fit-content;
+  background: rgba(255, 210, 63, 0.16);
+  border: 2px solid var(--secondary-color, #ffd23f);
+  color: var(--secondary-color, #ffd23f);
+  border-radius: 999px;
+  padding: 6px 24px;
+  font-size: 26px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.hc-badge--group { background: rgba(255, 210, 63, 0.2); color: #ffd23f; }
