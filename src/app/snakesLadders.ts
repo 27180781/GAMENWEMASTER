@@ -290,3 +290,48 @@ export function hasWinner(board: BoardState, boardSize = BOARD_SIZE): boolean {
 export function groupsOfPlayer(roster: RosterData, playerId: string): string[] {
   return playerGroupNames(roster, playerId);
 }
+
+/**
+ * שחזור מצב הלוח מההצבעות השמורות — לשחזור מגיבוי.
+ *
+ * מצב הלוח אינו נשמר בגיבוי בנפרד, ואין בכך צורך: הוא **נגזר דטרמיניסטית**
+ * מההצבעות (שכן נשמרות), מהמרשם ומההגדרות. לכן אחרי שחזור פשוט מריצים מחדש
+ * את הסבבים של כל השקופיות שכבר הושלמו, לפי הסדר, ומקבלים בדיוק את אותו לוח —
+ * כולל חוק "אין נשיכה כפולה" והטלות הקובייה (שה-seed שלהן הוא מזהה השקופית).
+ *
+ * @param slides שקופיות המשחק לפי הסדר
+ * @param votesBySlide ההצבעות מהמצב המשוחזר (slideId → voterId → answerId)
+ * @param completedIds מזהי השקופיות שהושלמו (רק להן מריצים סבב)
+ */
+export function rebuildBoard(
+  slides: { id: number; type: string; question: { answers: { id: number; correct: boolean }[] } }[],
+  votesBySlide: Record<number, Record<string, number>>,
+  completedIds: Set<number>,
+  opts: {
+    roster: RosterData;
+    categoryId: string;
+    progression: 'percent' | 'dice';
+    ladders?: Record<number, number>;
+    snakes?: Record<number, number>;
+    boardSize?: number;
+  },
+): BoardState {
+  const VOTABLE = new Set(['trivia', 'survey', 'ans_images']);
+  let board: BoardState = EMPTY_BOARD;
+  for (const slide of slides) {
+    if (!completedIds.has(slide.id) || !VOTABLE.has(slide.type)) continue;
+    board = playRound({
+      roster: opts.roster,
+      categoryId: opts.categoryId,
+      votes: votesBySlide[slide.id] ?? {},
+      correctAnswerIds: slide.question.answers.filter((a) => a.correct).map((a) => a.id),
+      progression: opts.progression,
+      seed: slide.id,
+      board,
+      ...(opts.ladders ? { ladders: opts.ladders } : {}),
+      ...(opts.snakes ? { snakes: opts.snakes } : {}),
+      ...(opts.boardSize !== undefined ? { boardSize: opts.boardSize } : {}),
+    });
+  }
+  return board;
+}

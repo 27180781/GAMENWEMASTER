@@ -79,6 +79,7 @@ import {
   boardCategoryId,
   EMPTY_BOARD,
   playRound,
+  rebuildBoard,
   type BoardState,
 } from './snakesLadders.ts';
 import { SnakesLaddersBoard } from '../render/SnakesLaddersBoard.tsx';
@@ -547,6 +548,25 @@ export function GameHost({
           setReveal({ questionShown: true, answersShown: rSlide.question.answers.length, revealCorrect: false });
         }
         setStage(data.meta.phase === 'ended' ? 'winners' : 'playing');
+        // מרוץ הקבוצות: מצב הלוח נגזר מההצבעות, ולכן משחזרים אותו בהרצה חוזרת
+        // של הסבבים שהושלמו — כך משחק שנקטע חוזר בדיוק לאותו מיקום על הלוח.
+        if (engine.getGame().setting.gameType === 'snakes_ladders_team') {
+          const catId = boardCategoryId(rosterRef.current);
+          if (catId !== null) {
+            const g = engine.getGame();
+            const st2 = engine.getState();
+            setBoard(
+              rebuildBoard(g.questions, st2.votesBySlide, new Set(st2.slidesCompleted), {
+                roster: rosterRef.current,
+                categoryId: catId,
+                progression: g.setting.gameTypeSettings.snakesLadders.progression,
+              }),
+            );
+            // השקופית הנוכחית **אינה** ב-slidesCompleted (כך נשמר הגיבוי), ולכן
+            // הסבב שלה לא הורץ בשחזור — הוא ירוץ חי כשהמנחה יחשוף שוב את
+            // התשובה. לכן לא מסמנים אותה כ"חושבה", אחרת הסבב שלה היה נבלע.
+          }
+        }
         debugLog('game', 'שוחזר מגיבוי', { phase: data.meta.phase, currentQueId: data.meta.currentQueId });
       } catch (err) {
         debugLog('game', `שחזור מגיבוי נכשל (${String(err)})`);
@@ -1310,11 +1330,14 @@ export function GameHost({
   const onApplyGameRef = useRef(onApplyGame);
   onApplyGameRef.current = onApplyGame;
   const controlRef = useRef<ControlChannel | null>(null);
+  /** האם מסך מנחה כבר הזדהה — רק אז שולחים פעימות-לב (חיסכון במשחק רגיל). */
+  const hostSeenRef = useRef(false);
 
   useEffect(() => {
     const ch = openControlChannel((msg) => {
       if (msg.t === 'state' || msg.t === 'game') return; // הד/הצד-השני — התצוגה מתעלמת
       if (msg.t === 'hello') {
+        hostSeenRef.current = true; // יש מסך מנחה מאזין — מכאן שולחים פעימות
         ch.post(buildSnapshotRef.current());
         ch.post({ t: 'game', game: engine.getGame() });
         return;
@@ -1345,6 +1368,9 @@ export function GameHost({
   // מצב ישן בשקט. פעימה קבועה מאפשרת לו לזהות שקט ולהתריע.
   useEffect(() => {
     const id = window.setInterval(() => {
+      // רק אם באמת יש מסך מנחה מאזין: בלי זה היינו בונים ומשדרים תמונת-מצב
+      // מלאה (כל השקופיות) כל 3 שניות לחינם בכל משחק, גם כשאיש לא מקשיב.
+      if (!hostSeenRef.current) return;
       controlRef.current?.post(buildSnapshotRef.current());
     }, HOST_HEARTBEAT_MS);
     return () => window.clearInterval(id);
@@ -1897,6 +1923,12 @@ export function GameHost({
     setLeadersOverlay(false);
     setAnswerers([]);
     setCorrectAnswerers([]);
+    // מרוץ הקבוצות מתאפס גם הוא: הקבוצות חוזרות לתחילת הלוח, והסימון "כבר
+    // חושב לשקופית X" מתנקה — אחרת אחרי איפוס הלוח לא היה נפתח לשקופית שכבר
+    // הוצגה בריצה הקודמת.
+    setBoard(EMPTY_BOARD);
+    setBoardOverlay(false);
+    boardDoneRef.current = null;
     // ריצה חדשה גם מבחינת הגיבוי: זמן התחלה טרי, והשמירות שיבואו יפתחו גיבוי
     // חי חדש לאותו משחק — במקום להיראות כהמשך של הריצה הקודמת. אם הריצה
     // הקודמת הסתיימה (game-over), הגיבוי הנעול שלה בארכיון "נפתח" מחדש בכוונה.

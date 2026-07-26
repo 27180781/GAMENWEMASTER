@@ -14,7 +14,13 @@ function percent({ total, loaded, failed }: MediaPreloadState): number {
   return total > 0 ? Math.round((done / total) * 100) : 100;
 }
 
-export function MediaLoadBar(state: MediaPreloadState) {
+export function MediaLoadBar({
+  startsImmediately = false,
+  ...state
+}: MediaPreloadState & {
+  /** ההגדרה "אפשר להתחיל מיד" — בלעדיה לחיצה על התחל ממתינה לסיום הטעינה. */
+  startsImmediately?: boolean;
+}) {
   const { total, loaded, failed } = state;
   const done = loaded + failed;
   return (
@@ -26,7 +32,9 @@ export function MediaLoadBar(state: MediaPreloadState) {
         <span className="media-load-icon">⏬</span>
         טוען מדיה… {done}/{total}
         {failed > 0 && <span className="media-load-failed"> · {failed} נכשלו</span>}
-        <span className="media-load-hint"> · אפשר כבר להתחיל</span>
+        <span className="media-load-hint">
+          {startsImmediately ? ' · אפשר כבר להתחיל' : ' · אפשר ללחוץ התחל — המשחק ייפתח בסיום'}
+        </span>
       </div>
     </div>
   );
