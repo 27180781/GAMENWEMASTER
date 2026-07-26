@@ -583,7 +583,9 @@ export function App() {
         {mediaIssues.length > 0 && !mediaAlertDismissed && (
           <MediaIssuesAlert issues={mediaIssues} onClose={() => setMediaAlertDismissed(true)} />
         )}
-        {!mediaPreload.done && <MediaLoadBar {...mediaPreload} />}
+        {!mediaPreload.done && (
+          <MediaLoadBar {...mediaPreload} startsImmediately={settings.allowStartBeforeLoad} />
+        )}
       </Shell>
     );
   }

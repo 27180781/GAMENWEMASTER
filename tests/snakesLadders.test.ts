@@ -15,6 +15,7 @@ import {
   MAX_STEPS,
   membersByGroup,
   playRound,
+  rebuildBoard,
   rollDice,
   stepsForPercent,
   type BoardState,
@@ -231,5 +232,65 @@ describe('חוק "אין נשיכה כפולה" — מונע לולאה אינס
     }
     expect(hasWinner(b)).toBe(true); // הגיעה לסוף
     expect(rounds).toBeLessThan(40);
+  });
+});
+
+describe('rebuildBoard — שחזור הלוח מגיבוי', () => {
+  /** שקופית מצביעה מינימלית: תשובה 2 היא הנכונה. */
+  const slide = (id: number) => ({
+    id,
+    type: 'trivia',
+    question: {
+      answers: [
+        { id: 1, correct: false },
+        { id: 2, correct: true },
+      ],
+    },
+  });
+  const slides = [slide(1), slide(2), slide(3)];
+  const opts = { roster: roster(), categoryId: 'cat1', progression: 'percent' as const };
+
+  it('שחזור זהה בדיוק להרצה חיה של אותם סבבים', () => {
+    const votes: Record<number, Record<string, number>> = {
+      1: { a: 2, b: 2, c: 2, d: 1, e: 1 },
+      2: { a: 2, b: 1, c: 2, d: 2, e: 2 },
+    };
+    // הרצה "חיה": סבב אחרי סבב, בדיוק כמו במשחק
+    let live: BoardState = EMPTY_BOARD;
+    for (const s of [1, 2]) {
+      live = round({ votes: votes[s]!, board: live, seed: s });
+    }
+    const restored = rebuildBoard(slides, votes, new Set([1, 2]), opts);
+    expect(restored.positions).toEqual(live.positions);
+    expect(restored.lastSnake).toEqual(live.lastSnake);
+  });
+
+  it('מריץ רק שקופיות שהושלמו — השקופית הנוכחית לא נבלעת', () => {
+    const votes = { 1: { a: 2, b: 2 }, 2: { a: 2, b: 2 } };
+    // רק שקופית 1 הושלמה; 2 היא הנוכחית וסבבה ירוץ חי אחרי החשיפה
+    const only1 = rebuildBoard(slides, votes, new Set([1]), opts);
+    const both = rebuildBoard(slides, votes, new Set([1, 2]), opts);
+    expect(only1.positions.g1).toBeLessThan(both.positions.g1!);
+  });
+
+  it('בלי שקופיות שהושלמו מחזיר לוח ריק', () => {
+    expect(rebuildBoard(slides, {}, new Set(), opts)).toEqual(EMPTY_BOARD);
+  });
+
+  it('מדלג על שקופיות לא-מצביעות (media/players) גם אם הושלמו', () => {
+    const withMedia = [slide(1), { ...slide(2), type: 'media' }, slide(3)];
+    const votes = { 1: { a: 2, b: 2 }, 2: { a: 2, b: 2 } };
+    const built = rebuildBoard(withMedia, votes, new Set([1, 2]), opts);
+    const onlyVotable = rebuildBoard(slides, votes, new Set([1]), opts);
+    expect(built.positions).toEqual(onlyVotable.positions);
+  });
+
+  it('התקדמות בקובייה משוחזרת זהה (seed = מזהה השקופית)', () => {
+    const diceOpts = { ...opts, progression: 'dice' as const };
+    const votes = { 1: { a: 2, b: 2, c: 2, d: 2, e: 2 }, 2: { a: 2, b: 2, c: 2, d: 2, e: 2 } };
+    const a = rebuildBoard(slides, votes, new Set([1, 2]), diceOpts);
+    const b = rebuildBoard(slides, votes, new Set([1, 2]), diceOpts);
+    expect(a.positions).toEqual(b.positions); // דטרמיניסטי
+    expect(a.lastDice).not.toBeNull();
   });
 });
