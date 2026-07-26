@@ -16,6 +16,12 @@ const { spawn, spawnSync } = require('node:child_process');
 const JSZip = require('jszip');
 const { createClickerServer, DEFAULT_PORT } = require('./clickerServer.cjs');
 const { readSealedFromFile } = require('./sealPayload.cjs');
+const {
+  writeEncryptedMedia,
+  readEncryptedMediaRange,
+  encryptedMediaSize,
+  isEncryptedMedia,
+} = require('./contentCrypto.cjs');
 
 // סכימת מדיה מהדיסק (trivia-media://) — חייבת להירשם כ"מיוחסת" לפני app.ready
 // כדי ש-<video>/<img> יוכלו לטעון ממנה, ותמיכת fetch/זרימה (Range) תעבוד.
@@ -325,6 +331,20 @@ function mediaCacheKey(buf) {
   }
   return h.digest('hex').slice(0, 24);
 }
+/** סוג MIME לפי סיומת — נדרש כי המדיה מוגשת מפוענחת מהזיכרון (לא דרך file://). */
+function mimeForPath(p) {
+  const ext = (p.split('.').pop() || '').toLowerCase();
+  const map = {
+    mp4: 'video/mp4', m4v: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', ogv: 'video/ogg',
+    mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg', oga: 'audio/ogg', m4a: 'audio/mp4',
+    aac: 'audio/aac', flac: 'audio/flac', opus: 'audio/opus',
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp',
+    svg: 'image/svg+xml', avif: 'image/avif', bmp: 'image/bmp', ico: 'image/x-icon',
+    json: 'application/json', txt: 'text/plain',
+  };
+  return map[ext] || 'application/octet-stream';
+}
+
 /** נתיב יחסי בטוח בתוך המטמון — חוסם path traversal / נתיב מוחלט. null = לדלג. */
 function safeRelPath(name) {
   const out = [];
@@ -351,6 +371,17 @@ function pruneMediaCache(keepKey) {
     /* אין תיקייה */
   }
 }
+/**
+ * קריאת קובץ טקסט מהמטמון (data.json). הקבצים שמורים מוצפנים; קובץ ישן/גלוי
+ * (ממטמון שנוצר לפני ההצפנה) עדיין נקרא כרגיל.
+ */
+function readCachedText(dir, rel, key) {
+  const full = path.join(dir, rel);
+  if (!isEncryptedMedia(full)) return fs.readFileSync(full, 'utf8');
+  const size = encryptedMediaSize(full);
+  return readEncryptedMediaRange(full, key, 0, size - 1).toString('utf8');
+}
+
 /** איתור data.json בתוך רשימת שמות (בכל עומק, ללא תלות ברישיות). */
 function findDataPath(names) {
   return (
@@ -382,7 +413,7 @@ async function extractGameToCache(bytes) {
       if (dataPath !== null && fs.existsSync(path.join(dir, dataPath))) {
         pruneMediaCache(key);
         currentMediaCacheKey = key;
-        return { cacheKey: key, dataPath, dataJson: fs.readFileSync(path.join(dir, dataPath), 'utf8'), names };
+        return { cacheKey: key, dataPath, dataJson: readCachedText(dir, dataPath, key), names };
       }
     } catch {
       /* מניפסט פגום/ישן — מחלצים מחדש */
@@ -399,13 +430,15 @@ async function extractGameToCache(bytes) {
     if (rel === null) continue;
     const dest = path.join(dir, rel);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
-    fs.writeFileSync(dest, await entry.async('nodebuffer'));
+    // המדיה נשמרת **מוצפנת** בדיסק ומפוענחת רק תוך כדי נגינה (בפרוטוקול
+    // trivia-media://). כך אין קובץ וידאו/תמונה פתוח בסייר הקבצים בשום רגע.
+    writeEncryptedMedia(dest, await entry.async('nodebuffer'), key);
     names.push(rel);
   }
   const dataPath = findDataPath(names);
   fs.writeFileSync(manifestPath, JSON.stringify({ names, dataPath, savedAt: Date.now() }));
   currentMediaCacheKey = key;
-  const dataJson = dataPath !== null ? fs.readFileSync(path.join(dir, dataPath), 'utf8') : '';
+  const dataJson = dataPath !== null ? readCachedText(dir, dataPath, key) : '';
   return { cacheKey: key, dataPath, dataJson, names };
 }
 
@@ -449,9 +482,21 @@ function createWindow() {
   // טעינת הבנייה הסטטית מהדיסק — אופליין מלא
   void mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
 
+  hardenWindow(mainWindow);
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+}
+
+/**
+ * הקשחת חלון בגרסה הארוזה: חסימת תפריט-הקשר (שמירת תמונה/וידאו בקליק ימני)
+ * וחסימת ניווט/חלונות חיצוניים. בפיתוח לא מפריעים לעבודה.
+ */
+function hardenWindow(win) {
+  if (!app.isPackaged) return;
+  win.webContents.on('context-menu', (e) => e.preventDefault());
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 }
 
 /**
@@ -478,6 +523,7 @@ function openHostWindow() {
     },
   });
   void hostWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), { hash: 'host' });
+  hardenWindow(hostWindow);
   hostWindow.on('closed', () => {
     hostWindow = null;
   });
@@ -569,7 +615,45 @@ app.whenReady().then(() => {
         return new Response('forbidden', { status: 403 });
       }
       if (!fs.existsSync(file)) return new Response('not found', { status: 404 });
-      return net.fetch(pathToFileURL(file).toString());
+      // קובץ ישן/גלוי (מטמון מלפני ההצפנה) — מוגש כרגיל.
+      if (!isEncryptedMedia(file)) return net.fetch(pathToFileURL(file).toString());
+
+      // מדיה מוצפנת: מפענחים **רק את הטווח המבוקש**, בזיכרון, ומגישים. אין
+      // בשום שלב קובץ מפוענח על הדיסק. תמיכת Range נשמרת, ולכן דילוג/חיפוש
+      // בווידאו עובד והנגן לא מושך את כל הקובץ.
+      const total = encryptedMediaSize(file);
+      const type = mimeForPath(file);
+      const range = request.headers.get('Range');
+      const m = range ? /bytes=(\d*)-(\d*)/.exec(range) : null;
+      if (m) {
+        const start = m[1] ? Number(m[1]) : 0;
+        const end = m[2] ? Math.min(Number(m[2]), total - 1) : total - 1;
+        if (Number.isNaN(start) || start > end || start >= total) {
+          return new Response('range not satisfiable', {
+            status: 416,
+            headers: { 'Content-Range': `bytes */${total}` },
+          });
+        }
+        const body = readEncryptedMediaRange(file, key, start, end);
+        return new Response(body, {
+          status: 206,
+          headers: {
+            'Content-Type': type,
+            'Content-Length': String(body.length),
+            'Content-Range': `bytes ${start}-${end}/${total}`,
+            'Accept-Ranges': 'bytes',
+          },
+        });
+      }
+      const body = readEncryptedMediaRange(file, key, 0, total - 1);
+      return new Response(body, {
+        status: 200,
+        headers: {
+          'Content-Type': type,
+          'Content-Length': String(body.length),
+          'Accept-Ranges': 'bytes',
+        },
+      });
     } catch (err) {
       console.error('[media] הגשת מדיה נכשלה:', /** @type {Error} */ (err).message);
       return new Response('error', { status: 500 });
@@ -655,7 +739,8 @@ app.whenReady().then(() => {
       const file = `${crypto.randomUUID()}${safeExt}`;
       const dir = path.join(mediaCacheDir(currentMediaCacheKey), '_edits');
       fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(path.join(dir, file), Buffer.from(bytes));
+      // גם מדיה שנוספת בעריכה חיה נשמרת מוצפנת, כמו שאר המדיה.
+      writeEncryptedMedia(path.join(dir, file), Buffer.from(bytes), currentMediaCacheKey);
       return `trivia-media://${currentMediaCacheKey}/_edits/${file}`;
     } catch (err) {
       console.error('[media] שמירת קובץ עריכה נכשלה:', /** @type {Error} */ (err).message);
@@ -677,9 +762,14 @@ app.whenReady().then(() => {
   globalShortcut.register('F11', () => {
     if (mainWindow) mainWindow.setFullScreen(!mainWindow.isFullScreen());
   });
-  globalShortcut.register('CommandOrControl+Shift+I', () => {
-    mainWindow?.webContents.toggleDevTools();
-  });
+  // כלי הפיתוח נפתחים רק בפיתוח: בגרסה הארוזה הם היו מאפשרים לכל אחד לראות
+  // את כתובות המדיה ואת קוד האפליקציה ולשמור אותם. (ניתן להפעיל במודע דרך
+  // משתנה הסביבה TRIVIA_DEVTOOLS=1 לצורך אבחון בשטח.)
+  if (!app.isPackaged || process.env.TRIVIA_DEVTOOLS === '1') {
+    globalShortcut.register('CommandOrControl+Shift+I', () => {
+      mainWindow?.webContents.toggleDevTools();
+    });
+  }
   globalShortcut.register('CommandOrControl+Q', () => app.quit());
 
   app.on('activate', () => {

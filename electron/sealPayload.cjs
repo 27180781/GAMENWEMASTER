@@ -15,9 +15,14 @@
  */
 
 const fs = require('node:fs');
+const { sealBox, openBox } = require('./contentCrypto.cjs');
 
-const MAGIC = Buffer.from('TREGSEAL'); // 8 bytes
+const MAGIC = Buffer.from('TREGSEAL'); // 8 bytes — גרסה 1 (מטען גלוי, נתמך לקריאה)
+const MAGIC_ENC = Buffer.from('TREGSEA2'); // 8 bytes — גרסה 2 (מטען מוצפן)
 const FOOTER_LEN = 4 + 4 + MAGIC.length; // 16
+/** מפרידי-תחום להצפנה — מפתח נגזר שונה למשחק ולהגדרות. */
+const CTX_GAME = 'seal-game';
+const CTX_CONFIG = 'seal-config';
 
 /**
  * @typedef {Object} SealConfig
@@ -37,13 +42,28 @@ const FOOTER_LEN = 4 + 4 + MAGIC.length; // 16
  */
 function sealPayload(exeBuf, gameZipBuf, config) {
   const exe = Buffer.from(exeBuf);
-  const gameZip = Buffer.from(gameZipBuf);
-  const configBuf = Buffer.from(JSON.stringify(config), 'utf8');
+  // המטען מוצפן (AES-256-GCM): בלי זה אפשר היה לפתוח את ה-EXE ב-7-Zip או
+  // בהקס-אדיטור ולשלוף את כל המשחק והמדיה. עכשיו אין שם ZIP גלוי כלל.
+  const gameZip = sealBox(Buffer.from(gameZipBuf), CTX_GAME);
+  const configBuf = sealBox(Buffer.from(JSON.stringify(config), 'utf8'), CTX_CONFIG);
   const footer = Buffer.alloc(FOOTER_LEN);
   footer.writeUInt32LE(gameZip.length, 0);
   footer.writeUInt32LE(configBuf.length, 4);
-  MAGIC.copy(footer, 8);
+  MAGIC_ENC.copy(footer, 8);
   return Buffer.concat([exe, gameZip, configBuf, footer]);
+}
+
+/**
+ * מפענח את שני חלקי המטען לפי גרסת החותמת. גרסה 1 (גלויה) עדיין נקראת, כדי
+ * ש-EXE-ים שכבר הופצו ימשיכו לעבוד.
+ * @param {Buffer} gamePart
+ * @param {Buffer} configPart
+ * @param {boolean} encrypted
+ */
+function decodeParts(gamePart, configPart, encrypted) {
+  const gameZip = encrypted ? openBox(gamePart, CTX_GAME) : gamePart;
+  const configJson = (encrypted ? openBox(configPart, CTX_CONFIG) : configPart).toString('utf8');
+  return { gameZip: new Uint8Array(gameZip), config: JSON.parse(configJson) };
 }
 
 /**
@@ -55,7 +75,9 @@ function readSealed(input) {
   const buf = Buffer.from(input);
   if (buf.length < FOOTER_LEN) return null;
   const footer = buf.subarray(buf.length - FOOTER_LEN);
-  if (!footer.subarray(8).equals(MAGIC)) return null;
+  const tail = footer.subarray(8);
+  const encrypted = tail.equals(MAGIC_ENC);
+  if (!encrypted && !tail.equals(MAGIC)) return null;
   const gameZipLen = footer.readUInt32LE(0);
   const configLen = footer.readUInt32LE(4);
   const total = gameZipLen + configLen + FOOTER_LEN;
@@ -64,8 +86,7 @@ function readSealed(input) {
   const gameZip = buf.subarray(start, start + gameZipLen);
   const configBuf = buf.subarray(start + gameZipLen, start + gameZipLen + configLen);
   try {
-    const config = /** @type {SealConfig} */ (JSON.parse(configBuf.toString('utf8')));
-    return { gameZip: new Uint8Array(gameZip), config };
+    return decodeParts(gameZip, configBuf, encrypted);
   } catch {
     return null;
   }
@@ -85,7 +106,9 @@ function readSealedFromFile(filePath) {
     if (size < FOOTER_LEN) return null;
     const footer = Buffer.alloc(FOOTER_LEN);
     fs.readSync(fd, footer, 0, FOOTER_LEN, size - FOOTER_LEN);
-    if (!footer.subarray(8).equals(MAGIC)) return null;
+    const tail = footer.subarray(8);
+    const encrypted = tail.equals(MAGIC_ENC);
+    if (!encrypted && !tail.equals(MAGIC)) return null;
     const gameZipLen = footer.readUInt32LE(0);
     const configLen = footer.readUInt32LE(4);
     const payloadLen = gameZipLen + configLen;
@@ -93,11 +116,7 @@ function readSealedFromFile(filePath) {
     if (start < 0) return null;
     const payload = Buffer.alloc(payloadLen);
     fs.readSync(fd, payload, 0, payloadLen, start);
-    const gameZip = payload.subarray(0, gameZipLen);
-    const config = /** @type {SealConfig} */ (
-      JSON.parse(payload.subarray(gameZipLen).toString('utf8'))
-    );
-    return { gameZip: new Uint8Array(gameZip), config };
+    return decodeParts(payload.subarray(0, gameZipLen), payload.subarray(gameZipLen), encrypted);
   } catch {
     return null;
   } finally {
