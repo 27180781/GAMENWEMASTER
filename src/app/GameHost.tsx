@@ -346,6 +346,19 @@ export function GameHost({
   boardOverlayRef.current = boardOverlay;
   const boardRef = useRef(board);
   boardRef.current = board;
+  /**
+   * מזהה השקופית שסבב הלוח שלה כבר חושב וממתין להצגה (null = אין). הלוח *אינו*
+   * נפתח מיד עם חשיפת התשובה הנכונה — קודם הקהל רואה את התשובה, ורק רווח נוסף
+   * פותח את הלוח. שמירת מזהה השקופית (ולא סתם דגל) מבטיחה שהמתנה משקופית אחת
+   * לא "תיפתח" בטעות על שקופית אחרת.
+   *
+   * state ולא ref בלבד, כי ההמתנה חייבת לעצור גם את המעברים האוטומטיים: הם
+   * שולחים ADVANCE ישירות למנוע (לא דרך advance), ולכן בלי זה היו מדלגים על
+   * הלוח לגמרי. כשהלוח היה נפתח מעצמו, boardOverlay הוא שחסם אותם.
+   */
+  const [boardPending, setBoardPending] = useState<number | null>(null);
+  const boardPendingRef = useRef<number | null>(null);
+  boardPendingRef.current = boardPending;
   /** מסך דירוג קבוצות (פקודת מנחה 4, בשלב חשיפת התשובה). */
   const [groupsOverlay, setGroupsOverlay] = useState(false);
   const groupsOverlayRef = useRef(false);
@@ -1155,6 +1168,15 @@ export function GameHost({
       setBoardOverlay(false);
       return;
     }
+    // סבב הלוח חושב וממתין: קודם הוצגה התשובה הנכונה, ורווח זה פותח את הלוח
+    // (ולא מקדם שקופית) — כך הקהל מספיק לראות את התשובה לפני שהמרוץ נכנס.
+    if (boardPendingRef.current !== null && boardPendingRef.current === engine.getState().currentSlideId) {
+      boardPendingRef.current = null;
+      setBoardPending(null);
+      setBoardOverlay(true);
+      audio.play('generic', soundsRef.current.genericMediaSound.src);
+      return;
+    }
     const stage = stageRef.current;
     if (stage === 'opening') setStage('playing');
     else if (stage === 'playing') advanceStep();
@@ -1167,7 +1189,7 @@ export function GameHost({
       // מסך הניקוד מדפדף לבד בלולאה; רווח/0 מדפדפים עמוד מיד (שליטה למנחה)
       setScoresPageBump((n) => n + 1);
     }
-  }, [engine, advanceStep]);
+  }, [engine, advanceStep, audio]);
   const advanceRef = useRef(advance);
   advanceRef.current = advance;
 
@@ -1586,6 +1608,7 @@ export function GameHost({
     votesOverlay ||
     groupsOverlay ||
     boardOverlay ||
+    boardPending !== null || // הלוח מחושב וממתין לרווח — לא מדלגים עליו אוטומטית
     connectCategory !== null ||
     settingsOpen ||
     rosterOpen ||
@@ -1758,13 +1781,17 @@ export function GameHost({
       board: boardRef.current,
     });
     setBoard(next);
-    setBoardOverlay(true);
-    audio.play('generic', soundsRef.current.genericMediaSound.src);
-  }, [isSnakesGame, stage, state.phase, reveal.revealCorrect, state.currentSlideId, state.votesBySlide, engine, audio]);
+    // לא נפתח כאן: קודם התשובה הנכונה על המסך, והלוח ממתין לרווח הבא (advance).
+    setBoardPending(state.currentSlideId);
+  }, [isSnakesGame, stage, state.phase, reveal.revealCorrect, state.currentSlideId, state.votesBySlide, engine]);
 
-  // הלוח נסגר אוטומטית כשעוזבים את שלב החשיפה (מעבר שקופית וכו').
+  // הלוח נסגר אוטומטית כשעוזבים את שלב החשיפה (מעבר שקופית וכו'), וגם ההמתנה
+  // מתבטלת — כדי שלוח של שקופית קודמת לא ייפתח על השקופית הבאה.
   useEffect(() => {
-    if (state.phase !== 'results') setBoardOverlay(false);
+    if (state.phase !== 'results') {
+      setBoardOverlay(false);
+      setBoardPending(null);
+    }
   }, [state.phase, state.currentSlideId]);
 
   // פירוט ההצבעות (פקודה 5) ומסך הקבוצות (פקודה 4) רלוונטיים רק בשלב חשיפת
@@ -1929,6 +1956,7 @@ export function GameHost({
     setBoard(EMPTY_BOARD);
     setBoardOverlay(false);
     boardDoneRef.current = null;
+    setBoardPending(null);
     // ריצה חדשה גם מבחינת הגיבוי: זמן התחלה טרי, והשמירות שיבואו יפתחו גיבוי
     // חי חדש לאותו משחק — במקום להיראות כהמשך של הריצה הקודמת. אם הריצה
     // הקודמת הסתיימה (game-over), הגיבוי הנעול שלה בארכיון "נפתח" מחדש בכוונה.
