@@ -16,8 +16,16 @@
 import type { Slide, VoteSnapshot } from '../engine/index.ts';
 import { playerGroupNames, type RosterData } from './roster.ts';
 
-/** שם הקבוצה שהשקופית מוגבלת אליה, או null אם אין הגבלה. */
-export function slideGroupRestriction(slide: Slide): string | null {
+/**
+ * שם הקבוצה שהשקופית מוגבלת אליה, או null אם אין הגבלה.
+ *
+ * `gameType` מועבר כדי שסוגי משחק שההגבלה אינה רלוונטית להם יתעלמו ממנה: ב-
+ * "סולמות וחבלים קבוצתי" *כל* הקהל עונה על כל שאלה במקביל (זה כל הרעיון), ולכן
+ * הגבלה לקבוצה בודדת בקובץ פשוט מנוטרלת — כדי שהמשחק ירוץ חלק גם אם נשארו
+ * בקובץ הגדרות מסוג אחר.
+ */
+export function slideGroupRestriction(slide: Slide, gameType = 'classic'): string | null {
+  if (gameType !== 'classic') return null;
   const r = slide.setting.groupRestriction;
   if (!r?.active) return null;
   const name = r.groupName.trim();

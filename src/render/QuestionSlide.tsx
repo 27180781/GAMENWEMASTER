@@ -66,6 +66,8 @@ interface QuestionSlideProps {
   title: string;
   /** לוגו המשחק (setting.logo) — עיגול בכותרת; ריק ⇐ מוסתר. */
   logo: string;
+  /** סוג המשחק — הגבלת שאלה לקבוצה רלוונטית רק ל-'classic'. */
+  gameType?: string;
 }
 
 /** אווטרים שמתעופפים כלפי מעלה בכל תשובה חדשה שנכנסת. */
@@ -208,6 +210,7 @@ export function QuestionSlide({
   leaders,
   title,
   logo,
+  gameType = 'classic',
 }: QuestionSlideProps) {
   const isVoting = state.phase === 'voting';
   const isTrivia = slide.type === 'trivia';
@@ -234,7 +237,7 @@ export function QuestionSlide({
 
   const hasImage = slide.question.src !== '';
   /** שם הקבוצה שהשקופית מוגבלת אליה (null = פתוחה לכולם). */
-  const restrictedGroup = slideGroupRestriction(slide);
+  const restrictedGroup = slideGroupRestriction(slide, gameType);
   const low = timer !== null && !timer.paused && timer.remaining <= 5;
   // שבר הטיימר — נותר/סה"כ, מדויק לפי השניות (מתעדכן כל 200ms מ-GameHost).
   const timerFrac = timer && timer.total > 0 ? Math.max(0, timer.remaining / timer.total) : 1;

@@ -291,6 +291,36 @@ export const globalSettingsSchema = z.object({
   }),
   // מעברים אוטומטיים — ברירת מחדל למשחק (ניתן לדריסה בהגדרות ולשמירה ב-localStorage)
   autoTransition: autoTransitionSchema,
+  /**
+   * סוג המשחק. חסר/לא מוכר = 'classic' — המשחק הרגיל, בדיוק כפי שהיה. סוגים
+   * נוספים מוסיפים שכבת חוויה מעל אותו מנוע שאלות (ראו gameTypeSettings).
+   */
+  gameType: z
+    .string()
+    .optional()
+    .default('classic')
+    .transform((v) => (v === 'snakes_ladders_team' ? v : 'classic')),
+  /** הגדרות ייעודיות לסוג המשחק. כולן אופציונליות עם ברירות מחדל שמישות. */
+  gameTypeSettings: z
+    .object({
+      snakesLadders: z
+        .object({
+          /**
+           * איך נקבעת ההתקדמות בלוח:
+           *   'dice'    — הקבוצה עם אחוז ההצלחה הגבוה ביותר "מטילה קובייה".
+           *   'percent' — כל קבוצה מתקדמת לפי אחוז ההצלחה שלה.
+           */
+          progression: z
+            .string()
+            .optional()
+            .default('percent')
+            .transform((v) => (v === 'dice' ? 'dice' : 'percent')),
+        })
+        .optional()
+        .default({ progression: 'percent' }),
+    })
+    .optional()
+    .default({ snakesLadders: { progression: 'percent' } }),
 });
 
 export type AutoTransition = z.infer<typeof autoTransitionSchema>;

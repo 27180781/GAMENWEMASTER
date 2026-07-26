@@ -76,6 +76,13 @@ import {
   slideGroupRestriction,
 } from './groupRestriction.ts';
 import {
+  boardCategoryId,
+  EMPTY_BOARD,
+  playRound,
+  type BoardState,
+} from './snakesLadders.ts';
+import { SnakesLaddersBoard } from '../render/SnakesLaddersBoard.tsx';
+import {
   HOST_HEARTBEAT_MS,
   openControlChannel,
   type ControlChannel,
@@ -330,6 +337,14 @@ export function GameHost({
   leadersOverlayRef.current = leadersOverlay;
   /** פירוט הצבעות השחקנים (פקודת מנחה 5, בשלב חשיפת התשובה). */
   const [votesOverlay, setVotesOverlay] = useState(false);
+  /** מצב לוח "סולמות וחבלים קבוצתי" (רק ב-gameType מתאים). */
+  const [board, setBoard] = useState<BoardState>(EMPTY_BOARD);
+  /** האם לוח המרוץ מוצג כרגע. */
+  const [boardOverlay, setBoardOverlay] = useState(false);
+  const boardOverlayRef = useRef(false);
+  boardOverlayRef.current = boardOverlay;
+  const boardRef = useRef(board);
+  boardRef.current = board;
   /** מסך דירוג קבוצות (פקודת מנחה 4, בשלב חשיפת התשובה). */
   const [groupsOverlay, setGroupsOverlay] = useState(false);
   const groupsOverlayRef = useRef(false);
@@ -1115,6 +1130,11 @@ export function GameHost({
       setGroupsOverlay(false);
       return;
     }
+    // לוח המרוץ (סולמות וחבלים) פתוח — רווח סוגר אותו וממשיך לשקופית הבאה.
+    if (boardOverlayRef.current) {
+      setBoardOverlay(false);
+      return;
+    }
     const stage = stageRef.current;
     if (stage === 'opening') setStage('playing');
     else if (stage === 'playing') advanceStep();
@@ -1220,7 +1240,7 @@ export function GameHost({
     const g = engine.getGame();
     const st = engine.getState();
     const votes = st.votesBySlide[st.currentSlideId] ?? {};
-    const restricted = slideGroupRestriction(engine.getCurrentSlide());
+    const restricted = slideGroupRestriction(engine.getCurrentSlide(), g.setting.gameType);
     const leaders = Object.entries(st.scores)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 8)
@@ -1380,7 +1400,7 @@ export function GameHost({
       // לפני המנוע — ולכן אינן נספרות, אינן מזכות בניקוד ואינן מופיעות בפירוט.
       // הניקוד הקיים שלהם לא משתנה; הם פשוט מדלגים על השאלה. (הסינון אחרי
       // מסך ההתחברות לקבוצות, כדי שהצטרפות לקבוצה תמשיך לעבוד לכולם.)
-      const restrictTo = slideGroupRestriction(engine.getCurrentSlide());
+      const restrictTo = slideGroupRestriction(engine.getCurrentSlide(), engine.getGame().setting.gameType);
       if (restrictTo !== null) {
         snapshot = restrictSnapshotToGroup(snapshot, rosterRef.current, restrictTo);
       }
@@ -1539,6 +1559,7 @@ export function GameHost({
     leadersOverlay ||
     votesOverlay ||
     groupsOverlay ||
+    boardOverlay ||
     connectCategory !== null ||
     settingsOpen ||
     rosterOpen ||
@@ -1680,6 +1701,41 @@ export function GameHost({
     audio.play('winnersList', sounds.winnersListMediaSound.src);
     return () => audio.stop('winnersList');
   }, [leadersOverlay, audio, sounds]);
+
+  // -------------------------------------------------------------------------
+  // "סולמות וחבלים קבוצתי": בסיום חשיפת התשובה מחשבים את הסבב (אחוז הצלחה לכל
+  // קבוצה → צעדים → סולם/חבל) ומעלים את הלוח. האפקט תופס את כל דרכי החשיפה
+  // (ידנית, אוטומטית, וחשיפה-מלאה) באופן אחיד, ורץ פעם אחת לכל שקופית.
+  // -------------------------------------------------------------------------
+  const isSnakesGame = engine.getGame().setting.gameType === 'snakes_ladders_team';
+  const boardDoneRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!isSnakesGame || stage !== 'playing') return;
+    if (!reveal.revealCorrect) return;
+    const slide = engine.getCurrentSlide();
+    if (!isVotableSlide(slide)) return;
+    if (boardDoneRef.current === state.currentSlideId) return; // כבר חושב לשקופית הזו
+    const categoryId = boardCategoryId(rosterRef.current);
+    if (categoryId === null) return; // אין חלוקה לקבוצות — אין מרוץ
+    boardDoneRef.current = state.currentSlideId;
+    const next = playRound({
+      roster: rosterRef.current,
+      categoryId,
+      votes: state.votesBySlide[state.currentSlideId] ?? {},
+      correctAnswerIds: slide.question.answers.filter((a) => a.correct).map((a) => a.id),
+      progression: engine.getGame().setting.gameTypeSettings.snakesLadders.progression,
+      seed: state.currentSlideId, // דטרמיניסטי — רענון/גיבוי מציגים אותו לוח
+      board: boardRef.current,
+    });
+    setBoard(next);
+    setBoardOverlay(true);
+    audio.play('generic', soundsRef.current.genericMediaSound.src);
+  }, [isSnakesGame, stage, reveal.revealCorrect, state.currentSlideId, state.votesBySlide, engine, audio]);
+
+  // הלוח נסגר אוטומטית כשעוזבים את שלב החשיפה (מעבר שקופית וכו').
+  useEffect(() => {
+    if (state.phase !== 'results') setBoardOverlay(false);
+  }, [state.phase, state.currentSlideId]);
 
   // פירוט ההצבעות (פקודה 5) ומסך הקבוצות (פקודה 4) רלוונטיים רק בשלב חשיפת
   // התשובה — נסגרים אוטומטית כשעוזבים את שלב ה-results או עוברים שקופית.
@@ -1983,6 +2039,18 @@ export function GameHost({
             nameOf={nameOf}
             ansIsNumber={setting.ansIsNumber}
             onClose={() => setVotesOverlay(false)}
+          />
+        )}
+
+        {/* לוח "סולמות וחבלים קבוצתי" — עולה אוטומטית אחרי חשיפת התשובה */}
+        {stage === 'playing' && boardOverlay && (
+          <SnakesLaddersBoard
+            board={board}
+            groups={
+              roster.categories.find((c) => c.id === boardCategoryId(roster))?.groups ?? []
+            }
+            progression={setting.gameTypeSettings.snakesLadders.progression}
+            onClose={() => setBoardOverlay(false)}
           />
         )}
 
