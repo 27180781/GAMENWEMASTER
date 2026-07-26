@@ -4,8 +4,9 @@
  * YouTube; לתמונה אין "סיום" — המפעיל מקדם ידנית).
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { classifyMediaUrl } from '../engine/index.ts';
+import { MediaPauseContext } from './mediaPause.ts';
 
 interface MediaPlayerProps {
   src: string;
@@ -52,15 +53,78 @@ export function MediaPlayer({ src, onEnded, asBackground = false, className }: M
   // משיכה טרייה של הנכס שנכשל רגעית.
   const loadSrc = attempt === 0 ? src : `${src}${src.includes('?') ? '&' : '?'}_retry=${attempt}`;
 
-  // רקע = מושתק. התכונה muted ב-JSX אינה אמינה ל-autoplay (React מגדיר אותה
-  // כ-attribute ולא כ-property בזמן, אז הדפדפן עלול להתחיל לנגן *עם* קול); לכן
-  // מגדירים muted ישירות על ה-DOM ברגע שהמרכיב נוצר (callback ref).
-  const setVideoMuted = useCallback(
-    (node: HTMLVideoElement | null) => {
-      if (node) node.muted = asBackground;
+  // ---- עצירה בזמן שכבה חוסמת + חיווי טעינה ----
+  const elRef = useRef<HTMLMediaElement | null>(null);
+  const pausedByOverlay = useContext(MediaPauseContext);
+  /** האם *אנחנו* עצרנו — כדי לא להפעיל מחדש וידאו שנגמר או שהמנחה עצר. */
+  const overlayPausedRef = useRef(false);
+  /**
+   * "ממתין לנתונים": הנגן מציג פריים קפוא כי הבאפר ריק. קורה בתחילת סרטון כבד
+   * (עד שיש מספיק כדי להתחיל) וגם באמצע נגינה כשהבאפר נגמר. בלי חיווי זה נראה
+   * כאילו המשחק נתקע — לכן מציגים עיגול טעינה מעל המדיה.
+   */
+  const [buffering, setBuffering] = useState(kind === 'video' || kind === 'audio');
+  useEffect(() => {
+    setBuffering(kind === 'video' || kind === 'audio');
+  }, [loadSrc, kind]);
+
+  const attachMedia = useCallback(
+    (node: HTMLMediaElement | null) => {
+      elRef.current = node;
+      // רקע = מושתק. התכונה muted ב-JSX אינה אמינה ל-autoplay (React מגדיר אותה
+      // כ-attribute ולא כ-property בזמן, אז הדפדפן עלול להתחיל לנגן *עם* קול);
+      // לכן מגדירים muted ישירות על ה-DOM ברגע שהמרכיב נוצר.
+      if (node && node instanceof HTMLVideoElement) node.muted = asBackground;
     },
     [asBackground],
   );
+
+  // מנוי לאירועי הבאפר של הנגן — מקור אמת ישיר, בלי ניחושים לפי זמן.
+  useEffect(() => {
+    const el = elRef.current;
+    if (!el) return undefined;
+    const wait = () => setBuffering(true);
+    const go = () => setBuffering(false);
+    el.addEventListener('waiting', wait);
+    el.addEventListener('stalled', wait);
+    el.addEventListener('playing', go);
+    el.addEventListener('canplay', go);
+    el.addEventListener('canplaythrough', go);
+    el.addEventListener('ended', go);
+    return () => {
+      el.removeEventListener('waiting', wait);
+      el.removeEventListener('stalled', wait);
+      el.removeEventListener('playing', go);
+      el.removeEventListener('canplay', go);
+      el.removeEventListener('canplaythrough', go);
+      el.removeEventListener('ended', go);
+    };
+  }, [loadSrc, kind]);
+
+  // עצירה/המשך לפי השכבה החוסמת — ממשיכים בדיוק מאותה נקודה.
+  useEffect(() => {
+    const el = elRef.current;
+    if (!el) return;
+    if (pausedByOverlay) {
+      if (!el.paused && !el.ended) {
+        overlayPausedRef.current = true;
+        el.pause();
+      }
+    } else if (overlayPausedRef.current) {
+      overlayPausedRef.current = false;
+      void el.play().catch(() => {
+        /* חסימת autoplay — נשאר עצור, המנחה ימשיך ידנית */
+      });
+    }
+  }, [pausedByOverlay, loadSrc]);
+
+  /** עיגול הטעינה שמוצג מעל המדיה בזמן המתנה לנתונים (לא על רקע — מכער). */
+  const spinner =
+    buffering && !asBackground ? (
+      <div className="media-buffering" role="status" aria-label="טוען מדיה">
+        <span className="media-buffering-ring" />
+      </div>
+    ) : null;
   if (failed && (kind === 'image' || kind === 'video' || kind === 'audio')) {
     if (asBackground) return null;
     return (
@@ -80,18 +144,24 @@ export function MediaPlayer({ src, onEnded, asBackground = false, className }: M
       return <img key={loadSrc} className={className ?? 'media-fill'} src={loadSrc} alt="" onError={fail} />;
     case 'video':
       return (
-        <video
-          key={loadSrc}
-          ref={setVideoMuted}
-          className={className ?? 'media-fill'}
-          src={loadSrc}
-          autoPlay
-          muted={asBackground}
-          loop={asBackground}
-          playsInline
-          onEnded={asBackground ? undefined : onEnded}
-          onError={fail}
-        />
+        <>
+          <video
+            key={loadSrc}
+            ref={attachMedia}
+            className={className ?? 'media-fill'}
+            src={loadSrc}
+            autoPlay
+            // מבקשים מהדפדפן לצבור באפר קדימה ולא רק "מספיק כדי להתחיל" —
+            // פחות עצירות באמצע. הבייטים ממילא מגיעים מהמטמון המקומי.
+            preload="auto"
+            muted={asBackground}
+            loop={asBackground}
+            playsInline
+            onEnded={asBackground ? undefined : onEnded}
+            onError={fail}
+          />
+          {spinner}
+        </>
       );
     case 'audio':
       return (
@@ -99,12 +169,15 @@ export function MediaPlayer({ src, onEnded, asBackground = false, className }: M
           <div className="media-audio-icon">🎵</div>
           <audio
             key={loadSrc}
+            ref={attachMedia}
             src={loadSrc}
             autoPlay
+            preload="auto"
             loop={asBackground}
             onEnded={asBackground ? undefined : onEnded}
             onError={fail}
           />
+          {spinner}
         </div>
       );
     case 'youtube':
