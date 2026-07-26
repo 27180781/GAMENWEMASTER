@@ -1190,6 +1190,19 @@ body {
   margin: 0;
 }
 .startup-failed { color: #ff9f9f; }
+/* "התחל בכל זאת" — מופיע רק כשהטעינה מתארכת; מודגש פחות מהכפתור הראשי, כי
+   ההמתנה לסיום הטעינה היא המסלול הרצוי (נגינה מהמטמון ולא הזרמה מקרטעת). */
+.startup-skip {
+  margin-top: 26px;
+  font-size: 22px;
+  opacity: 0.75;
+  animation: startup-skip-in 0.35s ease;
+}
+.startup-skip:hover { opacity: 1; }
+@keyframes startup-skip-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 0.75; transform: translateY(0); }
+}
 .startup-count-wrap {
   display: flex;
   flex-direction: column;

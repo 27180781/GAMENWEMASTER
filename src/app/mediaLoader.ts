@@ -32,29 +32,51 @@ export function orderedMediaUrls(game: GameFile): string[] {
 }
 
 /**
+ * כמה זמן בלי שהגיע ולו בייט אחד נחשב "הזרם נתקע" — ואז מפסיקים להמתין לנכס
+ * הכבד. זו המדידה הנכונה: קובץ *גדול* אינו קובץ *תקוע*. תקרת זמן קבועה נכשלה
+ * בשני הקצוות — קצרה מדי סימנה וידאו כבד כ"נטען" הרבה לפני שהיה במטמון (ואז
+ * הנגינה הזרימה חי מהרשת והתקרטעה), וארוכה מדי הקפיאה את פתיחת המשחק על כתובת
+ * מתה. לפי קצב-ההגעה שניהם נפתרים: הורדה שמתקדמת ממתינים לה עד הסוף, וכתובת
+ * שנתקעה נזנחת מהר.
+ */
+const HEAVY_STALL_MS = 12000;
+/** תקרה מוחלטת גם לזרם שמטפטף — כדי שלא נמתין לנצח. */
+const HEAVY_CEILING_MS = 180000;
+
+/**
  * וידאו/סאונד — מורידים את *כל* הקובץ (fetch + ריקון הגוף) כדי שיהיה במלואו
  * במטמון, ולא רק "מספיק כדי להתחיל". כך הנגן בפועל מנגן מיד במקום להציג פריים
- * סטטי ולחכות ל-buffering. timeout רך: אחרי הזמן מדווחים 'loaded' אבל ההורדה
- * ממשיכה ברקע (וידאו גדול על רשת איטית לא חוסם את השאר).
+ * סטטי ולחכות ל-buffering. ויתור רך: מדווחים 'loaded' אבל ההורדה ממשיכה ברקע.
  */
-async function preloadHeavy(url: string, timeoutMs: number, signal?: AbortSignal): Promise<'loaded' | 'failed'> {
+async function preloadHeavy(url: string, _timeoutMs: number, signal?: AbortSignal): Promise<'loaded' | 'failed'> {
   if (typeof fetch === 'undefined') return 'loaded';
   try {
     const res = await fetch(url, signal ? { signal } : {});
     if (!res.ok || !res.body) return 'failed';
     const reader = res.body.getReader();
+    const startedAt = Date.now();
+    let lastByteAt = startedAt;
+    let finished = false;
     const drain = (async () => {
       for (;;) {
         const { done } = await reader.read();
         if (done) break;
+        lastByteAt = Date.now(); // התקדמות — שעון ההיתקעות מתאפס
       }
+      finished = true;
     })();
-    let softTimer = 0;
-    const soft = new Promise<void>((r) => {
-      softTimer = setTimeout(r, timeoutMs) as unknown as number;
+    // שומר-סף: מוותר רק כשהזרם נתקע (או עבר את התקרה), לא כי הקובץ גדול.
+    const watchdog = new Promise<void>((resolve) => {
+      const id = setInterval(() => {
+        const stalled = Date.now() - lastByteAt >= HEAVY_STALL_MS;
+        const tooLong = Date.now() - startedAt >= HEAVY_CEILING_MS;
+        if (finished || stalled || tooLong || signal?.aborted === true) {
+          clearInterval(id);
+          resolve();
+        }
+      }, 500) as unknown as number;
     });
-    await Promise.race([drain, soft]);
-    if (softTimer) clearTimeout(softTimer);
+    await Promise.race([drain, watchdog]);
     return 'loaded';
   } catch {
     return 'failed';
@@ -84,6 +106,8 @@ function preloadImage(url: string, timeoutMs: number): Promise<'loaded' | 'faile
 /** טעינה מוקדמת של נכס בודד (ניסיון יחיד). */
 function preloadOnce(url: string, timeoutMs: number, signal?: AbortSignal): Promise<'loaded' | 'failed'> {
   const kind = classifyMediaUrl(url);
+  // נכס כבד נמדד לפי קצב-הגעה ולא לפי שעון עצר (ראו preloadHeavy): וידאו של
+  // מאות מגה-בייט פשוט לוקח זמן, ואסור לספור אותו כ"נטען" לפני שהוא במטמון.
   if (kind === 'video' || kind === 'audio') return preloadHeavy(url, timeoutMs, signal);
   return preloadImage(url, timeoutMs);
 }

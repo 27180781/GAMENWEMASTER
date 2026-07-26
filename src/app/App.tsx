@@ -463,6 +463,9 @@ export function App() {
   const [starting, setStarting] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [preloadNonce, setPreloadNonce] = useState(0);
+  /** אחרי כמה שניות של המתנה מציעים "התחל בכל זאת" (שסתום ביטחון). */
+  const STARTUP_SKIP_AFTER_MS = 15000;
+  const [canSkipWait, setCanSkipWait] = useState(false);
 
   // טעינה מוקדמת של כל מדיית המשחק — מתחילה כבר במסך ההגדרות וממשיכה במשחק.
   const mediaPreload = useMediaPreload(game ?? pendingGame, preloadNonce);
@@ -484,6 +487,18 @@ export function App() {
   useEffect(() => {
     if (starting && preloadReady && countdown === null) setCountdown(STARTUP_COUNTDOWN);
   }, [starting, preloadReady, countdown]);
+
+  // שסתום ביטחון: מדיה כבדה מקבלת זמן אמיתי להסתיים (כדי שהנגינה תהיה מהמטמון
+  // ולא הזרמה חיה מקרטעת), אבל אחרי המתנה סבירה מציעים למנחה להתחיל בכל זאת —
+  // כך CDN איטי/תקוע לעולם לא כולא אותו במסך הטעינה.
+  useEffect(() => {
+    if (!starting) {
+      setCanSkipWait(false);
+      return undefined;
+    }
+    const t = window.setTimeout(() => setCanSkipWait(true), STARTUP_SKIP_AFTER_MS);
+    return () => window.clearTimeout(t);
+  }, [starting]);
 
   // טיק הספירה-לאחור; ב-0 נכנסים למשחק (מסך ההתחברות).
   useEffect(() => {
@@ -557,6 +572,9 @@ export function App() {
             preload={mediaPreload}
             retrying={preloadRetrying}
             countdown={countdown}
+            {...(canSkipWait && countdown === null
+              ? { onStartAnyway: () => setCountdown(0) }
+              : {})}
           />
         </Shell>
       );

@@ -16,9 +16,11 @@ interface StartupOverlayProps {
   retrying: boolean;
   /** ספירה-לאחור בשניות עד פתיחת המשחק; null = עדיין בשלב הטעינה. */
   countdown: number | null;
+  /** "התחל בכל זאת" — מוצג רק כשהטעינה מתארכת, כדי לא להיתקע על CDN איטי. */
+  onStartAnyway?: (() => void) | undefined;
 }
 
-export function StartupOverlay({ logo, preload, retrying, countdown }: StartupOverlayProps) {
+export function StartupOverlay({ logo, preload, retrying, countdown, onStartAnyway }: StartupOverlayProps) {
   const { total, loaded, failed } = preload;
   const done = loaded + failed;
   const pct = total > 0 ? Math.round((done / total) * 100) : 100;
@@ -48,6 +50,11 @@ export function StartupOverlay({ logo, preload, retrying, countdown }: StartupOv
               {done}/{total} ({pct}%)
               {failed > 0 && <span className="startup-failed"> · {failed} נכשלו</span>}
             </p>
+            {onStartAnyway !== undefined && (
+              <button className="picker-button startup-skip" onClick={onStartAnyway}>
+                ▶ התחל בכל זאת
+              </button>
+            )}
           </div>
         )}
       </div>

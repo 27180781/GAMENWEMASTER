@@ -113,23 +113,97 @@ async function cacheFirstMedia(req) {
 }
 
 /**
+ * חיתוך טווח *בהזרמה*: קוראים את גוף התשובה השמורה נתח-אחר-נתח, מדלגים על מה
+ * שלפני start, מנפיקים עד end, ומפסיקים. צריכת הזיכרון היא בגודל נתח בודד ולא
+ * בגודל הקובץ — קריטי לווידאו כבד, שבו מימוש הקובץ כולו לכל בקשת Range הקפיא
+ * את הנגינה לכל אורכה.
+ */
+function sliceStream(source, start, end) {
+  const reader = source.getReader();
+  const want = end - start + 1;
+  let pos = 0; // כמה בייטים כבר נקראו מהמקור
+  let sent = 0; // כמה בייטים כבר הונפקו
+  return new ReadableStream({
+    async pull(controller) {
+      while (sent < want) {
+        const { done, value } = await reader.read();
+        if (done) {
+          controller.close();
+          return;
+        }
+        const chunkStart = pos;
+        pos += value.byteLength;
+        if (pos <= start) continue; // הנתח כולו לפני הטווח — מדלגים
+        const from = Math.max(0, start - chunkStart);
+        const to = Math.min(value.byteLength, from + (want - sent));
+        const piece = value.subarray(from, to);
+        sent += piece.byteLength;
+        controller.enqueue(piece);
+        if (sent >= want) {
+          controller.close();
+          void reader.cancel();
+        }
+        return; // נתח אחד לכל pull — שומר על backpressure תקין
+      }
+      controller.close();
+    },
+    cancel(reason) {
+      void reader.cancel(reason);
+    },
+  });
+}
+
+/**
  * נגני וידאו/אודיו מבקשים טווחי בייטים (Range). התשובה שבמטמון היא 200 מלאה —
  * כשמתבקש טווח, חותכים ממנה 206 תקני כדי ש-seek יעבוד חלק. תשובת opaque
  * (cross-origin ללא CORS) אינה קריאה — מוחזרת כמות שהיא (הדפדפן מתמודד עם
  * 200 מלא כמו מול שרת בלי תמיכת Range).
+ *
+ * הגודל נלקח מכותרת Content-Length ולא מקריאת הגוף: קריאת הגוף כדי *לדעת* את
+ * הגודל שקולה למימוש כל הקובץ בזיכרון, וזה בדיוק מה שגרם לקרטוע. אם הכותרת
+ * חסרה (למשל תשובה דחוסה/chunked) — נופלים לנתיב הישן, שנכון אך יקר.
  */
 async function withRange(req, cached) {
   const rangeHeader = req.headers.get('range');
   if (!rangeHeader || cached.type === 'opaque' || cached.status !== 200) return cached;
   const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader.trim());
   if (!match || (match[1] === '' && match[2] === '')) return cached;
+  const declared = Number(cached.headers.get('content-length'));
+  const size = Number.isFinite(declared) && declared > 0 ? declared : null;
+  if (size === null || !cached.body) return withRangeSlow(req, cached, match);
+
+  let start;
+  let end;
+  if (match[1] === '') {
+    const n = Number(match[2]); // צורת suffix: bytes=-N (N הבייטים האחרונים)
+    start = Math.max(0, size - n);
+    end = size - 1;
+  } else {
+    start = Number(match[1]);
+    end = match[2] === '' ? size - 1 : Math.min(Number(match[2]), size - 1);
+  }
+  if (start >= size || start > end) {
+    return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } });
+  }
+  const headers = new Headers(cached.headers);
+  headers.set('Content-Range', `bytes ${start}-${end}/${size}`);
+  headers.set('Content-Length', String(end - start + 1));
+  headers.set('Accept-Ranges', 'bytes');
+  return new Response(sliceStream(cached.body, start, end), {
+    status: 206,
+    statusText: 'Partial Content',
+    headers,
+  });
+}
+
+/** נתיב גיבוי כשאין Content-Length: מימוש מלא בזיכרון (נכון, אך יקר). */
+async function withRangeSlow(req, cached, match) {
   try {
     const buf = await cached.clone().arrayBuffer();
     const size = buf.byteLength;
     let start;
     let end;
     if (match[1] === '') {
-      // צורת suffix: bytes=-N (N הבייטים האחרונים)
       const n = Number(match[2]);
       start = Math.max(0, size - n);
       end = size - 1;
@@ -138,10 +212,7 @@ async function withRange(req, cached) {
       end = match[2] === '' ? size - 1 : Math.min(Number(match[2]), size - 1);
     }
     if (start >= size || start > end) {
-      return new Response(null, {
-        status: 416,
-        headers: { 'Content-Range': `bytes */${size}` },
-      });
+      return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } });
     }
     const headers = new Headers(cached.headers);
     headers.set('Content-Range', `bytes ${start}-${end}/${size}`);
