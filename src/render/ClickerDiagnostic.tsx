@@ -20,8 +20,12 @@ interface LastPress {
 }
 
 export function ClickerDiagnostic() {
-  const [connected, setConnected] = useState(false);
-  const [status, setStatus] = useState('ממתין לריסיבר…');
+  // שני מקורות נפרדים במכוון: סטטוס הדונגל (rf317:event) וחיבור תוכנת הקליטה
+  // לסוקט (rf317:client). הם מגיעים בזרמים נפרדים ובסדר לא מובטח — במיוחד
+  // בשידור החוזר למנוי חדש — ולכן כל אחד נשמר בנפרד והטקסט נגזר משניהם, במקום
+  // מחרוזת אחת שכל אירוע דורס.
+  const [dongle, setDongle] = useState<string | null>(null);
+  const [software, setSoftware] = useState<boolean | null>(null);
   const [last, setLast] = useState<LastPress | null>(null);
 
   useEffect(() => {
@@ -35,8 +39,7 @@ export function ClickerDiagnostic() {
         setLast({ button: ev.button, remoteId: ev.remoteId, at: Date.now() });
       } else {
         debugLog('clicker', `סטטוס ריסיבר: ${ev.status}`, { code: ev.code });
-        setConnected(ev.status === 'connected');
-        setStatus(`ריסיבר: ${ev.status}`);
+        setDongle(ev.status);
       }
     });
     const offClient = onReceiverClient((info) => {
@@ -44,14 +47,24 @@ export function ClickerDiagnostic() {
         'clicker',
         info.connected ? `תוכנת הריסיבר התחברה לסוקט${info.who ? ` (${info.who})` : ''}` : 'תוכנת הריסיבר התנתקה מהסוקט',
       );
-      setConnected(info.connected);
-      setStatus(info.connected ? 'תוכנת הריסיבר מחוברת' : 'תוכנת הריסיבר מנותקת');
+      setSoftware(info.connected);
     });
     return () => {
       offEvent();
       offClient();
     };
   }, []);
+
+  // מחוברים רק כששני הצדדים בסדר; די בצד אחד שלילי כדי להתריע.
+  const connected = software === true || (software === null && dongle === 'connected');
+  const status =
+    software === false
+      ? 'תוכנת הריסיבר מנותקת'
+      : software === true
+        ? 'תוכנת הריסיבר מחוברת'
+        : dongle !== null
+          ? `ריסיבר: ${dongle}`
+          : 'ממתין לריסיבר…';
 
   useEffect(() => {
     if (last === null) return undefined;

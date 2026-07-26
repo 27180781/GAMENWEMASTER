@@ -13,12 +13,42 @@ const eventSubs = new Set();
 /** @type {Set<(info: unknown) => void>} */
 const clientSubs = new Set();
 
+/**
+ * הסטטוס האחרון של כל אחד משני הזרמים, כדי לשדר אותו למנויים חדשים. הרכיבים
+ * שמאזינים מתמזגים מחדש כשעוברים ממסך ההגדרות אל המשחק — ובלי השידור החוזר
+ * הם היו חוזרים למצב ההתחלתי (חיווי אדום "ממתין לריסיבר…", ואזהרת "אין חיבור
+ * לריסיבר") למרות שהריסיבר מחובר, עד לאירוע הבא שיגיע מהדונגל.
+ *
+ * כל זרם משודר בנפרד ותמיד: הם מזינים צרכנים שונים (סטטוס הדונגל מזין את
+ * מתאם ההצבעות, חיבור התוכנה מזין את החיווי), ולכן אין להשתיק אחד בגלל השני.
+ * @type {unknown}
+ */
+let lastStatusEvent = null;
+/** @type {unknown} */
+let lastClientInfo = null;
+
 ipcRenderer.on('rf317:event', (_e, ev) => {
+  // לחיצות אינן "מצב" — רק סטטוס הדונגל נשמר לשידור חוזר.
+  if (ev !== null && typeof ev === 'object' && /** @type {{type?: string}} */ (ev).type === 'status') {
+    lastStatusEvent = ev;
+  }
   for (const cb of eventSubs) cb(ev);
 });
 ipcRenderer.on('rf317:client', (_e, info) => {
+  lastClientInfo = info;
   for (const cb of clientSubs) cb(info);
 });
+
+/**
+ * שידור חוזר של הסטטוס הידוע האחרון — למנוי החדש בלבד, ואחרי הרינדור הנוכחי
+ * (queueMicrotask) כדי לא לעדכן state תוך כדי הרכבת הרכיב.
+ * @param {unknown} last
+ * @param {(v: unknown) => void} cb
+ */
+function replayLastStatus(last, cb) {
+  if (last === null) return;
+  queueMicrotask(() => cb(last));
+}
 
 contextBridge.exposeInMainWorld('triviaDesktop', {
   isDesktop: true,
@@ -26,11 +56,13 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
   /** מנוי לאירועי לחיצה/סטטוס מהקליקרים. מחזיר פונקציית ביטול-מנוי. */
   onClicker(/** @type {(ev: unknown) => void} */ cb) {
     eventSubs.add(cb);
+    replayLastStatus(lastStatusEvent, cb);
     return () => eventSubs.delete(cb);
   },
   /** מנוי להתחברות/ניתוק של תוכנת הריסיבר לסוקט. מחזיר פונקציית ביטול-מנוי. */
   onReceiver(/** @type {(info: unknown) => void} */ cb) {
     clientSubs.add(cb);
+    replayLastStatus(lastClientInfo, cb);
     return () => clientSubs.delete(cb);
   },
   /** הפעלת תוכנת הקליטה RF317SocketForm המצורפת (בבחירת "שחק עם שלטים"). */

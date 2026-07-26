@@ -2509,11 +2509,15 @@ body {
 .host-cmd-icon { font-size: 18px; line-height: 1; }
 .host-cmd-label { white-space: nowrap; }
 
-/* ---- חיווי קליקרי RF317 (EXE) ---- */
+/* ---- חיווי קליקרי RF317 (EXE) ----
+   התג יושב *מתחת* לכפתורי הפינה (⛶ ⚙ 👥) ומיושר איתם: הכפתורים הם
+   top:14px בגובה 52px, ולכן 78px הוא השורה הראשונה הפנויה מתחתיהם. קודם
+   התג היה ב-top:12px ופשוט כיסה אותם. עם באנר ההצטרפות הכפתורים יורדים
+   ל-top:58px — ואיתם גם התג (ראו .has-banner למטה). */
 .clicker-badge {
   position: fixed;
-  top: 12px;
-  left: 12px;
+  top: 78px;
+  left: 22px;
   z-index: 90;
   display: inline-flex;
   align-items: center;
@@ -2525,6 +2529,10 @@ body {
   padding: 5px 14px;
   font-size: 17px;
   font-weight: 700;
+  max-width: 340px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .clicker-badge--on {
   background: rgba(20, 90, 45, 0.82);
@@ -2533,8 +2541,8 @@ body {
 }
 .clicker-toast {
   position: fixed;
-  top: 52px;
-  left: 12px;
+  top: 124px;
+  left: 22px;
   z-index: 90;
   background: rgba(0, 0, 0, 0.78);
   color: #fff;
@@ -2917,6 +2925,9 @@ body {
 /* דחיפת הכרום והתוכן אל מתחת לבאנר */
 .has-banner .corner-buttons,
 .has-banner .slide-counter { top: 58px; }
+/* גם חיווי הקליקרים יורד עם הכפתורים, כדי שיישאר מתחתיהם ולא עליהם */
+.has-banner .clicker-badge { top: 122px; }
+.has-banner .clicker-toast { top: 168px; }
 .has-banner .screen-content { padding-top: 84px; }
 
 .license-modal {

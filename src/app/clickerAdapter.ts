@@ -22,24 +22,43 @@ export class ClickerVoteAdapter implements LiveVoteAdapter {
   private window: VoteWindow | null = null;
   private offEvent: (() => void) | null = null;
   private offClient: (() => void) | null = null;
+  /** סטטוס הדונגל עצמו (מבית הסטטוס), null = טרם התקבל. */
+  private dongle: string | null = null;
+  /** האם תוכנת הקליטה מחוברת לסוקט, null = טרם ידוע. */
+  private software: boolean | null = null;
 
   connect(_roomId: string): Promise<void> {
     // עד שהריסיבר יתחבר וישלח בית "connected" — הסטטוס הוא 'offline' (→ אזהרה).
     this.statusListener?.('offline');
     this.offEvent = onClickerEvent((ev) => this.handle(ev));
     this.offClient = onReceiverClient((info) => {
-      // התחברות תוכנת הריסיבר לסוקט עדיין אינה "מחובר" — ממתינים לבית הסטטוס
-      // של הדונגל עצמו. ניתוק מהסוקט = אין מקור הצבעות.
-      this.statusListener?.(info.connected ? 'reconnecting' : 'offline');
+      this.software = info.connected;
+      this.pushStatus();
     });
     return Promise.resolve();
   }
 
+  /**
+   * שני אותות נפרדים (בית הסטטוס של הדונגל · חיבור תוכנת הקליטה לסוקט) מגיעים
+   * בזרמים נפרדים ובסדר לא מובטח — במיוחד בשידור החוזר של הסטטוס האחרון למנוי
+   * חדש, כשעוברים ממסך ההגדרות אל המשחק. לכן כל אות נשמר בנפרד והסטטוס נגזר
+   * משניהם, במקום שכל אירוע ידרוס את קודמו (מה שהיה מוריד 'connected' חזרה
+   * ל'reconnecting' ומחזיר את אזהרת "אין חיבור לריסיבר" בלי סיבה).
+   */
+  private pushStatus(): void {
+    // ניתוק תוכנת הקליטה = אין מקור הצבעות, בלי קשר לבית האחרון מהדונגל.
+    if (this.software === false) return this.statusListener?.('offline');
+    if (this.dongle === 'connected') return this.statusListener?.('connected');
+    if (this.dongle === 'connecting') return this.statusListener?.('reconnecting');
+    if (this.dongle !== null) return this.statusListener?.('offline'); // disconnected / not_connected
+    // אין עדיין בית מהדונגל: חיבור התוכנה לסוקט הוא "בדרך", לא "מחובר".
+    return this.statusListener?.(this.software === true ? 'reconnecting' : 'offline');
+  }
+
   private handle(ev: ClickerEvent): void {
     if (ev.type === 'status') {
-      if (ev.status === 'connected') this.statusListener?.('connected');
-      else if (ev.status === 'connecting') this.statusListener?.('reconnecting');
-      else this.statusListener?.('offline'); // disconnected / not_connected
+      this.dongle = ev.status;
+      this.pushStatus();
       return;
     }
     // לחיצת כפתור → הצבעה גולמית. כפתור F (השלט-אצבע) מגיע כ-7 ומשמעו 0:
@@ -60,6 +79,9 @@ export class ClickerVoteAdapter implements LiveVoteAdapter {
     this.offClient?.();
     this.offClient = null;
     this.window = null;
+    // איפוס האותות — חיבור הבא מתחיל מדף חלק ולא נשען על מצב ישן.
+    this.dongle = null;
+    this.software = null;
     this.statusListener?.('offline');
   }
 
