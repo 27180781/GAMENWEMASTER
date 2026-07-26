@@ -950,6 +950,36 @@ body {
 
 .media-audio-icon { font-size: 140px; animation: hint-pulse 1.6s infinite; }
 
+/* עיגול טעינה מעל המדיה — מוצג כשהנגן ממתין לנתונים: גם בהתחלה (הסרטון עומד
+   על הפריים הראשון) וגם בעצירה באמצע. בלי זה נראה כאילו המשחק נתקע. מופיע
+   בהשהיה קלה כדי שהמתנה של רגע לא תבהב על המסך. */
+.media-buffering {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 6;
+  opacity: 0;
+  animation: media-buffering-in 0.25s ease 0.45s forwards;
+}
+.media-buffering-ring {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 7px solid rgba(255, 255, 255, 0.22);
+  border-top-color: var(--secondary-color, #ffd23f);
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.55);
+  animation: media-buffering-spin 0.9s linear infinite;
+}
+@keyframes media-buffering-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes media-buffering-in {
+  to { opacity: 1; }
+}
+
 /* מדיה שנכשלה בטעינה — חיווי ברור למפעיל במקום מסך שחור */
 .media-error {
   display: flex;

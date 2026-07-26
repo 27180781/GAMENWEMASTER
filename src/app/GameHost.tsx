@@ -83,6 +83,7 @@ import {
   type BoardState,
 } from './snakesLadders.ts';
 import { SnakesLaddersBoard } from '../render/SnakesLaddersBoard.tsx';
+import { MediaPauseContext } from '../render/mediaPause.ts';
 import {
   HOST_HEARTBEAT_MS,
   openControlChannel,
@@ -1977,6 +1978,9 @@ export function GameHost({
       dir="rtl"
       style={themeStyle(setting)}
     >
+      {/* שכבה חוסמת פתוחה = המשחק עצור, וזה כולל את המדיה: וידאו/סאונד נעצרים
+          וממשיכים מאותה נקודה כשהיא נסגרת (הטיימר כבר קפא כך ממילא). */}
+      <MediaPauseContext.Provider value={overlayActive}>
       <Stage>
         {/* באנר הצטרפות עליון — משחק אונליין עם קוד חדר, לכל אורך המשחק. במסך
             הלובי (opening) הוא מוסתר, ובמקומו מוצג מספר גדול+קוד בשליש העליון של
@@ -2368,6 +2372,7 @@ export function GameHost({
             תג "ממתין לריסיבר" היה מטעה. */}
         {useClicker && <ClickerDiagnostic />}
       </Stage>
+      </MediaPauseContext.Provider>
     </div>
   );
 }
