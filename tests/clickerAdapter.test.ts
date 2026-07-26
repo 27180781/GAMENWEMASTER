@@ -120,3 +120,61 @@ describe('ClickerVoteAdapter', () => {
     expect(snaps).toHaveLength(1);
   });
 });
+
+describe('סטטוס משני אותות — סדר ההגעה לא משנה', () => {
+  /** מקים מתאם מחובר ומחזיר את רשימת הסטטוסים שדווחו. */
+  async function connected() {
+    const adapter = new ClickerVoteAdapter();
+    const seen: string[] = [];
+    adapter.onStatusChange((s) => seen.push(s));
+    await adapter.connect('r');
+    return { adapter, seen, last: () => seen[seen.length - 1] };
+  }
+  const fireClient = (isConnected: boolean) =>
+    recvCbs.forEach((cb) => cb({ connected: isConnected, who: '127.0.0.1' }));
+
+  it('בית "connected" מהדונגל אחרי חיבור התוכנה → connected', async () => {
+    const { last } = await connected();
+    fireClient(true);
+    expect(last()).toBe('reconnecting'); // התוכנה מחוברת, הדונגל טרם ענה
+    fireStatus('connected');
+    expect(last()).toBe('connected');
+  });
+
+  it('חיבור התוכנה *אחרי* בית הדונגל לא מוריד חזרה ל-reconnecting', async () => {
+    // בדיוק תרחיש השידור-החוזר: הסטטוס מגיע ראשון, חיבור התוכנה אחריו.
+    const { last } = await connected();
+    fireStatus('connected');
+    expect(last()).toBe('connected');
+    fireClient(true);
+    expect(last()).toBe('connected'); // ולא reconnecting
+  });
+
+  it('ניתוק תוכנת הקליטה גובר על בית "connected" ישן', async () => {
+    const { last } = await connected();
+    fireStatus('connected');
+    fireClient(false);
+    expect(last()).toBe('offline');
+  });
+
+  it('בית "disconnected" מהדונגל בזמן שהתוכנה מחוברת → offline', async () => {
+    const { last } = await connected();
+    fireClient(true);
+    fireStatus('disconnected');
+    expect(last()).toBe('offline');
+  });
+
+  it('ניתוק המתאם מאפס את שני האותות', async () => {
+    const { adapter, last } = await connected();
+    fireStatus('connected');
+    fireClient(true);
+    expect(last()).toBe('connected');
+    adapter.disconnect();
+    expect(last()).toBe('offline');
+    // חיבור מחדש — בלי אירועים חדשים הסטטוס נשאר offline (אין מצב ישן דולף)
+    const seen2: string[] = [];
+    adapter.onStatusChange((s) => seen2.push(s));
+    await adapter.connect('r');
+    expect(seen2).toEqual(['offline']);
+  });
+});
