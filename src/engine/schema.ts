@@ -64,6 +64,20 @@ export const slideSettingsSchema = z.object({
     seconds: emptyableNumber(0),
   }),
   showInLoop: z.boolean(),
+  /**
+   * הגבלת שקופית לקבוצה אחת: רק משתתפים ששייכים ל-groupName יכולים להצביע
+   * בשקופית הזו; הקשות של השאר נזרקות (הניקוד שלהם נשאר כפי שהוא — הם פשוט
+   * לא משתתפים בשאלה). `groupName` הוא שם הקבוצה בדיוק כפי שהוא מופיע בשדה
+   * `users` של קובץ המשחק. אופציונלי עם ברירת מחדל כבויה, כדי שקבצים בלי
+   * השדה (וגרסאות מנוע ישנות) ימשיכו לעבוד ללא שינוי.
+   */
+  groupRestriction: z
+    .object({
+      active: z.boolean().optional().default(false),
+      groupName: z.string().optional().default(''),
+    })
+    .optional()
+    .default({ active: false, groupName: '' }),
 });
 
 /**

@@ -162,6 +162,9 @@ export function HostConsole() {
             {snap.stage === 'playing' && (
               <span className="hc-badge hc-badge--phase">{PHASE_LABEL[snap.phase] ?? snap.phase}</span>
             )}
+            {snap.restrictedGroup !== undefined && (
+              <span className="hc-badge hc-badge--group">🔒 {snap.restrictedGroup} בלבד</span>
+            )}
           </span>
         </div>
         <div className="hc-tabs">

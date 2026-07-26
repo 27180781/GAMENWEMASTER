@@ -16,6 +16,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { GameState, Slide } from '../engine/index.ts';
+import { slideGroupRestriction } from '../app/groupRestriction.ts';
 import { FitText } from './FitText.tsx';
 import type { TimerView } from './TimerRing.tsx';
 
@@ -232,6 +233,8 @@ export function QuestionSlide({
   const showBoard = reveal.revealCorrect && isTrivia && leaders.length > 0;
 
   const hasImage = slide.question.src !== '';
+  /** שם הקבוצה שהשקופית מוגבלת אליה (null = פתוחה לכולם). */
+  const restrictedGroup = slideGroupRestriction(slide);
   const low = timer !== null && !timer.paused && timer.remaining <= 5;
   // שבר הטיימר — נותר/סה"כ, מדויק לפי השניות (מתעדכן כל 200ms מ-GameHost).
   const timerFrac = timer && timer.total > 0 ? Math.max(0, timer.remaining / timer.total) : 1;
@@ -262,6 +265,10 @@ export function QuestionSlide({
               </div>
             )}
             {title !== '' && <div className="q-title-pill">{title}</div>}
+            {/* שקופית המוגבלת לקבוצה — חיווי ברור למשתתפים מי אמור לענות */}
+            {restrictedGroup !== null && (
+              <div className="q-group-pill">🔒 שאלה לקבוצת {restrictedGroup} בלבד</div>
+            )}
           </div>
         </div>
 

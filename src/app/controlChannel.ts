@@ -36,6 +36,8 @@ export interface HostStateSnapshot {
   connected: number;
   /** מובילים כלליים (שם + ניקוד), כבר עם שמות מהמרשם. */
   leaders: { name: string; score: number }[];
+  /** שם הקבוצה שהשקופית הנוכחית מוגבלת אליה (חסר = פתוחה לכולם). */
+  restrictedGroup?: string;
   reveal: { questionShown: boolean; answersShown: number; revealCorrect: boolean };
 }
 
