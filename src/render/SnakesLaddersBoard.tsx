@@ -75,6 +75,17 @@ function DieFace({ value }: { value: number }) {
   );
 }
 
+/** משך גלגול הקובייה עד לנחיתה על התוצאה (ms). */
+const DICE_ROLL_MS = 1500;
+/** שהייה אחרי הנחיתה, לפני שהחיילים זזים — זמן לקרוא כמה יצא ולמי. */
+const DICE_READ_MS = 1100;
+/** התקדמות באחוזים: שהייה קצרה לפני הצעדים (אין הטלה להמתין לה). */
+const PERCENT_START_MS = 900;
+/** מהצעדים ועד קפיצת הסולם/הנחש. */
+const JUMP_MS = 2000;
+/** מהקפיצה ועד מסך הקבוצה המנצחת. */
+const WIN_MS = 1800;
+
 /**
  * קובייה שמתגלגלת: מציגה פאות אקראיות במהירות, מאטה, ונעצרת על התוצאה עם
  * "נחיתה". כך ההגרלה נראית ומרגישה אמיתית, במקום מספר שקופץ.
@@ -92,8 +103,8 @@ function RollingDice({ value }: { value: number }) {
       if (!alive) return;
       setFace(1 + Math.floor(Math.random() * 6));
       elapsed += delay;
-      delay *= 1.18; // האטה הדרגתית — תחושת גלגול שנחלש
-      if (elapsed < 1200) {
+      delay *= 1.16; // האטה הדרגתית — תחושת גלגול שנחלש
+      if (elapsed < DICE_ROLL_MS) {
         window.setTimeout(tick, delay);
       } else {
         setFace(value); // נעצרת על התוצאה האמיתית
@@ -210,25 +221,35 @@ export function SnakesLaddersBoard({ board, groups, progression, onCue, onClose 
   /** קבוצות שסיימו את הלוח בסבב הזה. */
   const finishers = board.lastRound.filter((r) => r.to >= BOARD_SIZE);
 
+  /** בהתקדמות בקובייה: האם ההטלה כבר נחתה (ורק אז מציגים למי היא שייכת). */
+  const [diceLanded, setDiceLanded] = useState(false);
+
   useEffect(() => {
     setPhase(0);
     setShowWinner(false);
+    setDiceLanded(false);
     const timers: number[] = [];
-    timers.push(window.setTimeout(() => setPhase(1), 400));
+    // בהתקדמות בקובייה החיילים ממתינים לה: קודם ההטלה מסתיימת ונקראת, ורק אז
+    // הצעדים. בלי ההמתנה הזו הם היו זזים בזמן שהקובייה עוד מתגלגלת, ולא היה
+    // ברור מאיפה הגיע מספר הצעדים.
+    const rolling = progression === 'dice' && board.lastDice !== null;
+    const stepAt = rolling ? DICE_ROLL_MS + DICE_READ_MS : PERCENT_START_MS;
+    if (rolling) timers.push(window.setTimeout(() => setDiceLanded(true), DICE_ROLL_MS));
+    timers.push(window.setTimeout(() => setPhase(1), stepAt));
     timers.push(
       window.setTimeout(() => {
         setPhase(2);
         // אפקטים: מי שטיפס ומי שנפל — יכולים להישמע יחד
         if (board.lastRound.some((r) => r.jump === 'ladder')) onCue?.('climb');
         if (board.lastRound.some((r) => r.jump === 'snake')) onCue?.('fall');
-      }, 1800),
+      }, stepAt + JUMP_MS),
     );
     if (finishers.length > 0) {
       timers.push(
         window.setTimeout(() => {
           setShowWinner(true);
           onCue?.('fanfare');
-        }, 3200),
+        }, stepAt + JUMP_MS + WIN_MS),
       );
     }
     return () => timers.forEach((t) => window.clearTimeout(t));
@@ -307,7 +328,8 @@ export function SnakesLaddersBoard({ board, groups, progression, onCue, onClose 
             <div className="sl-dice-wrap">
               <RollingDice value={board.lastDice} />
               {board.diceWinner !== null && (
-                <span className="sl-dice-who">
+                // מוצג רק אחרי שהקובייה נחתה — קודם רואים כמה יצא, ואז למי.
+                <span className={`sl-dice-who${diceLanded ? ' is-in' : ''}`}>
                   {board.lastRound.find((r) => r.groupId === board.diceWinner)?.name ?? ''}
                 </span>
               )}

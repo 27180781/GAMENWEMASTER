@@ -4292,12 +4292,18 @@ body {
   background: #1a1a1a;
   box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.35);
 }
+/* שם הקבוצה שהטילה — נכנס רק אחרי שהקובייה נחתה (is-in), כדי שהרצף יהיה
+   ברור: קודם כמה יצא, ואז למי. שומרים מקום קבוע כדי שהכותרת לא "תקפוץ". */
 .sl-dice-who {
   font-size: 26px; font-weight: 800;
   color: var(--secondary-color, #ffd23f);
   background: rgba(255, 255, 255, 0.1);
   border-radius: 999px; padding: 5px 18px;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
+.sl-dice-who.is-in { opacity: 1; transform: translateY(0); }
 
 /* --- סולמות ונחשים מצוירים --- */
 .sl-links { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
