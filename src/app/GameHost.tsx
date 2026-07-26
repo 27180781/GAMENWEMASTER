@@ -1711,7 +1711,11 @@ export function GameHost({
   const boardDoneRef = useRef<number | null>(null);
   useEffect(() => {
     if (!isSnakesGame || stage !== 'playing') return;
-    if (!reveal.revealCorrect) return;
+    // חייבים גם phase === 'results': במעבר שקופית יש רינדור-ביניים שבו
+    // currentSlideId כבר החדש אך revealCorrect עדיין true מהשקופית הקודמת.
+    // בלי התנאי הזה הסבב היה מחושב מוקדם ו"צורך" את השקופית החדשה, וכשהחשיפה
+    // האמיתית שלה הגיעה — הלוח כבר לא היה נפתח.
+    if (state.phase !== 'results' || !reveal.revealCorrect) return;
     const slide = engine.getCurrentSlide();
     if (!isVotableSlide(slide)) return;
     if (boardDoneRef.current === state.currentSlideId) return; // כבר חושב לשקופית הזו
@@ -1730,7 +1734,7 @@ export function GameHost({
     setBoard(next);
     setBoardOverlay(true);
     audio.play('generic', soundsRef.current.genericMediaSound.src);
-  }, [isSnakesGame, stage, reveal.revealCorrect, state.currentSlideId, state.votesBySlide, engine, audio]);
+  }, [isSnakesGame, stage, state.phase, reveal.revealCorrect, state.currentSlideId, state.votesBySlide, engine, audio]);
 
   // הלוח נסגר אוטומטית כשעוזבים את שלב החשיפה (מעבר שקופית וכו').
   useEffect(() => {
@@ -2050,6 +2054,7 @@ export function GameHost({
               roster.categories.find((c) => c.id === boardCategoryId(roster))?.groups ?? []
             }
             progression={setting.gameTypeSettings.snakesLadders.progression}
+            onCue={(kind) => audio.playCue(kind)}
             onClose={() => setBoardOverlay(false)}
           />
         )}

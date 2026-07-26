@@ -21,12 +21,37 @@ import { playerGroupNames } from './roster.ts';
 export const BOARD_SIZE = 30;
 
 /**
- * לוח ברירת המחדל: סולמות (עלייה) וחבלים (ירידה), מאוזנים כך שהמשחק נשאר
- * דרמטי אך הוגן — אין מלכודת ממש לפני הסוף שמייאשת, ואין סולם שמנצח מיד.
+ * לוח ברירת המחדל: סולמות (עלייה) וחבלים (ירידה), במיקומים **ובאורכים מגוונים**
+ * — קפיצה קצרצרה של 2-3 משבצות לצד "מכה" של 15 — כדי שהלוח יהיה דרמטי ולא
+ * צפוי. מאוזן: אין מלכודת ממש לפני הסוף שמייאשת, ואין סולם שמנצח מיד.
+ *
+ * אין שרשור: יעד של סולם לעולם אינו כניסה של נחש (ולהפך), כך שקבוצה לא
+ * "נשאבת" בשרשרת אחת.
+ *
  * מפתח = משבצת הכניסה, ערך = משבצת היעד.
  */
-export const DEFAULT_LADDERS: Record<number, number> = { 3: 11, 7: 17, 13: 22, 19: 26 };
-export const DEFAULT_SNAKES: Record<number, number> = { 15: 6, 21: 9, 25: 14, 28: 18 };
+export const DEFAULT_LADDERS: Record<number, number> = {
+  2: 8, // בינוני (6)
+  5: 17, // ארוך (12)
+  12: 15, // קצרצר (3)
+  20: 28, // בינוני-ארוך (8)
+};
+export const DEFAULT_SNAKES: Record<number, number> = {
+  14: 4, // ארוך (10)
+  18: 16, // קצרצר (2)
+  24: 9, // ארוך מאוד (15)
+  27: 22, // בינוני (5)
+};
+
+/**
+ * חוק "אין נשיכה כפולה": נחש לא מפיל את אותה קבוצה פעמיים **ברצף**.
+ *
+ * למה זה נחוץ: בהתקדמות לפי אחוזים, קבוצה שעונה נכון באופן עקבי מתקדמת מספר
+ * צעדים *קבוע* — ואז היא עלולה לנחות שוב ושוב בדיוק על אותו נחש ולחזור לאותה
+ * משבצת לנצח (למשל 22 →(+5) 27 → נחש → 22). זה נראה כאילו המשחק "תקוע" למרות
+ * שהקבוצה מצטיינת. עם החוק הזה הנחש מדלג בפעם השנייה ("כבר נשך אתכם — הפעם
+ * חמקתם"), הקבוצה מתקדמת, והדרמה נשמרת.
+ */
 
 /** מקסימום צעדים בהתקדמות לפי אחוזים (100% הצלחה). */
 export const MAX_STEPS = 5;
@@ -66,6 +91,8 @@ export interface GroupRoundResult {
 /** מצב הלוח: מיקום כל קבוצה + תוצאות הסבב האחרון (לאנימציה). */
 export interface BoardState {
   positions: Record<string, number>;
+  /** מזהה קבוצה → משבצת הנחש שנשך אותה בסבב הקודם (לחוק "אין נשיכה כפולה"). */
+  lastSnake: Record<string, number>;
   lastRound: GroupRoundResult[];
   /** תוצאת הקובייה בסבב האחרון (רק במצב 'dice'), או null. */
   lastDice: number | null;
@@ -75,6 +102,7 @@ export interface BoardState {
 
 export const EMPTY_BOARD: BoardState = {
   positions: {},
+  lastSnake: {},
   lastRound: [],
   lastDice: null,
   diceWinner: null,
@@ -207,17 +235,33 @@ export function playRound(input: RoundInput): BoardState {
 
   // שלב ג׳: הזזה על הלוח + סולמות/חבלים.
   const positions = { ...board.positions };
+  const lastSnake = { ...board.lastSnake };
   const lastRound: GroupRoundResult[] = base.map((g) => {
     const from = positions[g.groupId] ?? 0;
     const steps = stepsByGroup[g.groupId] ?? 0;
     // לא חורגים מקצה הלוח (אין "חזרה אחורה" מהסוף — מגיעים ונשארים).
     const landed = Math.min(boardSize, from + steps);
-    const { to, jump } = landed === boardSize ? { to: landed, jump: null as null } : applyJump(landed, ladders, snakes);
+    let to = landed;
+    let jump: 'ladder' | 'snake' | null = null;
+    if (landed !== boardSize) {
+      const res = applyJump(landed, ladders, snakes);
+      // "אין נשיכה כפולה": אותו נחש פעמיים ברצף — מדלגים עליו הפעם.
+      if (res.jump === 'snake' && lastSnake[g.groupId] === landed) {
+        delete lastSnake[g.groupId];
+      } else {
+        to = res.to;
+        jump = res.jump;
+        if (res.jump === 'snake') lastSnake[g.groupId] = landed;
+        else delete lastSnake[g.groupId];
+      }
+    } else {
+      delete lastSnake[g.groupId];
+    }
     positions[g.groupId] = to;
     return { ...g, steps, from, landed, to, jump };
   });
 
-  return { positions, lastRound, lastDice, diceWinner };
+  return { positions, lastSnake, lastRound, lastDice, diceWinner };
 }
 
 /** דירוג הקבוצות לפי מיקום בלוח (המוביל ראשון). */

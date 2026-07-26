@@ -82,7 +82,8 @@ describe('עזרי לוח', () => {
     expect(applyJump(ladderFrom)).toEqual({ to: DEFAULT_LADDERS[ladderFrom], jump: 'ladder' });
     const snakeFrom = Number(Object.keys(DEFAULT_SNAKES)[0]);
     expect(applyJump(snakeFrom)).toEqual({ to: DEFAULT_SNAKES[snakeFrom], jump: 'snake' });
-    expect(applyJump(2)).toEqual({ to: 2, jump: null });
+    // משבצת פנויה (לא כניסת סולם ולא כניסת נחש) — בלי קפיצה
+    expect(applyJump(10)).toEqual({ to: 10, jump: null });
   });
 });
 
@@ -185,5 +186,50 @@ describe('boardStandings', () => {
     expect(s[0]!.finished).toBe(true);
     expect(s[1]!.name).toBe('אדום');
     expect(s[1]!.finished).toBe(false);
+  });
+});
+
+describe('חוק "אין נשיכה כפולה" — מונע לולאה אינסופית', () => {
+  /**
+   * בהתקדמות לפי אחוזים, קבוצה שעונה נכון בעקביות מתקדמת מספר צעדים *קבוע*,
+   * ולכן עלולה לנחות שוב ושוב על אותו נחש ולחזור לאותה משבצת לנצח. החוק פותר
+   * זאת: הנחש אינו נושך פעמיים ברצף.
+   */
+  it('נחש זהה פעמיים ברצף — בפעם השנייה מדלגים והקבוצה מתקדמת', () => {
+    const entry = Number(Object.keys(DEFAULT_SNAKES)[3]); // 27
+    const target = DEFAULT_SNAKES[entry]!; // 22
+    const start = entry - MAX_STEPS; // 22 — נחיתה מדויקת על הנחש
+    expect(start).toBe(target); // התרחיש שיוצר את הלולאה
+
+    // סבב 1: נחיתה על הנחש → נפילה חזרה
+    const b1 = round({ votes: { a: 2, b: 2 }, board: { ...EMPTY_BOARD, positions: { g1: start } } });
+    const r1 = b1.lastRound.find((g) => g.name === 'אדומים' || g.name === 'אדום')!;
+    expect(r1.jump).toBe('snake');
+    expect(b1.positions.g1).toBe(target);
+    expect(b1.lastSnake.g1).toBe(entry);
+
+    // סבב 2: נחיתה על *אותו* נחש → מדלגים, הקבוצה נשארת על משבצת הנחיתה
+    const b2 = round({ votes: { a: 2, b: 2 }, board: b1 });
+    const r2 = b2.lastRound.find((g) => g.name === 'אדומים' || g.name === 'אדום')!;
+    expect(r2.jump).toBeNull();
+    expect(b2.positions.g1).toBe(entry); // התקדמה! לא נתקעה
+    expect(b2.lastSnake.g1).toBeUndefined(); // החסינות נוצלה
+  });
+
+  it('נחש אחר (לא אותו אחד) כן נושך', () => {
+    const b1: BoardState = { ...EMPTY_BOARD, positions: { g1: 9 }, lastSnake: { g1: 27 } };
+    const b2 = round({ votes: { a: 2, b: 2 }, board: b1 }); // 9+5=14 → נחש אחר
+    expect(b2.lastRound.find((g) => g.groupId === 'g1')!.jump).toBe('snake');
+  });
+
+  it('משחק ארוך של קבוצה מושלמת מסתיים — אין לולאה אינסופית', () => {
+    let b: BoardState = EMPTY_BOARD;
+    let rounds = 0;
+    while (!hasWinner(b) && rounds < 40) {
+      b = round({ votes: { a: 2, b: 2 }, board: b }); // אדומים 100% בכל סבב
+      rounds += 1;
+    }
+    expect(hasWinner(b)).toBe(true); // הגיעה לסוף
+    expect(rounds).toBeLessThan(40);
   });
 });
