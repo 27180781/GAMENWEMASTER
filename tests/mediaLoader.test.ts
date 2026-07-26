@@ -2,8 +2,8 @@
  * orderedMediaUrls — איסוף כל מדיית המשחק בסדר עדיפות לטעינה מוקדמת.
  */
 
-import { describe, expect, it } from 'vitest';
-import { orderedMediaUrls } from '../src/app/mediaLoader.ts';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { orderedMediaUrls, preloadMediaList } from '../src/app/mediaLoader.ts';
 import { fourAnswers, makeGame, rawSlide } from './helpers.ts';
 
 describe('orderedMediaUrls', () => {
@@ -68,4 +68,63 @@ describe('orderedMediaUrls', () => {
     const game = makeGame([rawSlide({ id: 1, type: 'trivia', answers: fourAnswers(1) })]);
     expect(orderedMediaUrls(game)).toEqual([]);
   });
+});
+
+/**
+ * טעינה מוקדמת של נכס כבד: ההבחנה החשובה היא בין קובץ *גדול* (שממשיכים
+ * להמתין לו — אחרת הנגינה תזרים חי ותקרטע) לבין זרם *תקוע* (שמוותרים עליו
+ * מהר — אחרת פתיחת המשחק נתקעת על כתובת מתה).
+ */
+describe('preloadMediaList — נכס כבד: גדול מול תקוע', () => {
+  const realFetch = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    vi.useRealTimers();
+  });
+
+  /** גוף שמזרים `chunks` נתחים במרווח `gapMs`, ואז מסתיים (או נתקע לנצח). */
+  function streamBody(chunks: number, gapMs: number, hang = false) {
+    let sent = 0;
+    return {
+      getReader: () => ({
+        read: () =>
+          new Promise<{ done: boolean; value?: Uint8Array }>((resolve) => {
+            if (hang && sent >= chunks) return; // לעולם לא נפתר — זרם תקוע
+            setTimeout(() => {
+              if (sent >= chunks) return resolve({ done: true });
+              sent += 1;
+              resolve({ done: false, value: new Uint8Array(1024) });
+            }, gapMs);
+          }),
+      }),
+    };
+  }
+
+  it('וידאו גדול שממשיך להגיע — ממתינים עד שהוא באמת נגמר', async () => {
+    // 12 נתחים במרווח 300ms = 3.6 שניות: הרבה מעבר לתקרה הישנה של תמונה,
+    // אך הזרם מתקדם ולכן חייבים להמתין לו עד הסוף.
+    globalThis.fetch = (() =>
+      Promise.resolve({ ok: true, body: streamBody(12, 300) })) as unknown as typeof fetch;
+    const t0 = Date.now();
+    const res = await preloadMediaList(['https://cdn/big.mp4'], { timeoutMs: 500 });
+    expect(res).toEqual({ total: 1, loaded: 1, failed: 0 });
+    expect(Date.now() - t0).toBeGreaterThan(3000); // באמת חיכה, לא ויתר מוקדם
+  }, 20000);
+
+  it('זרם תקוע — מוותרים אחרי שתיקה, ולא ממתינים לתקרה המלאה', async () => {
+    globalThis.fetch = (() =>
+      Promise.resolve({ ok: true, body: streamBody(1, 50, true) })) as unknown as typeof fetch;
+    const t0 = Date.now();
+    const res = await preloadMediaList(['https://cdn/hangs.mp4'], { timeoutMs: 500 });
+    const elapsed = Date.now() - t0;
+    expect(res.loaded + res.failed).toBe(1);
+    expect(elapsed).toBeGreaterThan(10000); // חיכה לשתיקה (12ש׳), לא ויתר מיד
+    expect(elapsed).toBeLessThan(30000); // ולא נתקע עד התקרה (180ש׳)
+  }, 40000);
+
+  it('תשובה שאינה ok — כשל מיידי (בלי המתנה)', async () => {
+    globalThis.fetch = (() => Promise.resolve({ ok: false })) as unknown as typeof fetch;
+    const res = await preloadMediaList(['https://cdn/404.mp4'], { timeoutMs: 200 });
+    expect(res.failed).toBe(1);
+  }, 20000);
 });
