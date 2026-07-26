@@ -165,6 +165,7 @@ export function SlideView({
             leaders={leaders}
             title={engine.getGame().setting.titleThroughoutGame}
             logo={engine.getGame().setting.logo.src}
+            gameType={engine.getGame().setting.gameType}
           />
         )}
       </div>
