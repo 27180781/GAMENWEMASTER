@@ -4135,7 +4135,7 @@ body {
   flex-direction: column;
   gap: 14px;
 }
-.sl-head { display: flex; align-items: center; justify-content: center; gap: 26px; flex: 0 0 auto; }
+.sl-head { display: flex; align-items: center; justify-content: center; gap: 26px; flex: 0 0 auto; padding-top: 8px; }
 .sl-title {
   font-size: 52px;
   font-weight: 900;
@@ -4143,14 +4143,6 @@ body {
   color: var(--secondary-color, #ffd23f);
   text-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
 }
-.sl-dice {
-  display: flex; align-items: center; gap: 10px;
-  background: rgba(255, 255, 255, 0.12);
-  border: 3px solid var(--secondary-color, #ffd23f);
-  border-radius: 20px; padding: 6px 22px; font-size: 34px;
-  animation: sl-pop 0.5s ease;
-}
-.sl-dice-num { font-size: 42px; font-weight: 900; color: var(--secondary-color, #ffd23f); }
 @keyframes sl-pop { from { transform: scale(0.4) rotate(-25deg); opacity: 0; } to { transform: none; opacity: 1; } }
 
 .sl-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 1fr 420px; gap: 20px; }
@@ -4166,6 +4158,7 @@ body {
 }
 .sl-cell {
   position: absolute;
+  z-index: 1;
   transform: translate(-50%, -50%);
   width: 12%;
   height: 17%;
@@ -4175,7 +4168,22 @@ body {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 2px;
 }
-.sl-cell-num { font-size: 22px; font-weight: 800; opacity: 0.55; color: #fff; }
+/* מספר המשבצת — שכבה נפרדת מעל הגרפיקה, בפינה העליונה של המשבצת, עם
+   רקע כהה כדי שיישאר קריא גם כשנחש/סולם עובר מעליו. */
+.sl-cell-num {
+  position: absolute;
+  z-index: 3;
+  transform: translate(-50%, -50%);
+  margin-top: -5.6%;
+  margin-left: -4.2%;
+  font-size: 20px;
+  font-weight: 800;
+  color: #fff;
+  background: rgba(8, 10, 22, 0.8);
+  border-radius: 8px;
+  padding: 1px 8px;
+  pointer-events: none;
+}
 .sl-cell-icon { font-size: 30px; line-height: 1; }
 .sl-cell--ladder { background: rgba(56, 178, 74, 0.22); border-color: rgba(56, 178, 74, 0.75); }
 .sl-cell--snake { background: rgba(226, 59, 59, 0.22); border-color: rgba(226, 59, 59, 0.75); }
@@ -4184,10 +4192,6 @@ body {
   border-color: var(--secondary-color, #ffd23f);
   box-shadow: 0 0 32px rgba(255, 210, 63, 0.55);
 }
-.sl-links { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.sl-link { stroke-width: 0.7; stroke-linecap: round; vector-effect: non-scaling-stroke; }
-.sl-link--ladder { stroke: rgba(56, 178, 74, 0.75); stroke-dasharray: 2 1.6; }
-.sl-link--snake { stroke: rgba(226, 59, 59, 0.75); }
 
 .sl-avatar {
   position: absolute;
@@ -4243,3 +4247,130 @@ body {
 .sl-result-steps { font-weight: 800; opacity: 0.85; }
 .sl-result-pos { grid-column: 1 / -1; font-size: 19px; opacity: 0.6; }
 .sl-foot { flex: 0 0 auto; text-align: center; font-size: 22px; opacity: 0.55; color: #fff; }
+
+/* --- קובייה מונפשת --- */
+.sl-dice-wrap { display: flex; align-items: center; gap: 14px; }
+.sl-die {
+  position: relative;
+  width: 86px; height: 86px;
+  border-radius: 18px;
+  background: linear-gradient(150deg, #fffdf5, #ddd6c2);
+  border: 3px solid rgba(0, 0, 0, 0.35);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55), inset 0 -6px 14px rgba(0, 0, 0, 0.14);
+}
+.sl-die--rolling { animation: sl-tumble 0.32s linear infinite; }
+.sl-die--settled { animation: sl-land 0.45s cubic-bezier(0.3, 1.6, 0.5, 1); }
+@keyframes sl-tumble {
+  0% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(90deg) scale(1.07); }
+  50% { transform: rotate(180deg) scale(0.95); }
+  75% { transform: rotate(270deg) scale(1.07); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+@keyframes sl-land {
+  0% { transform: scale(1.4) rotate(-12deg); }
+  60% { transform: scale(0.92) rotate(3deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+.sl-die-face { position: absolute; inset: 0; }
+.sl-die-pip {
+  position: absolute;
+  width: 15px; height: 15px;
+  margin: -7.5px 0 0 -7.5px;
+  border-radius: 50%;
+  background: #1a1a1a;
+  box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.35);
+}
+.sl-dice-who {
+  font-size: 26px; font-weight: 800;
+  color: var(--secondary-color, #ffd23f);
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px; padding: 5px 18px;
+}
+
+/* --- סולמות ונחשים מצוירים --- */
+.sl-links { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.sl-ladder line {
+  stroke: #c98a3c;
+  stroke-width: 7;
+  stroke-linecap: round;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+}
+.sl-ladder .sl-rung { stroke: #e0a854; stroke-width: 5.5; }
+.sl-snake-body {
+  fill: none;
+  stroke: #2f8f3c;
+  stroke-width: 20;
+  stroke-linecap: round;
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.55));
+}
+.sl-snake-belly {
+  fill: none;
+  stroke: #7fd489;
+  stroke-width: 7;
+  stroke-linecap: round;
+  stroke-dasharray: 10 12;
+  opacity: 0.75;
+}
+.sl-snake-head { fill: #35a144; stroke: #1d5f26; stroke-width: 2.5; }
+.sl-snake-eye { fill: #fff; }
+
+/* --- מסך הקבוצה המנצחת --- */
+.sl-overlay--win {
+  background: radial-gradient(ellipse at 50% 20%, #6d3ba8, #120726 70%);
+}
+.sl-win {
+  position: relative;
+  text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  padding: 40px 60px;
+}
+.sl-win-crown { font-size: 110px; line-height: 1; animation: sl-crown 1.2s ease-out; }
+@keyframes sl-crown {
+  0% { transform: translateY(-160px) scale(0.3) rotate(-40deg); opacity: 0; }
+  70% { transform: translateY(10px) scale(1.15) rotate(6deg); opacity: 1; }
+  100% { transform: none; opacity: 1; }
+}
+.sl-win-title {
+  margin: 0;
+  font-size: 82px;
+  font-weight: 900;
+  color: var(--secondary-color, #ffd23f);
+  text-shadow: 0 6px 0 rgba(0, 0, 0, 0.35);
+  animation: sl-pop 0.6s ease-out 0.2s backwards;
+}
+.sl-win-groups { display: flex; gap: 34px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
+.sl-win-group {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  animation: sl-pop 0.6s ease-out 0.45s backwards;
+}
+.sl-win-avatar {
+  width: 150px; height: 150px; border-radius: 50%;
+  border: 8px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 80px;
+  animation: sl-bounce 1.6s ease-in-out 1s infinite;
+}
+@keyframes sl-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-18px); }
+}
+.sl-win-name { font-size: 46px; font-weight: 900; color: #fff; }
+.sl-win-sub { font-size: 30px; opacity: 0.75; color: #fff; margin: 4px 0 0; }
+.sl-win-confetti { position: absolute; inset: -40px 0 0; overflow: hidden; pointer-events: none; }
+.sl-confetti {
+  position: absolute;
+  top: -30px;
+  width: 14px; height: 22px;
+  border-radius: 3px;
+  opacity: 0.9;
+  animation-name: sl-fallconf;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+@keyframes sl-fallconf {
+  0% { transform: translateY(-40px) rotate(0deg); opacity: 0; }
+  10% { opacity: 0.95; }
+  100% { transform: translateY(1100px) rotate(720deg); opacity: 0.9; }
+}

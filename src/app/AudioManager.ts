@@ -199,6 +199,67 @@ export class AudioManager {
       // סביבה בלי אודיו — מתעלמים בשקט
     }
   }
+
+  /**
+   * אפקט קצר מסונתז (WebAudio) — עובד גם אופליין בלי שום קובץ מדיה:
+   *   'climb'   — ארפג'יו עולה (טיפוס בסולם).
+   *   'fall'    — גלישה יורדת (החלקה בחבל).
+   *   'fanfare' — תרועת ניצחון.
+   * בניגוד ל-play/playApplause, אפקטים אלו *אינם* עוצרים סאונד אחר: הם קצרים,
+   * ולעיתים שני אפקטים קורים יחד (קבוצה מטפסת בזמן שאחרת נופלת).
+   */
+  playCue(kind: 'climb' | 'fall' | 'fanfare'): void {
+    try {
+      this.context ??= new AudioContext();
+      const ctx = this.context;
+      if (ctx.state === 'suspended') void ctx.resume();
+      const now = ctx.currentTime;
+      const master = ctx.createGain();
+      master.gain.value = this.volume * 0.5;
+      master.connect(ctx.destination);
+
+      /** צליל בודד עם מעטפת רכה (בלי קליקים). */
+      const tone = (freq: number, at: number, dur: number, type: OscillatorType = 'triangle') => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, now + at);
+        gain.gain.setValueAtTime(0.0001, now + at);
+        gain.gain.exponentialRampToValueAtTime(0.9, now + at + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + at + dur);
+        osc.connect(gain);
+        gain.connect(master);
+        osc.start(now + at);
+        osc.stop(now + at + dur + 0.05);
+      };
+
+      if (kind === 'climb') {
+        // דו-מי-סול-דו עולה — תחושת טיפוס
+        [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, i * 0.08, 0.22));
+      } else if (kind === 'fall') {
+        // גלישה יורדת רציפה — תחושת נפילה
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(700, now);
+        osc.frequency.exponentialRampToValueAtTime(120, now + 0.55);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.6, now + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
+        osc.connect(gain);
+        gain.connect(master);
+        osc.start(now);
+        osc.stop(now + 0.65);
+      } else {
+        // תרועה: שלוש הכרזות ואז אקורד מנצח
+        [392, 392, 523.25].forEach((f, i) => tone(f, i * 0.16, 0.16, 'square'));
+        [523.25, 659.25, 783.99].forEach((f) => tone(f, 0.5, 0.9, 'square'));
+      }
+      debugLog('audio', `אפקט ${kind} (WebAudio)`);
+    } catch {
+      // סביבה בלי אודיו — מתעלמים בשקט
+    }
+  }
 }
 
 function buildApplauseBuffer(ctx: AudioContext): AudioBuffer {
