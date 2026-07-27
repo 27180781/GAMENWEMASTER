@@ -232,6 +232,16 @@ export function QuestionSlide({
   // ואינו חושף מעצמו; החשיפה קורית בלחיצה (או אוטומטית כש-showCorrectAnswerAfterTimer
   // דלוק). כך "מעבר אוטומטי כבוי" באמת עוצר אחרי הטיימר עד ללחיצה.
   const revealed = reveal.revealCorrect;
+  /**
+   * האם יש לשקופית "תשובה נכונה" להצביע עליה בחשיפה.
+   *
+   * ב-trivia תמיד. תשובות-כתמונה מנוקדות כהשתתפות (כמו סקר) ולכן לא סומנה בהן
+   * תשובה עד היום — אבל כשהמחבר כן סימן אחת, ראוי להראות אותה. התנאי דורש גם
+   * מסומנת אחת *וגם* אחת שאינה: כשכולן מסומנות (או אף אחת) אין על מה להצביע,
+   * ואז לא מעמעמים כלום. הניקוד אינו מושפע — זה חיווי בלבד.
+   */
+  const marksCorrect =
+    isTrivia || (isImages && answers.some((a) => a.correct) && answers.some((a) => !a.correct));
   // פס מובילים מוצג רק ב-trivia אחרי חשיפת התשובה הנכונה.
   const showBoard = reveal.revealCorrect && isTrivia && leaders.length > 0;
 
@@ -316,8 +326,8 @@ export function QuestionSlide({
               const shown = index < reveal.answersShown;
               const count = counts[String(answer.id)] ?? 0;
               const percent = total > 0 ? Math.round((count / total) * 100) : 0;
-              const correct = revealed && isTrivia && answer.correct;
-              const dim = revealed && isTrivia && !answer.correct;
+              const correct = revealed && marksCorrect && answer.correct;
+              const dim = revealed && marksCorrect && !answer.correct;
               const coin = COIN_COLORS[index] ?? COIN_COLORS[0]!;
               const label = ansIsNumber ? answer.id : ANSWER_LETTERS[index] ?? answer.id;
               return (
