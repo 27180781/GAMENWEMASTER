@@ -47,6 +47,13 @@
         font-size: 20px;
       }
       .btn.secondary:hover { box-shadow: 0 8px 28px rgba(250, 204, 21, 0.2); }
+      .btn.seal {
+        background: transparent;
+        color: #c084fc;
+        border: 2px solid rgba(192, 132, 252, 0.6);
+        font-size: 20px;
+      }
+      .btn.seal:hover { box-shadow: 0 8px 28px rgba(192, 132, 252, 0.25); }
       .btn .small { display: block; font-size: 14px; font-weight: 500; opacity: 0.75; margin-top: 4px; }
       .note { margin-top: 28px; font-size: 15px; opacity: 0.6; line-height: 1.7; text-align: right; }
       .note strong { opacity: 0.9; }
@@ -73,6 +80,13 @@
           גרסה ניידת (בלי התקנה)
           <span class="small">קובץ בודד שרץ ישירות</span>
         </a>
+        <a
+          class="btn seal"
+          href="https://github.com/27180781/GAMENWEMASTER/releases/download/desktop-latest/SealEXE.exe"
+        >
+          🔏 חתום EXE
+          <span class="small">כלי שסוגר קובץ ZIP של משחק לקובץ EXE בודד</span>
+        </a>
       </div>
 
       <div class="note">
@@ -82,6 +96,13 @@
           (הקובץ אינו חתום דיגיטלית) — יש ללחוץ «מידע נוסף» → «הפעל בכל זאת».
         </p>
         <p><strong>שליטה:</strong> רווח = השלב הבא · ‏2 = אחורה · ‏F11 = מסך מלא · ‏Ctrl+Q = יציאה.</p>
+        <p>
+          <strong>חתום EXE:</strong> מריצים את הקובץ, בוחרים בו את ה-ZIP של המשחק
+          (בדיוק כמו טעינת משחק אופליין), מסמנים שלטים/טלפונים ומגבלת משתתפים —
+          והוא כותב קובץ EXE אחד עם המשחק בפנים. הקובץ שנוצר נסגר תמיד על
+          <em>גרסת המנוע האחרונה</em> (מורדת בזמן החתימה); בלי אינטרנט הוא נסגר
+          על גרסת הכלי עצמו.
+        </p>
         <p style="margin-top: 14px; opacity: 0.8">
           מדיה מרוחקת (יוטיוב/וידאו בענן) עדיין דורשת אינטרנט. תמיכה במשחק ארוז
           מקומית (ZIP) תיווסף ב-Milestone 5.
