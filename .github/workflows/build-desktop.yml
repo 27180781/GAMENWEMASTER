@@ -40,6 +40,11 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run dist:win
+      # כלי "חתום EXE" הוא אותה גרסה ניידת בשם ייעודי: היא משמשת גם כבסיס
+      # לחתימה (הקובץ הנייד חותם על עצמו), ולכן אין צורך בבינארי שני.
+      - name: Duplicate portable EXE as the sealing tool
+        run: copy release\TriviaEngine-Portable.exe release\SealEXE.exe
+        shell: cmd
       - name: Publish EXE files to a stable release
         uses: softprops/action-gh-release@v2
         with:
@@ -49,7 +54,9 @@ jobs:
             גרסת שולחן עבודה אופליין ל-Windows, נבנית אוטומטית מהקומיט האחרון ב-main:
             - **TriviaEngine-Setup.exe** — מתקין עם קיצור דרך בשולחן העבודה ובתפריט התחל.
             - **TriviaEngine-Portable.exe** — נייד, רץ בלי התקנה.
+            - **SealEXE.exe** — כלי "חתום EXE": סוגר ZIP של משחק לקובץ EXE בודד.
           files: |
             release/TriviaEngine-Setup.exe
             release/TriviaEngine-Portable.exe
+            release/SealEXE.exe
           prerelease: false

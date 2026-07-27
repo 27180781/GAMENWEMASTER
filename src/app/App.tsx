@@ -22,6 +22,7 @@ import { MediaLoadBar, MediaLoadDot } from '../render/MediaLoadBar.tsx';
 import { StartupOverlay } from '../render/StartupOverlay.tsx';
 import { ErrorScreen } from '../render/ErrorScreen.tsx';
 import { ClickerDiagnostic } from '../render/ClickerDiagnostic.tsx';
+import { SealScreen } from '../render/SealScreen.tsx';
 import {
   isDesktopClicker,
   isDesktopApp,
@@ -29,6 +30,7 @@ import {
   getLastGame,
   forgetGame,
   getSealedGame,
+  canSealExe,
   canStreamMedia,
   desktopMediaClear,
   desktopLoadSavedGame,
@@ -85,11 +87,20 @@ function useHash(): string {
 }
 
 /** מעטפת במה 16:9 למסכים שמחוץ למשחק עצמו (בחירה, הגדרות, טעינה). */
-function Shell({ children, style }: { children: ReactNode; style?: Record<string, string> }) {
+function Shell({
+  children,
+  style,
+  bare = false,
+}: {
+  children: ReactNode;
+  style?: Record<string, string>;
+  /** בלי חיווי הריסיבר — למסכים שאינם משחק (כלי "חתום EXE"), שם הוא רק רעש. */
+  bare?: boolean;
+}) {
   return (
     <div className="game-root" dir="rtl" style={style}>
       <Stage>{children}</Stage>
-      <ClickerDiagnostic />
+      {!bare && <ClickerDiagnostic />}
     </div>
   );
 }
@@ -158,6 +169,9 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   /** חיווי שהמדיה הזמנית נוקתה מהדיסק (EXE) — הגיבויים והתוצאות לא נגעו. */
   const [mediaCleared, setMediaCleared] = useState(false);
+  /** כלי "חתום EXE" — זמין רק בקובץ הנייד שאינו חתום בעצמו, ורק לפי בקשה. */
+  const [sealCapable, setSealCapable] = useState(false);
+  const [showSeal, setShowSeal] = useState(false);
   /**
    * טעינה עם שקופיות פגומות בודדות: המשחק תקין-למשחק אך יש שקופיות שנשמטו.
    * מוצג מסך אזהרה (מה לתקן) + "דלג והמשך" — ורק בלחיצה נכנסים למשחק.
@@ -298,6 +312,19 @@ export function App() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- ריצה חד-פעמית בעליית התוכנה
   }, []);
+
+  // כלי "חתום EXE": נבדק פעם אחת בעלייה. אמת רק בקובץ הנייד הארוז שאינו חתום
+  // בעצמו — ב-EXE של משחק סגור מסך הפתיחה בכלל לא מוצג.
+  useEffect(() => {
+    if (!desktopApp) return;
+    let cancelled = false;
+    void canSealExe().then((ok) => {
+      if (!cancelled) setSealCapable(ok);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [desktopApp]);
 
   // בדיקת מדיה למשחק אונליין — מזהה קישורים שבורים (אופליין נבדק ב-zipLoader)
   useEffect(() => {
@@ -676,6 +703,14 @@ export function App() {
     />
   );
 
+  if (desktopApp && showSeal) {
+    return (
+      <Shell bare>
+        <SealScreen onBack={() => setShowSeal(false)} />
+      </Shell>
+    );
+  }
+
   if (desktopApp) {
     return (
       <Shell>
@@ -692,6 +727,15 @@ export function App() {
                 {zipInput}
               </label>
               {error !== null && <p className="offline-open-error">{error}</p>}
+              {sealCapable && (
+                <button
+                  type="button"
+                  className="offline-open-seal"
+                  onClick={() => setShowSeal(true)}
+                >
+                  🔏 חתום EXE — סגירת משחק לקובץ בודד
+                </button>
+              )}
               {canStreamMedia() && (
                 <button
                   type="button"

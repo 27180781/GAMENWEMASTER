@@ -154,4 +154,23 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
   extendDisplay() {
     void ipcRenderer.invoke('display:extend');
   },
+  /** האם אפשר לחתום EXE מהתוכנה הזו (ארוזה ולא-חתומה בעצמה). */
+  sealCapable() {
+    return ipcRenderer.invoke('seal:capable');
+  },
+  /** חתימת ZIP ל-EXE חדש; מחזיר { ok, path } או { ok:false, error|canceled }. */
+  sealGame(
+    /** @type {Uint8Array} */ zipBytes,
+    /** @type {unknown} */ config,
+    /** @type {string} */ suggested,
+    /** @type {unknown} */ opts,
+  ) {
+    return ipcRenderer.invoke('seal:create', zipBytes, config, suggested, opts);
+  },
+  /** מנוי להתקדמות החתימה (הורדת הבסיס/כתיבה). מחזיר פונקציית ביטול-מנוי. */
+  onSealProgress(/** @type {(p: unknown) => void} */ cb) {
+    const listener = (/** @type {unknown} */ _e, /** @type {unknown} */ p) => cb(p);
+    ipcRenderer.on('seal:progress', listener);
+    return () => ipcRenderer.removeListener('seal:progress', listener);
+  },
 });
