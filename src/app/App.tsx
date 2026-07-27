@@ -30,7 +30,7 @@ import {
   getLastGame,
   forgetGame,
   getSealedGame,
-  canSealExe,
+  getSealMode,
   canStreamMedia,
   desktopMediaClear,
   desktopLoadSavedGame,
@@ -39,7 +39,17 @@ import {
 import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.ts';
 import { decodeInitialMedia } from './mediaDecode.ts';
 import { openPushChannel } from './pushChannel.ts';
-import { loadRoster, mergeGameUsers, parseGameUsers, saveRoster } from './roster.ts';
+import {
+  EMPTY_ROSTER,
+  fingerprintUsers,
+  loadRoster,
+  loadRosterSource,
+  mergeGameUsers,
+  parseGameUsers,
+  rosterIsStale,
+  saveRoster,
+  saveRosterSource,
+} from './roster.ts';
 import { VOTE_SERVER_URL } from './socketAdapter.ts';
 import {
   DEFAULT_GAME_SETTINGS,
@@ -69,11 +79,21 @@ const RAW_FIXTURES: Record<string, unknown> = {
  * אידמפוטנטי (upsert לפי מספר; קטגוריה/קבוצות לפי שם) — בטוח להריץ גם בטעינה
  * וגם בכל רענון חם באמצע משחק.
  */
-function mergeUsersIntoRoster(file: GameFile): void {
+function mergeUsersIntoRoster(file: GameFile, opts: { sealed?: boolean } = {}): void {
   const users = parseGameUsers(file.users);
   if (users.length === 0) return;
   const categoryName = file.name.trim() !== '' ? file.name.trim() : 'קבוצות המשחק';
-  saveRoster(file.id, mergeGameUsers(loadRoster(file.id), users, categoryName));
+
+  // מהדורה חדשה של אותו משחק: אותו id, אבל רשימת משתתפים אחרת (למשל EXE שנחתם
+  // מחדש עם מספרי שלטים אחרים). המרשם ממוזג ולעולם אינו מוחק, ולכן בלי הבדיקה
+  // הזו המספרים הישנים היו נשארים לצד החדשים. כשהרשימה השתנתה — בונים מחדש.
+  const fingerprint = fingerprintUsers(String(file.users ?? ''));
+  const previous = loadRosterSource(file.id);
+  const stale = rosterIsStale(previous, fingerprint, opts.sealed === true);
+  const base = stale ? { ...EMPTY_ROSTER } : loadRoster(file.id);
+
+  saveRoster(file.id, mergeGameUsers(base, users, categoryName));
+  saveRosterSource(file.id, fingerprint);
 }
 
 function useHash(): string {
@@ -173,6 +193,12 @@ export function App() {
   const [sealCapable, setSealCapable] = useState(false);
   const [showSeal, setShowSeal] = useState(false);
   /**
+   * הקובץ שרץ *הוא* כלי החתימה (‏SealEXE.exe). אז הוא לא נגן: אינו טוען שום
+   * משחק שמור, ונפתח ישר על מסך החתימה. null = עוד לא ידוע (בודקים בעלייה),
+   * וכל עוד לא ידוע — הטעינה האוטומטית ממתינה, כדי שלא תקדים את הבדיקה.
+   */
+  const [sealTool, setSealTool] = useState<boolean | null>(isDesktopApp() ? null : false);
+  /**
    * טעינה עם שקופיות פגומות בודדות: המשחק תקין-למשחק אך יש שקופיות שנשמטו.
    * מוצג מסך אזהרה (מה לתקן) + "דלג והמשך" — ורק בלחיצה נכנסים למשחק.
    */
@@ -195,8 +221,8 @@ export function App() {
   // והשיוך לקבוצות תחת קטגוריה בשם המשחק (השיוך בגייסון מגיע בלי קטגוריה).
   useEffect(() => {
     if (pendingGame === null) return;
-    mergeUsersIntoRoster(pendingGame);
-  }, [pendingGame]);
+    mergeUsersIntoRoster(pendingGame, { sealed: sealConfig !== null });
+  }, [pendingGame, sealConfig]);
 
   // פענוח-מקדים כבר מהמסך הראשון: רקע הלובי והשקופית הראשונה (כולל הסרטון-רקע
   // המשותף, שמפוענח פעם אחת) — כדי שההצגה הראשונה תהיה מיידית ולא "נטענת קצת-קצת".
@@ -270,9 +296,12 @@ export function App() {
   // משחק אחרון — טוענים אותו ישר למסך ההגדרות, כך שאפשר מיד "התחל משחק".
   const autoLoadTriedRef = useRef(false);
   useEffect(() => {
+    // ממתינים לתשובה על "האם זה כלי החתימה" — כלי החתימה חולק את תיקיית
+    // ה-userData עם הנגן, ובלי ההמתנה הוא היה טוען משחק ישן שנשמר במחשב.
+    if (sealTool === null) return;
     if (autoLoadTriedRef.current) return;
     autoLoadTriedRef.current = true;
-    if (!isDesktopApp() || params.gameUrl !== null) return;
+    if (sealTool || !isDesktopApp() || params.gameUrl !== null) return;
     const toBuffer = (b: Uint8Array) => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
     /**
      * מסלול מהיר (EXE עם זרימת מדיה): ה-main קורא את ה-ZIP מהדיסק, מחלץ, ומחזיר
@@ -311,15 +340,18 @@ export function App() {
       if (last !== null && last.bytes.byteLength > 0) await loadZipBuffer(toBuffer(last.bytes));
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- ריצה חד-פעמית בעליית התוכנה
-  }, []);
+  }, [sealTool]);
 
-  // כלי "חתום EXE": נבדק פעם אחת בעלייה. אמת רק בקובץ הנייד הארוז שאינו חתום
-  // בעצמו — ב-EXE של משחק סגור מסך הפתיחה בכלל לא מוצג.
+  // מצב החתימה — נבדק פעם אחת בעלייה, *לפני* הטעינה האוטומטית. אם הקובץ שרץ
+  // הוא כלי החתימה, נפתחים ישר על מסכו ולא טוענים שום משחק שמור.
   useEffect(() => {
     if (!desktopApp) return;
     let cancelled = false;
-    void canSealExe().then((ok) => {
-      if (!cancelled) setSealCapable(ok);
+    void getSealMode().then((mode) => {
+      if (cancelled) return;
+      setSealCapable(mode.capable);
+      setSealTool(mode.tool);
+      if (mode.tool) setShowSeal(true);
     });
     return () => {
       cancelled = true;
@@ -703,10 +735,11 @@ export function App() {
     />
   );
 
+  // כלי החתימה נפתח ישר על מסכו. ב-SealEXE אין "חזרה" — אין מאחוריו משחק.
   if (desktopApp && showSeal) {
     return (
       <Shell bare>
-        <SealScreen onBack={() => setShowSeal(false)} />
+        <SealScreen {...(sealTool === true ? {} : { onBack: () => setShowSeal(false) })} />
       </Shell>
     );
   }

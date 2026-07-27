@@ -102,8 +102,8 @@ interface TriviaDesktop {
   loadSavedGame?: (source: 'last' | 'sealed') => Promise<SavedGamePayload | null>;
   /** מעבר לתצוגת מסכים מורחבת (Windows DisplaySwitch /extend). */
   extendDisplay?: () => void;
-  /** האם הכלי הנוכחי יכול לחתום EXE (קובץ נייד ארוז שאינו חתום בעצמו). */
-  sealCapable?: () => Promise<boolean>;
+  /** מצב החתימה של הקובץ שרץ — יכולת חתימה, והאם הוא כלי החתימה עצמו. */
+  sealMode?: () => Promise<SealMode>;
   /** חתימת ZIP ל-EXE חדש (כלי "חתום EXE"). */
   sealGame?: (
     zipBytes: Uint8Array,
@@ -113,6 +113,17 @@ interface TriviaDesktop {
   ) => Promise<SealResult>;
   /** מנוי להתקדמות החתימה. מחזיר פונקציית ביטול-מנוי. */
   onSealProgress?: (cb: (p: SealProgress) => void) => () => void;
+}
+
+/**
+ * מצב החתימה של הקובץ שרץ.
+ * - `capable`: אפשר לחתום ממנו (קובץ נייד ארוז שאינו חתום בעצמו).
+ * - `tool`: הוא *כלי החתימה* (‏SealEXE.exe) — ולכן אינו נגן משחקים, ולא יטען
+ *   שום משחק שמור אלא ייפתח ישר על מסך החתימה.
+ */
+export interface SealMode {
+  capable: boolean;
+  tool: boolean;
 }
 
 /** אפשרויות חתימה — בסיס עדכני מהרשת מול ה-EXE שרץ. */
@@ -372,17 +383,17 @@ export function extendDisplay(): void {
 }
 
 /**
- * האם הכלי הנוכחי יכול לחתום EXE. אמת רק בקובץ הנייד הארוז שאינו חתום בעצמו —
- * EXE של משחק סגור טוען את המשחק שלו ולא מציג את הכלי, וגרסת ההתקנה אינה קובץ
- * בודד ולכן אינה יכולה לשמש בסיס.
+ * מצב החתימה של הקובץ שרץ. בדפדפן/גרסה ישנה — הכול כבוי, וההתנהגות זהה למה
+ * שהיה לפני שהכלי נוסף.
  */
-export async function canSealExe(): Promise<boolean> {
-  const fn = desktop()?.sealCapable;
-  if (typeof fn !== 'function') return false;
+export async function getSealMode(): Promise<SealMode> {
+  const fn = desktop()?.sealMode;
+  if (typeof fn !== 'function') return { capable: false, tool: false };
   try {
-    return await fn();
+    const mode = await fn();
+    return { capable: mode?.capable === true, tool: mode?.tool === true };
   } catch {
-    return false;
+    return { capable: false, tool: false };
   }
 }
 

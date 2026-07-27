@@ -15,6 +15,7 @@ import {
   displayName,
   groupCounts,
   groupOf,
+  fingerprintUsers,
   mergeGameUsers,
   normalizeRoster,
   parseGameUsers,
@@ -22,6 +23,7 @@ import {
   removeGroup,
   removePlayer,
   resetCategoryMemberships,
+  rosterIsStale,
   upsertPlayer,
   type RosterData,
 } from '../src/app/roster.ts';
@@ -247,5 +249,50 @@ describe('normalizeRoster — טעינה מ-JSON', () => {
   it('קלט לא-אובייקט → מרשם ריק', () => {
     expect(normalizeRoster(null)).toEqual(EMPTY_ROSTER);
     expect(normalizeRoster('x')).toEqual(EMPTY_ROSTER);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// טביעת אצבע של רשימת המשתתפים — זיהוי "מהדורה חדשה של אותו משחק"
+// ---------------------------------------------------------------------------
+
+describe('טביעת אצבע של רשימת המשתתפים', () => {
+  const A = JSON.stringify({ 101: { remoteId: '101', name: 'אבי', groupName: 'א' } });
+  const B = JSON.stringify({ 201: { remoteId: '201', name: 'אבי', groupName: 'א' } });
+
+  it('אותה רשימה → אותה טביעת אצבע; רשימה אחרת → טביעה אחרת', () => {
+    expect(fingerprintUsers(A)).toBe(fingerprintUsers(A));
+    expect(fingerprintUsers(A)).not.toBe(fingerprintUsers(B));
+    expect(fingerprintUsers('')).toBe(fingerprintUsers(''));
+  });
+
+  it('rosterIsStale: אותה רשימה → לא ישן (שמות שהוקלדו ידנית נשמרים)', () => {
+    const fp = fingerprintUsers(A);
+    expect(rosterIsStale(fp, fp, false)).toBe(false);
+    expect(rosterIsStale(fp, fp, true)).toBe(false);
+  });
+
+  it('rosterIsStale: רשימה שהשתנתה → ישן (המספרים הישנים לא יישארו)', () => {
+    expect(rosterIsStale(fingerprintUsers(A), fingerprintUsers(B), false)).toBe(true);
+    expect(rosterIsStale(fingerprintUsers(A), fingerprintUsers(B), true)).toBe(true);
+  });
+
+  it('rosterIsStale: אין טביעה שמורה → ישן רק במשחק סגור', () => {
+    // משחק רגיל: שומרים על מה שיש (יכול להיות מרשם שהוקלד ידנית)
+    expect(rosterIsStale(null, fingerprintUsers(A), false)).toBe(false);
+    // משחק סגור (EXE חתום): הרשימה שבקובץ היא מקור האמת — מנקים שאריות
+    expect(rosterIsStale(null, fingerprintUsers(A), true)).toBe(true);
+  });
+
+  it('בנייה מחדש באמת מסירה מספרים ישנים (מיזוג לבד היה משאיר אותם)', () => {
+    const oldUsers = parseGameUsers(A);
+    const newUsers = parseGameUsers(B);
+    const before = mergeGameUsers(EMPTY_ROSTER, oldUsers, 'משחק');
+    // מיזוג לתוך הקיים — המספר הישן שורד לצד החדש (ההתנהגות שגרמה לבאג)
+    const merged = mergeGameUsers(before, newUsers, 'משחק');
+    expect(merged.players.map((p) => p.id).sort()).toEqual(['101', '201']);
+    // בנייה מחדש — רק המספר החדש
+    const rebuilt = mergeGameUsers(EMPTY_ROSTER, newUsers, 'משחק');
+    expect(rebuilt.players.map((p) => p.id)).toEqual(['201']);
   });
 });

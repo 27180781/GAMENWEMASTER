@@ -72,6 +72,32 @@ function portableExePath() {
   return typeof p === 'string' && p !== '' ? p : null;
 }
 
+/**
+ * האם אפשר לחתום מהתוכנה הזו: קובץ נייד ארוז, שאינו חתום בעצמו. (התקנת NSIS
+ * אינה קובץ בודד ולכן אינה יכולה לשמש בסיס; EXE חתום כבר טוען משחק משלו.)
+ */
+function sealCapable() {
+  const selfPath = portableExePath();
+  if (!app.isPackaged || selfPath === null) return false;
+  return readSealedFromFile(selfPath) === null;
+}
+
+/**
+ * האם הקובץ שרץ הוא **כלי החתימה** (‏SealEXE.exe) ולא נגן המשחקים.
+ *
+ * למה לפי שם הקובץ: כלי החתימה והנגן הנייד הם אותו בינארי בדיוק (הכלי חותם על
+ * עצמו), ולכן אין בהם שום הבדל פנימי להיתלות בו — רק השם שבו הורידו אותו.
+ *
+ * למה זה חשוב: תיקיית ה-userData משותפת לכל העותקים (אותו appId), וביניהם גם
+ * "המשחק האחרון" שנשמר. בלי ההבחנה הזו, הרצת כלי החתימה הייתה טוענת אוטומטית
+ * משחק ישן שנשמר במחשב ומציגה אותו במקום את הכלי.
+ */
+function isSealerBuild() {
+  const selfPath = portableExePath();
+  if (selfPath === null || !sealCapable()) return false;
+  return /seal/i.test(path.basename(selfPath));
+}
+
 /** ה-EXE הבסיסי העדכני — המהדורה היציבה שנבנית מכל קומיט ב-main. */
 const SEAL_BASE_URL =
   'https://github.com/27180781/GAMENWEMASTER/releases/download/desktop-latest/TriviaEngine-Portable.exe';
@@ -735,11 +761,15 @@ function safeReportName(name) {
 }
 
 function createWindow() {
+  // כלי החתימה אינו משחק: חלון רגיל עם כותרת, לא קיוסק במסך מלא — כדי שדיאלוג
+  // השמירה ושאר החלונות של Windows יתנהגו כרגיל, ושיהיה ברור מה רץ.
+  const sealer = isSealerBuild();
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 720,
+    width: sealer ? 1180 : 1280,
+    height: sealer ? 820 : 720,
     backgroundColor: '#0b0e1a',
-    fullscreen: true,
+    fullscreen: !sealer,
+    title: sealer ? 'חתום EXE' : 'Trivia Engine',
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -817,11 +847,15 @@ app.whenReady().then(() => {
   ipcMain.handle('rf317:stop', () => {
     stopReceiver();
   });
-  // זכירת המשחק האחרון (בייטי ZIP + שם) + שליפה/מחיקה.
+  // זכירת המשחק האחרון (בייטי ZIP + שם) + שליפה/מחיקה. תיקיית ה-userData
+  // משותפת לכל העותקים של התוכנה (אותו appId), ולכן כלי החתימה לא נוגע ב"משחק
+  // האחרון" כלל — לא קורא ממנו (שלא יטען משחק ישן במקום להציג את הכלי) ולא
+  // כותב אליו (שלא ידרוס את המשחק של הנגן).
   ipcMain.handle('game:remember', (_e, name, bytes) => {
+    if (isSealerBuild()) return;
     rememberLastGame(name, bytes);
   });
-  ipcMain.handle('game:getLast', () => getLastGame());
+  ipcMain.handle('game:getLast', () => (isSealerBuild() ? null : getLastGame()));
   // משחק מוטבע ("סגור") ב-EXE — { bytes, config } או null.
   ipcMain.handle('game:sealed', () => sealedGame);
   ipcMain.handle('game:forget', () => {
@@ -919,12 +953,12 @@ app.whenReady().then(() => {
     }
   });
 
-  /** האם התוכנה הנוכחית יכולה לחתום (קובץ נייד ארוז, שאינו חתום בעצמו). */
-  ipcMain.handle('seal:capable', () => {
-    const selfPath = portableExePath();
-    if (!app.isPackaged || selfPath === null) return false;
-    return readSealedFromFile(selfPath) === null;
-  });
+  /**
+   * מצב החתימה של התוכנה הנוכחית:
+   *   capable — אפשר לחתום ממנה (קובץ נייד ארוז שאינו חתום בעצמו).
+   *   tool    — היא *כלי החתימה* עצמו (SealEXE.exe), ולא נגן משחקים.
+   */
+  ipcMain.handle('seal:mode', () => ({ capable: sealCapable(), tool: isSealerBuild() }));
 
   // פרוטוקול trivia-media:// — מגיש קבצי מדיה מהמטמון בדיסק בזרימה (net.fetch
   // על file:// תומך ב-Range, כך שחיפוש/דילוג בווידאו עובד) — רק המדיה המתנגנת
@@ -1006,6 +1040,7 @@ app.whenReady().then(() => {
         bytes = sealedGame.bytes;
         config = sealedGame.config;
       } else {
+        if (isSealerBuild()) return null; // כלי החתימה אינו נגן — ראו game:getLast
         const zipPath = lastGameZipPath();
         if (!fs.existsSync(zipPath)) return null;
         bytes = fs.readFileSync(zipPath);
