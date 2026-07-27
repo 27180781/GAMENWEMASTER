@@ -83,6 +83,39 @@ function extensionOf(path: string): string {
   return i === -1 ? '' : base.slice(i + 1);
 }
 
+/** איתור data.json בתוך ה-ZIP (בכל עומק, ללא תלות ברישיות). זורק אם אין. */
+function findDataEntry(entries: JSZip.JSZipObject[]): JSZip.JSZipObject {
+  const entry =
+    entries.find((f) => (f.name.split('/').pop() ?? '').toLowerCase() === 'data.json') ??
+    entries.find((f) => f.name.toLowerCase().endsWith('.json'));
+  if (!entry) throw new Error('לא נמצא קובץ data.json בתוך ה-ZIP');
+  return entry;
+}
+
+/** קריאת data.json מהערך שנמצא, עם שגיאה ברורה על JSON פגום. */
+async function readDataJson(entry: JSZip.JSZipObject): Promise<unknown> {
+  const rawJson = await entry.async('string');
+  try {
+    return JSON.parse(rawJson) as unknown;
+  } catch (e) {
+    throw new Error(`data.json אינו JSON תקין: ${(e as Error).message}`);
+  }
+}
+
+/**
+ * קריאת קובץ המשחק מתוך ZIP **בלי** לפרוס מדיה — לכלי "חתום EXE", שצריך רק
+ * לוודא שה-ZIP תקין ולהציג ממנו שם/מספר שקופיות/משתתפים. מיפוי המדיה (Blob או
+ * חילוץ לדיסק) הוא היקר בטעינה, וכאן הוא מיותר לגמרי.
+ */
+export async function readZipGameFile(
+  input: ArrayBuffer | Uint8Array,
+): Promise<{ game: GameFile; dropped: DroppedSlide[] }> {
+  const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
+  const zip = await JSZip.loadAsync(bytes);
+  const entries = Object.values(zip.files).filter((f) => !f.dir);
+  return parseGameFileLenient(await readDataJson(findDataEntry(entries)));
+}
+
 /** בניית כתובת trivia-media:// לנתיב שחולץ (כל מקטע מקודד בנפרד). */
 function mediaUrl(cacheKey: string, name: string): string {
   const rel = normalizePath(name)
@@ -174,21 +207,8 @@ export async function loadGameFromZip(
 
   // איתור data.json (בכל עומק, ללא תלות ברישיות)
   const entries = Object.values(zip.files).filter((f) => !f.dir);
-  const dataEntry =
-    entries.find((f) => (f.name.split('/').pop() ?? '').toLowerCase() === 'data.json') ??
-    entries.find((f) => f.name.toLowerCase().endsWith('.json'));
-  if (!dataEntry) {
-    throw new Error('לא נמצא קובץ data.json בתוך ה-ZIP');
-  }
-
-  const rawJson = await dataEntry.async('string');
-  let data: unknown;
-  try {
-    data = JSON.parse(rawJson);
-  } catch (e) {
-    throw new Error(`data.json אינו JSON תקין: ${(e as Error).message}`);
-  }
-  const { game, dropped } = parseGameFileLenient(data);
+  const dataEntry = findDataEntry(entries);
+  const { game, dropped } = parseGameFileLenient(await readDataJson(dataEntry));
 
   // מיפוי נתיבים יחסיים → Blob URLs (עם cache לפי נתיב, ורישום סוג המדיה)
   const baseDir = dirOf(dataEntry.name);

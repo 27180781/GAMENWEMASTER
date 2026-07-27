@@ -2211,6 +2211,164 @@ body {
   max-width: 640px;
   white-space: pre-wrap;
 }
+/* כניסה לכלי "חתום EXE" — פעולה משנית, לא הדרך הרגילה לשחק */
+.offline-open-seal {
+  background: #f4f6fb;
+  border: 2px solid #cfd4e2;
+  border-radius: 999px;
+  color: #2b3048;
+  font-size: 20px;
+  font-weight: 700;
+  padding: 12px 30px;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+.offline-open-seal:hover {
+  transform: translateY(-2px);
+  border-color: #8B2FC9;
+  background: #f7f0fc;
+}
+
+/* ---- כלי "חתום EXE" ---- */
+.settings-screen.seal-screen {
+  background: radial-gradient(ellipse at 50% -10%, #ffffff, #eef0f4 60%, #e6e9ef);
+  color: #171a2b;
+}
+.seal-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 48px 40px;
+  overflow-y: auto;
+}
+.seal-title { font-size: 46px; font-weight: 900; margin: 0; }
+.seal-lead {
+  font-size: 22px;
+  line-height: 1.5;
+  color: #3a3f52;
+  margin: 0;
+  max-width: 900px;
+  text-align: center;
+}
+.seal-pick {
+  background: #141414;
+  color: #fff;
+  border: 3px solid #8B2FC9;
+  border-radius: 44px;
+  font-weight: 800;
+  font-size: 26px;
+  padding: 14px 44px;
+  cursor: pointer;
+}
+.seal-pick:hover { transform: translateY(-2px); }
+.seal-info {
+  background: #fff;
+  border: 1px solid #e3e5ea;
+  border-radius: 24px;
+  box-shadow: 0 14px 34px rgba(20, 20, 40, 0.1);
+  padding: 20px 32px;
+  min-width: 620px;
+  max-width: 92%;
+}
+.seal-info-name { font-size: 28px; font-weight: 800; margin: 0 0 12px; text-align: center; }
+.seal-info-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.seal-info-list li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: #f4f6fb;
+  border-radius: 14px;
+  padding: 10px 8px;
+}
+.seal-info-list span { font-size: 16px; color: #5a6076; }
+.seal-info-list strong { font-size: 26px; font-weight: 800; }
+.seal-warn { color: #a8620d; font-size: 18px; font-weight: 600; margin: 12px 0 0; text-align: center; }
+.seal-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid #e3e5ea;
+  border-radius: 24px;
+  padding: 20px 32px;
+  min-width: 620px;
+  max-width: 92%;
+}
+.seal-check { display: flex; align-items: center; gap: 12px; font-size: 21px; cursor: pointer; }
+.seal-check input { width: 22px; height: 22px; cursor: pointer; }
+.seal-field { display: flex; align-items: center; gap: 14px; font-size: 21px; }
+.seal-field span { min-width: 170px; }
+.seal-field input {
+  flex: 1;
+  font-size: 20px;
+  padding: 8px 14px;
+  border: 2px solid #cfd4e2;
+  border-radius: 12px;
+  background: #f9fafc;
+}
+.seal-status { display: flex; flex-direction: column; align-items: center; gap: 10px; font-size: 21px; }
+.seal-bar {
+  width: 520px;
+  max-width: 80vw;
+  height: 12px;
+  border-radius: 999px;
+  background: #e3e5ea;
+  overflow: hidden;
+}
+.seal-bar-fill { height: 100%; background: #8B2FC9; transition: width 0.2s ease; }
+.seal-error {
+  color: #c0263f;
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+  text-align: center;
+  max-width: 900px;
+  white-space: pre-wrap;
+}
+.seal-done {
+  background: #f0fbf4;
+  border: 2px solid #2e8b57;
+  border-radius: 24px;
+  padding: 18px 32px;
+  text-align: center;
+  max-width: 92%;
+}
+.seal-done-title { font-size: 26px; font-weight: 800; margin: 0 0 6px; color: #1a7f4b; }
+.seal-done-path { font-size: 18px; margin: 0; word-break: break-all; color: #2b3048; }
+.seal-done-meta { font-size: 17px; margin: 6px 0 0; color: #4a4f63; }
+.seal-actions { display: flex; align-items: center; gap: 20px; }
+.seal-go {
+  background: #141414;
+  color: #fff;
+  border: 3px solid #2e8b57;
+  border-radius: 44px;
+  font-weight: 800;
+  font-size: 26px;
+  padding: 14px 44px;
+  cursor: pointer;
+}
+.seal-go:disabled { opacity: 0.45; cursor: default; transform: none; }
+.seal-go:not(:disabled):hover { transform: translateY(-2px); }
+.seal-back {
+  background: transparent;
+  border: none;
+  color: #3a3f52;
+  font-size: 20px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.seal-back:hover { text-decoration: underline; }
+.seal-back:disabled { opacity: 0.4; cursor: default; }
+
 /* ניקוי מדיה זמנית — קישור משני עדין (לא נוגע בגיבויים/בתוצאות) */
 .offline-open-clear {
   background: transparent;

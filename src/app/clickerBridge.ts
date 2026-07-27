@@ -102,6 +102,40 @@ interface TriviaDesktop {
   loadSavedGame?: (source: 'last' | 'sealed') => Promise<SavedGamePayload | null>;
   /** מעבר לתצוגת מסכים מורחבת (Windows DisplaySwitch /extend). */
   extendDisplay?: () => void;
+  /** האם הכלי הנוכחי יכול לחתום EXE (קובץ נייד ארוז שאינו חתום בעצמו). */
+  sealCapable?: () => Promise<boolean>;
+  /** חתימת ZIP ל-EXE חדש (כלי "חתום EXE"). */
+  sealGame?: (
+    zipBytes: Uint8Array,
+    config: SealConfig,
+    suggested: string,
+    opts: SealOptions,
+  ) => Promise<SealResult>;
+  /** מנוי להתקדמות החתימה. מחזיר פונקציית ביטול-מנוי. */
+  onSealProgress?: (cb: (p: SealProgress) => void) => () => void;
+}
+
+/** אפשרויות חתימה — בסיס עדכני מהרשת מול ה-EXE שרץ. */
+export interface SealOptions {
+  /** להוריד את גרסת המנוע האחרונה כבסיס (ברירת מחדל). false = הכלי עצמו. */
+  useLatest: boolean;
+}
+
+/** התקדמות החתימה: הורדת הבסיס, ואז כתיבת ה-EXE. */
+export interface SealProgress {
+  phase: 'base' | 'writing' | 'done';
+  received?: number;
+  total?: number;
+}
+
+/** תוצאת חתימה. baseSource='latest' = נחתם על גרסת המנוע שהורדה מהרשת. */
+export interface SealResult {
+  ok: boolean;
+  path?: string;
+  size?: number;
+  baseSource?: 'latest' | 'self';
+  canceled?: boolean;
+  error?: string;
 }
 
 function desktop(): TriviaDesktop | undefined {
@@ -335,4 +369,42 @@ export function canExtendDisplay(): boolean {
 /** מעבר לתצוגת מסכים מורחבת (EXE, Windows). no-op בדפדפן. */
 export function extendDisplay(): void {
   desktop()?.extendDisplay?.();
+}
+
+/**
+ * האם הכלי הנוכחי יכול לחתום EXE. אמת רק בקובץ הנייד הארוז שאינו חתום בעצמו —
+ * EXE של משחק סגור טוען את המשחק שלו ולא מציג את הכלי, וגרסת ההתקנה אינה קובץ
+ * בודד ולכן אינה יכולה לשמש בסיס.
+ */
+export async function canSealExe(): Promise<boolean> {
+  const fn = desktop()?.sealCapable;
+  if (typeof fn !== 'function') return false;
+  try {
+    return await fn();
+  } catch {
+    return false;
+  }
+}
+
+/** חתימת ZIP ל-EXE חדש. מחזיר תוצאה עם הנתיב שנשמר, ביטול, או שגיאה. */
+export async function desktopSealGame(
+  zipBytes: Uint8Array,
+  config: SealConfig,
+  suggested: string,
+  opts: SealOptions,
+): Promise<SealResult> {
+  const fn = desktop()?.sealGame;
+  if (typeof fn !== 'function') return { ok: false, error: 'החתימה אינה זמינה בגרסה הזו' };
+  try {
+    return await fn(zipBytes, config, suggested, opts);
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+/** מנוי להתקדמות החתימה. מחזיר פונקציית ביטול-מנוי (no-op בדפדפן). */
+export function onSealProgress(cb: (p: SealProgress) => void): () => void {
+  const fn = desktop()?.onSealProgress;
+  if (typeof fn !== 'function') return () => {};
+  return fn(cb);
 }

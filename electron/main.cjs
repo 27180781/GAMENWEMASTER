@@ -7,7 +7,7 @@
  * שליטה: F11 מסך מלא/יציאה · Ctrl+Shift+I כלי פיתוח · Ctrl+Q יציאה.
  */
 
-const { app, BrowserWindow, globalShortcut, ipcMain, shell, protocol, net } = require('electron');
+const { app, BrowserWindow, dialog, globalShortcut, ipcMain, shell, protocol, net } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const crypto = require('node:crypto');
@@ -15,7 +15,7 @@ const { pathToFileURL } = require('node:url');
 const { spawn, spawnSync } = require('node:child_process');
 const JSZip = require('jszip');
 const { createClickerServer, DEFAULT_PORT } = require('./clickerServer.cjs');
-const { readSealedFromFile } = require('./sealPayload.cjs');
+const { readSealedFromFile, sealToFile } = require('./sealPayload.cjs');
 const {
   writeEncryptedMedia,
   readEncryptedMediaRange,
@@ -61,11 +61,161 @@ let receiverProc = null;
 let sealedGame = null;
 
 /**
+ * נתיב קובץ ה-EXE *הנייד* של התוכנה עצמה — הקובץ הבודד שאפשר להעתיק, לחתום
+ * ולשלוח הלאה. בגרסה הניידת האפליקציה רצה מתיקייה זמנית, ולכן process.execPath
+ * מצביע על עותק פנימי שאינו עומד בפני עצמו; הנתיב האמיתי נמצא במשתנה הסביבה
+ * שהמעטפת הניידת מגדירה. null = לא רצים מגרסה ניידת (פיתוח או התקנה NSIS).
+ * @returns {string | null}
+ */
+function portableExePath() {
+  const p = process.env.PORTABLE_EXECUTABLE_FILE;
+  return typeof p === 'string' && p !== '' ? p : null;
+}
+
+/** ה-EXE הבסיסי העדכני — המהדורה היציבה שנבנית מכל קומיט ב-main. */
+const SEAL_BASE_URL =
+  'https://github.com/27180781/GAMENWEMASTER/releases/download/desktop-latest/TriviaEngine-Portable.exe';
+/** תקרת זמן להורדת הבסיס, ופסק-זמן על *שקט* בקו (לא על הגודל). */
+const BASE_DOWNLOAD_CEILING_MS = 10 * 60 * 1000;
+const BASE_DOWNLOAD_IDLE_MS = 45 * 1000;
+
+/** תיקיית מטמון ה-EXE הבסיסי (בתוך userData — לא נוגעת בגיבויים/בתוצאות). */
+function sealBaseDir() {
+  const dir = path.join(app.getPath('userData'), 'seal-base');
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+/**
+ * מוריד את ה-EXE הבסיסי מהמהדורה היציבה, כדי שכל משחק שנחתם ייצא עם **הגרסה
+ * האחרונה** של המנוע — גם אם הכלי שבידי המשתמש ישן. הקובץ נשמר במטמון יחד עם
+ * ה-ETag שלו, כך שחתימה חוזרת שולחת בקשה מותנית ומקבלת 304 במקום ~90MB.
+ *
+ * מחזיר נתיב לקובץ בסיס מקומי, או null אם אין רשת ואין מטמון — ואז החותם
+ * נופל חזרה על ה-EXE שרץ.
+ *
+ * @param {(p: object) => void} onProgress
+ * @returns {Promise<string | null>}
+ */
+function fetchLatestBase(onProgress) {
+  return new Promise((resolve) => {
+    let dir;
+    try {
+      dir = sealBaseDir();
+    } catch {
+      resolve(null);
+      return;
+    }
+    const exePath = path.join(dir, 'base.exe');
+    const partPath = path.join(dir, 'base.part');
+    const metaPath = path.join(dir, 'base.json');
+    const cached = fs.existsSync(exePath) ? exePath : null;
+    let etag = '';
+    try {
+      etag = String(JSON.parse(fs.readFileSync(metaPath, 'utf8')).etag || '');
+    } catch {
+      /* אין מטא — נוריד מלא */
+    }
+
+    let settled = false;
+    /** @type {NodeJS.Timeout | null} */
+    let idleTimer = null;
+    /** @type {import('electron').ClientRequest | null} */
+    let req = null;
+    /** @type {import('node:fs').WriteStream | null} */
+    let out = null;
+    const finish = (/** @type {string | null} */ value) => {
+      if (settled) return;
+      settled = true;
+      if (idleTimer !== null) clearTimeout(idleTimer);
+      clearTimeout(ceiling);
+      try {
+        req?.abort();
+      } catch {
+        /* כבר נסגר */
+      }
+      if (out !== null) {
+        out.destroy();
+        try {
+          fs.rmSync(partPath, { force: true });
+        } catch {
+          /* אין חלקי */
+        }
+      }
+      resolve(value);
+    };
+    const ceiling = setTimeout(() => finish(cached), BASE_DOWNLOAD_CEILING_MS);
+    const touch = () => {
+      if (idleTimer !== null) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => finish(cached), BASE_DOWNLOAD_IDLE_MS);
+    };
+
+    onProgress({ phase: 'base', received: 0, total: 0 });
+    try {
+      req = net.request({ method: 'GET', url: SEAL_BASE_URL });
+    } catch {
+      finish(cached);
+      return;
+    }
+    if (etag !== '' && cached !== null) req.setHeader('If-None-Match', etag);
+    req.on('error', () => finish(cached));
+    req.on('response', (res) => {
+      const status = res.statusCode;
+      if (status === 304 && cached !== null) {
+        console.log('[seal] בסיס עדכני כבר במטמון (304)');
+        finish(cached);
+        return;
+      }
+      if (status !== 200) {
+        console.warn('[seal] הורדת הבסיס החזירה', status);
+        res.resume?.();
+        finish(cached);
+        return;
+      }
+      const lenHeader = res.headers['content-length'];
+      const total = Number(Array.isArray(lenHeader) ? lenHeader[0] : lenHeader) || 0;
+      const newEtag = String(
+        (Array.isArray(res.headers.etag) ? res.headers.etag[0] : res.headers.etag) || '',
+      );
+      let received = 0;
+      out = fs.createWriteStream(partPath);
+      out.on('error', () => finish(cached));
+      touch();
+      res.on('data', (chunk) => {
+        received += chunk.length;
+        out?.write(chunk);
+        touch();
+        onProgress({ phase: 'base', received, total });
+      });
+      res.on('error', () => finish(cached));
+      res.on('end', () => {
+        if (settled || out === null) return;
+        const stream = out;
+        out = null; // מכאן אין למחוק את ה-part — הוא הופך לקובץ הבסיס
+        stream.end(() => {
+          try {
+            fs.rmSync(exePath, { force: true });
+            fs.renameSync(partPath, exePath);
+            fs.writeFileSync(metaPath, JSON.stringify({ etag: newEtag, size: received }), 'utf8');
+            console.log('[seal] הורד בסיס עדכני:', `${(received / 1048576).toFixed(1)}MB`);
+            finish(exePath);
+          } catch (err) {
+            console.warn('[seal] שמירת הבסיס נכשלה:', /** @type {Error} */ (err).message);
+            finish(cached);
+          }
+        });
+      });
+    });
+    req.end();
+  });
+}
+
+/**
  * טוען משחק מוטבע (אם ה-EXE נחתם ב-seal-game): קורא את הקובץ הנייד המקורי
  * (‏PORTABLE_EXECUTABLE_FILE) ומחלץ ZIP + הגדרות. null אם ה-EXE גנרי.
  */
 function loadSealedGame() {
-  const file = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath;
+  const file = portableExePath() || process.execPath;
   try {
     const res = readSealedFromFile(file);
     if (res !== null) {
@@ -598,6 +748,61 @@ app.whenReady().then(() => {
   // פתיחת תיקיית התוצאות בסייר הקבצים.
   ipcMain.handle('report:open', () => {
     void shell.openPath(reportsDir());
+  });
+
+  /**
+   * חתימת משחק ל-EXE חדש — "חתום EXE" מתוך התוכנה עצמה, בלי שורת פקודה.
+   *
+   * בסיס החתימה: קודם כול מנסים את **הגרסה העדכנית** של המנוע מהמהדורה היציבה
+   * (הורדה עם מטמון ETag), כדי שכל משחק שנחתם ייצא עם המנוע האחרון — גם אם
+   * הכלי שבידי המשתמש ישן. אם אין רשת/ההורדה נכשלה — נופלים חזרה על ה-EXE
+   * הנייד שרץ כרגע, שמשמש כבסיס בעצמו (בלי חותמת קודמת, אם יש).
+   */
+  ipcMain.handle('seal:create', async (e, zipBytes, config, suggested, opts) => {
+    try {
+      const selfPath = portableExePath();
+      if (!app.isPackaged || selfPath === null) {
+        return { ok: false, error: 'חתימה זמינה רק מהקובץ הנייד (SealEXE.exe / TriviaEngine-Portable.exe)' };
+      }
+      const name = String(suggested || 'משחק')
+        .replace(/[\\/:*?"<>|]/g, '_')
+        .slice(0, 60);
+      const picked = await dialog.showSaveDialog({
+        title: 'שמירת EXE חתום',
+        defaultPath: path.join(app.getPath('desktop'), `${name}.exe`),
+        filters: [{ name: 'Windows EXE', extensions: ['exe'] }],
+      });
+      if (picked.canceled || !picked.filePath) return { ok: false, canceled: true };
+
+      const notify = (/** @type {object} */ p) => {
+        if (!e.sender.isDestroyed()) e.sender.send('seal:progress', p);
+      };
+      let basePath = selfPath;
+      let baseSource = 'self';
+      if (!opts || opts.useLatest !== false) {
+        const latest = await fetchLatestBase(notify);
+        if (latest !== null) {
+          basePath = latest;
+          baseSource = 'latest';
+        }
+      }
+      notify({ phase: 'writing' });
+      const size = sealToFile(basePath, Buffer.from(zipBytes), config, picked.filePath);
+      notify({ phase: 'done' });
+      console.log('[seal] נוצר EXE חתום:', picked.filePath, `${(size / 1048576).toFixed(1)}MB`, `base=${baseSource}`);
+      return { ok: true, path: picked.filePath, size, baseSource };
+    } catch (err) {
+      const msg = /** @type {Error} */ (err).message;
+      console.error('[seal] חתימה נכשלה:', msg);
+      return { ok: false, error: msg };
+    }
+  });
+
+  /** האם התוכנה הנוכחית יכולה לחתום (קובץ נייד ארוז, שאינו חתום בעצמו). */
+  ipcMain.handle('seal:capable', () => {
+    const selfPath = portableExePath();
+    if (!app.isPackaged || selfPath === null) return false;
+    return readSealedFromFile(selfPath) === null;
   });
 
   // פרוטוקול trivia-media:// — מגיש קבצי מדיה מהמטמון בדיסק בזרימה (net.fetch
