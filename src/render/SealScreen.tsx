@@ -39,7 +39,7 @@ type Phase = 'idle' | 'reading' | 'ready' | 'sealing' | 'done';
 
 const MAX_LIMIT = Number.MAX_SAFE_INTEGER;
 
-export function SealScreen({ onBack }: { onBack: () => void }) {
+export function SealScreen({ onBack }: { onBack?: () => void }) {
   const [phase, setPhase] = useState<Phase>('idle');
   const [info, setInfo] = useState<ZipInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -278,9 +278,16 @@ export function SealScreen({ onBack }: { onBack: () => void }) {
           >
             {phase === 'sealing' ? 'חותם...' : '🔏 צור EXE חתום'}
           </button>
-          <button type="button" className="seal-back" onClick={onBack} disabled={phase === 'sealing'}>
-            חזרה
-          </button>
+          {onBack !== undefined && (
+            <button
+              type="button"
+              className="seal-back"
+              onClick={onBack}
+              disabled={phase === 'sealing'}
+            >
+              חזרה
+            </button>
+          )}
         </div>
       </div>
     </div>

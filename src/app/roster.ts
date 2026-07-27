@@ -368,8 +368,70 @@ export function normalizeRoster(raw: unknown): RosterData {
 
 const STORAGE_PREFIX = 'trivia-roster:';
 
+/**
+ * מפתח נלווה: טביעת האצבע של רשימת המשתתפים (`users`) שממנה נבנה המרשם השמור.
+ * המרשם ממוזג (upsert) ולעולם אינו מוחק — וזה נכון כשמפעילים שוב את *אותו*
+ * משחק. אבל מהדורה חדשה של אותו משחק (אותו id, מספרי שלטים אחרים) הייתה
+ * מוסיפה את המספרים החדשים לצד הישנים. טביעת האצבע מזהה בדיוק את המצב הזה.
+ */
+const SOURCE_PREFIX = 'trivia-roster-src:';
+
 export function rosterStorageKey(gameId: string): string {
   return STORAGE_PREFIX + (gameId.trim() === '' ? 'default' : gameId);
+}
+
+export function rosterSourceKey(gameId: string): string {
+  return SOURCE_PREFIX + (gameId.trim() === '' ? 'default' : gameId);
+}
+
+/**
+ * טביעת אצבע קצרה ויציבה למחרוזת (FNV-1a). לא קריפטוגרפית — היא משמשת רק
+ * לזיהוי *שינוי*, ואורך המחרוזת מצורף כדי להקטין עוד התנגשויות אקראיות.
+ */
+export function fingerprintUsers(raw: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < raw.length; i += 1) {
+    h ^= raw.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return `${raw.length.toString(36)}.${h.toString(36)}`;
+}
+
+/** טביעת האצבע ששמורה למשחק, או null אם אין (משחק חדש / גרסה ישנה). */
+export function loadRosterSource(gameId: string): string | null {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    return localStorage.getItem(rosterSourceKey(gameId));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * האם המרשם השמור נבנה מרשימת משתתפים *אחרת* מזו שבקובץ שנטען עכשיו — ולכן יש
+ * לבנות אותו מחדש במקום למזג לתוכו.
+ *
+ * @param previous טביעת האצבע השמורה, או null אם אין (משחק חדש / גרסה ישנה)
+ * @param fingerprint טביעת האצבע של הקובץ שנטען עכשיו
+ * @param sealed משחק סגור (EXE חתום) — שם רשימת המשתתפים היא מקור האמת, ולכן
+ *   גם היעדר טביעת אצבע נחשב "ישן" ומנקה שאריות ממהדורה קודמת של אותו משחק.
+ */
+export function rosterIsStale(
+  previous: string | null,
+  fingerprint: string,
+  sealed: boolean,
+): boolean {
+  return previous === null ? sealed : previous !== fingerprint;
+}
+
+/** שמירת טביעת האצבע שממנה נבנה המרשם הנוכחי. */
+export function saveRosterSource(gameId: string, fingerprint: string): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(rosterSourceKey(gameId), fingerprint);
+  } catch {
+    /* מכסת אחסון חריגה — מתעלמים */
+  }
 }
 
 export function loadRoster(gameId: string): RosterData {

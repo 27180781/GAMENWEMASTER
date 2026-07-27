@@ -154,9 +154,9 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
   extendDisplay() {
     void ipcRenderer.invoke('display:extend');
   },
-  /** האם אפשר לחתום EXE מהתוכנה הזו (ארוזה ולא-חתומה בעצמה). */
-  sealCapable() {
-    return ipcRenderer.invoke('seal:capable');
+  /** מצב החתימה: { capable, tool } — ראו seal:mode ב-main. */
+  sealMode() {
+    return ipcRenderer.invoke('seal:mode');
   },
   /** חתימת ZIP ל-EXE חדש; מחזיר { ok, path } או { ok:false, error|canceled }. */
   sealGame(
