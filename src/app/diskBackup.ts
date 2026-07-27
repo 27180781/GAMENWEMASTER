@@ -8,16 +8,24 @@
 import type { BackupData, BackupPayload } from './backup.ts';
 import type { GameFile } from '../engine/index.ts';
 import { canDiskBackup, desktopBackupSave, desktopBackupLoad } from './clickerBridge.ts';
+import { fingerprintUsers } from './roster.ts';
 
 export { canDiskBackup };
 
 /**
- * מפתח הגיבוי בדיסק: מזהה + שם המשחק. קבצי אופליין מגיעים לעיתים בלי id
- * (הסכמה מתירה זאת) — מפתח לפי id בלבד היה גורם לכל המשחקים חסרי-ה-id לחלוק
- * גיבוי אחד, ומציע למשחק אחד את המצב השמור של אחר. השם מבדל ביניהם.
+ * מפתח הגיבוי בדיסק: מזהה + שם המשחק + טביעת אצבע של רשימת המשתתפים.
+ *
+ * - **מזהה**: הבסיס הטבעי.
+ * - **שם**: קבצי אופליין מגיעים לעיתים בלי id (הסכמה מתירה זאת) — מפתח לפי id
+ *   בלבד היה גורם לכל המשחקים חסרי-ה-id לחלוק גיבוי אחד.
+ * - **רשימת המשתתפים**: תיקיית הגיבויים משותפת לכל עותקי התוכנה במחשב (אותו
+ *   appId). בלי הרכיב הזה, EXE שנחתם מחדש לאותו משחק עם מספרי שלטים אחרים היה
+ *   מקבל את *אותו* קובץ גיבוי — ומציע להמשיך אירוע קודם על ניקוד והצבעות של
+ *   משתתפים אחרים. הרכיב לא משתנה בין הרצות של אותו קובץ, ולכן התאוששות
+ *   מקריסה באמצע אירוע ממשיכה לעבוד בדיוק כמו קודם.
  */
-export function diskBackupKey(game: Pick<GameFile, 'id' | 'name'>): string {
-  return `${game.id}::${game.name}`;
+export function diskBackupKey(game: Pick<GameFile, 'id' | 'name' | 'users'>): string {
+  return `${game.id}::${game.name}::${fingerprintUsers(String(game.users ?? ''))}`;
 }
 
 /** שמירת מצב המשחק לדיסק (completed=true נועל את הגיבוי בסיום המשחק). */
