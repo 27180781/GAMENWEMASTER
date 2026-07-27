@@ -254,6 +254,124 @@ function startClickerServer() {
 const RECEIVER_EXE = 'RF317SocketForm.exe';
 /** האם כבר הפעלנו את תוכנת הקליטה בהרצה הנוכחית (מונע הפעלה כפולה). */
 let receiverStarted = false;
+/** תהליך ה"שומר" שממזער את חלון הקליטה אחרי ההפעלה (ראו hideReceiverWindow). */
+/** @type {import('node:child_process').ChildProcess | null} */
+let receiverHideProc = null;
+/** נודניק חד-פעמי להחזרת המיקוד למשחק אחרי ההפעלה. @type {NodeJS.Timeout | null} */
+let receiverFocusTimer = null;
+/** מפוגג את "המשחק מעל הכול" בתום חלון ההפעלה. @type {NodeJS.Timeout | null} */
+let onTopTimer = null;
+
+/** מחזיר את המיקוד לחלון המשחק — המקלדת (רווח/2) עובדת רק כשהוא בחזית. */
+function focusGameWindow() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.show();
+    mainWindow.focus();
+  }
+}
+
+/** מבטל את "המשחק מעל הכול" ומחזיר את המצב הרגיל. */
+function releaseGameOnTop() {
+  if (onTopTimer !== null) {
+    clearTimeout(onTopTimer);
+    onTopTimer = null;
+  }
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.setAlwaysOnTop(false);
+}
+
+/**
+ * מחזיק את חלון המשחק מעל שאר החלונות למשך זמן קצוב. זהו הגיבוי למזעור: אם
+ * PowerShell חסום במדיניות ארגונית או שהמזעור אֵחר, חלון הקליטה עדיין נשאר
+ * *מתחת* למשחק ולא מכסה אותו באמצע אירוע חי.
+ * @param {number} ms
+ */
+function keepGameOnTop(ms) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (onTopTimer !== null) clearTimeout(onTopTimer);
+  mainWindow.setAlwaysOnTop(true);
+  onTopTimer = setTimeout(releaseGameOnTop, ms);
+}
+
+/** עוצר את השומר ואת הנודניק — כשהמשתמש ביקש במפורש לראות את חלון הקליטה. */
+function cancelReceiverHide() {
+  if (receiverFocusTimer !== null) {
+    clearTimeout(receiverFocusTimer);
+    receiverFocusTimer = null;
+  }
+  releaseGameOnTop();
+  if (receiverHideProc !== null) {
+    try {
+      receiverHideProc.kill();
+    } catch {
+      /* כבר הסתיים */
+    }
+    receiverHideProc = null;
+  }
+}
+
+/**
+ * ממזער את חלון תוכנת הקליטה מיד כשהוא נפתח, כדי שלא יקפוץ מעל המשחק באמצע
+ * אירוע חי — ומחזיר את המיקוד לחלון המשחק (בלי מיקוד, מקשי הרווח/2 לא עובדים).
+ *
+ * למה "שומר" ולא מזעור חד-פעמי: החלון נוצר כמה מאות מילישניות אחרי ה-spawn,
+ * והתוכנה מציגה אותו שוב אחרי האתחול הפנימי שלה. לכן ממתינים לו (עד 20 שניות)
+ * וממשיכים למזער עוד ~4 שניות אחרי שנמצא. לחיצה על "חלון קליטת שלטים" עוצרת
+ * את השומר (cancelReceiverHide), כדי שלא ילחם בבקשה מפורשת של המשתמש.
+ */
+function hideReceiverWindow() {
+  if (process.platform !== 'win32') return;
+  cancelReceiverHide();
+  // גיבוי בלתי-תלוי ב-PowerShell: כל עוד השומר פועל, המשחק נשאר מעל.
+  keepGameOnTop(8000);
+  const script = [
+    'Add-Type @"',
+    'using System;',
+    'using System.Runtime.InteropServices;',
+    'public static class WinH {',
+    '  [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr h, int c);',
+    '}',
+    '"@',
+    '$deadline = (Get-Date).AddSeconds(20)',
+    '$first = $null',
+    'while ((Get-Date) -lt $deadline) {',
+    '  foreach ($p in @(Get-Process RF317SocketForm -ErrorAction SilentlyContinue)) {',
+    '    $p.Refresh()',
+    '    if ($p.MainWindowHandle -ne 0) {',
+    '      [WinH]::ShowWindowAsync($p.MainWindowHandle, 6) | Out-Null', // 6 = SW_MINIMIZE
+    '      if ($null -eq $first) { $first = Get-Date }',
+    '    }',
+    '  }',
+    '  if ($null -ne $first -and ((Get-Date) - $first).TotalSeconds -ge 4) { break }',
+    '  Start-Sleep -Milliseconds 250',
+    '}',
+  ].join('\n');
+  const encoded = Buffer.from(script, 'utf16le').toString('base64');
+  try {
+    const ps = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded], {
+      windowsHide: true,
+      stdio: 'ignore',
+    });
+    receiverHideProc = ps;
+    ps.on('error', (err) => {
+      console.error('[RF317] מזעור חלון הקליטה נכשל:', err.message);
+      if (receiverHideProc === ps) receiverHideProc = null;
+    });
+    ps.on('exit', () => {
+      if (receiverHideProc !== ps) return; // בוטל בבקשת "הצג" — לא נוגעים במיקוד
+      receiverHideProc = null;
+      focusGameWindow();
+    });
+  } catch (err) {
+    console.error('[RF317] מזעור חלון הקליטה נכשל:', /** @type {Error} */ (err).message);
+    receiverHideProc = null;
+  }
+  // נודניק מוקדם: המזעור מעביר את ההפעלה לחלון הבא בתור, אך אם התוכנה עדיין
+  // באתחול — מחזירים את המיקוד למשחק גם לפני שהשומר סיים.
+  receiverFocusTimer = setTimeout(() => {
+    receiverFocusTimer = null;
+    focusGameWindow();
+  }, 1500);
+}
 
 /** נתיב תיקיית תוכנת הקליטה — בחבילה resources/receiver, בפיתוח electron/receiver. */
 function receiverDir() {
@@ -295,6 +413,7 @@ function launchReceiver() {
     });
     receiverStarted = true;
     console.log('[RF317] תוכנת הקליטה הופעלה:', exe);
+    hideReceiverWindow(); // שלא תקפוץ מעל המשחק — ממוזערת מיד, המיקוד חוזר למשחק
   } catch (err) {
     console.error('[RF317] הפעלת תוכנת הקליטה נכשלה:', /** @type {Error} */ (err).message);
     receiverStarted = false;
@@ -309,6 +428,7 @@ function launchReceiver() {
  */
 function showReceiver() {
   if (process.platform !== 'win32') return;
+  cancelReceiverHide(); // בקשה מפורשת גוברת על השומר שממזער אחרי ההפעלה
   const script = [
     'Add-Type @"',
     'using System;',
@@ -342,6 +462,7 @@ function showReceiver() {
 function stopReceiver() {
   receiverStarted = false;
   receiverProc = null;
+  cancelReceiverHide(); // אין את מי למזער, ואין להחזיר מיקוד אחרי סגירה
   if (process.platform !== 'win32') return;
   try {
     const tk = spawn('taskkill', ['/IM', RECEIVER_EXE, '/F', '/T'], { windowsHide: true, stdio: 'ignore' });
