@@ -547,7 +547,7 @@ export function SettingsScreen({
                   </span>
                   <span className="clicker-choice-title">שחק עם שלטים</span>
                   <span className="clicker-choice-sub">
-                    נפעיל את תוכנת הקליטה (RF317) ונתחבר לשלטים אוטומטית
+                    נפעיל ברקע את תוכנת הקליטה (RF317) ונתחבר לשלטים אוטומטית
                   </span>
                 </button>
               )}
