@@ -226,6 +226,12 @@ export function QuestionSlide({
   const imgRows = Math.max(1, Math.ceil(answers.length / 4));
   const imgCols = Math.max(1, Math.ceil(answers.length / imgRows));
   const imagesGridVars = { '--img-cols': imgCols, '--img-rows': imgRows } as CSSProperties;
+  // תשובות טקסט: שתי עמודות, ולכן מספר השורות הוא ceil(n/2). תקציב הגובה של
+  // אזור התשובות מתחלק בין השורות בפועל — כך ששאלה עם 2–4 תשובות נותנת לכל
+  // כרטיס הרבה יותר מקום, ותשובה ארוכה נכנסת בגודל קריא במקום להצטמצם לתקציב
+  // של המקרה הצפוף ביותר (8 תשובות).
+  const ansRows = Math.max(1, Math.ceil(answers.length / 2));
+  const answersGridVars = { '--ans-rows': ansRows } as CSSProperties;
 
   // חשיפת הפילוח/התשובה הנכונה היא צעד מפורש (reveal.revealCorrect) בכל סוגי
   // השקופיות ההצבעה — trivia, סקר ותמונות כאחד. תום הטיימר רק *סוגר* את ההצבעה
@@ -311,7 +317,10 @@ export function QuestionSlide({
           <div className={`q-question${reveal.questionShown ? '' : ' reveal-hidden'}`}>
             <div className="q-question-row">
               {isSurvey && <SurveyIcon />}
-              <FitText className="q-question-text">{slide.question.que}</FitText>
+              {/* min נמוך במכוון: עדיף שאלה ארוכה בפונט קטן על שאלה שסופה נעלם. */}
+              <FitText className="q-question-text" min={13}>
+                {slide.question.que}
+              </FitText>
             </div>
           </div>
 
@@ -320,7 +329,7 @@ export function QuestionSlide({
           ) : (
           <ul
             className={`q-answers${isImages ? ' q-answers--images' : ''}`}
-            {...(isImages ? { style: imagesGridVars } : {})}
+            style={isImages ? imagesGridVars : answersGridVars}
           >
             {answers.map((answer, index) => {
               const shown = index < reveal.answersShown;
@@ -349,7 +358,9 @@ export function QuestionSlide({
                       <img className="q-card-image" src={answer.ans} alt={`תשובה ${answer.id}`} />
                     </>
                   ) : (
-                    <FitText className="q-card-text">{answer.ans}</FitText>
+                    <FitText className="q-card-text" min={11}>
+                      {answer.ans}
+                    </FitText>
                   )}
                 </li>
               );

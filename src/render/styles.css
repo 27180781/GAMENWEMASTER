@@ -498,6 +498,10 @@ body {
   align-items: center;
   gap: 18px;
 }
+/* גובה חסום — אך *בלי* חיתוך שורות. הגבלת שורות (line-clamp) הייתה קוצצת את
+   סוף השאלה בשקט; במקומה יש כאן תקציב גובה, ו-FitText מקטין את הפונט עד
+   שהטקסט כולו נכנס בתוכו. 240px הוא התקציב הגדול ביותר שעדיין מותיר מקום
+   לשמונה תשובות בארבע שורות (ראו החישוב אצל .q-card-text). */
 .q-question-text {
   max-width: 100%;
   min-width: 0;
@@ -506,11 +510,8 @@ body {
   line-height: 1.16;
   text-align: center;
   text-wrap: balance;
-  max-height: 168px;
+  max-height: 240px;
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
 }
 .q-question-image img {
   width: 100%;
@@ -572,6 +573,10 @@ body {
 }
 .q-coin--reveal { font-size: 25px; }
 .q-card--correct .q-coin { box-shadow: 0 0 0 4px color-mix(in srgb, var(--text) 55%, transparent), 0 6px 16px rgba(0, 0, 0, 0.4); }
+/* כמו בשאלה: תקציב גובה במקום הגבלת שורות, כדי שתשובה ארוכה תוקטן ולא תיקצץ.
+   תקציב הגובה נגזר מהמקרה הצפוף ביותר — 8 תשובות בארבע שורות:
+   4 × (110 + 24 ריפוד) = 536, ועוד שאלה מלאה (240 + 44) ורווח 22 = 842px,
+   בתוך 856px הפנויים בין הכותרת לפס התחתון. */
 .q-card-text {
   flex: 1 1 auto;
   text-align: center;
@@ -580,10 +585,11 @@ body {
   line-height: 1.12;
   color: var(--text);
   transition: color 0.45s ease;
+  /* התקציב (536px) מתחלק בין שורות התשובות בפועל: 8 תשובות (4 שורות) → 110px
+     לכרטיס כמו קודם, אבל 2–4 תשובות מקבלות פי 2–4 מזה. --ans-rows מגיע
+     מ-QuestionSlide. */
+  max-height: calc(536px / var(--ans-rows, 4) - 24px);
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
 }
 .q-card--correct .q-card-text { color: var(--pill); }
 
@@ -1050,11 +1056,12 @@ body {
   box-shadow: 0 20px 54px rgba(0, 0, 0, 0.4);
   max-width: 1400px;
   white-space: pre-wrap;
-  max-height: 840px;
+  /* גם כאן: תקציב גובה במקום הגבלת שורות. הטקסט עטוף ב-FitText ולכן מוקטן עד
+     שהוא נכנס, במקום להיקצץ אחרי עשר שורות. display:block כי FitText מרנדר span. */
+  display: block;
+  box-sizing: border-box;
+  max-height: 880px;
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 10;
-  -webkit-box-orient: vertical;
 }
 
 .subject-text--muted { opacity: 0.55; font-size: 36px; }
