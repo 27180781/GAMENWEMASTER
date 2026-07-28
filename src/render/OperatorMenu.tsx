@@ -1,7 +1,11 @@
 /**
  * תפריט מפעיל (ESC — SPEC סעיף 9): קפיצה לשקופית, פתיחת/סגירת הצבעה,
- * סטטוס חיבור, ווליום, קהל סינתטי, סיום משחק. סטטוס הורדות וניקוי מטמון
- * יגיעו ב-M4 (Preload/Cache).
+ * סטטוס חיבור, ווליום, סיום משחק.
+ *
+ * מקור ההצבעות מוצג כאן לקריאה בלבד, ואינו ניתן להחלפה. פעם היה כאן מתג "קהל
+ * סינתטי" — לחיצה אחת עליו באמצע אירוע חי הייתה מנתקת את השלטים ומחליפה את
+ * ההצבעות בשחקני דמה, בלי אזהרה ובלי דרך לשחזר. מצב דמה נבחר במקום שבו הוא
+ * שייך: בקישור (‎?demo=1‎) באונליין, ובמסך בחירת מקור ההצבעות באופליין.
  */
 
 import type { GameEngine, GameState } from '../engine/index.ts';
@@ -11,8 +15,8 @@ interface OperatorMenuProps {
   state: GameState;
   volume: number;
   onVolumeChange: (volume: number) => void;
-  syntheticCrowd: boolean;
-  onSyntheticCrowdChange: (on: boolean) => void;
+  /** תיאור מקור ההצבעות הפעיל — לתצוגה בלבד. */
+  voteSource: string;
   hostVoterId?: string;
   /** מצב קליקרים (EXE): הקפצת חלון תוכנת הקליטה לחזית — הגדרת טווח / Connect. */
   onShowReceiver?: () => void;
@@ -27,8 +31,7 @@ export function OperatorMenu({
   state,
   volume,
   onVolumeChange,
-  syntheticCrowd,
-  onSyntheticCrowdChange,
+  voteSource,
   hostVoterId = '',
   onShowReceiver,
   onOpenReports,
@@ -75,16 +78,8 @@ export function OperatorMenu({
               onChange={(e) => onVolumeChange(Number(e.target.value))}
             />
           </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={syntheticCrowd}
-              onChange={(e) => onSyntheticCrowdChange(e.target.checked)}
-            />{' '}
-            קהל סינתטי (Replay)
-          </label>
           <p className="operator-status">
-            מקור הצבעות: {syntheticCrowd ? 'קהל סינתטי (דמו)' : 'שרת ההצבעות'}
+            מקור הצבעות: {voteSource}
             {hostVoterId !== '' && ` · שלט מנחה: ${hostVoterId}`}
           </p>
           <p className="operator-status">
