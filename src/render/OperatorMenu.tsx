@@ -22,6 +22,10 @@ interface OperatorMenuProps {
   onShowReceiver?: () => void;
   /** אופליין (EXE): פתיחת תיקיית קבצי התוצאות (אקסל). */
   onOpenReports?: () => void;
+  /** אופליין (EXE): שמירת קובץ התוצאות עכשיו (דורס את הקודם). */
+  onSaveReport?: () => void;
+  /** חותמת הזמן של השמירה האחרונה — לחיווי "נשמר" בתפריט. */
+  reportSavedAt?: number | null;
   onEndGame: () => void;
   onClose: () => void;
 }
@@ -35,6 +39,8 @@ export function OperatorMenu({
   hostVoterId = '',
   onShowReceiver,
   onOpenReports,
+  onSaveReport,
+  reportSavedAt = null,
   onEndGame,
   onClose,
 }: OperatorMenuProps) {
@@ -60,6 +66,17 @@ export function OperatorMenu({
           {onShowReceiver && (
             <button className="operator-clicker-btn" onClick={onShowReceiver}>
               🎛️ חלון קליטת שלטים (טווח / Connect)
+            </button>
+          )}
+          {onSaveReport && (
+            <button className="operator-clicker-btn" onClick={onSaveReport}>
+              💾 שמור אקסל עכשיו
+              {reportSavedAt !== null && (
+                <span className="operator-saved">
+                  {' '}
+                  · נשמר {new Date(reportSavedAt).toLocaleTimeString('he-IL')}
+                </span>
+              )}
             </button>
           )}
           {onOpenReports && (

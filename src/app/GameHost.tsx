@@ -42,6 +42,7 @@ import {
 import { avatarColor, railInitial } from '../render/avatar.ts';
 import { AllScoresScreen, LobbyScreen, WinnersListScreen, WinnersScreen } from '../render/screens.tsx';
 import { OperatorMenu } from '../render/OperatorMenu.tsx';
+import { RaffleOverlay, type RaffleEntry } from '../render/RaffleOverlay.tsx';
 import type { RailPlayer, RevealState } from '../render/QuestionSlide.tsx';
 import { RosterPanel } from '../render/RosterPanel.tsx';
 import { SlideView } from '../render/SlideView.tsx';
@@ -339,6 +340,14 @@ export function GameHost({
   leadersOverlayRef.current = leadersOverlay;
   /** פירוט הצבעות השחקנים (פקודת מנחה 5, בשלב חשיפת התשובה). */
   const [votesOverlay, setVotesOverlay] = useState(false);
+  /** הגרלת משתתף (מקש R) — המאגר, המוגרל, ומזהה ריצה כדי לאפס את האנימציה. */
+  const [raffle, setRaffle] = useState<{
+    entries: RaffleEntry[];
+    winner: RaffleEntry;
+    run: number;
+  } | null>(null);
+  const raffleRef = useRef(raffle);
+  raffleRef.current = raffle;
   /** מצב לוח "סולמות וחבלים קבוצתי" (רק ב-gameType מתאים). */
   const [board, setBoard] = useState<BoardState>(EMPTY_BOARD);
   /** האם לוח המרוץ מוצג כרגע. */
@@ -428,6 +437,34 @@ export function GameHost({
 
   const crowdConfig = settings;
   const hostVoterId = settings.hostVoterId.trim();
+
+  /**
+   * הגרלת משתתף. המאגר נבנה *ברגע ההגרלה* (ולא בכל רינדור) מכל מי שהמערכת
+   * מכירה: המרשם (שמות ומספרי שלט מקובץ המשחק), מי שהתחבר בטלפון, ומי שכבר
+   * הצביע. שלט המנחה ומשתתפים שהוסרו בשקופית players לא נכנסים להגרלה.
+   */
+  const drawRaffle = useCallback(() => {
+    const ids = new Set<string>();
+    for (const p of rosterRef.current.players) ids.add(p.id);
+    for (const id of connectedIdsRef.current) ids.add(id);
+    const st = engine.getState();
+    for (const id of Object.keys(st.scores)) ids.add(id);
+    for (const votes of Object.values(st.votesBySlide)) for (const id of Object.keys(votes)) ids.add(id);
+    ids.delete('');
+    if (hostVoterId !== '') ids.delete(hostVoterId);
+    for (const id of removedRef.current) ids.delete(id);
+
+    const entries: RaffleEntry[] = [...ids].map((id) => ({ id, name: nameOfRef.current(id) }));
+    if (entries.length === 0) {
+      debugLog('command', 'R — הגרלה: אין משתתפים במאגר');
+      return;
+    }
+    const winner = entries[Math.floor(Math.random() * entries.length)]!;
+    debugLog('command', `R — הוגרל ${winner.name}`, { pool: entries.length });
+    setRaffle((prev) => ({ entries, winner, run: (prev?.run ?? 0) + 1 }));
+  }, [engine, hostVoterId]);
+  const drawRaffleRef = useRef(drawRaffle);
+  drawRaffleRef.current = drawRaffle;
   /**
    * מקור ההצבעות הפעיל, לתצוגה בתפריט המפעיל. הנוסח הישן ("שרת ההצבעות") היה
    * שגוי במשחק שלטים — ודווקא כאן חשוב שהמנחה יראה במדויק מאיפה מגיעות
@@ -675,6 +712,44 @@ export function GameHost({
       );
     }
   }, [canReportToDisk, offline, stage, engine, nameOf]);
+
+  /**
+   * שמירת קובץ התוצאות *עכשיו* — דורסת את הקובץ הקודם של אותו משחק. משמשת גם
+   * את השמירה האוטומטית אחרי כל שאלה וגם את הכפתור בתפריט המפעיל.
+   * `busy` מונע בנייה כפולה במקביל אם שאלה נסגרת בזמן שהקודמת עוד נכתבת.
+   */
+  const liveReportBusyRef = useRef(false);
+  const [reportSavedAt, setReportSavedAt] = useState<number | null>(null);
+  const saveReportNow = useCallback(async (): Promise<boolean> => {
+    if (!canReportToDisk || liveReportBusyRef.current) return false;
+    liveReportBusyRef.current = true;
+    try {
+      const g = engine.getGame();
+      const bytes = await buildGameReportBytes(g, engine.getState(), rosterRef.current, nameOf);
+      const saved = await desktopSaveReport(reportFilename(g), bytes);
+      if (saved !== null) {
+        setReportSavedAt(Date.now());
+        return true;
+      }
+      // כשל נפוץ: הקובץ פתוח כרגע באקסל ו-Windows נועל אותו לכתיבה.
+      debugLog('game', 'שמירת קובץ תוצאות נכשלה (ייתכן שהקובץ פתוח באקסל)');
+      return false;
+    } catch (err) {
+      debugLog('game', `שמירת קובץ תוצאות נכשלה (${String(err)})`);
+      return false;
+    } finally {
+      liveReportBusyRef.current = false;
+    }
+  }, [canReportToDisk, engine, nameOf]);
+
+  // אקסל חי (EXE): אחרי כל שאלה שנסגרה, הקובץ נכתב מחדש ודורס את הקודם — כך
+  // יש תמיד תמונת מצב מעודכנת בדיסק, גם אם המשחק נקטע לפני מסך המנצחים.
+  // נמדד: ~8ms ל-30 שאלות × 100 משתתפים, ~60ms בקצה העליון (500 משתתפים).
+  // רץ בשלב התוצאות — רגע שקט שבו אין אנימציית מעבר — ולא בזמן ההצבעה.
+  useEffect(() => {
+    if (!canReportToDisk || stage !== 'playing' || state.phase !== 'results') return;
+    void saveReportNow();
+  }, [canReportToDisk, stage, state.phase, state.currentSlideId, saveReportNow]);
 
   // שקופית "פונקציה" (type: "function") — כשמגיעים אליה, שולחים את כל נתוני
   // המשחק ל-webhook שהוגדר בעורך (function.api). פעם אחת בכל כניסה לשקופית.
@@ -1624,6 +1699,7 @@ export function GameHost({
     groupsOverlay ||
     boardOverlay ||
     boardPending !== null || // הלוח מחושב וממתין לרווח — לא מדלגים עליו אוטומטית
+    raffle !== null ||
     connectCategory !== null ||
     settingsOpen ||
     rosterOpen ||
@@ -1882,6 +1958,21 @@ export function GameHost({
         if (event.key === 'Escape') setConnectCategory(null);
         return;
       }
+      // הגרלה מוצגת — כל המקשים חסומים חוץ מסגירה, שלא נתקדם בטעות במשחק.
+      if (raffleRef.current !== null) {
+        if (
+          event.key === 'Escape' ||
+          event.key === ' ' ||
+          event.key === 'Enter' ||
+          event.code === 'KeyR' ||
+          event.key === 'r' ||
+          event.key === 'R'
+        ) {
+          event.preventDefault();
+          setRaffle(null);
+        }
+        return;
+      }
       if (event.key === 'Escape') {
         // ESC סוגר קודם שכבות פתוחות; אחרת: ב-EXE — אישור יציאה מהמשחק,
         // באונליין/דפדפן — פתיחת/סגירת תפריט המפעיל (כמו קודם).
@@ -1914,10 +2005,15 @@ export function GameHost({
           engine.dispatch({ type: 'BACK', at: Date.now() });
         }
       } else if (event.code === 'KeyR' || event.key === 'r' || event.key === 'R') {
-        // רענון יזום של קובץ המשחק מהשרת (בלי לאבד ניקוד/מיקום)
         event.preventDefault();
-        debugLog('command', 'R — רענון קובץ המשחק');
-        onRequestRefresh?.();
+        if (event.shiftKey) {
+          // Shift+R — רענון יזום של קובץ המשחק מהשרת (בלי לאבד ניקוד/מיקום).
+          // עבר מ-R כדי לפנות את R להגרלה, שהיא פעולה שמשתמשים בה באירוע חי.
+          debugLog('command', 'Shift+R — רענון קובץ המשחק');
+          onRequestRefresh?.();
+        } else {
+          drawRaffleRef.current();
+        }
       } else if (event.code === 'KeyW' || event.key === 'w' || event.key === 'W') {
         // תצוגה מקדימה של מסך המנצחים הסופי — ובלחיצה נוספת חזרה למיקום במשחק.
         // לפי event.code (מיקום פיזי) כדי שיעבוד גם בפריסת מקלדת עברית.
@@ -2297,6 +2393,9 @@ export function GameHost({
             onVolumeChange={setVolume}
             voteSource={voteSourceLabel}
             hostVoterId={hostVoterId}
+            {...(canReportToDisk
+              ? { onSaveReport: () => void saveReportNow(), reportSavedAt }
+              : {})}
             {...(useClicker && canShowReceiver()
               ? { onShowReceiver: () => showReceiver() }
               : {})}
@@ -2325,6 +2424,15 @@ export function GameHost({
               </div>
             </div>
           </div>
+        )}
+
+        {raffle !== null && (
+          <RaffleOverlay
+            key={raffle.run}
+            entries={raffle.entries}
+            winner={raffle.winner}
+            onClose={() => setRaffle(null)}
+          />
         )}
 
         {/* כפתור תפריט המפעיל (EXE) — כי ESC משמש ליציאה; עדין בפינה */}
