@@ -428,6 +428,20 @@ export function GameHost({
 
   const crowdConfig = settings;
   const hostVoterId = settings.hostVoterId.trim();
+  /**
+   * מקור ההצבעות הפעיל, לתצוגה בתפריט המפעיל. הנוסח הישן ("שרת ההצבעות") היה
+   * שגוי במשחק שלטים — ודווקא כאן חשוב שהמנחה יראה במדויק מאיפה מגיעות
+   * ההצבעות, בלי לנחש.
+   */
+  const voteSourceLabel = syntheticCrowd
+    ? `קהל סינתטי (דמו) · ${settings.voterCount} שחקנים`
+    : isComposite
+      ? 'שלטים (RF317) + טלפונים'
+      : useClicker
+        ? 'שלטים (RF317)'
+        : useSocket
+          ? 'טלפונים (שרת ההצבעות)'
+          : 'אין מקור הצבעות פעיל';
 
   const slide = engine.getCurrentSlide();
   const setting = engine.getGame().setting;
@@ -2281,8 +2295,7 @@ export function GameHost({
             state={state}
             volume={volume}
             onVolumeChange={setVolume}
-            syntheticCrowd={syntheticCrowd}
-            onSyntheticCrowdChange={(on) => onSettingsChange({ ...settings, crowdEnabled: on })}
+            voteSource={voteSourceLabel}
             hostVoterId={hostVoterId}
             {...(useClicker && canShowReceiver()
               ? { onShowReceiver: () => showReceiver() }
