@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const { parseClickerStream, createClickerServer } = require('../electron/clickerServer.cjs') as {
-  parseClickerStream: (b: Buffer) => { events: ClickerEvent[]; rest: Buffer };
+  parseClickerStream: (b: Buffer) => { events: ClickerEvent[]; rest: Buffer; dropped: number };
   createClickerServer: (opts: Record<string, unknown>) => net.Server;
 };
 
@@ -114,5 +114,79 @@ describe('createClickerServer — קבלה מלקוח TCP', () => {
       { type: 'key', button: 5, remoteId: 3 },
       { type: 'status', code: 10, status: 'disconnected' },
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// התיישרות מחדש: בית עודף/חסר מצד תוכנת הקליטה לא מנציח "הקשות רפאים"
+// ---------------------------------------------------------------------------
+
+/** רשומת לחיצה: כפתור + מזהה שלט (Int16 big-endian). */
+function key(button: number, remoteId: number): Buffer {
+  const b = Buffer.alloc(3);
+  b[0] = button;
+  b.writeInt16BE(remoteId, 1);
+  return b;
+}
+
+describe('אי-סנכרון בזרם הקליקרים', () => {
+  it('הזרם התקין מתפרש כרגיל, בלי דחיות', () => {
+    const buf = Buffer.concat([key(2, 105), key(1, 106), Buffer.from([9])]);
+    const { events, dropped } = parseClickerStream(buf);
+    expect(dropped).toBe(0);
+    expect(events).toEqual([
+      { type: 'key', button: 2, remoteId: 105 },
+      { type: 'key', button: 1, remoteId: 106 },
+      { type: 'status', code: 9, status: 'connected' },
+    ]);
+  });
+
+  it('בית שחסר בהתחלה לא מייצר הקשת רפאים בת 5 ספרות', () => {
+    // הבאג המקורי: [2,0,105,9] בלי הבית הראשון התפרש כלחיצה של שלט 26889
+    const shifted = Buffer.concat([key(2, 105), Buffer.from([9])]).subarray(1);
+    const { events, dropped } = parseClickerStream(shifted);
+    expect(events.some((e) => e.type === 'key')).toBe(false);
+    expect(dropped).toBeGreaterThan(0);
+    // ובכל זאת בית הסטטוס שאחריו מזוהה — הזרם התיישר מחדש
+    expect(events).toEqual([{ type: 'status', code: 9, status: 'connected' }]);
+  });
+
+  it('מזהה אפס או שלילי נדחה ולא הופך למשתתף', () => {
+    expect(parseClickerStream(key(3, 0)).events).toEqual([]);
+    expect(parseClickerStream(key(1, -100)).events).toEqual([]);
+    expect(parseClickerStream(key(1, 0)).dropped).toBeGreaterThan(0);
+  });
+
+  it('מזהה בן 5 ספרות נדחה (מעל התקרה), ומזהה סביר עובר', () => {
+    expect(parseClickerStream(key(1, 12345)).events).toEqual([]);
+    expect(parseClickerStream(key(1, 600)).events).toEqual([
+      { type: 'key', button: 1, remoteId: 600 },
+    ]);
+    // גם ערכה עם מזהים גבוהים יחסית עדיין עוברת — התקרה נדיבה בכוונה
+    expect(parseClickerStream(key(4, 4095)).events).toEqual([
+      { type: 'key', button: 4, remoteId: 4095 },
+    ]);
+  });
+
+  it('בית זבל בין רשומות פוגע לכל היותר ברשומה אחת, ולא בכל השאר', () => {
+    const clean = [key(1, 101), key(2, 102), key(3, 103), key(4, 104)];
+    const noisy = Buffer.concat([clean[0]!, Buffer.from([0xfe]), ...clean.slice(1)]);
+    const { events } = parseClickerStream(noisy);
+    const ids = events.filter((e) => e.type === 'key').map((e) => (e as { remoteId: number }).remoteId);
+    // הרשומה הראשונה והאחרונות נשמרו — הסטייה לא נמשכה עד סוף הזרם
+    expect(ids).toContain(101);
+    expect(ids).toContain(104);
+    expect(ids.every((id) => id >= 1 && id <= 9999)).toBe(true);
+  });
+
+  it('רשומה שנחתכה בין חבילות TCP עדיין ממתינה כשארית (בלי דחייה)', () => {
+    const full = key(2, 300);
+    const { events, rest, dropped } = parseClickerStream(full.subarray(0, 2));
+    expect(events).toEqual([]);
+    expect(dropped).toBe(0);
+    expect(rest.length).toBe(2);
+    // וכשההמשך מגיע — הרשומה נשלמת
+    const joined = parseClickerStream(Buffer.concat([rest, full.subarray(2)]));
+    expect(joined.events).toEqual([{ type: 'key', button: 2, remoteId: 300 }]);
   });
 });
