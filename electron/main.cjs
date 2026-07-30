@@ -271,6 +271,10 @@ function startClickerServer() {
     port,
     onEvent: (ev) => sendToRenderer('rf317:event', ev),
     onClientChange: (connected, who) => sendToRenderer('rf317:client', { connected, who }),
+    // בתים שנדחו = הזרם מתוכנת הקליטה לא היה מיושר. נרשם כדי שהתופעה תהיה
+    // נראית (ותיאום עם הבהוב סטטוס הדונגל יצביע על המקור), ולא תיעלם בשקט.
+    onDropped: (dropped, total) =>
+      console.warn(`[RF317] ${dropped} בתים לא מיושרים נדחו (סה"כ ${total}) — הזרם התיישר מחדש`),
     onListening: (p) => console.log(`[RF317] מאזין לקליקרים על 127.0.0.1:${p}`),
     onError: (err) => console.error('[RF317] שגיאת שרת קליקרים:', err.message),
   });

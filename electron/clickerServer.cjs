@@ -26,21 +26,41 @@ const STATUS_BY_CODE = {
 const DEFAULT_PORT = 8090;
 
 /**
+ * טווח מזהי שלט קביל. הפרוטוקול הוא רשומות באורך קבוע בלי סמן-התחלה, ולכן בית
+ * אחד שנוסף או נחסר מצד תוכנת הקליטה מזיז את היישור — וכל הרשומות שאחריו
+ * מתפרשות שגוי. הסימן המובהק לכך הוא מזהה בלתי-אפשרי: אפס, שלילי, או בן חמש
+ * ספרות (‏readInt16BE מגיע עד 32767). מזהה כזה מסמן ש*אין* כאן תחילת רשומה.
+ *
+ * התקרה נדיבה בכוונה — היא לא באה לסנן ערכות שלטים אלא לזהות זבל. ניתן לדרוס
+ * אותה ב-RF317_MAX_ID אם קיימת ערכה עם מזהים גבוהים.
+ */
+const MIN_REMOTE_ID = 1;
+const MAX_REMOTE_ID = Number(process.env.RF317_MAX_ID) || 9999;
+
+/**
  * @typedef {{ type: 'key', button: number, remoteId: number }} ClickerKeyEvent
  * @typedef {{ type: 'status', code: number, status: string }} ClickerStatusEvent
  * @typedef {ClickerKeyEvent | ClickerStatusEvent} ClickerEvent
  */
 
 /**
- * מפרש זרם בתים לרשומות. מחזיר את האירועים שהושלמו ואת שארית הבתים (רשומת
- * לחיצה שנחתכה בין חבילות TCP — ממתינה להמשך).
+ * מפרש זרם בתים לרשומות. מחזיר את האירועים שהושלמו, את שארית הבתים (רשומת
+ * לחיצה שנחתכה בין חבילות TCP — ממתינה להמשך), ומונה בתים שנדחו כזבל.
+ *
+ * התיישרות מחדש: הפרוטוקול חסר סמן-התחלה, ולכן בית אחד עודף/חסר מצד תוכנת
+ * הקליטה מזיז את היישור. קודם, צריכה עיוורת של 3 בתים לכל רשומה הנציחה את
+ * השגיאה — כל שאר המשחק התפרש שגוי והופיעו "הקשות רפאים" ממזהים בני חמש
+ * ספרות שאינם קיימים. עכשיו רשומה שמזההּ בלתי-אפשרי אינה נצרכת: מקדמים בית
+ * *אחד* ומנסים שוב, כך שהזרם מתיישר בחזרה בתוך בית או שניים.
+ *
  * @param {Buffer} buffer
- * @returns {{ events: ClickerEvent[], rest: Buffer }}
+ * @returns {{ events: ClickerEvent[], rest: Buffer, dropped: number }}
  */
 function parseClickerStream(buffer) {
   /** @type {ClickerEvent[]} */
   const events = [];
   let i = 0;
+  let dropped = 0;
   while (i < buffer.length) {
     const a = buffer[i];
     if (a >= 9) {
@@ -49,17 +69,24 @@ function parseClickerStream(buffer) {
       // את חיווי החיבור.
       if (STATUS_BY_CODE[a] !== undefined) {
         events.push({ type: 'status', code: a, status: STATUS_BY_CODE[a] });
+      } else {
+        dropped += 1;
       }
       i += 1;
-    } else {
-      // לחיצת כפתור — 3 בתים; אם עדיין לא הגיעו כולם, עוצרים ומחזירים כשארית
-      if (i + 3 > buffer.length) break;
-      const remoteId = buffer.readInt16BE(i + 1);
-      events.push({ type: 'key', button: a, remoteId });
-      i += 3;
+      continue;
     }
+    // לחיצת כפתור — 3 בתים; אם עדיין לא הגיעו כולם, עוצרים ומחזירים כשארית
+    if (i + 3 > buffer.length) break;
+    const remoteId = buffer.readInt16BE(i + 1);
+    if (remoteId < MIN_REMOTE_ID || remoteId > MAX_REMOTE_ID) {
+      dropped += 1;
+      i += 1; // התיישרות מחדש — ולא צריכה של 3 בתים שהייתה מנציחה את הסטייה
+      continue;
+    }
+    events.push({ type: 'key', button: a, remoteId });
+    i += 3;
   }
-  return { events, rest: buffer.subarray(i) };
+  return { events, rest: buffer.subarray(i), dropped };
 }
 
 /**
@@ -69,6 +96,7 @@ function parseClickerStream(buffer) {
  *   host?: string,
  *   onEvent?: (ev: ClickerEvent) => void,
  *   onClientChange?: (connected: boolean, who: string | null) => void,
+ *   onDropped?: (dropped: number, total: number) => void,
  *   onListening?: (port: number, host: string) => void,
  *   onError?: (err: Error) => void,
  * }} [opts]
@@ -80,6 +108,7 @@ function createClickerServer(opts = {}) {
     host = '127.0.0.1',
     onEvent,
     onClientChange,
+    onDropped,
     onListening,
     onError,
   } = opts;
@@ -89,10 +118,16 @@ function createClickerServer(opts = {}) {
     let leftover = Buffer.alloc(0);
     onClientChange?.(true, `${socket.remoteAddress}:${socket.remotePort}`);
 
+    // בתים שנדחו כזבל — מדווחים כדי שאי-סנכרון יהיה נראה בלוג ולא ייעלם בשקט.
+    let droppedTotal = 0;
     socket.on('data', (chunk) => {
       const combined = leftover.length ? Buffer.concat([leftover, chunk]) : chunk;
-      const { events, rest } = parseClickerStream(combined);
+      const { events, rest, dropped } = parseClickerStream(combined);
       leftover = rest;
+      if (dropped > 0) {
+        droppedTotal += dropped;
+        onDropped?.(dropped, droppedTotal);
+      }
       for (const ev of events) onEvent?.(ev);
     });
     socket.on('close', () => {
@@ -107,4 +142,11 @@ function createClickerServer(opts = {}) {
   return server;
 }
 
-module.exports = { parseClickerStream, createClickerServer, STATUS_BY_CODE, DEFAULT_PORT };
+module.exports = {
+  parseClickerStream,
+  createClickerServer,
+  STATUS_BY_CODE,
+  DEFAULT_PORT,
+  MIN_REMOTE_ID,
+  MAX_REMOTE_ID,
+};
