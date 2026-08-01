@@ -56,6 +56,12 @@ export interface SavedGamePayload {
   config?: SealConfig;
 }
 
+/** מצב חלון המשחק ב-EXE. בדפדפן אין כזה — ושם משתמשים ב-Fullscreen API. */
+export interface DesktopWindowState {
+  fullscreen: boolean;
+  minimizable: boolean;
+}
+
 interface TriviaDesktop {
   isDesktop?: boolean;
   platform?: string;
@@ -102,6 +108,14 @@ interface TriviaDesktop {
   loadSavedGame?: (source: 'last' | 'sealed') => Promise<SavedGamePayload | null>;
   /** מעבר לתצוגת מסכים מורחבת (Windows DisplaySwitch /extend). */
   extendDisplay?: () => void;
+  /** מצב חלון המשחק ב-EXE (מסך מלא / ניתן למזעור). */
+  windowState?: () => Promise<DesktopWindowState | null>;
+  /** מסך מלא של חלון Electron — לא Fullscreen API של הדפדפן. */
+  setWindowFullscreen?: (on: boolean) => Promise<DesktopWindowState | null>;
+  /** מזעור חלון המשחק. */
+  minimizeWindow?: () => Promise<DesktopWindowState | null>;
+  /** מנוי לשינויי מצב החלון (כולל F11 ומנהל החלונות). */
+  onWindowState?: (cb: (state: DesktopWindowState | null) => void) => () => void;
   /** מצב החתימה של הקובץ שרץ — יכולת חתימה, והאם הוא כלי החתימה עצמו. */
   sealMode?: () => Promise<SealMode>;
   /** חתימת ZIP ל-EXE חדש (כלי "חתום EXE"). */
@@ -202,6 +216,11 @@ function desktop(): TriviaDesktop | undefined {
 /** האם רצים ב-EXE (אפליקציית שולחן עבודה — Electron), ללא תלות בקליקרים. */
 export function isDesktopApp(): boolean {
   return desktop()?.isDesktop === true;
+}
+
+/** הגשר עצמו — לבדיקת יכולות (ראו windowMode.ts). undefined בדפדפן. */
+export function desktopBridge(): TriviaDesktop | undefined {
+  return desktop();
 }
 
 /** האם רצים ב-EXE עם גשר קליקרים זמין. */
@@ -425,6 +444,57 @@ export function canExtendDisplay(): boolean {
 /** מעבר לתצוגת מסכים מורחבת (EXE, Windows). no-op בדפדפן. */
 export function extendDisplay(): void {
   desktop()?.extendDisplay?.();
+}
+
+/**
+ * האם אפשר לשלוט בחלון האמיתי (EXE חדש). ב-EXE ישן — אין את הגשר הזה, ואז
+ * ממשיכים ב-Fullscreen API של הדפדפן בדיוק כמו קודם.
+ */
+export function canControlWindow(): boolean {
+  const d = desktop();
+  return typeof d?.setWindowFullscreen === 'function' && typeof d.minimizeWindow === 'function';
+}
+
+/** מצב חלון המשחק. null בדפדפן / EXE ישן. */
+export async function getWindowState(): Promise<DesktopWindowState | null> {
+  const fn = desktop()?.windowState;
+  if (typeof fn !== 'function') return null;
+  try {
+    return await fn();
+  } catch {
+    return null;
+  }
+}
+
+/** כניסה/יציאה ממסך מלא של חלון ה-EXE. */
+export async function setWindowFullscreen(on: boolean): Promise<DesktopWindowState | null> {
+  const fn = desktop()?.setWindowFullscreen;
+  if (typeof fn !== 'function') return null;
+  try {
+    return await fn(on);
+  } catch {
+    return null;
+  }
+}
+
+/** מזעור חלון ה-EXE (יוצא ממסך מלא קודם). */
+export async function minimizeWindow(): Promise<DesktopWindowState | null> {
+  const fn = desktop()?.minimizeWindow;
+  if (typeof fn !== 'function') return null;
+  try {
+    return await fn();
+  } catch {
+    return null;
+  }
+}
+
+/** מנוי לשינויי מצב החלון (כולל F11). מחזיר פונקציית ביטול-מנוי. */
+export function onWindowState(cb: (state: DesktopWindowState) => void): () => void {
+  const fn = desktop()?.onWindowState;
+  if (typeof fn !== 'function') return () => {};
+  return fn((state) => {
+    if (state !== null) cb(state);
+  });
 }
 
 /**

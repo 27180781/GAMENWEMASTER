@@ -894,6 +894,21 @@ body {
 
 .corner-buttons button:hover { opacity: 1; background: rgba(0, 0, 0, 0.7); }
 
+/* אותם כפתורים במסכים שאינם המשחק: קבועים לחלון (לא לבמה המוקטנת), כדי
+   שיהיו נגישים גם כשהמסך שמתחתם בהיר. */
+.corner-buttons--floating {
+  position: fixed;
+  z-index: 60;
+}
+
+.corner-buttons--floating button {
+  width: 40px;
+  height: 40px;
+  font-size: 18px;
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 0.4;
+}
+
 /* ---- טיימר ---- */
 
 .timer-ring {

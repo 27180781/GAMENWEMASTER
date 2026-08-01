@@ -154,6 +154,24 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
   extendDisplay() {
     void ipcRenderer.invoke('display:extend');
   },
+  /** מצב חלון המשחק: { fullscreen, minimizable }. */
+  windowState() {
+    return ipcRenderer.invoke('win:state');
+  },
+  /** כניסה/יציאה ממסך מלא של *חלון Electron* (לא Fullscreen API של הדפדפן). */
+  setWindowFullscreen(/** @type {boolean} */ on) {
+    return ipcRenderer.invoke('win:setFullscreen', on);
+  },
+  /** מזעור חלון המשחק (יוצא ממסך מלא קודם, כדי שיהיה ניתן לגרירה). */
+  minimizeWindow() {
+    return ipcRenderer.invoke('win:minimize');
+  },
+  /** מנוי לשינויי מצב החלון (גם F11 ומנהל החלונות). מחזיר ביטול-מנוי. */
+  onWindowState(/** @type {(s: unknown) => void} */ cb) {
+    const listener = (/** @type {unknown} */ _e, /** @type {unknown} */ s) => cb(s);
+    ipcRenderer.on('win:state', listener);
+    return () => ipcRenderer.removeListener('win:state', listener);
+  },
   /** מצב החתימה: { capable, tool } — ראו seal:mode ב-main. */
   sealMode() {
     return ipcRenderer.invoke('seal:mode');

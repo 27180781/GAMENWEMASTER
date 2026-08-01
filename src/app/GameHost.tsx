@@ -50,6 +50,7 @@ import { VotesBreakdown } from '../render/VotesBreakdown.tsx';
 import { GroupStandingsOverlay } from '../render/GroupStandingsOverlay.tsx';
 import { HostCommandBar } from '../render/HostCommandBar.tsx';
 import { ClickerDiagnostic } from '../render/ClickerDiagnostic.tsx';
+import { WindowControls } from '../render/WindowControls.tsx';
 import { Stage } from '../render/Stage.tsx';
 import { themeStyle } from '../render/theme.ts';
 import type { TimerView } from '../render/TimerRing.tsx';
@@ -2038,18 +2039,6 @@ export function GameHost({
     return () => window.removeEventListener('keydown', handleKey);
   }, [stage, menuOpen, settingsOpen, rosterOpen, exitConfirm, canExit, leadersOverlay, connectCategory, engine, advance, goBack, onRequestRefresh]);
 
-  // מסך מלא — כפתור בפינה (window resize מעדכן את סקייל הבמה אוטומטית)
-  const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
-  useEffect(() => {
-    const onChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
-    document.addEventListener('fullscreenchange', onChange);
-    return () => document.removeEventListener('fullscreenchange', onChange);
-  }, []);
-  const toggleFullscreen = useCallback(() => {
-    if (document.fullscreenElement) void document.exitFullscreen();
-    else void document.documentElement.requestFullscreen().catch(() => {});
-  }, []);
-
   /** "התחלת המשחק מחדש" מתוך מסך ההגדרות — איפוס מלא וחזרה למסך הפתיחה. */
   const restartGame = useCallback(() => {
     const wasEnded = gameEndedRef.current;
@@ -2245,14 +2234,9 @@ export function GameHost({
           />
         )}
 
-        {/* כפתורי פינה: מסך מלא + הגדרות + שמות וקבוצות */}
+        {/* כפתורי פינה: מזעור + מסך מלא + הגדרות + שמות וקבוצות */}
         <div className="corner-buttons">
-          <button
-            title={isFullscreen ? 'יציאה ממסך מלא' : 'מסך מלא'}
-            onClick={toggleFullscreen}
-          >
-            {isFullscreen ? '🗗' : '⛶'}
-          </button>
+          <WindowControls />
           <button title="הגדרות" onClick={() => setSettingsOpen((open) => !open)}>
             ⚙
           </button>

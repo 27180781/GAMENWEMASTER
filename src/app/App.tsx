@@ -22,6 +22,7 @@ import { MediaLoadBar, MediaLoadDot } from '../render/MediaLoadBar.tsx';
 import { StartupOverlay } from '../render/StartupOverlay.tsx';
 import { ErrorScreen } from '../render/ErrorScreen.tsx';
 import { ClickerDiagnostic } from '../render/ClickerDiagnostic.tsx';
+import { FloatingWindowControls } from '../render/WindowControls.tsx';
 import { SealScreen } from '../render/SealScreen.tsx';
 import { GameEditor } from '../render/GameEditor.tsx';
 import {
@@ -129,6 +130,9 @@ function Shell({
     <div className="game-root" dir="rtl" style={style}>
       <Stage>{children}</Stage>
       {!bare && <ClickerDiagnostic />}
+      {/* מסכים שאינם המשחק (הגדרות/פתיחה/עורך) — גם מהם צריך לצאת ממסך מלא
+          כדי לגרור את החלון למסך השני. במשחק עצמו הכפתורים כבר בפינה. */}
+      <FloatingWindowControls />
     </div>
   );
 }

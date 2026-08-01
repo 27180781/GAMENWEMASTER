@@ -1151,6 +1151,25 @@ function closeSplash() {
   splashWindow = null;
 }
 
+/** מצב החלון כפי שה-UI צריך אותו. null לחלון שכבר נסגר. */
+function windowStateOf(win) {
+  if (win === null || win.isDestroyed()) return null;
+  return { fullscreen: win.isFullScreen(), minimizable: win.isMinimizable() };
+}
+
+/**
+ * מדווח ל-renderer על כל שינוי במצב מסך-מלא, כולל שינויים שלא הגיעו מה-UI
+ * (F11, מנהל החלונות של Windows) — כדי שהכפתור בפינה יראה תמיד את האמת.
+ */
+function reportWindowState(win) {
+  const send = () => {
+    if (!win.isDestroyed()) win.webContents.send('win:state', windowStateOf(win));
+  };
+  win.on('enter-full-screen', send);
+  win.on('leave-full-screen', send);
+  win.on('restore', send);
+}
+
 function createWindow() {
   // כלי החתימה אינו משחק: חלון רגיל עם כותרת, לא קיוסק במסך מלא — כדי שדיאלוג
   // השמירה ושאר החלונות של Windows יתנהגו כרגיל, ושיהיה ברור מה רץ.
@@ -1177,6 +1196,7 @@ function createWindow() {
   void mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
 
   hardenWindow(mainWindow);
+  reportWindowState(mainWindow);
 
   /** מעבר מחלון הטעינה לחלון האמיתי — פעם אחת, מאיזה מסלול שיגיע קודם. */
   const reveal = () => {
@@ -1557,6 +1577,28 @@ app.whenReady().then(() => {
     } catch (err) {
       console.error('[display] הרחבת תצוגה נכשלה:', /** @type {Error} */ (err).message);
     }
+  });
+
+  // ---- שליטה בחלון עצמו (EXE) ----
+  // חלון המשחק נפתח במסך מלא בלי מסגרת, ולכן אין לו כפתורי מזעור/גרירה של
+  // Windows. בלי הממשק הזה אי אפשר להזיז אותו למסך השני או למזער אותו —
+  // וכפתור "מסך מלא" שב-UI השתמש ב-Fullscreen API של הדפדפן, שאינו מזיז
+  // כלל את מצב החלון של Electron.
+  ipcMain.handle('win:state', (e) => windowStateOf(BrowserWindow.fromWebContents(e.sender)));
+  ipcMain.handle('win:setFullscreen', (e, on) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (win === null || win.isDestroyed()) return null;
+    win.setFullScreen(on === true);
+    return windowStateOf(win);
+  });
+  ipcMain.handle('win:minimize', (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (win === null || win.isDestroyed()) return null;
+    // ממוזער *ממסך מלא* חוזר בדרך כלל למסך מלא ומסתיר שוב את שורת המשימות —
+    // יוצאים ממסך מלא קודם, כך שאחרי המזעור החלון ניתן לגרירה למסך השני.
+    if (win.isFullScreen()) win.setFullScreen(false);
+    win.minimize();
+    return windowStateOf(win);
   });
 
   // קיצורי מקלדת גלובליים למפעיל
