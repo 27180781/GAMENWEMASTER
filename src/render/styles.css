@@ -3240,6 +3240,182 @@ body {
 
 .roster-empty { opacity: 0.6; text-align: center; padding: 24px; }
 
+/* ---- קלט חכם: ייבוא מאקסל + קליטת שלטים בלחיצה ---- */
+.roster-import {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  flex: none;
+}
+
+.roster-import-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.roster-import-btn,
+.roster-capture-btn,
+.roster-clear-btn {
+  flex: 1 1 auto;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.roster-import-btn:hover,
+.roster-capture-btn:hover,
+.roster-clear-btn:hover { background: rgba(255, 255, 255, 0.18); }
+
+.roster-clear-btn { flex: 0 0 auto; font-weight: 600; opacity: 0.8; }
+
+.roster-capture-btn.on { background: #b91c1c; border-color: #ef4444; }
+
+.roster-capture-btn:disabled { opacity: 0.4; cursor: default; }
+
+.roster-import-hint { margin: 0; font-size: 13px; line-height: 1.5; opacity: 0.65; }
+
+.roster-capture-live {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.roster-pending {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.18);
+}
+
+.roster-names-draft {
+  min-height: 68px;
+  resize: vertical;
+  background: #0f1424;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 15px;
+}
+
+.roster-names-add {
+  align-self: flex-start;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: none;
+  background: #16a34a;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.roster-names-add:hover { background: #15803d; }
+
+.roster-pending-list {
+  margin: 0;
+  padding: 0 22px 0 0;
+  max-height: 180px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 15px;
+}
+
+.roster-pending-list li { display: flex; align-items: center; gap: 8px; }
+
+.roster-pending-group { opacity: 0.6; font-size: 13px; font-style: normal; }
+
+.roster-import-ok { margin: 0; color: #86efac; font-size: 14px; font-weight: 700; }
+.roster-import-err { margin: 0; color: #fca5a5; font-size: 14px; font-weight: 700; }
+
+/* שלט שנקלט ועדיין בלי שם */
+.roster-name-row--waiting .roster-num {
+  border-color: rgba(250, 204, 21, 0.7);
+  background: rgba(250, 204, 21, 0.12);
+}
+
+/* ---- החלונית הגדולה של קליטת השלטים ---- */
+.capture-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(3, 6, 16, 0.82);
+  /* מעל מגירת "שמות וקבוצות" (55) — היא זו שממנה מפעילים את הקליטה, ובלי זה
+     החלונית הייתה מוסתרת מאחוריה. */
+  z-index: 60;
+}
+
+/* המגירה פתוחה — החלונית עוברת לשטח שנשאר לצידה, כדי שאפשר יהיה להמשיך
+   לערוך את הרשימה ולראות את הקליטה באותו הזמן. */
+.capture-overlay--aside {
+  left: 560px;
+  background: rgba(3, 6, 16, 0.88);
+}
+
+.capture-box {
+  min-width: 520px;
+  padding: 40px 56px;
+  border-radius: 28px;
+  background: #111a2e;
+  border: 2px solid rgba(255, 255, 255, 0.16);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  align-items: center;
+}
+
+.capture-title { font-size: 30px; font-weight: 800; opacity: 0.85; }
+
+.capture-wait { font-size: 30px; opacity: 0.55; padding: 40px 0; }
+
+.capture-hit { display: flex; flex-direction: column; gap: 8px; }
+
+.capture-id {
+  font-size: 128px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--secondary-color, #ffd23f);
+  direction: ltr;
+}
+
+.capture-name { font-size: 52px; font-weight: 800; }
+
+.capture-name--none { font-size: 34px; opacity: 0.6; font-weight: 700; }
+
+.capture-hit--again .capture-id { opacity: 0.55; }
+
+.capture-again { font-size: 20px; opacity: 0.6; }
+
+.capture-stats { font-size: 22px; opacity: 0.75; }
+
+.capture-stop {
+  padding: 12px 28px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.capture-stop:hover { background: rgba(255, 255, 255, 0.2); }
+
 .roster-panel input,
 .roster-panel select {
   background: #0f1424;

@@ -205,5 +205,6 @@ export function rosterFromBackup(backup: BackupData): RosterData {
     players,
     categories: groups.length > 0 ? [{ id: CAT, name: 'קבוצות', groups }] : [],
     memberships,
+    pendingNames: [], // גיבוי אינו נושא שמות ממתינים — הם נקשרים לפני המשחק
   };
 }

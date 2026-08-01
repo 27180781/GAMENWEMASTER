@@ -26,7 +26,7 @@ import {
 } from '../engine/index.ts';
 import { SocketVoteAdapter, isLiveVoteAdapter, type RawVote } from './socketAdapter.ts';
 import { CompositeVoteAdapter } from './compositeAdapter.ts';
-import { ClickerVoteAdapter } from './clickerAdapter.ts';
+import { ClickerVoteAdapter, setClickerCaptureMode } from './clickerAdapter.ts';
 import {
   isDesktopClicker,
   showReceiver,
@@ -38,8 +38,10 @@ import {
   desktopOpenReports,
   canQuit,
   desktopQuit,
+  onClickerEvent,
 } from './clickerBridge.ts';
 import { avatarColor, railInitial } from '../render/avatar.ts';
+import { CaptureOverlay, type CaptureFlash } from '../render/CaptureOverlay.tsx';
 import { AllScoresScreen, LobbyScreen, WinnersListScreen, WinnersScreen } from '../render/screens.tsx';
 import { OperatorMenu } from '../render/OperatorMenu.tsx';
 import { RaffleOverlay, type RaffleEntry } from '../render/RaffleOverlay.tsx';
@@ -61,6 +63,7 @@ import { extractHostVote } from './hostRemote.ts';
 import { completedQuestionCount, shouldShowLeaderboard } from './leaderboardSchedule.ts';
 import {
   assignGroupByNumber,
+  captureRemote,
   categoryMemberTotal,
   displayName,
   groupCounts,
@@ -262,6 +265,41 @@ export function GameHost({
   applyGroupPressesRef.current = applyGroupPresses;
   const rosterRef = useRef(roster);
   rosterRef.current = roster;
+
+  /**
+   * "קליטת שלטים בלחיצה": כל לחיצה מוסיפה את השלט לרשימה ותופסת את השם הבא
+   * בתור. מנוי ישיר לאירועי הקליקר (ולא דרך מתאם ההצבעות) — כדי שזה יעבוד גם
+   * כשאין חלון הצבעה פתוח, וכדי שהלחיצות האלה לא ייספרו כהצבעות.
+   */
+  const [captureOn, setCaptureOn] = useState(false);
+  const [captureFlash, setCaptureFlash] = useState<CaptureFlash | null>(null);
+  const captureSeq = useRef(0);
+  useEffect(() => {
+    // הדגל חוסם את מתאם ההצבעות כל עוד הקליטה פעילה (ראו clickerAdapter).
+    setClickerCaptureMode(captureOn);
+    if (!captureOn) return;
+    const off = onClickerEvent((ev) => {
+      if (ev.type !== 'key') return;
+      captureSeq.current += 1;
+      const seq = captureSeq.current;
+      setRoster((prev) => {
+        const res = captureRemote(prev, String(ev.remoteId));
+        setCaptureFlash({ id: res.id, name: res.name, isNew: res.isNew, seq });
+        if (res.roster !== prev) saveRoster(game.id, res.roster);
+        return res.roster;
+      });
+    });
+    // גם פירוק הרכיב באמצע קליטה חייב לשחרר את הדגל — אחרת ההצבעות היו
+    // נשארות חסומות אחרי שהמשחק כבר התחלף.
+    return () => {
+      off();
+      setClickerCaptureMode(false);
+    };
+  }, [captureOn, game.id]);
+  // יציאה ממצב הקליטה מנקה את החיווי, שלא יישאר תלוי על המסך.
+  useEffect(() => {
+    if (!captureOn) setCaptureFlash(null);
+  }, [captureOn]);
   // אם הקטגוריה של מסך ההתחברות נמחקה — סוגרים אותו (אחרת המקשים נחסמים בלי מסך נראה)
   useEffect(() => {
     if (connectCategory !== null && !roster.categories.some((c) => c.id === connectCategory)) {
@@ -1704,6 +1742,7 @@ export function GameHost({
     connectCategory !== null ||
     settingsOpen ||
     rosterOpen ||
+    captureOn || // קליטת שלטים — המשחק ממתין, לא מתקדם מאחורי הגב
     menuOpen;
 
   // הקפאת/הפשרת טיימר ההצבעה בזמן שכבה חוסמת. מכבדים עצירה ידנית (מקש 6): מפשירים
@@ -1977,14 +2016,15 @@ export function GameHost({
       if (event.key === 'Escape') {
         // ESC סוגר קודם שכבות פתוחות; אחרת: ב-EXE — אישור יציאה מהמשחק,
         // באונליין/דפדפן — פתיחת/סגירת תפריט המפעיל (כמו קודם).
-        if (rosterOpen) setRosterOpen(false);
+        if (captureOn) setCaptureOn(false);
+        else if (rosterOpen) setRosterOpen(false);
         else if (settingsOpen) setSettingsOpen(false);
         else if (menuOpen) setMenuOpen(false);
         else if (canExit) setExitConfirm((open) => !open);
         else setMenuOpen(true);
         return;
       }
-      if (menuOpen || settingsOpen || rosterOpen || exitConfirm) return;
+      if (menuOpen || settingsOpen || rosterOpen || exitConfirm || captureOn) return;
       if (event.key >= '0' && event.key <= '6') {
         debugLog('command', `שלט: מקש ${event.key}`, { stage });
         // 0/2 מטופלים בתוך advance/goBack לכל שלבי המשחק (כולל מסכי הסיום)
@@ -2037,7 +2077,7 @@ export function GameHost({
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [stage, menuOpen, settingsOpen, rosterOpen, exitConfirm, canExit, leadersOverlay, connectCategory, engine, advance, goBack, onRequestRefresh]);
+  }, [stage, menuOpen, settingsOpen, rosterOpen, exitConfirm, captureOn, canExit, leadersOverlay, connectCategory, engine, advance, goBack, onRequestRefresh]);
 
   /** "התחלת המשחק מחדש" מתוך מסך ההגדרות — איפוס מלא וחזרה למסך הפתיחה. */
   const restartGame = useCallback(() => {
@@ -2245,10 +2285,23 @@ export function GameHost({
           </button>
         </div>
 
+        {/* קליטת שלטים בלחיצה — החלונית הגדולה שמראה מה נקלט */}
+        {captureOn && (
+          <CaptureOverlay
+            flash={captureFlash}
+            total={roster.players.length}
+            waitingNames={roster.pendingNames.length}
+            aside={rosterOpen}
+            onStop={() => setCaptureOn(false)}
+          />
+        )}
+
         {rosterOpen && (
           <RosterPanel
             roster={roster}
             onChange={updateRoster}
+            captureOn={captureOn}
+            onToggleCapture={setCaptureOn}
             onClose={() => setRosterOpen(false)}
             onOpenConnect={(categoryId) => {
               setConnectCategory(categoryId);
