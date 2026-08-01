@@ -31,10 +31,12 @@ import {
   forgetGame,
   getSealedGame,
   getSealMode,
+  onUpdateStatus,
   canStreamMedia,
   desktopMediaClear,
   desktopLoadSavedGame,
   type SealConfig,
+  type UpdateStatus,
 } from './clickerBridge.ts';
 import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.ts';
 import { decodeInitialMedia } from './mediaDecode.ts';
@@ -125,6 +127,22 @@ function Shell({
   );
 }
 
+/**
+ * חיווי עדכון — פס עדין בפינה. מוצג רק מחוץ למשחק חי: ההתקנה קורית בסגירת
+ * התוכנה ואינה קוטעת דבר, ולכן אין שום סיבה להסיח את המנחה באמצע אירוע.
+ */
+function UpdateBadge({ status }: { status: UpdateStatus }) {
+  if (status.state === 'ready') {
+    return (
+      <div className="update-badge update-badge--ready">
+        ✅ גרסה {status.version ?? 'חדשה'} הורדה — תותקן בסגירת התוכנה
+      </div>
+    );
+  }
+  const pct = status.percent ?? 0;
+  return <div className="update-badge">⬇ מוריד עדכון… {pct}%</div>;
+}
+
 /** התראת בעיות מדיה בטעינה — קישורים שבורים (אונליין) / נכסים חסרים (אופליין). */
 function MediaIssuesAlert({ issues, onClose }: { issues: MediaIssue[]; onClose: () => void }) {
   const missing = issues.filter((i) => i.reason === 'missing').length;
@@ -189,6 +207,8 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   /** חיווי שהמדיה הזמנית נוקתה מהדיסק (EXE) — הגיבויים והתוצאות לא נגעו. */
   const [mediaCleared, setMediaCleared] = useState(false);
+  /** מצב העדכון האוטומטי (גרסת ההתקנה) — מוצג רק מחוץ למשחק חי. */
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   /** כלי "חתום EXE" — זמין רק בקובץ הנייד שאינו חתום בעצמו, ורק לפי בקשה. */
   const [sealCapable, setSealCapable] = useState(false);
   const [showSeal, setShowSeal] = useState(false);
@@ -357,6 +377,10 @@ export function App() {
       cancelled = true;
     };
   }, [desktopApp]);
+
+  // עדכון אוטומטי — מנוי למצב, וגם בדיקה מחדש בכל חזרה לרשת. ההתקנה עצמה
+  // קורית בסגירת התוכנה, ולכן החיווי הוא מידע בלבד ואינו קוטע כלום.
+  useEffect(() => onUpdateStatus(setUpdateStatus), []);
 
   // בדיקת מדיה למשחק אונליין — מזהה קישורים שבורים (אופליין נבדק ב-zipLoader)
   useEffect(() => {
@@ -657,6 +681,7 @@ export function App() {
             else setStarting(true);
           }}
         />
+        {updateStatus !== null && <UpdateBadge status={updateStatus} />}
         {mediaIssues.length > 0 && !mediaAlertDismissed && (
           <MediaIssuesAlert issues={mediaIssues} onClose={() => setMediaAlertDismissed(true)} />
         )}
@@ -760,6 +785,7 @@ export function App() {
                 {zipInput}
               </label>
               {error !== null && <p className="offline-open-error">{error}</p>}
+              {updateStatus !== null && <UpdateBadge status={updateStatus} />}
               {sealCapable && (
                 <button
                   type="button"

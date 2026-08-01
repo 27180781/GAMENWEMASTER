@@ -39,12 +39,22 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      # מספר גרסה עולה לכל בנייה — זה מה שמאפשר לתוכנה המותקנת לזהות שיש עדכון.
+      # run_number עולה מונוטונית, ולכן הגרסה תמיד גדולה מזו שכבר מותקנת.
+      - name: Set build version
+        shell: bash
+        run: npm version "0.1.${{ github.run_number }}" --no-git-tag-version --allow-same-version
       - run: npm run dist:win
       # כלי "חתום EXE" הוא אותה גרסה ניידת בשם ייעודי: היא משמשת גם כבסיס
       # לחתימה (הקובץ הנייד חותם על עצמו), ולכן אין צורך בבינארי שני.
       - name: Duplicate portable EXE as the sealing tool
         run: copy release\TriviaEngine-Portable.exe release\SealEXE.exe
         shell: cmd
+      # אם latest.yml לא נוצר, העדכון האוטומטי פשוט לא יעבוד — ובשקט. עדיף
+      # שהבנייה תיפול כאן ונדע מיד, מאשר לגלות את זה אצל משתמש בשטח.
+      - name: Verify update metadata exists
+        shell: bash
+        run: test -f release/latest.yml || { echo "::error::latest.yml חסר — העדכון האוטומטי לא יעבוד"; exit 1; }
       - name: Publish EXE files to a stable release
         uses: softprops/action-gh-release@v2
         with:
@@ -53,10 +63,16 @@ jobs:
           body: |
             גרסת שולחן עבודה אופליין ל-Windows, נבנית אוטומטית מהקומיט האחרון ב-main:
             - **TriviaEngine-Setup.exe** — מתקין עם קיצור דרך בשולחן העבודה ובתפריט התחל.
-            - **TriviaEngine-Portable.exe** — נייד, רץ בלי התקנה.
+              **מתעדכן לבד**: בכל פעם שיש רשת הוא בודק אם יצאה גרסה חדשה, מוריד ברקע,
+              ומתקין בסגירת התוכנה — בלי להתקין ידנית שוב.
+            - **TriviaEngine-Portable.exe** — נייד, רץ בלי התקנה (בלי עדכון אוטומטי).
             - **SealEXE.exe** — כלי "חתום EXE": סוגר ZIP של משחק לקובץ EXE בודד.
+              הוא חותם תמיד על גרסת המנוע האחרונה, גם אם הכלי עצמו ישן.
+          # latest.yml הוא הקובץ ש-electron-updater קורא כדי לדעת מה הגרסה
+          # האחרונה ואיפה המתקין. בלעדיו העדכון האוטומטי לא יעבוד.
           files: |
             release/TriviaEngine-Setup.exe
             release/TriviaEngine-Portable.exe
             release/SealEXE.exe
+            release/latest.yml
           prerelease: false

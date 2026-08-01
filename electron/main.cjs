@@ -16,6 +16,7 @@ const { spawn, spawnSync } = require('node:child_process');
 const JSZip = require('jszip');
 const { createClickerServer, DEFAULT_PORT } = require('./clickerServer.cjs');
 const { readSealedFromFile, sealToFile } = require('./sealPayload.cjs');
+const { canAutoUpdate } = require('./updateGate.cjs');
 const {
   writeEncryptedMedia,
   readEncryptedMediaRange,
@@ -96,6 +97,81 @@ function isSealerBuild() {
   const selfPath = portableExePath();
   if (selfPath === null || !sealCapable()) return false;
   return /seal/i.test(path.basename(selfPath));
+}
+
+// ---------------------------------------------------------------------------
+// עדכון אוטומטי (גרסת ההתקנה בלבד)
+// ---------------------------------------------------------------------------
+
+/** מצב העדכון האחרון שנשלח ל-renderer — לשידור חוזר לחלון שנפתח מאוחר. */
+let lastUpdateState = null;
+/** מתי נבדק עדכון לאחרונה — מונע הצפה כשהרשת מתחברת ומתנתקת שוב ושוב. */
+let lastUpdateCheck = 0;
+const UPDATE_CHECK_GAP_MS = 10 * 60 * 1000;
+/** @type {import('electron-updater').AppUpdater | null} */
+let updater = null;
+
+/** האם מותר לעדכן את התוכנה הזו אוטומטית — הכלל עצמו ב-updateGate.cjs. */
+function updateAllowed() {
+  return canAutoUpdate({
+    packaged: app.isPackaged,
+    sealed: sealedGame !== null,
+    portable: portableExePath() !== null,
+  });
+}
+
+/** משדר מצב עדכון ל-renderer ושומר אותו לשידור חוזר. */
+function pushUpdateState(state) {
+  lastUpdateState = state;
+  sendToRenderer('app:update', state);
+}
+
+/**
+ * מפעיל את בדיקת העדכונים: פעם אחת זמן קצר אחרי הפתיחה (לא מיד — שלא תתחרה
+ * בטעינת המשחק), כל שש שעות, ובכל פעם שהמחשב חוזר לרשת (ה-renderer מדווח).
+ *
+ * ההתקנה עצמה קורית *בסגירת התוכנה* (autoInstallOnAppQuit) ולא באמצע — אירוע
+ * חי לעולם לא ייקטע בהתקנה או בהפעלה מחדש.
+ */
+function startAutoUpdate() {
+  if (!updateAllowed()) return;
+  try {
+    ({ autoUpdater: updater } = require('electron-updater'));
+  } catch (err) {
+    console.warn('[update] מודול העדכון אינו זמין:', /** @type {Error} */ (err).message);
+    return;
+  }
+  if (updater === null) return;
+  updater.autoDownload = true;
+  updater.autoInstallOnAppQuit = true;
+  updater.on('update-available', (info) => {
+    console.log('[update] נמצאה גרסה חדשה:', info.version);
+    pushUpdateState({ state: 'downloading', version: String(info.version), percent: 0 });
+  });
+  updater.on('download-progress', (p) => {
+    pushUpdateState({ state: 'downloading', percent: Math.round(p.percent) });
+  });
+  updater.on('update-downloaded', (info) => {
+    console.log('[update] הגרסה החדשה מוכנה ותותקן בסגירה:', info.version);
+    pushUpdateState({ state: 'ready', version: String(info.version) });
+  });
+  updater.on('error', (err) => {
+    // אין רשת / המהדורה לא זמינה — לא מציגים כלום למשתמש, ננסה שוב בהמשך.
+    console.warn('[update] בדיקת עדכון נכשלה:', err.message);
+  });
+  checkForUpdate();
+  setInterval(checkForUpdate, 6 * 60 * 60 * 1000);
+}
+
+/** בדיקת עדכון בפועל, עם מרווח מינימלי בין בדיקות. */
+function checkForUpdate() {
+  if (updater === null) return;
+  const now = Date.now();
+  if (now - lastUpdateCheck < UPDATE_CHECK_GAP_MS) return;
+  lastUpdateCheck = now;
+  updater.checkForUpdates().catch(() => {
+    /* השגיאה כבר נרשמה במאזין error */
+  });
 }
 
 /** ה-EXE הבסיסי העדכני — המהדורה היציבה שנבנית מכל קומיט ב-main. */
@@ -839,6 +915,15 @@ app.whenReady().then(() => {
   loadSealedGame(); // משחק מוטבע (EXE סגור) — אם קיים, ייטען אוטומטית ב-renderer
   createWindow();
   startClickerServer(); // שרת קליקרי RF317 (מקומי, פורט 8090)
+  // עדכון אוטומטי — אחרי loadSealedGame, שהבדיקה "האם זה EXE חתום" תהיה נכונה.
+  // ההשהיה נותנת למשחק להיטען קודם; בדיקת הרשת אינה דחופה.
+  setTimeout(startAutoUpdate, 20000);
+  /** דיווח מה-renderer שהמחשב חזר לרשת — הזדמנות טובה לבדוק עדכון. */
+  ipcMain.handle('app:online', () => {
+    checkForUpdate();
+  });
+  /** מצב העדכון האחרון — לחלון שנפתח אחרי שהאירוע כבר שודר. */
+  ipcMain.handle('app:updateState', () => lastUpdateState);
   // בקשת הפעלה של תוכנת הקליטה מה-renderer (בחירת "שחק עם שלטים").
   ipcMain.handle('rf317:launch', () => {
     launchReceiver();

@@ -52,4 +52,14 @@ nsis:
   runAfterFinish: true
 
 # בלי חתימת קוד (אין תעודה) — Windows יציג אזהרת SmartScreen בהרצה ראשונה
-publish: null
+
+# עדכון אוטומטי (electron-updater) — ספק "generic" מול תגית המהדורה היציבה.
+# הכתובת קבועה, ולכן כל בנייה מ-main דורסת שם את latest.yml ואת המתקין, והתוכנה
+# המותקנת מוצאת את הגרסה החדשה בלי שנצטרך תגית חדשה לכל מהדורה.
+# חשוב: העדכון פעיל *רק* בגרסת ההתקנה (NSIS). הגרסה הניידת אינה נתמכת
+# ב-electron-updater, ו-EXE חתום בכלל אסור לעדכן — הכתיבה מעליו הייתה מוחקת את
+# המשחק המוטבע בסופו. הסינון עצמו נמצא ב-electron/main.cjs.
+publish:
+  provider: generic
+  url: https://github.com/27180781/GAMENWEMASTER/releases/download/desktop-latest
+  channel: latest
