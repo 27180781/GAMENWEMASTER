@@ -139,6 +139,16 @@ function UpdateBadge({ status }: { status: UpdateStatus }) {
       </div>
     );
   }
+  if (status.state === 'sealer') {
+    return <div className="update-badge update-badge--ready">✅ הכלי עודכן — ייכנס לתוקף בפתיחה הבאה</div>;
+  }
+  if (status.state === 'manual') {
+    return (
+      <div className="update-badge update-badge--warn">
+        ⚠ יש גרסה חדשה, אך אין הרשאת כתיבה לתיקייה — הורידו את הכלי מחדש
+      </div>
+    );
+  }
   const pct = status.percent ?? 0;
   return <div className="update-badge">⬇ מוריד עדכון… {pct}%</div>;
 }
@@ -765,6 +775,7 @@ export function App() {
     return (
       <Shell bare>
         <SealScreen {...(sealTool === true ? {} : { onBack: () => setShowSeal(false) })} />
+        {updateStatus !== null && <UpdateBadge status={updateStatus} />}
       </Shell>
     );
   }
