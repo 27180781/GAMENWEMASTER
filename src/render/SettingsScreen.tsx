@@ -36,6 +36,8 @@ interface SettingsScreenProps {
   offline?: boolean;
   /** EXE בלבד — "טען משחק אחר": שכחת המשחק השמור וחזרה לבורר קובץ ה-ZIP. */
   onPickAnother?: () => void;
+  /** EXE בלבד — פתיחת עורך המשחק המקומי (לא זמין במשחק סגור). */
+  onEditGame?: () => void;
   /** משחק מוטבע ("סגור") ב-EXE — מגביל את מקורות ההצבעה שמותר לבחור. */
   sealConfig?: SealConfig;
 }
@@ -50,6 +52,7 @@ export function SettingsScreen({
   allowDemo = false,
   offline = false,
   onPickAnother,
+  onEditGame,
   sealConfig,
 }: SettingsScreenProps) {
   // אונליין-דמו (‎?demo=1‎, לא אופליין): הקהל המדומה תמיד פעיל. אופליין: תלוי
@@ -497,10 +500,19 @@ export function SettingsScreen({
 
   // "טען משחק אחר" (EXE) — מוצג רק במסך הפתיחה, כשיש אפשרות לשכוח את המשחק השמור.
   const pickAnotherLink =
-    onPickAnother && mode === 'start' ? (
-      <button className="settings-pick-another" onClick={onPickAnother}>
-        📂 טען משחק אחר
-      </button>
+    mode === 'start' && (onPickAnother || onEditGame) ? (
+      <div className="settings-secondary">
+        {onPickAnother && (
+          <button className="settings-pick-another" onClick={onPickAnother}>
+            📂 טען משחק אחר
+          </button>
+        )}
+        {onEditGame && (
+          <button className="settings-pick-another" onClick={onEditGame}>
+            ✏️ עריכת המשחק
+          </button>
+        )}
+      </div>
     ) : null;
 
   // חלון קופץ (מודאל) של ההגדרות המתקדמות — גלילה פנימית, בלי גלילת עמוד

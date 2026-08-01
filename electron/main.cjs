@@ -17,6 +17,7 @@ const JSZip = require('jszip');
 const { createClickerServer, DEFAULT_PORT } = require('./clickerServer.cjs');
 const { readSealedFromFile, sealToFile } = require('./sealPayload.cjs');
 const { canAutoUpdate } = require('./updateGate.cjs');
+const { findGameEntryName, mapStrings } = require('./gameZip.cjs');
 const { sameFile, replaceSelf, cleanupOldSelf } = require('./selfUpdate.cjs');
 const {
   writeEncryptedMedia,
@@ -211,6 +212,75 @@ async function selfUpdateSealer() {
   } catch (err) {
     console.warn('[seal-update] עדכון הכלי נכשל:', /** @type {Error} */ (err).message);
   }
+}
+
+// ---------------------------------------------------------------------------
+// שמירת עריכה מקומית לתוך קובץ המשחק
+// ---------------------------------------------------------------------------
+
+/**
+ * שומר משחק ערוך בחזרה לתוך חבילת ה-ZIP שעל הדיסק, כך שהשינויים שורדים סגירה
+ * ופתיחה מחדש.
+ *
+ * החלק הלא-טריוויאלי הוא **מדיה שנוספה בעריכה**: היא נשמרת במטמון המדיה
+ * (מוצפנת) ומקבלת כתובת ‎trivia-media://<cacheKey>/… — כתובת שתקפה *לסשן הזה
+ * בלבד*. אם היינו כותבים אותה לקובץ המשחק, הפתיחה הבאה הייתה מציגה מדיה חסרה.
+ * לכן כל קובץ כזה מפוענח, נכנס לארכיון תחת media-edits/, והכתובת בקובץ המשחק
+ * מוחלפת בנתיב יחסי — בדיוק כמו כל נכס אחר בחבילה.
+ *
+ * @param {string} dataJson קובץ המשחק הערוך (JSON)
+ * @returns {Promise<{ ok: boolean, error?: string, addedMedia?: number }>}
+ */
+async function saveEditedGame(dataJson) {
+  const zipPath = lastGameZipPath();
+  if (!fs.existsSync(zipPath)) return { ok: false, error: 'לא נמצאה חבילת משחק לשמירה' };
+  let parsed;
+  try {
+    parsed = JSON.parse(String(dataJson));
+  } catch (err) {
+    return { ok: false, error: `קובץ המשחק אינו JSON תקין: ${/** @type {Error} */ (err).message}` };
+  }
+
+  const zip = await JSZip.loadAsync(fs.readFileSync(zipPath));
+  const entryName = findGameEntryName(Object.keys(zip.files));
+  if (entryName === null) return { ok: false, error: 'לא נמצא קובץ משחק בתוך החבילה' };
+
+  // מדיה שנוספה בעריכה → לתוך הארכיון, והכתובת → נתיב יחסי.
+  const dir = entryName.includes('/') ? `${entryName.slice(0, entryName.lastIndexOf('/'))}/` : '';
+  let added = 0;
+  const baked = mapStrings(parsed, (s) => {
+    if (!s.startsWith('trivia-media://')) return s;
+    try {
+      const rest = s.slice('trivia-media://'.length);
+      const slash = rest.indexOf('/');
+      if (slash <= 0) return s;
+      const cacheKey = decodeURIComponent(rest.slice(0, slash));
+      const rel = safeRelPath(rest.slice(slash + 1).split('/').map(decodeURIComponent).join('/'));
+      if (rel === null) return s;
+      const src = path.join(mediaCacheDir(cacheKey), rel);
+      if (!fs.existsSync(src)) return s;
+      const bytes = isEncryptedMedia(src)
+        ? readEncryptedMediaRange(src, cacheKey, 0, encryptedMediaSize(src) - 1)
+        : fs.readFileSync(src);
+      const target = `media-edits/${rel.split('/').pop()}`;
+      zip.file(`${dir}${target}`, bytes);
+      added += 1;
+      return target;
+    } catch (err) {
+      console.warn('[edit] הטמעת מדיה נכשלה:', /** @type {Error} */ (err).message);
+      return s;
+    }
+  });
+
+  zip.file(entryName, JSON.stringify(baked));
+  // כתיבה זמנית ואז החלפה — קריסה באמצע לא משאירה חבילה חתוכה.
+  const tmp = `${zipPath}.saving`;
+  const out = await zip.generateAsync({ type: 'nodebuffer' });
+  fs.writeFileSync(tmp, out);
+  fs.rmSync(zipPath, { force: true });
+  fs.renameSync(tmp, zipPath);
+  console.log('[edit] המשחק נשמר:', entryName, `${added} קובצי מדיה הוטמעו`);
+  return { ok: true, addedMedia: added };
 }
 
 // ---------------------------------------------------------------------------
@@ -1207,6 +1277,19 @@ app.whenReady().then(() => {
   ipcMain.handle('game:getLast', () => (isSealerBuild() ? null : getLastGame()));
   // טעינת משחק מהשרת לפי קוד — נשמר במקום "המשחק האחרון", ומשם נטען במסלול
   // הרגיל (game:loadSaved) בלי להעביר את הבייטים ל-renderer.
+  // שמירת עריכה מקומית לתוך חבילת המשחק. חסום במשחק סגור (EXE חתום) — שם
+  // המשחק הוא חלק מהקובץ עצמו ואינו ניתן לשינוי.
+  ipcMain.handle('game:saveEdited', async (_e, dataJson) => {
+    if (sealedGame !== null) return { ok: false, error: 'משחק סגור אינו ניתן לעריכה' };
+    if (isSealerBuild()) return { ok: false, error: 'לא זמין בכלי החתימה' };
+    try {
+      return await saveEditedGame(dataJson);
+    } catch (err) {
+      const msg = /** @type {Error} */ (err).message;
+      console.error('[edit] שמירת המשחק נכשלה:', msg);
+      return { ok: false, error: msg };
+    }
+  });
   ipcMain.handle('game:downloadByCode', async (e, code) => {
     if (isSealerBuild()) return { ok: false, error: 'לא זמין בכלי החתימה' };
     return downloadGameByCode(code, (p) => {

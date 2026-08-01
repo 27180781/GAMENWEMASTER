@@ -113,6 +113,8 @@ interface TriviaDesktop {
   ) => Promise<SealResult>;
   /** מנוי להתקדמות החתימה. מחזיר פונקציית ביטול-מנוי. */
   onSealProgress?: (cb: (p: SealProgress) => void) => () => void;
+  /** שמירת משחק ערוך לתוך חבילת ה-ZIP שעל הדיסק. */
+  saveEditedGame?: (dataJson: string) => Promise<SaveEditResult>;
   /** הורדת משחק מהשרת לפי קוד (נשמר כ"משחק אחרון"). */
   downloadGameByCode?: (code: string) => Promise<RemoteDownloadResult>;
   /** מנוי להתקדמות ההורדה מהשרת. מחזיר פונקציית ביטול-מנוי. */
@@ -146,6 +148,13 @@ export interface UpdateStatus {
 export interface SealMode {
   capable: boolean;
   tool: boolean;
+}
+
+/** תוצאת שמירת עריכה. addedMedia = כמה קובצי מדיה הוטמעו בחבילה. */
+export interface SaveEditResult {
+  ok: boolean;
+  addedMedia?: number;
+  error?: string;
 }
 
 /** התקדמות הורדת משחק מהשרת. */
@@ -454,6 +463,22 @@ export function onSealProgress(cb: (p: SealProgress) => void): () => void {
   const fn = desktop()?.onSealProgress;
   if (typeof fn !== 'function') return () => {};
   return fn(cb);
+}
+
+/** האם אפשר לשמור עריכה לקובץ המשחק (EXE עם חבילה על הדיסק). */
+export function canSaveEdits(): boolean {
+  return typeof desktop()?.saveEditedGame === 'function';
+}
+
+/** שמירת המשחק הערוך לחבילה שעל הדיסק. */
+export async function saveEditedGame(dataJson: string): Promise<SaveEditResult> {
+  const fn = desktop()?.saveEditedGame;
+  if (typeof fn !== 'function') return { ok: false, error: 'שמירה אינה זמינה בגרסה הזו' };
+  try {
+    return await fn(dataJson);
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
 }
 
 /** האם התוכנה יודעת להוריד משחק מהשרת לפי קוד (EXE בלבד). */

@@ -167,6 +167,10 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
   ) {
     return ipcRenderer.invoke('seal:create', zipBytes, config, suggested, opts);
   },
+  /** שמירת משחק ערוך לתוך חבילת ה-ZIP שעל הדיסק. */
+  saveEditedGame(/** @type {string} */ dataJson) {
+    return ipcRenderer.invoke('game:saveEdited', dataJson);
+  },
   /** הורדת משחק מהשרת לפי קוד; נשמר כ"משחק אחרון" ונטען משם. */
   downloadGameByCode(/** @type {string} */ code) {
     return ipcRenderer.invoke('game:downloadByCode', code);

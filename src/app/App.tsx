@@ -23,6 +23,7 @@ import { StartupOverlay } from '../render/StartupOverlay.tsx';
 import { ErrorScreen } from '../render/ErrorScreen.tsx';
 import { ClickerDiagnostic } from '../render/ClickerDiagnostic.tsx';
 import { SealScreen } from '../render/SealScreen.tsx';
+import { GameEditor } from '../render/GameEditor.tsx';
 import {
   isDesktopClicker,
   isDesktopApp,
@@ -32,6 +33,7 @@ import {
   getSealedGame,
   getSealMode,
   onUpdateStatus,
+  canSaveEdits,
   canDownloadByCode,
   downloadGameByCode,
   onDownloadProgress,
@@ -250,6 +252,8 @@ export function App() {
   const [mediaCleared, setMediaCleared] = useState(false);
   /** מצב העדכון האוטומטי (גרסת ההתקנה) — מוצג רק מחוץ למשחק חי. */
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
+  /** עורך המשחק המקומי פתוח (EXE, משחק שאינו סגור). */
+  const [editorOpen, setEditorOpen] = useState(false);
   /** קוד המשחק שהוקלד, והתקדמות ההורדה מהשרת (null = לא מוריד כרגע). */
   const [gameCode, setGameCode] = useState('');
   const [downloading, setDownloading] = useState<DownloadProgress | null>(null);
@@ -744,6 +748,18 @@ export function App() {
         </Shell>
       );
     }
+    // עורך המשחק המקומי — מסך מלא, מעל מסך ההגדרות שממנו נפתח.
+    if (editorOpen) {
+      return (
+        <Shell bare style={themeStyle(pendingGame.setting)}>
+          <GameEditor
+            game={pendingGame}
+            onApply={(edited) => setPendingGame(edited)}
+            onClose={() => setEditorOpen(false)}
+          />
+        </Shell>
+      );
+    }
     return (
       <Shell style={themeStyle(pendingGame.setting)}>
         <SettingsScreen
@@ -755,6 +771,9 @@ export function App() {
           qrAvailable={!offline && (pendingGame.room ?? '') !== ''}
           {...(sealConfig !== null ? { sealConfig } : {})}
           {...(desktopApp && sealConfig === null ? { onPickAnother: () => pickAnotherGame() } : {})}
+          {...(offline && sealConfig === null && canSaveEdits()
+            ? { onEditGame: () => setEditorOpen(true) }
+            : {})}
           onSave={(saved) => {
             persistAndSetSettings(saved);
             // ברירת מחדל — חוסמים עד סיום טעינה (מסך פתיחה + ספירה); עם ההגדרה
