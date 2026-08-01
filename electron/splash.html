@@ -1,0 +1,51 @@
+<!doctype html>
+<!--
+  חלון פתיחה קטן שנפתח *מיד* עם עליית Electron ונסגר כשהחלון הראשי מוכן להצגה.
+  בלעדיו יש כמה שניות שבהן לחיצה כפולה על הקובץ לא מייצרת שום סימן חיים,
+  והמשתמש לוחץ שוב. עומד בפני עצמו — בלי רשת, בלי גופנים חיצוניים.
+  (בגרסה הניידת, את שלב *החילוץ* שלפני כן מכסה build/splash.bmp.)
+-->
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <title>מנוע הטריוויה — נטען</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { width: 100%; height: 100%; overflow: hidden; }
+      body {
+        background: radial-gradient(ellipse at 50% 25%, #241d4d 0%, #12102a 55%, #0b0e1a 100%);
+        color: #fff;
+        font-family: 'Segoe UI', Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        user-select: none;
+        cursor: wait;
+      }
+      .icon { font-size: 58px; line-height: 1; }
+      .title { font-size: 30px; font-weight: 800; }
+      .sub { font-size: 19px; font-weight: 600; color: #ffd23f; }
+      .bar {
+        width: 260px; height: 6px; margin-top: 4px;
+        border-radius: 99px; background: rgba(255, 255, 255, 0.14); overflow: hidden;
+      }
+      /* פס בתנועה מתמדת — חיווי "עובד" בלי להתחייב לאחוזים שאיננו יודעים */
+      .bar i {
+        display: block; width: 42%; height: 100%;
+        border-radius: 99px; background: #8b2fc9;
+        animation: slide 1.25s ease-in-out infinite alternate;
+      }
+      @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(238%); } }
+      .hint { font-size: 14px; color: rgba(255, 255, 255, 0.55); text-align: center; line-height: 1.6; }
+    </style>
+  </head>
+  <body>
+    <div class="icon">🎯</div>
+    <div class="title">מנוע הטריוויה</div>
+    <div class="sub">התוכנה נטענת…</div>
+    <div class="bar"><i></i></div>
+    <div class="hint">הפתיחה אורכת מספר שניות<br />נא להמתין ולא ללחוץ שוב</div>
+  </body>
+</html>

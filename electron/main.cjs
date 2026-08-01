@@ -900,6 +900,44 @@ function safeReportName(name) {
   return base.toLowerCase().endsWith('.xlsx') ? base : `${base}.xlsx`;
 }
 
+/** @type {BrowserWindow | null} חלון "התוכנה נטענת" עד שהחלון הראשי מוכן. */
+let splashWindow = null;
+
+/**
+ * פותח חלון פתיחה קטן מיד עם עליית Electron. בלעדיו יש כמה שניות ללא שום סימן
+ * חיים אחרי הלחיצה — והמשתמש לוחץ שוב. (מנעול המופע היחיד מונע תוכנה כפולה,
+ * אבל בזמן הזה עדיין לא רץ תהליך שיכול להקפיץ חלון קיים.)
+ */
+function createSplash() {
+  try {
+    splashWindow = new BrowserWindow({
+      width: 460,
+      height: 300,
+      frame: false,
+      resizable: false,
+      center: true,
+      alwaysOnTop: true,
+      skipTaskbar: false,
+      backgroundColor: '#0b0e1a',
+      title: 'מנוע הטריוויה — נטען',
+      webPreferences: { contextIsolation: true, nodeIntegration: false },
+    });
+    void splashWindow.loadFile(path.join(__dirname, 'splash.html'));
+    splashWindow.on('closed', () => {
+      splashWindow = null;
+    });
+  } catch (err) {
+    console.warn('[splash] פתיחת חלון הטעינה נכשלה:', /** @type {Error} */ (err).message);
+    splashWindow = null;
+  }
+}
+
+/** סוגר את חלון הטעינה (אם עדיין פתוח). */
+function closeSplash() {
+  if (splashWindow !== null && !splashWindow.isDestroyed()) splashWindow.destroy();
+  splashWindow = null;
+}
+
 function createWindow() {
   // כלי החתימה אינו משחק: חלון רגיל עם כותרת, לא קיוסק במסך מלא — כדי שדיאלוג
   // השמירה ושאר החלונות של Windows יתנהגו כרגיל, ושיהיה ברור מה רץ.
@@ -910,6 +948,8 @@ function createWindow() {
     backgroundColor: '#0b0e1a',
     fullscreen: !sealer,
     title: sealer ? 'חתום EXE' : 'Trivia Engine',
+    // מוצג רק כשיש מה להראות — עד אז חלון הטעינה מחזיק את המשתמש.
+    show: false,
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -925,8 +965,21 @@ function createWindow() {
 
   hardenWindow(mainWindow);
 
+  /** מעבר מחלון הטעינה לחלון האמיתי — פעם אחת, מאיזה מסלול שיגיע קודם. */
+  const reveal = () => {
+    if (mainWindow === null || mainWindow.isDestroyed() || mainWindow.isVisible()) return;
+    closeSplash();
+    mainWindow.show();
+    mainWindow.focus();
+  };
+  mainWindow.once('ready-to-show', reveal);
+  // רשת ביטחון: אם ready-to-show לא מגיע (כשל טעינה), עדיף חלון עם הודעת שגיאה
+  // מאשר מסך תקוע על "נטען" לנצח.
+  setTimeout(reveal, 20000);
+
   mainWindow.on('closed', () => {
     mainWindow = null;
+    closeSplash();
   });
 }
 
@@ -972,6 +1025,7 @@ function openHostWindow() {
 
 app.whenReady().then(() => {
   if (!gotSingleInstanceLock) return; // מופע משני — נסגר; לא מרימים כלום
+  createSplash(); // "התוכנה נטענת" — לפני כל עבודה כבדה, שיהיה סימן חיים מיד
   loadSealedGame(); // משחק מוטבע (EXE סגור) — אם קיים, ייטען אוטומטית ב-renderer
   createWindow();
   startClickerServer(); // שרת קליקרי RF317 (מקומי, פורט 8090)
