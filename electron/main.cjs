@@ -213,6 +213,149 @@ async function selfUpdateSealer() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// טעינת משחק מהשרת לפי קוד (חלופה לטעינת ZIP מהדיסק)
+// ---------------------------------------------------------------------------
+
+/** ‏Edge Functions של מערכת יצירת המשחקים. מפתח ה-anon ציבורי מעצם הגדרתו. */
+const REMOTE_BASE_URL =
+  process.env.TRIVIA_REMOTE_URL || 'https://oousxptmdrrkybadikec.supabase.co/functions/v1';
+const REMOTE_ANON_KEY =
+  process.env.TRIVIA_REMOTE_KEY ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9vdXN4cHRtZHJya3liYWRpa2VjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMDc3NzcsImV4cCI6MjA5Mjc4Mzc3N30.9Qb5TZeI-yn3ueuTXh6-XDoFA31FV7EvKGYMu_1QY8c';
+/** פסק-זמן על *שקט* בקו (לא על הגודל) — משחק עם וידאו יכול לקחת דקות. */
+const REMOTE_IDLE_MS = 45 * 1000;
+const REMOTE_CEILING_MS = 20 * 60 * 1000;
+
+/**
+ * מוריד חבילת משחק מהשרת לפי קוד הקליקרים, ישר אל מקום "המשחק האחרון" בדיסק.
+ *
+ * הבייטים לא עוברים דרך ה-renderer: חבילה עם וידאו שוקלת מאות MB, והמסלול
+ * הקיים (game:loadSaved) ממילא יודע לחלץ אותה מהדיסק ולהחזיר רק את data.json.
+ *
+ * @param {string} code קוד המשחק (clickers_game_code)
+ * @param {(p: object) => void} onProgress
+ * @returns {Promise<{ ok: boolean, error?: string, bytes?: number }>}
+ */
+function downloadGameByCode(code, onProgress) {
+  return new Promise((resolve) => {
+    const clean = String(code ?? '').trim();
+    if (!/^[A-Za-z0-9_-]{1,32}$/.test(clean)) {
+      resolve({ ok: false, error: 'קוד משחק לא תקין' });
+      return;
+    }
+    const url = `${REMOTE_BASE_URL}/download-by-code?code=${encodeURIComponent(clean)}`;
+    const partPath = `${lastGameZipPath()}.part`;
+    let settled = false;
+    /** @type {NodeJS.Timeout | null} */
+    let idleTimer = null;
+    /** @type {import('node:fs').WriteStream | null} */
+    let out = null;
+    /** @type {import('electron').ClientRequest | null} */
+    let req = null;
+
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      if (idleTimer !== null) clearTimeout(idleTimer);
+      clearTimeout(ceiling);
+      try {
+        req?.abort();
+      } catch {
+        /* כבר נסגר */
+      }
+      if (out !== null) {
+        out.destroy();
+        out = null;
+        try {
+          fs.rmSync(partPath, { force: true });
+        } catch {
+          /* אין חלקי */
+        }
+      }
+      resolve(result);
+    };
+    const ceiling = setTimeout(
+      () => finish({ ok: false, error: 'ההורדה ארכה יותר מדי — נסו שוב' }),
+      REMOTE_CEILING_MS,
+    );
+    const touch = () => {
+      if (idleTimer !== null) clearTimeout(idleTimer);
+      idleTimer = setTimeout(
+        () => finish({ ok: false, error: 'ההורדה נתקעה — בדקו את החיבור לאינטרנט' }),
+        REMOTE_IDLE_MS,
+      );
+    };
+
+    onProgress({ phase: 'connect' });
+    try {
+      req = net.request({ method: 'GET', url });
+    } catch (err) {
+      finish({ ok: false, error: /** @type {Error} */ (err).message });
+      return;
+    }
+    req.setHeader('apikey', REMOTE_ANON_KEY);
+    req.setHeader('Authorization', `Bearer ${REMOTE_ANON_KEY}`);
+    req.on('error', (err) => finish({ ok: false, error: `החיבור לשרת נכשל: ${err.message}` }));
+    req.on('response', (res) => {
+      const status = res.statusCode;
+      if (status === 404) {
+        res.resume?.();
+        finish({ ok: false, error: 'קוד לא נמצא, או שהרישיון אינו בתוקף' });
+        return;
+      }
+      if (status !== 200) {
+        res.resume?.();
+        finish({ ok: false, error: `השרת החזיר שגיאה (${status})` });
+        return;
+      }
+      const lenHeader = res.headers['content-length'];
+      const total = Number(Array.isArray(lenHeader) ? lenHeader[0] : lenHeader) || 0;
+      let received = 0;
+      try {
+        out = fs.createWriteStream(partPath);
+      } catch (err) {
+        finish({ ok: false, error: /** @type {Error} */ (err).message });
+        return;
+      }
+      out.on('error', (err) => finish({ ok: false, error: `כתיבה לדיסק נכשלה: ${err.message}` }));
+      touch();
+      res.on('data', (chunk) => {
+        received += chunk.length;
+        out?.write(chunk);
+        touch();
+        onProgress({ phase: 'download', received, total });
+      });
+      res.on('error', (err) => finish({ ok: false, error: err.message }));
+      res.on('end', () => {
+        if (settled || out === null) return;
+        const stream = out;
+        out = null; // מכאן ה-part הופך לקובץ המשחק — אין למחוק אותו ב-finish
+        stream.end(() => {
+          try {
+            if (received === 0) {
+              fs.rmSync(partPath, { force: true });
+              finish({ ok: false, error: 'התקבלה חבילה ריקה מהשרת' });
+              return;
+            }
+            fs.rmSync(lastGameZipPath(), { force: true });
+            fs.renameSync(partPath, lastGameZipPath());
+            fs.writeFileSync(
+              lastGameMetaPath(),
+              JSON.stringify({ name: `משחק ${clean}`, savedAt: Date.now(), code: clean }),
+            );
+            console.log('[remote] משחק הורד לפי קוד:', clean, `${(received / 1048576).toFixed(1)}MB`);
+            finish({ ok: true, bytes: received });
+          } catch (err) {
+            finish({ ok: false, error: /** @type {Error} */ (err).message });
+          }
+        });
+      });
+    });
+    req.end();
+  });
+}
+
 /** ה-EXE הבסיסי העדכני — המהדורה היציבה שנבנית מכל קומיט ב-main. */
 const SEAL_BASE_URL =
   'https://github.com/27180781/GAMENWEMASTER/releases/download/desktop-latest/TriviaEngine-Portable.exe';
@@ -1062,6 +1205,14 @@ app.whenReady().then(() => {
     rememberLastGame(name, bytes);
   });
   ipcMain.handle('game:getLast', () => (isSealerBuild() ? null : getLastGame()));
+  // טעינת משחק מהשרת לפי קוד — נשמר במקום "המשחק האחרון", ומשם נטען במסלול
+  // הרגיל (game:loadSaved) בלי להעביר את הבייטים ל-renderer.
+  ipcMain.handle('game:downloadByCode', async (e, code) => {
+    if (isSealerBuild()) return { ok: false, error: 'לא זמין בכלי החתימה' };
+    return downloadGameByCode(code, (p) => {
+      if (!e.sender.isDestroyed()) e.sender.send('game:downloadProgress', p);
+    });
+  });
   // משחק מוטבע ("סגור") ב-EXE — { bytes, config } או null.
   ipcMain.handle('game:sealed', () => sealedGame);
   ipcMain.handle('game:forget', () => {

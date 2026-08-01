@@ -32,11 +32,15 @@ import {
   getSealedGame,
   getSealMode,
   onUpdateStatus,
+  canDownloadByCode,
+  downloadGameByCode,
+  onDownloadProgress,
   canStreamMedia,
   desktopMediaClear,
   desktopLoadSavedGame,
   type SealConfig,
   type UpdateStatus,
+  type DownloadProgress,
 } from './clickerBridge.ts';
 import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.ts';
 import { decodeInitialMedia } from './mediaDecode.ts';
@@ -153,6 +157,33 @@ function UpdateBadge({ status }: { status: UpdateStatus }) {
   return <div className="update-badge">⬇ מוריד עדכון… {pct}%</div>;
 }
 
+/** חיווי הורדת משחק מהשרת — אחוזים כשידוע הגודל, אחרת MB שהתקבלו. */
+function DownloadBar({ progress }: { progress: DownloadProgress }) {
+  if (progress.phase === 'connect') {
+    return <p className="offline-open-note">מתחבר לשרת…</p>;
+  }
+  const received = progress.received ?? 0;
+  const total = progress.total ?? 0;
+  const mb = (n: number) => (n / 1048576).toFixed(1);
+  const pct = total > 0 ? Math.round((received / total) * 100) : null;
+  return (
+    <div className="offline-open-dl">
+      <p className="offline-open-note">
+        {pct !== null
+          ? `מוריד את המשחק… ${pct}% (${mb(received)}/${mb(total)}MB)`
+          : `מוריד את המשחק… ${mb(received)}MB`}
+      </p>
+      <div className="offline-open-dl-bar">
+        {/* בלי Content-Length אין אחוזים — מציגים פס בתנועה במקום 0% מטעה */}
+        <div
+          className={pct === null ? 'offline-open-dl-fill is-indeterminate' : 'offline-open-dl-fill'}
+          style={pct === null ? undefined : { width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 /** התראת בעיות מדיה בטעינה — קישורים שבורים (אונליין) / נכסים חסרים (אופליין). */
 function MediaIssuesAlert({ issues, onClose }: { issues: MediaIssue[]; onClose: () => void }) {
   const missing = issues.filter((i) => i.reason === 'missing').length;
@@ -219,6 +250,14 @@ export function App() {
   const [mediaCleared, setMediaCleared] = useState(false);
   /** מצב העדכון האוטומטי (גרסת ההתקנה) — מוצג רק מחוץ למשחק חי. */
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
+  /** קוד המשחק שהוקלד, והתקדמות ההורדה מהשרת (null = לא מוריד כרגע). */
+  const [gameCode, setGameCode] = useState('');
+  const [downloading, setDownloading] = useState<DownloadProgress | null>(null);
+  /**
+   * שגיאת טעינה-מקוד. *לא* משתמשים ב-error הכללי: הוא מעביר למסך שגיאה מלא,
+   * וקוד שגוי הוא טעות קלדה שממנה רוצים פשוט לתקן ולנסות שוב באותו מסך.
+   */
+  const [codeError, setCodeError] = useState<string | null>(null);
   /** כלי "חתום EXE" — זמין רק בקובץ הנייד שאינו חתום בעצמו, ורק לפי בקשה. */
   const [sealCapable, setSealCapable] = useState(false);
   const [showSeal, setShowSeal] = useState(false);
@@ -392,6 +431,12 @@ export function App() {
   // קורית בסגירת התוכנה, ולכן החיווי הוא מידע בלבד ואינו קוטע כלום.
   useEffect(() => onUpdateStatus(setUpdateStatus), []);
 
+  // התקדמות הורדת משחק מהשרת (מגיעה מ-main בזמן ההורדה).
+  useEffect(
+    () => onDownloadProgress((p) => setDownloading((cur) => (cur === null ? cur : p))),
+    [],
+  );
+
   // בדיקת מדיה למשחק אונליין — מזהה קישורים שבורים (אופליין נבדק ב-zipLoader)
   useEffect(() => {
     if (pendingGame === null || offline) return;
@@ -486,6 +531,33 @@ export function App() {
         return loadZipBuffer(buffer);
       })
       .catch((e: unknown) => setError(`קריאת הקובץ נכשלה: ${(e as Error).message}`));
+  };
+
+  /**
+   * טעינת משחק מהשרת לפי קוד — חלופה לטעינת ZIP מהדיסק. ההורדה נעשית ב-main
+   * ישר לדיסק (חבילה עם וידאו שוקלת מאות MB), ומשם נטענת במסלול המהיר הרגיל
+   * של "המשחק האחרון" — בלי להעביר בייטים דרך ה-renderer.
+   */
+  const loadFromCode = async (code: string) => {
+    setCodeError(null);
+    setDownloading({ phase: 'connect' });
+    const res = await downloadGameByCode(code);
+    if (!res.ok) {
+      setDownloading(null);
+      setCodeError(res.error ?? 'הורדת המשחק נכשלה');
+      return;
+    }
+    const saved = await desktopLoadSavedGame('last');
+    setDownloading(null);
+    if (saved === null || saved.dataJson === '') {
+      setCodeError('החבילה שהתקבלה מהשרת אינה תקינה');
+      return;
+    }
+    try {
+      applyLoadedZip(loadGameFromExtracted(saved));
+    } catch (e) {
+      setCodeError(`טעינת המשחק שהורד נכשלה: ${(e as Error).message}`);
+    }
   };
 
   // "טען משחק אחר" (EXE) — שכחת המשחק השמור וחזרה לבורר קובץ ה-ZIP.
@@ -790,11 +862,45 @@ export function App() {
                 🎯
               </div>
               <h1 className="offline-open-title">מנוע הטריוויה</h1>
-              <p className="offline-open-lead">בחרו את קובץ המשחק (ZIP) כדי להתחיל</p>
+              <p className="offline-open-lead">
+                {canDownloadByCode()
+                  ? 'בחרו קובץ משחק (ZIP), או הקלידו את קוד המשחק כדי למשוך אותו מהשרת'
+                  : 'בחרו את קובץ המשחק (ZIP) כדי להתחיל'}
+              </p>
               <label className="picker-button offline-open-load">
                 📦 טעינת משחק (ZIP)
                 {zipInput}
               </label>
+
+              {/* חלופה: משיכת המשחק מהשרת לפי קוד — בלי להעביר קובץ ידנית. */}
+              {canDownloadByCode() && (
+                <form
+                  className="offline-open-code"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (gameCode.trim() !== '' && downloading === null) void loadFromCode(gameCode);
+                  }}
+                >
+                  <span className="offline-open-code-or">או</span>
+                  <input
+                    type="text"
+                    dir="ltr"
+                    inputMode="numeric"
+                    placeholder="קוד משחק"
+                    value={gameCode}
+                    disabled={downloading !== null}
+                    onChange={(e) => {
+                      setGameCode(e.target.value);
+                      setCodeError(null);
+                    }}
+                  />
+                  <button type="submit" disabled={gameCode.trim() === '' || downloading !== null}>
+                    ☁ טען מהשרת
+                  </button>
+                </form>
+              )}
+              {downloading !== null && <DownloadBar progress={downloading} />}
+              {codeError !== null && <p className="offline-open-error">{codeError}</p>}
               {error !== null && <p className="offline-open-error">{error}</p>}
               {updateStatus !== null && <UpdateBadge status={updateStatus} />}
               {sealCapable && (

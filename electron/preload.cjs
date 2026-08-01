@@ -167,6 +167,16 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
   ) {
     return ipcRenderer.invoke('seal:create', zipBytes, config, suggested, opts);
   },
+  /** הורדת משחק מהשרת לפי קוד; נשמר כ"משחק אחרון" ונטען משם. */
+  downloadGameByCode(/** @type {string} */ code) {
+    return ipcRenderer.invoke('game:downloadByCode', code);
+  },
+  /** מנוי להתקדמות ההורדה מהשרת. מחזיר פונקציית ביטול-מנוי. */
+  onDownloadProgress(/** @type {(p: unknown) => void} */ cb) {
+    const listener = (/** @type {unknown} */ _e, /** @type {unknown} */ p) => cb(p);
+    ipcRenderer.on('game:downloadProgress', listener);
+    return () => ipcRenderer.removeListener('game:downloadProgress', listener);
+  },
   /** מנוי למצב העדכון האוטומטי. מחזיר פונקציית ביטול-מנוי. */
   onUpdateStatus(/** @type {(s: unknown) => void} */ cb) {
     const listener = (/** @type {unknown} */ _e, /** @type {unknown} */ s) => cb(s);

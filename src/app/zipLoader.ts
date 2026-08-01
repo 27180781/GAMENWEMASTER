@@ -83,11 +83,24 @@ function extensionOf(path: string): string {
   return i === -1 ? '' : base.slice(i + 1);
 }
 
-/** איתור data.json בתוך ה-ZIP (בכל עומק, ללא תלות ברישיות). זורק אם אין. */
+/**
+ * קבצי JSON שאינם קובץ המשחק ולעולם אין לבחור בהם. `manifest.json` מגיע
+ * בחבילות מהשרת (download-by-code) לצד game.json — ובלי הרשימה הזו הנפילה
+ * אחורה ל"כל קובץ JSON" הייתה עלולה לבחור דווקא בו, לפי סדר הערכים בארכיון.
+ */
+const NON_GAME_JSON = new Set(['manifest.json', 'package.json', 'meta.json']);
+
+/**
+ * איתור קובץ המשחק בתוך ה-ZIP (בכל עומק, ללא תלות ברישיות). מעדיף `data.json`
+ * (חבילה שנוצרה בעורך), אחר כך `game.json` (חבילה מהשרת), ורק אז כל JSON אחר
+ * שאינו מוכר כקובץ עזר. זורק אם אין.
+ */
 function findDataEntry(entries: JSZip.JSZipObject[]): JSZip.JSZipObject {
+  const baseName = (f: JSZip.JSZipObject) => (f.name.split('/').pop() ?? '').toLowerCase();
   const entry =
-    entries.find((f) => (f.name.split('/').pop() ?? '').toLowerCase() === 'data.json') ??
-    entries.find((f) => f.name.toLowerCase().endsWith('.json'));
+    entries.find((f) => baseName(f) === 'data.json') ??
+    entries.find((f) => baseName(f) === 'game.json') ??
+    entries.find((f) => baseName(f).endsWith('.json') && !NON_GAME_JSON.has(baseName(f)));
   if (!entry) throw new Error('לא נמצא קובץ data.json בתוך ה-ZIP');
   return entry;
 }
