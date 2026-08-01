@@ -113,6 +113,10 @@ interface TriviaDesktop {
   ) => Promise<SealResult>;
   /** מנוי להתקדמות החתימה. מחזיר פונקציית ביטול-מנוי. */
   onSealProgress?: (cb: (p: SealProgress) => void) => () => void;
+  /** הורדת משחק מהשרת לפי קוד (נשמר כ"משחק אחרון"). */
+  downloadGameByCode?: (code: string) => Promise<RemoteDownloadResult>;
+  /** מנוי להתקדמות ההורדה מהשרת. מחזיר פונקציית ביטול-מנוי. */
+  onDownloadProgress?: (cb: (p: DownloadProgress) => void) => () => void;
   /** מנוי למצב העדכון האוטומטי (null = אין מה להציג). ביטול-מנוי בהחזרה. */
   onUpdateStatus?: (cb: (s: UpdateStatus | null) => void) => () => void;
   /** דיווח שהמחשב חזר לרשת. */
@@ -142,6 +146,20 @@ export interface UpdateStatus {
 export interface SealMode {
   capable: boolean;
   tool: boolean;
+}
+
+/** התקדמות הורדת משחק מהשרת. */
+export interface DownloadProgress {
+  phase: 'connect' | 'download';
+  received?: number;
+  total?: number;
+}
+
+/** תוצאת הורדת משחק מהשרת לפי קוד. */
+export interface RemoteDownloadResult {
+  ok: boolean;
+  bytes?: number;
+  error?: string;
 }
 
 /** אפשרויות חתימה — בסיס עדכני מהרשת מול ה-EXE שרץ. */
@@ -434,6 +452,29 @@ export async function desktopSealGame(
 /** מנוי להתקדמות החתימה. מחזיר פונקציית ביטול-מנוי (no-op בדפדפן). */
 export function onSealProgress(cb: (p: SealProgress) => void): () => void {
   const fn = desktop()?.onSealProgress;
+  if (typeof fn !== 'function') return () => {};
+  return fn(cb);
+}
+
+/** האם התוכנה יודעת להוריד משחק מהשרת לפי קוד (EXE בלבד). */
+export function canDownloadByCode(): boolean {
+  return typeof desktop()?.downloadGameByCode === 'function';
+}
+
+/** הורדת משחק מהשרת לפי קוד. השמירה והטעינה נעשות בצד ה-main. */
+export async function downloadGameByCode(code: string): Promise<RemoteDownloadResult> {
+  const fn = desktop()?.downloadGameByCode;
+  if (typeof fn !== 'function') return { ok: false, error: 'לא זמין בגרסה הזו' };
+  try {
+    return await fn(code);
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+/** מנוי להתקדמות ההורדה מהשרת. מחזיר פונקציית ביטול-מנוי (no-op בדפדפן). */
+export function onDownloadProgress(cb: (p: DownloadProgress) => void): () => void {
+  const fn = desktop()?.onDownloadProgress;
   if (typeof fn !== 'function') return () => {};
   return fn(cb);
 }
