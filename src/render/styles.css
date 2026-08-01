@@ -2364,7 +2364,74 @@ body {
   color: #3a3f52;
   cursor: pointer;
 }
-.editor-body { flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 18px 26px; }
+.editor-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 12px 26px 0;
+  flex: 0 0 auto;
+}
+.editor-tab {
+  font-size: 17px;
+  font-weight: 700;
+  padding: 9px 22px;
+  border-radius: 12px 12px 0 0;
+  border: 1px solid #dfe2ea;
+  border-bottom: none;
+  background: #e8ebf2;
+  color: #4a4f63;
+  cursor: pointer;
+}
+.editor-tab--on { background: #fff; color: #171a2b; }
+.editor-body { flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 0 26px 18px; }
+.editor-pane {
+  height: 100%;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #dfe2ea;
+  border-radius: 0 18px 18px 18px;
+  padding: 18px 22px;
+}
+.editor-hint { font-size: 15px; color: #5a6076; margin: 0 0 14px; }
+.editor-slide-pick { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; font-size: 17px; }
+.editor-slide-pick select {
+  font-size: 16px;
+  padding: 7px 12px;
+  border: 2px solid #cfd4e2;
+  border-radius: 10px;
+  background: #f9fafc;
+  max-width: 480px;
+}
+
+/* ---- שדות שנגזרו מהסכימה ---- */
+.sf-group { display: flex; flex-direction: column; gap: 10px; }
+.sf-section {
+  border: 1px solid #e3e5ea;
+  border-radius: 14px;
+  padding: 10px 14px;
+  background: #f9fafc;
+}
+.sf-summary { font-size: 17px; font-weight: 800; cursor: pointer; color: #2b3048; padding: 4px 0; }
+.sf-section > .sf-group { margin-top: 10px; }
+.sf-row { display: flex; align-items: center; gap: 12px; font-size: 16px; }
+.sf-row--check { gap: 10px; }
+.sf-row--check input { width: 20px; height: 20px; cursor: pointer; }
+.sf-row--json { align-items: flex-start; }
+.sf-label { flex: 0 0 auto; min-width: 230px; color: #3a3f52; }
+.sf-input-wrap { flex: 1 1 auto; display: flex; align-items: center; gap: 8px; }
+.sf-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 16px;
+  padding: 8px 12px;
+  border: 2px solid #cfd4e2;
+  border-radius: 10px;
+  background: #fff;
+  font-family: inherit;
+}
+.sf-input:focus { outline: none; border-color: #8b2fc9; }
+.sf-color { flex: 0 0 auto; width: 42px; height: 36px; padding: 0; border: 2px solid #cfd4e2; border-radius: 8px; background: #fff; cursor: pointer; }
+.sf-json { min-height: 60px; resize: vertical; font-family: ui-monospace, monospace; font-size: 14px; }
+.sf-error { color: #c0263f; font-size: 14px; font-weight: 600; }
 
 /*
  * SlideEditor נבנה למסך המנחה — רקע כהה וטקסט בהיר. כאן הוא יושב על מסך בהיר,

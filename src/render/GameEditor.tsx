@@ -12,7 +12,20 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GameFile } from '../engine/index.ts';
 import { SlideEditor } from './SlideEditor.tsx';
+import { SchemaFields } from './SchemaFields.tsx';
+import { describeObject } from '../app/schemaForm.ts';
+import { globalSettingsSchema, slideSettingsSchema } from '../engine/schema.ts';
 import { saveEditedGame } from '../app/clickerBridge.ts';
+
+/**
+ * שדות שכבר נערכים בטופס הייעודי — לא מציגים אותם פעמיים. כל *שאר* השדות
+ * בסכימה (כולל כאלה שיתווספו בעתיד) נגזרים אוטומטית.
+ */
+const SETTING_HANDLED = ['titleThroughoutGame'];
+
+/** עץ השדות נגזר פעם אחת — הסכימה קבועה לאורך חיי התוכנה. */
+const SETTING_FIELDS = describeObject(globalSettingsSchema, SETTING_HANDLED);
+const SLIDE_SETTING_FIELDS = describeObject(slideSettingsSchema);
 
 interface GameEditorProps {
   game: GameFile;
@@ -33,6 +46,9 @@ export function GameEditor({ game, onApply, onClose }: GameEditorProps) {
    * "נשמר" ואת הטיוטה, כך שההודעה הייתה מהבהבת ונעלמת.
    */
   const appliedRef = useRef<GameFile | null>(null);
+  const [tab, setTab] = useState<'slides' | 'settings' | 'slideSettings'>('slides');
+  /** איזו שקופית נערכת בלשונית "הגדרות שקופית". */
+  const [slideIndex, setSlideIndex] = useState(0);
 
   // המשחק התחלף *מבחוץ* (נטען משחק אחר) — מתחילים ממנו מחדש.
   useEffect(() => {
@@ -115,9 +131,70 @@ export function GameEditor({ game, onApply, onClose }: GameEditorProps) {
         </div>
       </div>
 
+      <div className="editor-tabs">
+        <button
+          className={tab === 'slides' ? 'editor-tab editor-tab--on' : 'editor-tab'}
+          onClick={() => setTab('slides')}
+        >
+          שקופיות
+        </button>
+        <button
+          className={tab === 'settings' ? 'editor-tab editor-tab--on' : 'editor-tab'}
+          onClick={() => setTab('settings')}
+        >
+          הגדרות המשחק
+        </button>
+        <button
+          className={tab === 'slideSettings' ? 'editor-tab editor-tab--on' : 'editor-tab'}
+          onClick={() => setTab('slideSettings')}
+        >
+          הגדרות שקופית
+        </button>
+      </div>
+
       <div className="editor-body">
-        {/* currentSlideId=-1: אין שקופית "בהצבעה", ולכן שום שקופית אינה נעולה */}
-        <SlideEditor game={draft} currentSlideId={-1} onChange={edit} />
+        {tab === 'slides' && (
+          /* currentSlideId=-1: אין שקופית "בהצבעה", ולכן שום שקופית אינה נעולה */
+          <SlideEditor game={draft} currentSlideId={-1} onChange={edit} />
+        )}
+        {tab === 'settings' && (
+          <div className="editor-pane">
+            <p className="editor-hint">
+              כל השדות כאן נגזרים אוטומטית מסכימת המשחק — כולל שדות שיתווספו בעתיד.
+            </p>
+            <SchemaFields
+              nodes={SETTING_FIELDS}
+              value={draft}
+              onChange={edit}
+              path={['setting']}
+            />
+          </div>
+        )}
+        {tab === 'slideSettings' && (
+          <div className="editor-pane">
+            <div className="editor-slide-pick">
+              <span>שקופית</span>
+              <select
+                value={slideIndex}
+                onChange={(e) => setSlideIndex(Number(e.target.value))}
+              >
+                {draft.questions.map((q, i) => (
+                  <option key={q.id} value={i}>
+                    {i + 1}. {q.question.que.slice(0, 40) || '(ללא כותרת)'}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {draft.questions[slideIndex] !== undefined && (
+              <SchemaFields
+                nodes={SLIDE_SETTING_FIELDS}
+                value={draft}
+                onChange={edit}
+                path={['questions', String(slideIndex), 'setting']}
+              />
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
