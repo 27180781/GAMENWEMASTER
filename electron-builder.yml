@@ -40,6 +40,10 @@ win:
 portable:
   # שם קובץ קבוע כדי שקישור ההורדה יישאר יציב
   artifactName: TriviaEngine-Portable.exe
+  # תמונת "התוכנה נטענת" בזמן *חילוץ* ה-EXE — השלב הארוך שלפני שהקוד שלנו רץ
+  # בכלל. בלעדיה אין שום סימן חיים אחרי הלחיצה, והמשתמש לוחץ שוב.
+  # (את מה שאחרי החילוץ מכסה חלון הטעינה ב-electron/splash.html.)
+  splashImage: build/splash.bmp
 
 nsis:
   artifactName: TriviaEngine-Setup.exe
