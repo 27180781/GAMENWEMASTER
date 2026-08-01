@@ -113,18 +113,22 @@ interface TriviaDesktop {
   ) => Promise<SealResult>;
   /** מנוי להתקדמות החתימה. מחזיר פונקציית ביטול-מנוי. */
   onSealProgress?: (cb: (p: SealProgress) => void) => () => void;
-  /** מנוי למצב העדכון האוטומטי. מחזיר פונקציית ביטול-מנוי. */
-  onUpdateStatus?: (cb: (s: UpdateStatus) => void) => () => void;
+  /** מנוי למצב העדכון האוטומטי (null = אין מה להציג). ביטול-מנוי בהחזרה. */
+  onUpdateStatus?: (cb: (s: UpdateStatus | null) => void) => () => void;
   /** דיווח שהמחשב חזר לרשת. */
   reportOnline?: () => void;
 }
 
 /**
- * מצב העדכון האוטומטי (גרסת ההתקנה בלבד). ההתקנה עצמה קורית בסגירת התוכנה,
- * ולכן 'ready' פירושו "יופעל בפתיחה הבאה" — לא הפעלה מחדש עכשיו.
+ * מצב העדכון האוטומטי. שום מצב אינו דורש פעולה מיידית — העדכון נכנס לתוקף
+ * בפתיחה הבאה, ולעולם לא קוטע משחק שרץ.
+ * - `downloading` — מוריד ברקע.
+ * - `ready`  — גרסת ההתקנה הורדה ותותקן בסגירת התוכנה.
+ * - `sealer` — כלי "חתום EXE" החליף את עצמו; ייכנס לתוקף בפתיחה הבאה.
+ * - `manual` — נמצאה גרסה חדשה אך אין הרשאת כתיבה לתיקייה; נדרשת הורדה ידנית.
  */
 export interface UpdateStatus {
-  state: 'downloading' | 'ready';
+  state: 'downloading' | 'ready' | 'sealer' | 'manual';
   version?: string;
   percent?: number;
 }
@@ -438,7 +442,7 @@ export function onSealProgress(cb: (p: SealProgress) => void): () => void {
  * מנוי למצב העדכון האוטומטי, כולל בדיקה מחדש בכל פעם שהמחשב חוזר לרשת.
  * מחזיר פונקציית ביטול-מנוי. no-op בדפדפן ובגרסאות שאינן מתעדכנות.
  */
-export function onUpdateStatus(cb: (s: UpdateStatus) => void): () => void {
+export function onUpdateStatus(cb: (s: UpdateStatus | null) => void): () => void {
   const d = desktop();
   if (typeof d?.onUpdateStatus !== 'function') return () => {};
   const off = d.onUpdateStatus(cb);

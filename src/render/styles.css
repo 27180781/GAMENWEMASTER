@@ -2230,6 +2230,10 @@ body {
   background: rgba(26, 127, 75, 0.9);
   border-color: rgba(255, 255, 255, 0.28);
 }
+.update-badge--warn {
+  background: rgba(168, 98, 13, 0.92);
+  border-color: rgba(255, 255, 255, 0.28);
+}
 
 /* ---- הגרלת משתתף (מקש R) ---- */
 .raffle-overlay {

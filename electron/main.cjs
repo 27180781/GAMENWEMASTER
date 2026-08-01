@@ -17,6 +17,7 @@ const JSZip = require('jszip');
 const { createClickerServer, DEFAULT_PORT } = require('./clickerServer.cjs');
 const { readSealedFromFile, sealToFile } = require('./sealPayload.cjs');
 const { canAutoUpdate } = require('./updateGate.cjs');
+const { sameFile, replaceSelf, cleanupOldSelf } = require('./selfUpdate.cjs');
 const {
   writeEncryptedMedia,
   readEncryptedMediaRange,
@@ -174,6 +175,44 @@ function checkForUpdate() {
   });
 }
 
+/**
+ * עדכון עצמי של כלי "חתום EXE".
+ *
+ * הכלי הוא הקובץ הנייד, ו-electron-updater אינו תומך ביעד portable — אבל אין
+ * בכך צורך: הכלי ממילא מוריד את הבינארי העדכני כדי לחתום עליו, וזה *בדיוק*
+ * הקובץ שהוא צריך בשביל עצמו. אז אם מה שהורדנו שונה ממה שרץ — מחליפים.
+ *
+ * ההחלפה נכנסת לתוקף בפתיחה הבאה (התהליך הרץ ממשיך עם התמונה הישנה), בדיוק
+ * כמו עדכון גרסת ההתקנה. הלוגיקה הרגישה (שלא להישאר בלי כלי) ב-selfUpdate.cjs.
+ */
+async function selfUpdateSealer() {
+  const selfPath = portableExePath();
+  if (!app.isPackaged || selfPath === null || !isSealerBuild()) return;
+  if (cleanupOldSelf(selfPath)) console.log('[seal-update] נוקתה שארית מעדכון קודם');
+  try {
+    const latest = await fetchLatestBase((p) => {
+      if (p.phase === 'base' && p.total > 0) {
+        pushUpdateState({ state: 'downloading', percent: Math.round((p.received / p.total) * 100) });
+      }
+    });
+    if (latest === null) return; // אין רשת — נמשיך לעבוד עם מה שיש
+    if (sameFile(latest, selfPath)) {
+      pushUpdateState(null); // כבר הגרסה האחרונה — מסירים חיווי הורדה אם הוצג
+      return;
+    }
+    if (replaceSelf(selfPath, latest)) {
+      console.log('[seal-update] הכלי עודכן; ייכנס לתוקף בפתיחה הבאה');
+      pushUpdateState({ state: 'sealer' });
+    } else {
+      // תיקייה לא-כתיבה (Program Files / כונן לקריאה בלבד) — לא נכשלים בשקט.
+      console.warn('[seal-update] לא ניתן לכתוב לתיקיית הכלי — נדרשת הורדה ידנית');
+      pushUpdateState({ state: 'manual' });
+    }
+  } catch (err) {
+    console.warn('[seal-update] עדכון הכלי נכשל:', /** @type {Error} */ (err).message);
+  }
+}
+
 /** ה-EXE הבסיסי העדכני — המהדורה היציבה שנבנית מכל קומיט ב-main. */
 const SEAL_BASE_URL =
   'https://github.com/27180781/GAMENWEMASTER/releases/download/desktop-latest/TriviaEngine-Portable.exe';
@@ -199,7 +238,28 @@ function sealBaseDir() {
  * @param {(p: object) => void} onProgress
  * @returns {Promise<string | null>}
  */
+let baseFetchInFlight = null;
+/** ה-onProgress של הקורא האחרון — הוא זה שמסכו מוצג בפועל. */
+let baseProgressCb = null;
+
+/**
+ * עטיפה עם הגנת "בקשה אחת בכל רגע": העדכון העצמי של הכלי והחתימה עצמה מושכים
+ * את אותו קובץ לאותו נתיב. שתי הורדות במקביל היו כותבות זו על זו ומייצרות בסיס
+ * פגום. הקורא השני מקבל את אותה הבטחה, וההתקדמות מוצגת לו.
+ * @param {(p: object) => void} onProgress
+ * @returns {Promise<string | null>}
+ */
 function fetchLatestBase(onProgress) {
+  baseProgressCb = onProgress;
+  if (baseFetchInFlight !== null) return baseFetchInFlight;
+  baseFetchInFlight = runBaseFetch((p) => baseProgressCb?.(p)).finally(() => {
+    baseFetchInFlight = null;
+    baseProgressCb = null;
+  });
+  return baseFetchInFlight;
+}
+
+function runBaseFetch(onProgress) {
   return new Promise((resolve) => {
     let dir;
     try {
@@ -918,6 +978,9 @@ app.whenReady().then(() => {
   // עדכון אוטומטי — אחרי loadSealedGame, שהבדיקה "האם זה EXE חתום" תהיה נכונה.
   // ההשהיה נותנת למשחק להיטען קודם; בדיקת הרשת אינה דחופה.
   setTimeout(startAutoUpdate, 20000);
+  // עדכון עצמי של כלי "חתום EXE" — מסלול נפרד, כי הקובץ הנייד אינו נתמך
+  // ב-electron-updater. ההשהיה קצרה יותר: הכלי אינו מריץ אירוע חי.
+  setTimeout(() => void selfUpdateSealer(), 8000);
   /** דיווח מה-renderer שהמחשב חזר לרשת — הזדמנות טובה לבדוק עדכון. */
   ipcMain.handle('app:online', () => {
     checkForUpdate();
