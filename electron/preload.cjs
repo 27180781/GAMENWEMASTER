@@ -167,6 +167,20 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
   ) {
     return ipcRenderer.invoke('seal:create', zipBytes, config, suggested, opts);
   },
+  /** מנוי למצב העדכון האוטומטי. מחזיר פונקציית ביטול-מנוי. */
+  onUpdateStatus(/** @type {(s: unknown) => void} */ cb) {
+    const listener = (/** @type {unknown} */ _e, /** @type {unknown} */ s) => cb(s);
+    ipcRenderer.on('app:update', listener);
+    // שידור חוזר: החלון עלול להיפתח אחרי שהאירוע כבר נשלח.
+    void ipcRenderer.invoke('app:updateState').then((s) => {
+      if (s !== null && s !== undefined) cb(s);
+    });
+    return () => ipcRenderer.removeListener('app:update', listener);
+  },
+  /** דיווח שהמחשב חזר לרשת — הזדמנות לבדוק עדכון. */
+  reportOnline() {
+    void ipcRenderer.invoke('app:online');
+  },
   /** מנוי להתקדמות החתימה (הורדת הבסיס/כתיבה). מחזיר פונקציית ביטול-מנוי. */
   onSealProgress(/** @type {(p: unknown) => void} */ cb) {
     const listener = (/** @type {unknown} */ _e, /** @type {unknown} */ p) => cb(p);

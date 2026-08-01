@@ -2211,6 +2211,26 @@ body {
   max-width: 640px;
   white-space: pre-wrap;
 }
+/* ---- חיווי עדכון אוטומטי (גרסת ההתקנה) — מידע בלבד, לא חוסם ---- */
+.update-badge {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  z-index: 40;
+  padding: 9px 18px;
+  border-radius: 999px;
+  font-size: 17px;
+  font-weight: 600;
+  background: rgba(20, 20, 40, 0.72);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+}
+.update-badge--ready {
+  background: rgba(26, 127, 75, 0.9);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
 /* ---- הגרלת משתתף (מקש R) ---- */
 .raffle-overlay {
   position: absolute;

@@ -113,6 +113,20 @@ interface TriviaDesktop {
   ) => Promise<SealResult>;
   /** מנוי להתקדמות החתימה. מחזיר פונקציית ביטול-מנוי. */
   onSealProgress?: (cb: (p: SealProgress) => void) => () => void;
+  /** מנוי למצב העדכון האוטומטי. מחזיר פונקציית ביטול-מנוי. */
+  onUpdateStatus?: (cb: (s: UpdateStatus) => void) => () => void;
+  /** דיווח שהמחשב חזר לרשת. */
+  reportOnline?: () => void;
+}
+
+/**
+ * מצב העדכון האוטומטי (גרסת ההתקנה בלבד). ההתקנה עצמה קורית בסגירת התוכנה,
+ * ולכן 'ready' פירושו "יופעל בפתיחה הבאה" — לא הפעלה מחדש עכשיו.
+ */
+export interface UpdateStatus {
+  state: 'downloading' | 'ready';
+  version?: string;
+  percent?: number;
 }
 
 /**
@@ -418,4 +432,20 @@ export function onSealProgress(cb: (p: SealProgress) => void): () => void {
   const fn = desktop()?.onSealProgress;
   if (typeof fn !== 'function') return () => {};
   return fn(cb);
+}
+
+/**
+ * מנוי למצב העדכון האוטומטי, כולל בדיקה מחדש בכל פעם שהמחשב חוזר לרשת.
+ * מחזיר פונקציית ביטול-מנוי. no-op בדפדפן ובגרסאות שאינן מתעדכנות.
+ */
+export function onUpdateStatus(cb: (s: UpdateStatus) => void): () => void {
+  const d = desktop();
+  if (typeof d?.onUpdateStatus !== 'function') return () => {};
+  const off = d.onUpdateStatus(cb);
+  const onOnline = () => d.reportOnline?.();
+  window.addEventListener('online', onOnline);
+  return () => {
+    window.removeEventListener('online', onOnline);
+    off();
+  };
 }
