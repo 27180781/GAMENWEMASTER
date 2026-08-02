@@ -19,6 +19,7 @@ const { readSealedFromFile, sealToFile } = require('./sealPayload.cjs');
 const { canAutoUpdate } = require('./updateGate.cjs');
 const { findGameEntryName, mapStrings } = require('./gameZip.cjs');
 const { sameFile, replaceSelf, cleanupOldSelf } = require('./selfUpdate.cjs');
+const { remoteErrorMessage } = require('./remoteErrors.cjs');
 const {
   writeEncryptedMedia,
   readEncryptedMediaRange,
@@ -430,14 +431,12 @@ function downloadGameByCode(code, onProgress) {
     req.on('error', (err) => finish({ ok: false, error: `החיבור לשרת נכשל: ${err.message}` }));
     req.on('response', (res) => {
       const status = res.statusCode;
-      if (status === 404) {
-        res.resume?.();
-        finish({ ok: false, error: 'קוד לא נמצא, או שהרישיון אינו בתוקף' });
-        return;
-      }
       if (status !== 200) {
         res.resume?.();
-        finish({ ok: false, error: `השרת החזיר שגיאה (${status})` });
+        // ההודעה אומרת מה קרה ומה לעשות — ראו remoteErrors.cjs. במיוחד 546,
+        // שאינו שגיאה בקוד שהוקלד אלא כשל אריזה בשרת בגלל מדיה כבדה.
+        console.warn('[remote] הורדה לפי קוד נכשלה:', clean, 'HTTP', status);
+        finish({ ok: false, error: remoteErrorMessage(status) });
         return;
       }
       const lenHeader = res.headers['content-length'];
