@@ -963,7 +963,7 @@ export function App() {
     <Shell>
       <div className="screen">
         <div className="screen-content">
-          <h1 className="opening-title">Trivia Engine</h1>
+          <h1 className="opening-title">חוויה בקליק</h1>
           <p className="opening-hint">בחרו קובץ משחק</p>
           <div className="picker-buttons">
             {Object.keys(RAW_FIXTURES).map((name) => (

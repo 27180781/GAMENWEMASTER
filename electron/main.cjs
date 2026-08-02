@@ -26,6 +26,16 @@ const {
   isEncryptedMedia,
 } = require('./contentCrypto.cjs');
 
+/**
+ * תיקיית הנתונים ננעלת לשם הקבוע 'trivia-engine'.
+ *
+ * שם התוכנה שמוצג למשתמש הוא "חוויה בקליק", ו-Electron גוזר את נתיב ה-userData
+ * משם האפליקציה — כלומר שינוי שם היה מעביר את התיקייה, ועם ההתקנה החדשה היו
+ * "נעלמים" המשחק האחרון, המרשמים, הגיבויים והתוצאות של המשתמש. הנעילה
+ * המפורשת מנתקת את הקשר בין השם המוצג לבין מיקום הנתונים, לתמיד.
+ */
+app.setPath('userData', path.join(app.getPath('appData'), 'trivia-engine'));
+
 // סכימת מדיה מהדיסק (trivia-media://) — חייבת להירשם כ"מיוחסת" לפני app.ready
 // כדי ש-<video>/<img> יוכלו לטעון ממנה, ותמיכת fetch/זרימה (Range) תעבוד.
 protocol.registerSchemesAsPrivileged([
@@ -1179,7 +1189,7 @@ function createWindow() {
     height: sealer ? 820 : 720,
     backgroundColor: '#0b0e1a',
     fullscreen: !sealer,
-    title: sealer ? 'חתום EXE' : 'Trivia Engine',
+    title: sealer ? 'חתום EXE' : 'חוויה בקליק',
     // מוצג רק כשיש מה להראות — עד אז חלון הטעינה מחזיק את המשתמש.
     show: false,
     autoHideMenuBar: true,

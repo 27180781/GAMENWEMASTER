@@ -59,7 +59,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: desktop-latest
-          name: Trivia Engine — מנוע אופליין (Windows)
+          name: חוויה בקליק — תוכנת אופליין (Windows)
           body: |
             גרסת שולחן עבודה אופליין ל-Windows, נבנית אוטומטית מהקומיט האחרון ב-main:
             - **TriviaEngine-Setup.exe** — מתקין עם קיצור דרך בשולחן העבודה ובתפריט התחל.

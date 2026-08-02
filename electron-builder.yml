@@ -2,7 +2,7 @@
 # התקנה, רץ בלחיצה כפולה על כל מחשב. הבנייה עצמה מתבצעת ב-CI על windows-latest.
 
 appId: com.gamenwe.trivia-engine
-productName: Trivia Engine
+productName: חוויה בקליק
 copyright: © GAMENWEMASTER
 
 directories:
@@ -35,7 +35,9 @@ win:
     - target: nsis
       arch:
         - x64
-  # אפשר להוסיף אייקון ב-build/icon.ico בעתיד
+  # אייקון התוכנה — הלוגו של "חוויה בקליק". electron-builder גוזר ממנו את
+  # כל הגדלים ל-EXE, לקיצור הדרך בשולחן העבודה ולמתקין.
+  icon: build/icon.png
 
 portable:
   # שם קובץ קבוע כדי שקישור ההורדה יישאר יציב
@@ -52,7 +54,7 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: Trivia Engine
+  shortcutName: חוויה בקליק
   runAfterFinish: true
 
 # בלי חתימת קוד (אין תעודה) — Windows יציג אזהרת SmartScreen בהרצה ראשונה
