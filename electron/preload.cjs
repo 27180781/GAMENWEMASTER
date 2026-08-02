@@ -172,6 +172,10 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
     ipcRenderer.on('win:state', listener);
     return () => ipcRenderer.removeListener('win:state', listener);
   },
+  /** מספר הגרסה של התוכנה הרצה. */
+  appVersion() {
+    return ipcRenderer.invoke('app:version');
+  },
   /** מצב החתימה: { capable, tool } — ראו seal:mode ב-main. */
   sealMode() {
     return ipcRenderer.invoke('seal:mode');

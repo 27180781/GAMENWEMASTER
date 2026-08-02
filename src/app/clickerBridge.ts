@@ -116,6 +116,8 @@ interface TriviaDesktop {
   minimizeWindow?: () => Promise<DesktopWindowState | null>;
   /** מנוי לשינויי מצב החלון (כולל F11 ומנהל החלונות). */
   onWindowState?: (cb: (state: DesktopWindowState | null) => void) => () => void;
+  /** מספר הגרסה של התוכנה הרצה (EXE). */
+  appVersion?: () => Promise<string>;
   /** מצב החתימה של הקובץ שרץ — יכולת חתימה, והאם הוא כלי החתימה עצמו. */
   sealMode?: () => Promise<SealMode>;
   /** חתימת ZIP ל-EXE חדש (כלי "חתום EXE"). */
@@ -148,9 +150,24 @@ interface TriviaDesktop {
  * - `manual` — נמצאה גרסה חדשה אך אין הרשאת כתיבה לתיקייה; נדרשת הורדה ידנית.
  */
 export interface UpdateStatus {
-  state: 'downloading' | 'ready' | 'sealer' | 'manual';
+  /**
+   * checking / current / offline / unsupported נוספו כדי שיהיה אפשר *לראות*
+   * שהתוכנה בודקת עדכון — קודם היה חיווי רק כשכבר היה מה להוריד, ולכן לא
+   * הייתה שום דרך לדעת אם מנגנון העדכון בכלל פועל.
+   */
+  state:
+    | 'checking'
+    | 'current'
+    | 'downloading'
+    | 'ready'
+    | 'sealer'
+    | 'manual'
+    | 'offline'
+    | 'unsupported';
   version?: string;
   percent?: number;
+  /** למצב unsupported: למה אין עדכון אוטומטי לקובץ הזה. */
+  reason?: 'sealed' | 'portable' | 'dev';
 }
 
 /**
@@ -495,6 +512,17 @@ export function onWindowState(cb: (state: DesktopWindowState) => void): () => vo
   return fn((state) => {
     if (state !== null) cb(state);
   });
+}
+
+/** מספר הגרסה של ה-EXE הרץ, או null בדפדפן/גרסה ישנה. */
+export async function getAppVersion(): Promise<string | null> {
+  const fn = desktop()?.appVersion;
+  if (typeof fn !== 'function') return null;
+  try {
+    return await fn();
+  } catch {
+    return null;
+  }
 }
 
 /**

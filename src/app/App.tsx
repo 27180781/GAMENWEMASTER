@@ -34,6 +34,7 @@ import {
   getSealedGame,
   getSealMode,
   onUpdateStatus,
+  getAppVersion,
   canSaveEdits,
   canDownloadByCode,
   downloadGameByCode,
@@ -159,8 +160,68 @@ function UpdateBadge({ status }: { status: UpdateStatus }) {
       </div>
     );
   }
-  const pct = status.percent ?? 0;
-  return <div className="update-badge">⬇ מוריד עדכון… {pct}%</div>;
+  if (status.state === 'downloading') {
+    const pct = status.percent ?? 0;
+    return <div className="update-badge">⬇ מוריד עדכון… {pct}%</div>;
+  }
+  // checking / current / offline / unsupported — מידע בלבד, מוצג בשורת הגרסה
+  // ולא כפס בפינה (ראו VersionLine).
+  return null;
+}
+
+/** נוסח מצב העדכון לשורת הגרסה. מופרד כדי שיהיה ניתן לבדיקת יחידה. */
+export function updateStatusText(status: UpdateStatus | null): string {
+  if (status === null) return 'בודק עדכון…';
+  switch (status.state) {
+    case 'checking':
+      return 'בודק עדכון…';
+    case 'current':
+      return '✅ מעודכן';
+    case 'downloading':
+      return `⬇ מוריד עדכון… ${status.percent ?? 0}%`;
+    case 'ready':
+      return `✅ גרסה ${status.version ?? 'חדשה'} תותקן בסגירת התוכנה`;
+    case 'sealer':
+      return '✅ עודכן — ייכנס לתוקף בפתיחה הבאה';
+    case 'manual':
+      return '⚠ יש גרסה חדשה — אין הרשאת כתיבה, הורידו מחדש';
+    case 'offline':
+      return '⚠ לא הצלחנו לבדוק עדכון (אין רשת?)';
+    case 'unsupported':
+      if (status.reason === 'sealed') return 'משחק סגור — אינו מתעדכן (במכוון)';
+      if (status.reason === 'portable') return 'הקובץ הנייד אינו מתעדכן לבד';
+      return 'עדכון אוטומטי כבוי בגרסת פיתוח';
+    default:
+      return '';
+  }
+}
+
+/**
+ * שורת גרסה קבועה במסכים שלפני המשחק. בלעדיה אין למנחה שום דרך לדעת איזו
+ * גרסה רצה אצלו ואם מנגנון העדכון בכלל פועל — וזו בדיוק השאלה שנשאלת כשמשהו
+ * שהתווסף לא מופיע.
+ */
+function VersionLine({ status }: { status: UpdateStatus | null }) {
+  const [version, setVersion] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void getAppVersion().then((v) => {
+      if (alive) setVersion(v);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  if (!isDesktopApp()) return null;
+  // EXE ישן שאינו חושף לא גרסה ולא מצב עדכון — עדיף בלי שורה מאשר שורה
+  // שתקועה על "בודק עדכון…" לנצח.
+  if (version === null && status === null) return null;
+  return (
+    <div className="version-line" title="גרסת התוכנה ומצב העדכון האוטומטי">
+      {/* תמיד הגרסה *הרצה*; גרסה חדשה שהורדה מופיעה בתוך נוסח המצב. */}
+      חוויה בקליק{version !== null ? ` · גרסה ${version}` : ''} · {updateStatusText(status)}
+    </div>
+  );
 }
 
 /** חיווי הורדת משחק מהשרת — אחוזים כשידוע הגודל, אחרת MB שהתקבלו. */
@@ -787,6 +848,7 @@ export function App() {
           }}
         />
         {updateStatus !== null && <UpdateBadge status={updateStatus} />}
+        <VersionLine status={updateStatus} />
         {mediaIssues.length > 0 && !mediaAlertDismissed && (
           <MediaIssuesAlert issues={mediaIssues} onClose={() => setMediaAlertDismissed(true)} />
         )}
@@ -871,6 +933,7 @@ export function App() {
       <Shell bare>
         <SealScreen {...(sealTool === true ? {} : { onBack: () => setShowSeal(false) })} />
         {updateStatus !== null && <UpdateBadge status={updateStatus} />}
+        <VersionLine status={updateStatus} />
       </Shell>
     );
   }
@@ -926,6 +989,7 @@ export function App() {
               {codeError !== null && <p className="offline-open-error">{codeError}</p>}
               {error !== null && <p className="offline-open-error">{error}</p>}
               {updateStatus !== null && <UpdateBadge status={updateStatus} />}
+        <VersionLine status={updateStatus} />
               {sealCapable && (
                 <button
                   type="button"

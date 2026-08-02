@@ -146,7 +146,16 @@ function pushUpdateState(state) {
  * חי לעולם לא ייקטע בהתקנה או בהפעלה מחדש.
  */
 function startAutoUpdate() {
-  if (!updateAllowed()) return;
+  if (!updateAllowed()) {
+    // לא כישלון — פשוט אין עדכון אוטומטי לקובץ הזה. חשוב לומר את זה למשתמש,
+    // אחרת אין לו שום דרך לדעת אם התוכנה מתעדכנת או לא.
+    pushUpdateState({
+      state: 'unsupported',
+      version: app.getVersion(),
+      reason: sealedGame !== null ? 'sealed' : portableExePath() !== null ? 'portable' : 'dev',
+    });
+    return;
+  }
   try {
     ({ autoUpdater: updater } = require('electron-updater'));
   } catch (err) {
@@ -156,6 +165,12 @@ function startAutoUpdate() {
   if (updater === null) return;
   updater.autoDownload = true;
   updater.autoInstallOnAppQuit = true;
+  updater.on('checking-for-update', () => {
+    pushUpdateState({ state: 'checking', version: app.getVersion() });
+  });
+  updater.on('update-not-available', () => {
+    pushUpdateState({ state: 'current', version: app.getVersion() });
+  });
   updater.on('update-available', (info) => {
     console.log('[update] נמצאה גרסה חדשה:', info.version);
     pushUpdateState({ state: 'downloading', version: String(info.version), percent: 0 });
@@ -168,8 +183,10 @@ function startAutoUpdate() {
     pushUpdateState({ state: 'ready', version: String(info.version) });
   });
   updater.on('error', (err) => {
-    // אין רשת / המהדורה לא זמינה — לא מציגים כלום למשתמש, ננסה שוב בהמשך.
+    // אין רשת / המהדורה לא זמינה — לא שגיאה שדורשת פעולה, אבל כן מדווחת:
+    // "לא הצלחנו לבדוק" זו תשובה שימושית יותר מחיווי ריק.
     console.warn('[update] בדיקת עדכון נכשלה:', err.message);
+    pushUpdateState({ state: 'offline', version: app.getVersion() });
   });
   checkForUpdate();
   setInterval(checkForUpdate, 6 * 60 * 60 * 1000);
@@ -1284,6 +1301,8 @@ app.whenReady().then(() => {
   });
   /** מצב העדכון האחרון — לחלון שנפתח אחרי שהאירוע כבר שודר. */
   ipcMain.handle('app:updateState', () => lastUpdateState);
+  /** מספר הגרסה של התוכנה הרצה — מוצג תמיד, גם בלי עדכון אוטומטי. */
+  ipcMain.handle('app:version', () => app.getVersion());
   // בקשת הפעלה של תוכנת הקליטה מה-renderer (בחירת "שחק עם שלטים").
   ipcMain.handle('rf317:launch', () => {
     launchReceiver();
