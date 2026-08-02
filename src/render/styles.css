@@ -503,6 +503,8 @@ body {
    שהטקסט כולו נכנס בתוכו. 240px הוא התקציב הגדול ביותר שעדיין מותיר מקום
    לשמונה תשובות בארבע שורות (ראו החישוב אצל .q-card-text). */
 .q-question-text {
+  /* Enter בעורך = שורה חדשה במסך (ראו multiline.ts) */
+  white-space: pre-line;
   max-width: 100%;
   min-width: 0;
   font-weight: 900;
@@ -578,6 +580,8 @@ body {
    4 × (110 + 24 ריפוד) = 536, ועוד שאלה מלאה (240 + 44) ורווח 22 = 842px,
    בתוך 856px הפנויים בין הכותרת לפס התחתון. */
 .q-card-text {
+  /* Enter בעורך = שורה חדשה במסך (ראו multiline.ts) */
+  white-space: pre-line;
   flex: 1 1 auto;
   text-align: center;
   font-weight: 800;
@@ -1065,6 +1069,8 @@ body {
 
 /* בועת הטקסט — כמו בועת השאלה: רקע בצבע הראשי, טקסט בצבע המשני, מעל רקע המדיה */
 .subject-text {
+  /* Enter בעורך = שורה חדשה במסך (ראו multiline.ts) */
+  white-space: pre-line;
   font-size: 56px;
   font-weight: 800;
   line-height: 1.35;
@@ -3890,6 +3896,8 @@ body {
   min-width: 0;
 }
 .votes-question {
+  /* Enter בעורך = שורה חדשה במסך (ראו multiline.ts) */
+  white-space: pre-line;
   font-size: 44px;
   font-weight: 900;
   color: var(--secondary-color, #fff);
@@ -3966,6 +3974,8 @@ body {
   font-weight: 900;
 }
 .votes-col-text {
+  /* Enter בעורך = שורה חדשה במסך (ראו multiline.ts) */
+  white-space: pre-line;
   flex: 1 1 auto;
   min-width: 0;
   font-size: 24px;
@@ -4822,7 +4832,7 @@ body {
 .se-answers { display: flex; flex-direction: column; gap: 8px; }
 .se-answer { display: flex; align-items: center; gap: 8px; }
 .se-answer input[type="radio"] { width: 20px; height: 20px; flex: 0 0 auto; accent-color: #2a7d4f; }
-.se-answer-text { flex: 1 1 auto; }
+.se-answer-text { flex: 1 1 auto; resize: vertical; min-height: 34px; font: inherit; line-height: 1.3; }
 .se-answer-del {
   flex: 0 0 auto; background: rgba(255, 255, 255, 0.08); border: none; color: #eef1ff;
   border-radius: 8px; width: 34px; height: 34px; font-size: 16px; cursor: pointer;

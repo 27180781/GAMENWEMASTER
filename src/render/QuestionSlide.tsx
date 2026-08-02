@@ -18,6 +18,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { GameState, Slide } from '../engine/index.ts';
 import { slideGroupRestriction } from '../app/groupRestriction.ts';
 import { FitText } from './FitText.tsx';
+import { displayText } from './multiline.ts';
 import type { TimerView } from './TimerRing.tsx';
 
 export interface RevealState {
@@ -168,7 +169,7 @@ function SurveyPie({
     acc += pct;
     return {
       id: answer.id,
-      text: answer.ans,
+      text: displayText(answer.ans),
       color: COIN_COLORS[index % COIN_COLORS.length]!.bg,
       value,
       pct: Math.round(pct),
@@ -319,7 +320,7 @@ export function QuestionSlide({
               {isSurvey && <SurveyIcon />}
               {/* min נמוך במכוון: עדיף שאלה ארוכה בפונט קטן על שאלה שסופה נעלם. */}
               <FitText className="q-question-text" min={13}>
-                {slide.question.que}
+                {displayText(slide.question.que)}
               </FitText>
             </div>
           </div>
@@ -359,7 +360,7 @@ export function QuestionSlide({
                     </>
                   ) : (
                     <FitText className="q-card-text" min={11}>
-                      {answer.ans}
+                      {displayText(answer.ans)}
                     </FitText>
                   )}
                 </li>

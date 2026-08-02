@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react';
 import type { Slide, SubjectCommand } from '../engine/index.ts';
 import { FitText } from './FitText.tsx';
+import { displayText } from './multiline.ts';
 
 export function SubjectSlide({ slide, command }: { slide: Slide; command: SubjectCommand }) {
   if (command?.kind === 'dynamic-image') {
@@ -25,7 +26,7 @@ export function SubjectSlide({ slide, command }: { slide: Slide; command: Subjec
     <div className="subject-slide">
       {/* FitText מקטין עד שהטקסט כולו נכנס בתקציב הגובה, במקום לקצץ את סופו. */}
       <FitText className="subject-text" min={16}>
-        {slide.question.que}
+        {displayText(slide.question.que)}
       </FitText>
     </div>
   );
