@@ -22,7 +22,9 @@ import { MediaLoadBar, MediaLoadDot } from '../render/MediaLoadBar.tsx';
 import { StartupOverlay } from '../render/StartupOverlay.tsx';
 import { ErrorScreen } from '../render/ErrorScreen.tsx';
 import { ClickerDiagnostic } from '../render/ClickerDiagnostic.tsx';
+import { FloatingWindowControls } from '../render/WindowControls.tsx';
 import { SealScreen } from '../render/SealScreen.tsx';
+import { GameEditor } from '../render/GameEditor.tsx';
 import {
   isDesktopClicker,
   isDesktopApp,
@@ -32,6 +34,8 @@ import {
   getSealedGame,
   getSealMode,
   onUpdateStatus,
+  getAppVersion,
+  canSaveEdits,
   canDownloadByCode,
   downloadGameByCode,
   onDownloadProgress,
@@ -127,6 +131,9 @@ function Shell({
     <div className="game-root" dir="rtl" style={style}>
       <Stage>{children}</Stage>
       {!bare && <ClickerDiagnostic />}
+      {/* מסכים שאינם המשחק (הגדרות/פתיחה/עורך) — גם מהם צריך לצאת ממסך מלא
+          כדי לגרור את החלון למסך השני. במשחק עצמו הכפתורים כבר בפינה. */}
+      <FloatingWindowControls />
     </div>
   );
 }
@@ -153,8 +160,68 @@ function UpdateBadge({ status }: { status: UpdateStatus }) {
       </div>
     );
   }
-  const pct = status.percent ?? 0;
-  return <div className="update-badge">⬇ מוריד עדכון… {pct}%</div>;
+  if (status.state === 'downloading') {
+    const pct = status.percent ?? 0;
+    return <div className="update-badge">⬇ מוריד עדכון… {pct}%</div>;
+  }
+  // checking / current / offline / unsupported — מידע בלבד, מוצג בשורת הגרסה
+  // ולא כפס בפינה (ראו VersionLine).
+  return null;
+}
+
+/** נוסח מצב העדכון לשורת הגרסה. מופרד כדי שיהיה ניתן לבדיקת יחידה. */
+export function updateStatusText(status: UpdateStatus | null): string {
+  if (status === null) return 'בודק עדכון…';
+  switch (status.state) {
+    case 'checking':
+      return 'בודק עדכון…';
+    case 'current':
+      return '✅ מעודכן';
+    case 'downloading':
+      return `⬇ מוריד עדכון… ${status.percent ?? 0}%`;
+    case 'ready':
+      return `✅ גרסה ${status.version ?? 'חדשה'} תותקן בסגירת התוכנה`;
+    case 'sealer':
+      return '✅ עודכן — ייכנס לתוקף בפתיחה הבאה';
+    case 'manual':
+      return '⚠ יש גרסה חדשה — אין הרשאת כתיבה, הורידו מחדש';
+    case 'offline':
+      return '⚠ לא הצלחנו לבדוק עדכון (אין רשת?)';
+    case 'unsupported':
+      if (status.reason === 'sealed') return 'משחק סגור — אינו מתעדכן (במכוון)';
+      if (status.reason === 'portable') return 'הקובץ הנייד אינו מתעדכן לבד';
+      return 'עדכון אוטומטי כבוי בגרסת פיתוח';
+    default:
+      return '';
+  }
+}
+
+/**
+ * שורת גרסה קבועה במסכים שלפני המשחק. בלעדיה אין למנחה שום דרך לדעת איזו
+ * גרסה רצה אצלו ואם מנגנון העדכון בכלל פועל — וזו בדיוק השאלה שנשאלת כשמשהו
+ * שהתווסף לא מופיע.
+ */
+function VersionLine({ status }: { status: UpdateStatus | null }) {
+  const [version, setVersion] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void getAppVersion().then((v) => {
+      if (alive) setVersion(v);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  if (!isDesktopApp()) return null;
+  // EXE ישן שאינו חושף לא גרסה ולא מצב עדכון — עדיף בלי שורה מאשר שורה
+  // שתקועה על "בודק עדכון…" לנצח.
+  if (version === null && status === null) return null;
+  return (
+    <div className="version-line" title="גרסת התוכנה ומצב העדכון האוטומטי">
+      {/* תמיד הגרסה *הרצה*; גרסה חדשה שהורדה מופיעה בתוך נוסח המצב. */}
+      חוויה בקליק{version !== null ? ` · גרסה ${version}` : ''} · {updateStatusText(status)}
+    </div>
+  );
 }
 
 /** חיווי הורדת משחק מהשרת — אחוזים כשידוע הגודל, אחרת MB שהתקבלו. */
@@ -250,6 +317,8 @@ export function App() {
   const [mediaCleared, setMediaCleared] = useState(false);
   /** מצב העדכון האוטומטי (גרסת ההתקנה) — מוצג רק מחוץ למשחק חי. */
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
+  /** עורך המשחק המקומי פתוח (EXE, משחק שאינו סגור). */
+  const [editorOpen, setEditorOpen] = useState(false);
   /** קוד המשחק שהוקלד, והתקדמות ההורדה מהשרת (null = לא מוריד כרגע). */
   const [gameCode, setGameCode] = useState('');
   const [downloading, setDownloading] = useState<DownloadProgress | null>(null);
@@ -744,6 +813,18 @@ export function App() {
         </Shell>
       );
     }
+    // עורך המשחק המקומי — מסך מלא, מעל מסך ההגדרות שממנו נפתח.
+    if (editorOpen) {
+      return (
+        <Shell bare style={themeStyle(pendingGame.setting)}>
+          <GameEditor
+            game={pendingGame}
+            onApply={(edited) => setPendingGame(edited)}
+            onClose={() => setEditorOpen(false)}
+          />
+        </Shell>
+      );
+    }
     return (
       <Shell style={themeStyle(pendingGame.setting)}>
         <SettingsScreen
@@ -755,6 +836,9 @@ export function App() {
           qrAvailable={!offline && (pendingGame.room ?? '') !== ''}
           {...(sealConfig !== null ? { sealConfig } : {})}
           {...(desktopApp && sealConfig === null ? { onPickAnother: () => pickAnotherGame() } : {})}
+          {...(offline && sealConfig === null && canSaveEdits()
+            ? { onEditGame: () => setEditorOpen(true) }
+            : {})}
           onSave={(saved) => {
             persistAndSetSettings(saved);
             // ברירת מחדל — חוסמים עד סיום טעינה (מסך פתיחה + ספירה); עם ההגדרה
@@ -764,6 +848,7 @@ export function App() {
           }}
         />
         {updateStatus !== null && <UpdateBadge status={updateStatus} />}
+        <VersionLine status={updateStatus} />
         {mediaIssues.length > 0 && !mediaAlertDismissed && (
           <MediaIssuesAlert issues={mediaIssues} onClose={() => setMediaAlertDismissed(true)} />
         )}
@@ -848,6 +933,7 @@ export function App() {
       <Shell bare>
         <SealScreen {...(sealTool === true ? {} : { onBack: () => setShowSeal(false) })} />
         {updateStatus !== null && <UpdateBadge status={updateStatus} />}
+        <VersionLine status={updateStatus} />
       </Shell>
     );
   }
@@ -903,6 +989,7 @@ export function App() {
               {codeError !== null && <p className="offline-open-error">{codeError}</p>}
               {error !== null && <p className="offline-open-error">{error}</p>}
               {updateStatus !== null && <UpdateBadge status={updateStatus} />}
+        <VersionLine status={updateStatus} />
               {sealCapable && (
                 <button
                   type="button"
@@ -940,7 +1027,7 @@ export function App() {
     <Shell>
       <div className="screen">
         <div className="screen-content">
-          <h1 className="opening-title">Trivia Engine</h1>
+          <h1 className="opening-title">חוויה בקליק</h1>
           <p className="opening-hint">בחרו קובץ משחק</p>
           <div className="picker-buttons">
             {Object.keys(RAW_FIXTURES).map((name) => (

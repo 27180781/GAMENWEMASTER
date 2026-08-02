@@ -14,7 +14,7 @@ import {
   type HostStateSnapshot,
 } from '../app/controlChannel.ts';
 import { canExtendDisplay, extendDisplay } from '../app/clickerBridge.ts';
-import { loadRoster, saveRoster, type RosterData } from '../app/roster.ts';
+import { EMPTY_ROSTER, loadRoster, saveRoster, type RosterData } from '../app/roster.ts';
 import { RosterPanel } from './RosterPanel.tsx';
 import { SlideEditor } from './SlideEditor.tsx';
 
@@ -74,7 +74,7 @@ export function HostConsole() {
   /** אין קשר עם המסך הראשי (אין פעימת-לב) — המצב המוצג עלול להיות ישן. */
   const [stale, setStale] = useState(false);
   const lastSeenRef = useRef(Date.now());
-  const [roster, setRosterState] = useState<RosterData>({ players: [], categories: [], memberships: {} });
+  const [roster, setRosterState] = useState<RosterData>(EMPTY_ROSTER);
   const chRef = useRef<ControlChannel | null>(null);
   const gameIdRef = useRef<string>('');
 

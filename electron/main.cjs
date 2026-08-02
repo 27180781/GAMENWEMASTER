@@ -17,6 +17,7 @@ const JSZip = require('jszip');
 const { createClickerServer, DEFAULT_PORT } = require('./clickerServer.cjs');
 const { readSealedFromFile, sealToFile } = require('./sealPayload.cjs');
 const { canAutoUpdate } = require('./updateGate.cjs');
+const { findGameEntryName, mapStrings } = require('./gameZip.cjs');
 const { sameFile, replaceSelf, cleanupOldSelf } = require('./selfUpdate.cjs');
 const {
   writeEncryptedMedia,
@@ -24,6 +25,16 @@ const {
   encryptedMediaSize,
   isEncryptedMedia,
 } = require('./contentCrypto.cjs');
+
+/**
+ * תיקיית הנתונים ננעלת לשם הקבוע 'trivia-engine'.
+ *
+ * שם התוכנה שמוצג למשתמש הוא "חוויה בקליק", ו-Electron גוזר את נתיב ה-userData
+ * משם האפליקציה — כלומר שינוי שם היה מעביר את התיקייה, ועם ההתקנה החדשה היו
+ * "נעלמים" המשחק האחרון, המרשמים, הגיבויים והתוצאות של המשתמש. הנעילה
+ * המפורשת מנתקת את הקשר בין השם המוצג לבין מיקום הנתונים, לתמיד.
+ */
+app.setPath('userData', path.join(app.getPath('appData'), 'trivia-engine'));
 
 // סכימת מדיה מהדיסק (trivia-media://) — חייבת להירשם כ"מיוחסת" לפני app.ready
 // כדי ש-<video>/<img> יוכלו לטעון ממנה, ותמיכת fetch/זרימה (Range) תעבוד.
@@ -135,7 +146,16 @@ function pushUpdateState(state) {
  * חי לעולם לא ייקטע בהתקנה או בהפעלה מחדש.
  */
 function startAutoUpdate() {
-  if (!updateAllowed()) return;
+  if (!updateAllowed()) {
+    // לא כישלון — פשוט אין עדכון אוטומטי לקובץ הזה. חשוב לומר את זה למשתמש,
+    // אחרת אין לו שום דרך לדעת אם התוכנה מתעדכנת או לא.
+    pushUpdateState({
+      state: 'unsupported',
+      version: app.getVersion(),
+      reason: sealedGame !== null ? 'sealed' : portableExePath() !== null ? 'portable' : 'dev',
+    });
+    return;
+  }
   try {
     ({ autoUpdater: updater } = require('electron-updater'));
   } catch (err) {
@@ -145,6 +165,12 @@ function startAutoUpdate() {
   if (updater === null) return;
   updater.autoDownload = true;
   updater.autoInstallOnAppQuit = true;
+  updater.on('checking-for-update', () => {
+    pushUpdateState({ state: 'checking', version: app.getVersion() });
+  });
+  updater.on('update-not-available', () => {
+    pushUpdateState({ state: 'current', version: app.getVersion() });
+  });
   updater.on('update-available', (info) => {
     console.log('[update] נמצאה גרסה חדשה:', info.version);
     pushUpdateState({ state: 'downloading', version: String(info.version), percent: 0 });
@@ -157,8 +183,10 @@ function startAutoUpdate() {
     pushUpdateState({ state: 'ready', version: String(info.version) });
   });
   updater.on('error', (err) => {
-    // אין רשת / המהדורה לא זמינה — לא מציגים כלום למשתמש, ננסה שוב בהמשך.
+    // אין רשת / המהדורה לא זמינה — לא שגיאה שדורשת פעולה, אבל כן מדווחת:
+    // "לא הצלחנו לבדוק" זו תשובה שימושית יותר מחיווי ריק.
     console.warn('[update] בדיקת עדכון נכשלה:', err.message);
+    pushUpdateState({ state: 'offline', version: app.getVersion() });
   });
   checkForUpdate();
   setInterval(checkForUpdate, 6 * 60 * 60 * 1000);
@@ -211,6 +239,75 @@ async function selfUpdateSealer() {
   } catch (err) {
     console.warn('[seal-update] עדכון הכלי נכשל:', /** @type {Error} */ (err).message);
   }
+}
+
+// ---------------------------------------------------------------------------
+// שמירת עריכה מקומית לתוך קובץ המשחק
+// ---------------------------------------------------------------------------
+
+/**
+ * שומר משחק ערוך בחזרה לתוך חבילת ה-ZIP שעל הדיסק, כך שהשינויים שורדים סגירה
+ * ופתיחה מחדש.
+ *
+ * החלק הלא-טריוויאלי הוא **מדיה שנוספה בעריכה**: היא נשמרת במטמון המדיה
+ * (מוצפנת) ומקבלת כתובת ‎trivia-media://<cacheKey>/… — כתובת שתקפה *לסשן הזה
+ * בלבד*. אם היינו כותבים אותה לקובץ המשחק, הפתיחה הבאה הייתה מציגה מדיה חסרה.
+ * לכן כל קובץ כזה מפוענח, נכנס לארכיון תחת media-edits/, והכתובת בקובץ המשחק
+ * מוחלפת בנתיב יחסי — בדיוק כמו כל נכס אחר בחבילה.
+ *
+ * @param {string} dataJson קובץ המשחק הערוך (JSON)
+ * @returns {Promise<{ ok: boolean, error?: string, addedMedia?: number }>}
+ */
+async function saveEditedGame(dataJson) {
+  const zipPath = lastGameZipPath();
+  if (!fs.existsSync(zipPath)) return { ok: false, error: 'לא נמצאה חבילת משחק לשמירה' };
+  let parsed;
+  try {
+    parsed = JSON.parse(String(dataJson));
+  } catch (err) {
+    return { ok: false, error: `קובץ המשחק אינו JSON תקין: ${/** @type {Error} */ (err).message}` };
+  }
+
+  const zip = await JSZip.loadAsync(fs.readFileSync(zipPath));
+  const entryName = findGameEntryName(Object.keys(zip.files));
+  if (entryName === null) return { ok: false, error: 'לא נמצא קובץ משחק בתוך החבילה' };
+
+  // מדיה שנוספה בעריכה → לתוך הארכיון, והכתובת → נתיב יחסי.
+  const dir = entryName.includes('/') ? `${entryName.slice(0, entryName.lastIndexOf('/'))}/` : '';
+  let added = 0;
+  const baked = mapStrings(parsed, (s) => {
+    if (!s.startsWith('trivia-media://')) return s;
+    try {
+      const rest = s.slice('trivia-media://'.length);
+      const slash = rest.indexOf('/');
+      if (slash <= 0) return s;
+      const cacheKey = decodeURIComponent(rest.slice(0, slash));
+      const rel = safeRelPath(rest.slice(slash + 1).split('/').map(decodeURIComponent).join('/'));
+      if (rel === null) return s;
+      const src = path.join(mediaCacheDir(cacheKey), rel);
+      if (!fs.existsSync(src)) return s;
+      const bytes = isEncryptedMedia(src)
+        ? readEncryptedMediaRange(src, cacheKey, 0, encryptedMediaSize(src) - 1)
+        : fs.readFileSync(src);
+      const target = `media-edits/${rel.split('/').pop()}`;
+      zip.file(`${dir}${target}`, bytes);
+      added += 1;
+      return target;
+    } catch (err) {
+      console.warn('[edit] הטמעת מדיה נכשלה:', /** @type {Error} */ (err).message);
+      return s;
+    }
+  });
+
+  zip.file(entryName, JSON.stringify(baked));
+  // כתיבה זמנית ואז החלפה — קריסה באמצע לא משאירה חבילה חתוכה.
+  const tmp = `${zipPath}.saving`;
+  const out = await zip.generateAsync({ type: 'nodebuffer' });
+  fs.writeFileSync(tmp, out);
+  fs.rmSync(zipPath, { force: true });
+  fs.renameSync(tmp, zipPath);
+  console.log('[edit] המשחק נשמר:', entryName, `${added} קובצי מדיה הוטמעו`);
+  return { ok: true, addedMedia: added };
 }
 
 // ---------------------------------------------------------------------------
@@ -1081,6 +1178,25 @@ function closeSplash() {
   splashWindow = null;
 }
 
+/** מצב החלון כפי שה-UI צריך אותו. null לחלון שכבר נסגר. */
+function windowStateOf(win) {
+  if (win === null || win.isDestroyed()) return null;
+  return { fullscreen: win.isFullScreen(), minimizable: win.isMinimizable() };
+}
+
+/**
+ * מדווח ל-renderer על כל שינוי במצב מסך-מלא, כולל שינויים שלא הגיעו מה-UI
+ * (F11, מנהל החלונות של Windows) — כדי שהכפתור בפינה יראה תמיד את האמת.
+ */
+function reportWindowState(win) {
+  const send = () => {
+    if (!win.isDestroyed()) win.webContents.send('win:state', windowStateOf(win));
+  };
+  win.on('enter-full-screen', send);
+  win.on('leave-full-screen', send);
+  win.on('restore', send);
+}
+
 function createWindow() {
   // כלי החתימה אינו משחק: חלון רגיל עם כותרת, לא קיוסק במסך מלא — כדי שדיאלוג
   // השמירה ושאר החלונות של Windows יתנהגו כרגיל, ושיהיה ברור מה רץ.
@@ -1090,7 +1206,7 @@ function createWindow() {
     height: sealer ? 820 : 720,
     backgroundColor: '#0b0e1a',
     fullscreen: !sealer,
-    title: sealer ? 'חתום EXE' : 'Trivia Engine',
+    title: sealer ? 'חתום EXE' : 'חוויה בקליק',
     // מוצג רק כשיש מה להראות — עד אז חלון הטעינה מחזיק את המשתמש.
     show: false,
     autoHideMenuBar: true,
@@ -1107,6 +1223,7 @@ function createWindow() {
   void mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
 
   hardenWindow(mainWindow);
+  reportWindowState(mainWindow);
 
   /** מעבר מחלון הטעינה לחלון האמיתי — פעם אחת, מאיזה מסלול שיגיע קודם. */
   const reveal = () => {
@@ -1184,6 +1301,8 @@ app.whenReady().then(() => {
   });
   /** מצב העדכון האחרון — לחלון שנפתח אחרי שהאירוע כבר שודר. */
   ipcMain.handle('app:updateState', () => lastUpdateState);
+  /** מספר הגרסה של התוכנה הרצה — מוצג תמיד, גם בלי עדכון אוטומטי. */
+  ipcMain.handle('app:version', () => app.getVersion());
   // בקשת הפעלה של תוכנת הקליטה מה-renderer (בחירת "שחק עם שלטים").
   ipcMain.handle('rf317:launch', () => {
     launchReceiver();
@@ -1207,6 +1326,19 @@ app.whenReady().then(() => {
   ipcMain.handle('game:getLast', () => (isSealerBuild() ? null : getLastGame()));
   // טעינת משחק מהשרת לפי קוד — נשמר במקום "המשחק האחרון", ומשם נטען במסלול
   // הרגיל (game:loadSaved) בלי להעביר את הבייטים ל-renderer.
+  // שמירת עריכה מקומית לתוך חבילת המשחק. חסום במשחק סגור (EXE חתום) — שם
+  // המשחק הוא חלק מהקובץ עצמו ואינו ניתן לשינוי.
+  ipcMain.handle('game:saveEdited', async (_e, dataJson) => {
+    if (sealedGame !== null) return { ok: false, error: 'משחק סגור אינו ניתן לעריכה' };
+    if (isSealerBuild()) return { ok: false, error: 'לא זמין בכלי החתימה' };
+    try {
+      return await saveEditedGame(dataJson);
+    } catch (err) {
+      const msg = /** @type {Error} */ (err).message;
+      console.error('[edit] שמירת המשחק נכשלה:', msg);
+      return { ok: false, error: msg };
+    }
+  });
   ipcMain.handle('game:downloadByCode', async (e, code) => {
     if (isSealerBuild()) return { ok: false, error: 'לא זמין בכלי החתימה' };
     return downloadGameByCode(code, (p) => {
@@ -1474,6 +1606,28 @@ app.whenReady().then(() => {
     } catch (err) {
       console.error('[display] הרחבת תצוגה נכשלה:', /** @type {Error} */ (err).message);
     }
+  });
+
+  // ---- שליטה בחלון עצמו (EXE) ----
+  // חלון המשחק נפתח במסך מלא בלי מסגרת, ולכן אין לו כפתורי מזעור/גרירה של
+  // Windows. בלי הממשק הזה אי אפשר להזיז אותו למסך השני או למזער אותו —
+  // וכפתור "מסך מלא" שב-UI השתמש ב-Fullscreen API של הדפדפן, שאינו מזיז
+  // כלל את מצב החלון של Electron.
+  ipcMain.handle('win:state', (e) => windowStateOf(BrowserWindow.fromWebContents(e.sender)));
+  ipcMain.handle('win:setFullscreen', (e, on) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (win === null || win.isDestroyed()) return null;
+    win.setFullScreen(on === true);
+    return windowStateOf(win);
+  });
+  ipcMain.handle('win:minimize', (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (win === null || win.isDestroyed()) return null;
+    // ממוזער *ממסך מלא* חוזר בדרך כלל למסך מלא ומסתיר שוב את שורת המשימות —
+    // יוצאים ממסך מלא קודם, כך שאחרי המזעור החלון ניתן לגרירה למסך השני.
+    if (win.isFullScreen()) win.setFullScreen(false);
+    win.minimize();
+    return windowStateOf(win);
   });
 
   // קיצורי מקלדת גלובליים למפעיל

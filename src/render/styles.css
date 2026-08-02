@@ -503,6 +503,8 @@ body {
    שהטקסט כולו נכנס בתוכו. 240px הוא התקציב הגדול ביותר שעדיין מותיר מקום
    לשמונה תשובות בארבע שורות (ראו החישוב אצל .q-card-text). */
 .q-question-text {
+  /* Enter בעורך = שורה חדשה במסך (ראו multiline.ts) */
+  white-space: pre-line;
   max-width: 100%;
   min-width: 0;
   font-weight: 900;
@@ -578,6 +580,8 @@ body {
    4 × (110 + 24 ריפוד) = 536, ועוד שאלה מלאה (240 + 44) ורווח 22 = 842px,
    בתוך 856px הפנויים בין הכותרת לפס התחתון. */
 .q-card-text {
+  /* Enter בעורך = שורה חדשה במסך (ראו multiline.ts) */
+  white-space: pre-line;
   flex: 1 1 auto;
   text-align: center;
   font-weight: 800;
@@ -894,6 +898,27 @@ body {
 
 .corner-buttons button:hover { opacity: 1; background: rgba(0, 0, 0, 0.7); }
 
+/* אותם כפתורים במסכים שאינם המשחק: קבועים לחלון (לא לבמה המוקטנת), כדי
+   שיהיו נגישים גם כשהמסך שמתחתם בהיר. */
+.corner-buttons--floating {
+  position: fixed;
+  z-index: 60;
+}
+
+.corner-buttons--floating button {
+  width: 40px;
+  height: 40px;
+  font-size: 18px;
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 0.4;
+}
+
+/* סגירה — אדום בריחוף, שלא ילחצו עליו במקום מזעור */
+.corner-buttons--floating .win-btn--close:hover {
+  background: #b91c1c;
+  border-color: #ef4444;
+}
+
 /* ---- טיימר ---- */
 
 .timer-ring {
@@ -1044,6 +1069,8 @@ body {
 
 /* בועת הטקסט — כמו בועת השאלה: רקע בצבע הראשי, טקסט בצבע המשני, מעל רקע המדיה */
 .subject-text {
+  /* Enter בעורך = שורה חדשה במסך (ראו multiline.ts) */
+  white-space: pre-line;
   font-size: 56px;
   font-weight: 800;
   line-height: 1.35;
@@ -2309,6 +2336,179 @@ body {
   color: rgba(255, 255, 255, 0.55);
 }
 
+/* ---- עורך המשחק המקומי ---- */
+.settings-screen.editor-screen {
+  background: #eef0f4;
+  color: #171a2b;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+.editor-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 14px 26px;
+  background: #fff;
+  border-bottom: 1px solid #dfe2ea;
+  box-shadow: 0 2px 10px rgba(20, 20, 40, 0.06);
+  flex: 0 0 auto;
+}
+.editor-bar-fields { display: flex; gap: 18px; flex-wrap: wrap; }
+.editor-field { display: flex; align-items: center; gap: 8px; font-size: 17px; }
+.editor-field span { color: #4a4f63; white-space: nowrap; }
+.editor-field input {
+  font-size: 17px;
+  padding: 7px 12px;
+  border: 2px solid #cfd4e2;
+  border-radius: 10px;
+  background: #f9fafc;
+  min-width: 210px;
+}
+.editor-bar-actions { display: flex; align-items: center; gap: 14px; }
+.editor-saved { color: #1a7f4b; font-size: 16px; font-weight: 600; }
+.editor-error { color: #c0263f; font-size: 16px; font-weight: 600; max-width: 340px; }
+.editor-save {
+  font-size: 18px;
+  font-weight: 800;
+  padding: 10px 22px;
+  border-radius: 12px;
+  border: 2px solid #2e8b57;
+  background: #f0fbf4;
+  color: #17603a;
+  cursor: pointer;
+}
+.editor-save:disabled { opacity: 0.45; cursor: default; }
+.editor-save:not(:disabled):hover { background: #e2f6ea; }
+.editor-close {
+  font-size: 17px;
+  font-weight: 600;
+  padding: 10px 18px;
+  border-radius: 12px;
+  border: 2px solid #cfd4e2;
+  background: #fff;
+  color: #3a3f52;
+  cursor: pointer;
+}
+.editor-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 12px 26px 0;
+  flex: 0 0 auto;
+}
+.editor-tab {
+  font-size: 17px;
+  font-weight: 700;
+  padding: 9px 22px;
+  border-radius: 12px 12px 0 0;
+  border: 1px solid #dfe2ea;
+  border-bottom: none;
+  background: #e8ebf2;
+  color: #4a4f63;
+  cursor: pointer;
+}
+.editor-tab--on { background: #fff; color: #171a2b; }
+.editor-body { flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 0 26px 18px; }
+.editor-pane {
+  height: 100%;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #dfe2ea;
+  border-radius: 0 18px 18px 18px;
+  padding: 18px 22px;
+}
+.editor-hint { font-size: 15px; color: #5a6076; margin: 0 0 14px; }
+.editor-slide-pick { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; font-size: 17px; }
+.editor-slide-pick select {
+  font-size: 16px;
+  padding: 7px 12px;
+  border: 2px solid #cfd4e2;
+  border-radius: 10px;
+  background: #f9fafc;
+  max-width: 480px;
+}
+
+/* ---- שדות שנגזרו מהסכימה ---- */
+.sf-group { display: flex; flex-direction: column; gap: 10px; }
+.sf-section {
+  border: 1px solid #e3e5ea;
+  border-radius: 14px;
+  padding: 10px 14px;
+  background: #f9fafc;
+}
+.sf-summary { font-size: 17px; font-weight: 800; cursor: pointer; color: #2b3048; padding: 4px 0; }
+.sf-section > .sf-group { margin-top: 10px; }
+.sf-row { display: flex; align-items: center; gap: 12px; font-size: 16px; }
+.sf-row--check { gap: 10px; }
+.sf-row--check input { width: 20px; height: 20px; cursor: pointer; }
+.sf-row--json { align-items: flex-start; }
+.sf-label { flex: 0 0 auto; min-width: 230px; color: #3a3f52; }
+.sf-input-wrap { flex: 1 1 auto; display: flex; align-items: center; gap: 8px; }
+.sf-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 16px;
+  padding: 8px 12px;
+  border: 2px solid #cfd4e2;
+  border-radius: 10px;
+  background: #fff;
+  font-family: inherit;
+}
+.sf-input:focus { outline: none; border-color: #8b2fc9; }
+.sf-color { flex: 0 0 auto; width: 42px; height: 36px; padding: 0; border: 2px solid #cfd4e2; border-radius: 8px; background: #fff; cursor: pointer; }
+.sf-json { min-height: 60px; resize: vertical; font-family: ui-monospace, monospace; font-size: 14px; }
+.sf-error { color: #c0263f; font-size: 14px; font-weight: 600; }
+
+/*
+ * SlideEditor נבנה למסך המנחה — רקע כהה וטקסט בהיר. כאן הוא יושב על מסך בהיר,
+ * ולכן צריך היפוך צבעים ממוקד. הכללים מוגבלים ל-.editor-screen בלבד, כדי
+ * שמסך המנחה יישאר בדיוק כפי שהוא.
+ */
+.editor-screen .se-root {
+  height: 100%;
+  grid-template-columns: 380px 1fr;
+  gap: 26px;
+  align-items: stretch;
+}
+.editor-screen .se-list-col,
+.editor-screen .se-form-col {
+  background: #fff;
+  border: 1px solid #dfe2ea;
+  border-radius: 18px;
+  padding: 16px 18px;
+  min-height: 0;
+  overflow-y: auto;
+}
+.editor-screen .hc-section-title { color: #171a2b; font-size: 20px; }
+.editor-screen .se-item {
+  background: #f4f6fb;
+  border-color: #dfe2ea;
+}
+.editor-screen .se-item--sel { border-color: #8b2fc9; background: #f6eefc; }
+.editor-screen .se-item-main { color: #171a2b; }
+.editor-screen .se-item-num { background: #e3e7f2; color: #2b3048; }
+.editor-screen .se-item-ops button { background: #e6e9f2; color: #2b3048; }
+.editor-screen .se-item-ops button:hover:not(:disabled) { background: #d4d9e8; }
+.editor-screen .se-label { color: #3a3f52; opacity: 1; }
+.editor-screen .se-input {
+  background: #f9fafc;
+  border: 2px solid #cfd4e2;
+  color: #171a2b;
+}
+.editor-screen .se-input:focus { border-color: #8b2fc9; }
+.editor-screen .se-empty { color: #5a6076; }
+.editor-screen .se-add,
+.editor-screen .se-add-answer {
+  background: #f0fbf4;
+  border: 2px solid #2e8b57;
+  color: #17603a;
+}
+.editor-screen .se-note { color: #a8620d; }
+
+/* שתי פעולות משניות זו לצד זו במסך ההגדרות */
+.settings-secondary { display: flex; gap: 18px; align-items: center; justify-content: center; }
+
 /* טעינת משחק מהשרת לפי קוד — חלופה לטעינת ZIP */
 .offline-open-code {
   display: flex;
@@ -3052,6 +3252,182 @@ body {
 
 .roster-empty { opacity: 0.6; text-align: center; padding: 24px; }
 
+/* ---- קלט חכם: ייבוא מאקסל + קליטת שלטים בלחיצה ---- */
+.roster-import {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  flex: none;
+}
+
+.roster-import-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.roster-import-btn,
+.roster-capture-btn,
+.roster-clear-btn {
+  flex: 1 1 auto;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.roster-import-btn:hover,
+.roster-capture-btn:hover,
+.roster-clear-btn:hover { background: rgba(255, 255, 255, 0.18); }
+
+.roster-clear-btn { flex: 0 0 auto; font-weight: 600; opacity: 0.8; }
+
+.roster-capture-btn.on { background: #b91c1c; border-color: #ef4444; }
+
+.roster-capture-btn:disabled { opacity: 0.4; cursor: default; }
+
+.roster-import-hint { margin: 0; font-size: 13px; line-height: 1.5; opacity: 0.65; }
+
+.roster-capture-live {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.roster-pending {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.18);
+}
+
+.roster-names-draft {
+  min-height: 68px;
+  resize: vertical;
+  background: #0f1424;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 15px;
+}
+
+.roster-names-add {
+  align-self: flex-start;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: none;
+  background: #16a34a;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.roster-names-add:hover { background: #15803d; }
+
+.roster-pending-list {
+  margin: 0;
+  padding: 0 22px 0 0;
+  max-height: 180px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 15px;
+}
+
+.roster-pending-list li { display: flex; align-items: center; gap: 8px; }
+
+.roster-pending-group { opacity: 0.6; font-size: 13px; font-style: normal; }
+
+.roster-import-ok { margin: 0; color: #86efac; font-size: 14px; font-weight: 700; }
+.roster-import-err { margin: 0; color: #fca5a5; font-size: 14px; font-weight: 700; }
+
+/* שלט שנקלט ועדיין בלי שם */
+.roster-name-row--waiting .roster-num {
+  border-color: rgba(250, 204, 21, 0.7);
+  background: rgba(250, 204, 21, 0.12);
+}
+
+/* ---- החלונית הגדולה של קליטת השלטים ---- */
+.capture-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(3, 6, 16, 0.82);
+  /* מעל מגירת "שמות וקבוצות" (55) — היא זו שממנה מפעילים את הקליטה, ובלי זה
+     החלונית הייתה מוסתרת מאחוריה. */
+  z-index: 60;
+}
+
+/* המגירה פתוחה — החלונית עוברת לשטח שנשאר לצידה, כדי שאפשר יהיה להמשיך
+   לערוך את הרשימה ולראות את הקליטה באותו הזמן. */
+.capture-overlay--aside {
+  left: 560px;
+  background: rgba(3, 6, 16, 0.88);
+}
+
+.capture-box {
+  min-width: 520px;
+  padding: 40px 56px;
+  border-radius: 28px;
+  background: #111a2e;
+  border: 2px solid rgba(255, 255, 255, 0.16);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  align-items: center;
+}
+
+.capture-title { font-size: 30px; font-weight: 800; opacity: 0.85; }
+
+.capture-wait { font-size: 30px; opacity: 0.55; padding: 40px 0; }
+
+.capture-hit { display: flex; flex-direction: column; gap: 8px; }
+
+.capture-id {
+  font-size: 128px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--secondary-color, #ffd23f);
+  direction: ltr;
+}
+
+.capture-name { font-size: 52px; font-weight: 800; }
+
+.capture-name--none { font-size: 34px; opacity: 0.6; font-weight: 700; }
+
+.capture-hit--again .capture-id { opacity: 0.55; }
+
+.capture-again { font-size: 20px; opacity: 0.6; }
+
+.capture-stats { font-size: 22px; opacity: 0.75; }
+
+.capture-stop {
+  padding: 12px 28px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.capture-stop:hover { background: rgba(255, 255, 255, 0.2); }
+
 .roster-panel input,
 .roster-panel select {
   background: #0f1424;
@@ -3520,6 +3896,8 @@ body {
   min-width: 0;
 }
 .votes-question {
+  /* Enter בעורך = שורה חדשה במסך (ראו multiline.ts) */
+  white-space: pre-line;
   font-size: 44px;
   font-weight: 900;
   color: var(--secondary-color, #fff);
@@ -3596,6 +3974,8 @@ body {
   font-weight: 900;
 }
 .votes-col-text {
+  /* Enter בעורך = שורה חדשה במסך (ראו multiline.ts) */
+  white-space: pre-line;
   flex: 1 1 auto;
   min-width: 0;
   font-size: 24px;
@@ -4452,7 +4832,7 @@ body {
 .se-answers { display: flex; flex-direction: column; gap: 8px; }
 .se-answer { display: flex; align-items: center; gap: 8px; }
 .se-answer input[type="radio"] { width: 20px; height: 20px; flex: 0 0 auto; accent-color: #2a7d4f; }
-.se-answer-text { flex: 1 1 auto; }
+.se-answer-text { flex: 1 1 auto; resize: vertical; min-height: 34px; font: inherit; line-height: 1.3; }
 .se-answer-del {
   flex: 0 0 auto; background: rgba(255, 255, 255, 0.08); border: none; color: #eef1ff;
   border-radius: 8px; width: 34px; height: 34px; font-size: 16px; cursor: pointer;
@@ -4779,4 +5159,46 @@ body {
   0% { transform: translateY(-40px) rotate(0deg); opacity: 0; }
   10% { opacity: 0.95; }
   100% { transform: translateY(1100px) rotate(720deg); opacity: 0.9; }
+}
+
+
+/* ---- מסך התחברות שנפתח במקש X באמצע המשחק ---- */
+.lobby-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background: #0b0e1a;
+}
+
+.lobby-overlay-hint {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 20px;
+  border-radius: 99px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 20px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+
+/* שורת גרסה + מצב עדכון — קבועה בפינה במסכים שלפני המשחק */
+.version-line {
+  position: fixed;
+  bottom: 8px;
+  left: 12px;
+  z-index: 60;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
+  font-weight: 600;
+  direction: rtl;
+  pointer-events: none;
+  white-space: nowrap;
 }

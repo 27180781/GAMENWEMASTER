@@ -10,15 +10,18 @@
  * בכל הקשה. כל שינוי עולה כלפי מעלה דרך onChange.
  */
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   addCategory,
   addGroup,
+  addPendingNames,
   categoryMemberTotal,
   changePlayerId,
+  clearPendingNames,
   groupCounts,
   removeCategory,
   removeGroup,
+  removePendingName,
   removePlayer,
   renameCategory,
   renameGroup,
@@ -26,6 +29,8 @@ import {
   upsertPlayer,
   type RosterData,
 } from '../app/roster.ts';
+import { importSheet, summaryText, type ImportMode } from '../app/rosterImport.ts';
+import { readSheetRows } from '../app/xlsxRead.ts';
 
 interface RosterPanelProps {
   roster: RosterData;
@@ -33,14 +38,76 @@ interface RosterPanelProps {
   onClose: () => void;
   /** פתיחת מסך ההתחברות לקטגוריה (השחקנים מצטרפים לפי מספר הקבוצה). */
   onOpenConnect: (categoryId: string) => void;
+  /** מצב "קליטה חכמה" פעיל — כל לחיצת שלט נקלטת לרשימה. */
+  captureOn?: boolean;
+  onToggleCapture?: (on: boolean) => void;
 }
 
-export function RosterPanel({ roster, onChange, onClose, onOpenConnect }: RosterPanelProps) {
+export function RosterPanel({
+  roster,
+  onChange,
+  onClose,
+  onOpenConnect,
+  captureOn = false,
+  onToggleCapture,
+}: RosterPanelProps) {
   const [tab, setTab] = useState<'players' | 'groups'>('players');
   const [newNum, setNewNum] = useState('');
   const [newName, setNewName] = useState('');
   const [newCat, setNewCat] = useState('');
   const [newGroup, setNewGroup] = useState<Record<string, string>>({});
+  /** שמות שמוקלדים ידנית לתור ההמתנה (שורה לכל שם). */
+  const [namesDraft, setNamesDraft] = useState('');
+  const [importMsg, setImportMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  /**
+   * קלט קובץ נפרד לכל מצב ייבוא. שדה אחד עם "זכירת המצב" היה שביר: כל מסלול
+   * שמגיע לקלט בלי לעבור בכפתור (כולל בדיקות) היה מייבא במצב הלא נכון.
+   */
+  const fullRef = useRef<HTMLInputElement | null>(null);
+  const namesRef = useRef<HTMLInputElement | null>(null);
+
+  const onFile = async (file: File | undefined, mode: ImportMode) => {
+    if (file === undefined) return;
+    try {
+      const rows = await readSheetRows(new Uint8Array(await file.arrayBuffer()));
+      const summary = importSheet(roster, rows, mode);
+      onChange(summary.roster);
+      setImportMsg({ ok: true, text: summaryText(summary, mode) });
+    } catch {
+      setImportMsg({ ok: false, text: 'לא הצלחנו לקרוא את הקובץ — נסו XLSX או CSV' });
+    }
+  };
+
+  /** קלט קובץ מוסתר — נפתח מהכפתור שמעליו. */
+  const fileInput = (mode: ImportMode, ref: typeof fullRef) => (
+    <input
+      ref={ref}
+      className={mode === 'full' ? 'roster-file-full' : 'roster-file-names'}
+      type="file"
+      accept=".xlsx,.csv,.tsv,text/csv"
+      style={{ display: 'none' }}
+      onChange={(e) => {
+        void onFile(e.target.files?.[0], mode);
+        e.target.value = ''; // כדי שבחירת אותו קובץ שוב תפעיל שוב
+      }}
+    />
+  );
+
+  /** הוספת השמות שהוקלדו לתור (שורה = שם, אפשר "שם, קבוצה"). */
+  const addTypedNames = () => {
+    const names = namesDraft
+      .split(/\r?\n/)
+      .map((line) => {
+        const [name = '', group = ''] = line.split(/[,\t]/);
+        return { name: name.trim(), group: group.trim() };
+      })
+      .filter((n) => n.name !== '');
+    if (names.length === 0) return;
+    onChange(addPendingNames(roster, names));
+    setNamesDraft('');
+  };
+
+  const waitingRemotes = roster.players.filter((p) => p.name.trim() === '').length;
 
   const addPlayer = () => {
     if (newNum.trim() === '') return;
@@ -75,9 +142,118 @@ export function RosterPanel({ roster, onChange, onClose, onOpenConnect }: Roster
         {tab === 'players' && (
           <div className="roster-scroll">
             <h3 className="roster-heading">ניהול משתמשים</h3>
+
+            {/* קלט חכם: אקסל מלא, או קליטת שלטים בלחיצה + השלמת שמות */}
+            <div className="roster-import">
+              <div className="roster-import-row">
+                <button
+                  className="roster-import-btn"
+                  onClick={() => {
+                    setImportMsg(null);
+                    fullRef.current?.click();
+                  }}
+                >
+                  📄 ייבוא מאקסל
+                </button>
+                {fileInput('full', fullRef)}
+                <button
+                  className={captureOn ? 'roster-capture-btn on' : 'roster-capture-btn'}
+                  /* מסירים מיקוד: אחרת רווח (המקש שמקדם את המשחק) היה מפעיל
+                     מחדש את הכפתור הממוקד ומכבה את הקליטה בטעות. */
+                  onClick={(e) => {
+                    e.currentTarget.blur();
+                    onToggleCapture?.(!captureOn);
+                  }}
+                  disabled={onToggleCapture === undefined}
+                  title="כל לחיצה על שלט תוסיף אותו לרשימה"
+                >
+                  {captureOn ? '⏹ סיום קליטה' : '🎯 קליטת שלטים בלחיצה'}
+                </button>
+              </div>
+              <p className="roster-import-hint">
+                אקסל: מספר שלט · שם · קבוצה (אופציונלי). השורה הראשונה היא כותרת ואינה מיובאת —
+                שם עמודת הקבוצה הופך לשם הקטגוריה.
+              </p>
+
+              {captureOn && (
+                <div className="roster-capture-live">
+                  🎯 הקליטה פעילה — לחצו על השלטים לפי הסדר. נקלטו {roster.players.length}
+                  {waitingRemotes > 0 ? ` · ${waitingRemotes} ממתינים לשם` : ''}
+                </div>
+              )}
+
+              {(captureOn || roster.pendingNames.length > 0) && (
+                <div className="roster-pending">
+                  <div className="roster-import-row">
+                    <button
+                      className="roster-import-btn"
+                      onClick={() => {
+                        setImportMsg(null);
+                        namesRef.current?.click();
+                      }}
+                    >
+                      📄 השלמת שמות מאקסל
+                    </button>
+                    {fileInput('names', namesRef)}
+                    {roster.pendingNames.length > 0 && (
+                      <button
+                        className="roster-clear-btn"
+                        onClick={() => onChange(clearPendingNames(roster))}
+                      >
+                        ניקוי התור
+                      </button>
+                    )}
+                  </div>
+                  <p className="roster-import-hint">
+                    אקסל של שם · קבוצה בלבד (בלי מספרי שלטים). השורה הראשונה כותרת. השמות
+                    משתבצים לשלטים שכבר נלחצו לפי הסדר, והעודף ממתין ללחיצות הבאות.
+                  </p>
+                  <textarea
+                    className="roster-names-draft"
+                    placeholder={'או הקלדה — שם בכל שורה\nאפשר גם: שם, קבוצה'}
+                    value={namesDraft}
+                    onChange={(e) => setNamesDraft(e.target.value)}
+                  />
+                  <button className="roster-names-add" onClick={addTypedNames}>
+                    ＋ הוספה לתור
+                  </button>
+                  {roster.pendingNames.length > 0 && (
+                    <ol className="roster-pending-list">
+                      {roster.pendingNames.map((p, i) => (
+                        <li key={`${p.name}-${i}`}>
+                          <span>{p.name}</span>
+                          {p.group !== '' && <em className="roster-pending-group">{p.group}</em>}
+                          <button
+                            className="roster-del"
+                            title="הסרה מהתור"
+                            onClick={() => onChange(removePendingName(roster, i))}
+                          >
+                            🗑
+                          </button>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </div>
+              )}
+
+              {importMsg !== null && (
+                <p className={importMsg.ok ? 'roster-import-ok' : 'roster-import-err'}>
+                  {importMsg.text}
+                </p>
+              )}
+            </div>
+
             <ul className="roster-names">
               {roster.players.map((player) => (
-                <li key={player.id} className="roster-name-row">
+                <li
+                  key={player.id}
+                  className={
+                    player.name.trim() === ''
+                      ? 'roster-name-row roster-name-row--waiting'
+                      : 'roster-name-row'
+                  }
+                >
                   <button
                     className="roster-del"
                     title="מחיקת שחקן"
@@ -88,7 +264,8 @@ export function RosterPanel({ roster, onChange, onClose, onOpenConnect }: Roster
                   <input
                     className="roster-name-input"
                     defaultValue={player.name}
-                    placeholder="שם השחקן"
+                    key={`${player.id}:${player.name}`}
+                    placeholder={player.name.trim() === '' ? 'ממתין לשיוך' : 'שם השחקן'}
                     onBlur={(e) => onChange(upsertPlayer(roster, player.id, e.target.value))}
                   />
                   <input

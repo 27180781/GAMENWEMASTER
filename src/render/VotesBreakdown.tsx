@@ -8,6 +8,7 @@
 import type { Slide } from '../engine/index.ts';
 import { ANSWER_LETTERS, COIN_COLORS } from './QuestionSlide.tsx';
 import { FitText } from './FitText.tsx';
+import { displayText } from './multiline.ts';
 
 interface VotesBreakdownProps {
   slide: Slide;
@@ -44,7 +45,7 @@ export function VotesBreakdown({ slide, votes, nameOf, ansIsNumber, onClose }: V
       <div className="votes-panel" dir="rtl" onClick={(e) => e.stopPropagation()}>
         <div className="votes-head">
           <h2 className="votes-title">
-            <FitText className="votes-question">{slide.question.que || 'הצבעות השחקנים'}</FitText>
+            <FitText className="votes-question">{displayText(slide.question.que) || 'הצבעות השחקנים'}</FitText>
           </h2>
           <span className="votes-total">{total} הצבעות</span>
           <button className="votes-close" title="סגירה (5)" onClick={onClose}>
@@ -74,7 +75,7 @@ export function VotesBreakdown({ slide, votes, nameOf, ansIsNumber, onClose }: V
                   {isImages ? (
                     <img className="votes-col-image" src={answer.ans} alt={`תשובה ${answer.id}`} />
                   ) : (
-                    <FitText className="votes-col-text">{answer.ans}</FitText>
+                    <FitText className="votes-col-text">{displayText(answer.ans)}</FitText>
                   )}
                   {correct && <span className="votes-correct-mark">✓ נכונה</span>}
                   <span className="votes-col-count">

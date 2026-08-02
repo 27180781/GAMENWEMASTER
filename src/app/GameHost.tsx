@@ -26,7 +26,7 @@ import {
 } from '../engine/index.ts';
 import { SocketVoteAdapter, isLiveVoteAdapter, type RawVote } from './socketAdapter.ts';
 import { CompositeVoteAdapter } from './compositeAdapter.ts';
-import { ClickerVoteAdapter } from './clickerAdapter.ts';
+import { ClickerVoteAdapter, setClickerCaptureMode } from './clickerAdapter.ts';
 import {
   isDesktopClicker,
   showReceiver,
@@ -38,8 +38,10 @@ import {
   desktopOpenReports,
   canQuit,
   desktopQuit,
+  onClickerEvent,
 } from './clickerBridge.ts';
 import { avatarColor, railInitial } from '../render/avatar.ts';
+import { CaptureOverlay, type CaptureFlash } from '../render/CaptureOverlay.tsx';
 import { AllScoresScreen, LobbyScreen, WinnersListScreen, WinnersScreen } from '../render/screens.tsx';
 import { OperatorMenu } from '../render/OperatorMenu.tsx';
 import { RaffleOverlay, type RaffleEntry } from '../render/RaffleOverlay.tsx';
@@ -50,6 +52,7 @@ import { VotesBreakdown } from '../render/VotesBreakdown.tsx';
 import { GroupStandingsOverlay } from '../render/GroupStandingsOverlay.tsx';
 import { HostCommandBar } from '../render/HostCommandBar.tsx';
 import { ClickerDiagnostic } from '../render/ClickerDiagnostic.tsx';
+import { WindowControls } from '../render/WindowControls.tsx';
 import { Stage } from '../render/Stage.tsx';
 import { themeStyle } from '../render/theme.ts';
 import type { TimerView } from '../render/TimerRing.tsx';
@@ -60,6 +63,7 @@ import { extractHostVote } from './hostRemote.ts';
 import { completedQuestionCount, shouldShowLeaderboard } from './leaderboardSchedule.ts';
 import {
   assignGroupByNumber,
+  captureRemote,
   categoryMemberTotal,
   displayName,
   groupCounts,
@@ -261,6 +265,41 @@ export function GameHost({
   applyGroupPressesRef.current = applyGroupPresses;
   const rosterRef = useRef(roster);
   rosterRef.current = roster;
+
+  /**
+   * "קליטת שלטים בלחיצה": כל לחיצה מוסיפה את השלט לרשימה ותופסת את השם הבא
+   * בתור. מנוי ישיר לאירועי הקליקר (ולא דרך מתאם ההצבעות) — כדי שזה יעבוד גם
+   * כשאין חלון הצבעה פתוח, וכדי שהלחיצות האלה לא ייספרו כהצבעות.
+   */
+  const [captureOn, setCaptureOn] = useState(false);
+  const [captureFlash, setCaptureFlash] = useState<CaptureFlash | null>(null);
+  const captureSeq = useRef(0);
+  useEffect(() => {
+    // הדגל חוסם את מתאם ההצבעות כל עוד הקליטה פעילה (ראו clickerAdapter).
+    setClickerCaptureMode(captureOn);
+    if (!captureOn) return;
+    const off = onClickerEvent((ev) => {
+      if (ev.type !== 'key') return;
+      captureSeq.current += 1;
+      const seq = captureSeq.current;
+      setRoster((prev) => {
+        const res = captureRemote(prev, String(ev.remoteId));
+        setCaptureFlash({ id: res.id, name: res.name, isNew: res.isNew, seq });
+        if (res.roster !== prev) saveRoster(game.id, res.roster);
+        return res.roster;
+      });
+    });
+    // גם פירוק הרכיב באמצע קליטה חייב לשחרר את הדגל — אחרת ההצבעות היו
+    // נשארות חסומות אחרי שהמשחק כבר התחלף.
+    return () => {
+      off();
+      setClickerCaptureMode(false);
+    };
+  }, [captureOn, game.id]);
+  // יציאה ממצב הקליטה מנקה את החיווי, שלא יישאר תלוי על המסך.
+  useEffect(() => {
+    if (!captureOn) setCaptureFlash(null);
+  }, [captureOn]);
   // אם הקטגוריה של מסך ההתחברות נמחקה — סוגרים אותו (אחרת המקשים נחסמים בלי מסך נראה)
   useEffect(() => {
     if (connectCategory !== null && !roster.categories.some((c) => c.id === connectCategory)) {
@@ -425,15 +464,36 @@ export function GameHost({
       setServerNames((prev) => (prev[id] === name ? prev : { ...prev, [id]: name }));
     }
     setConnectedIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    setLobbyIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
   }, []);
+  /**
+   * רשימת ה*תצוגה* של מסך ההתחברות. מקבילה ל-connectedIds, אבל מקש X מאפס
+   * אותה — ורק אותה. connectedIds עצמו נשאר, כי הוא מזין את מאגר ההגרלה ואת
+   * מאגר "הסרת משתתפים" של שקופית פונקציה; איפוסו היה מוציא מהמשחק מי
+   * שהתחבר ועדיין לא צבר ניקוד. השחקנים תמיד מחוברים — מתאפסת רק התצוגה.
+   */
+  const [lobbyIds, setLobbyIds] = useState<string[]>([]);
   const connectedPlayers = useMemo<RailPlayer[]>(
     () =>
-      connectedIds.map((id) => {
+      lobbyIds.map((id) => {
         const name = nameOf(id);
         return { id, name, initial: railInitial(name), color: avatarColor(id) };
       }),
-    [connectedIds, nameOf],
+    [lobbyIds, nameOf],
   );
+  /** מסך ההתחברות שנפתח במקש X באמצע המשחק (מעל השקופית). */
+  const [lobbyOverlay, setLobbyOverlay] = useState(false);
+  /**
+   * X — מסך התחברות מאופס. באמצע המשחק גם פותח אותו; אם הוא כבר מוצג (או
+   * שאנחנו במסך הפתיחה), הלחיצה רק מאפסת את הרשימה המוצגת. רווח ממשיך את
+   * המשחק בדיוק מהמקום שבו היה.
+   */
+  const showResetLobby = useCallback(() => {
+    setLobbyIds([]);
+    // במסך הפתיחה הלובי *הוא* המסך — שם X רק מאפס, בלי לפתוח שכבה מעליו
+    // (ואז רווח ממשיך להתחיל את המשחק כרגיל).
+    setLobbyOverlay(stage !== 'opening');
+  }, [stage]);
 
   const crowdConfig = settings;
   const hostVoterId = settings.hostVoterId.trim();
@@ -804,6 +864,7 @@ export function GameHost({
       const removedCount = engine.removeVoters(toRemove);
       const removedSet = new Set(toRemove);
       setConnectedIds((prev) => prev.filter((id) => !removedSet.has(id)));
+      setLobbyIds((prev) => prev.filter((id) => !removedSet.has(id)));
       setAnswerers((prev) => prev.filter((id) => !removedSet.has(id)));
       setCorrectAnswerers((prev) => prev.filter((id) => !removedSet.has(id)));
       setFunctionStatus('sent');
@@ -1703,6 +1764,8 @@ export function GameHost({
     connectCategory !== null ||
     settingsOpen ||
     rosterOpen ||
+    captureOn || // קליטת שלטים — המשחק ממתין, לא מתקדם מאחורי הגב
+    lobbyOverlay || // מסך התחברות (X) — הטיימר קופא, וממשיכים ברווח
     menuOpen;
 
   // הקפאת/הפשרת טיימר ההצבעה בזמן שכבה חוסמת. מכבדים עצירה ידנית (מקש 6): מפשירים
@@ -1976,14 +2039,33 @@ export function GameHost({
       if (event.key === 'Escape') {
         // ESC סוגר קודם שכבות פתוחות; אחרת: ב-EXE — אישור יציאה מהמשחק,
         // באונליין/דפדפן — פתיחת/סגירת תפריט המפעיל (כמו קודם).
-        if (rosterOpen) setRosterOpen(false);
+        if (lobbyOverlay) setLobbyOverlay(false);
+        else if (captureOn) setCaptureOn(false);
+        else if (rosterOpen) setRosterOpen(false);
         else if (settingsOpen) setSettingsOpen(false);
         else if (menuOpen) setMenuOpen(false);
         else if (canExit) setExitConfirm((open) => !open);
         else setMenuOpen(true);
         return;
       }
-      if (menuOpen || settingsOpen || rosterOpen || exitConfirm) return;
+      if (menuOpen || settingsOpen || rosterOpen || exitConfirm || captureOn) return;
+      // X — מסך התחברות שחקנים מאופס, גם באמצע המשחק. לפי code ולא לפי key,
+      // כדי שיעבוד גם כשפריסת המקלדת עברית (שם אותו מקש מפיק 'ס').
+      if (event.code === 'KeyX' || event.key === 'x' || event.key === 'X') {
+        event.preventDefault();
+        debugLog('command', 'X — מסך התחברות מאופס', { stage });
+        showResetLobby();
+        return;
+      }
+      // מסך ההתחברות פתוח: רווח ממשיך את המשחק מאיפה שהיה, ותו לא. שאר
+      // הפקודות חסומות כדי שלא נתקדם בטעות בזמן שבודקים חיבור שלטים.
+      if (lobbyOverlay) {
+        if (event.key === ' ' || event.key === 'Enter') {
+          event.preventDefault();
+          setLobbyOverlay(false);
+        }
+        return;
+      }
       if (event.key >= '0' && event.key <= '6') {
         debugLog('command', `שלט: מקש ${event.key}`, { stage });
         // 0/2 מטופלים בתוך advance/goBack לכל שלבי המשחק (כולל מסכי הסיום)
@@ -2036,19 +2118,7 @@ export function GameHost({
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [stage, menuOpen, settingsOpen, rosterOpen, exitConfirm, canExit, leadersOverlay, connectCategory, engine, advance, goBack, onRequestRefresh]);
-
-  // מסך מלא — כפתור בפינה (window resize מעדכן את סקייל הבמה אוטומטית)
-  const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
-  useEffect(() => {
-    const onChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
-    document.addEventListener('fullscreenchange', onChange);
-    return () => document.removeEventListener('fullscreenchange', onChange);
-  }, []);
-  const toggleFullscreen = useCallback(() => {
-    if (document.fullscreenElement) void document.exitFullscreen();
-    else void document.documentElement.requestFullscreen().catch(() => {});
-  }, []);
+  }, [stage, menuOpen, settingsOpen, rosterOpen, exitConfirm, captureOn, lobbyOverlay, showResetLobby, canExit, leadersOverlay, connectCategory, engine, advance, goBack, onRequestRefresh]);
 
   /** "התחלת המשחק מחדש" מתוך מסך ההגדרות — איפוס מלא וחזרה למסך הפתיחה. */
   const restartGame = useCallback(() => {
@@ -2174,6 +2244,21 @@ export function GameHost({
             {...(showJoinBanner ? { joinInfo: { dial: JOIN_DIAL_DISPLAY, code: roomId } } : {})}
           />
         )}
+        {/* מקש X באמצע המשחק — אותו מסך התחברות, מאופס. תצוגה בלבד: המשחק
+            עומד במקומו וממשיך ברווח. */}
+        {lobbyOverlay && stage !== 'opening' && (
+          <div className="lobby-overlay">
+            <LobbyScreen
+              engine={engine}
+              players={connectedPlayers}
+              {...(showQrCode ? { qrUrl } : {})}
+              {...(showJoinBanner ? { joinInfo: { dial: JOIN_DIAL_DISPLAY, code: roomId } } : {})}
+            />
+            <div className="lobby-overlay-hint">
+              X — איפוס הרשימה · רווח — חזרה למשחק מאותה נקודה
+            </div>
+          </div>
+        )}
         {stage === 'playing' && (
           <>
             <SlideView
@@ -2245,14 +2330,9 @@ export function GameHost({
           />
         )}
 
-        {/* כפתורי פינה: מסך מלא + הגדרות + שמות וקבוצות */}
+        {/* כפתורי פינה: מזעור + מסך מלא + הגדרות + שמות וקבוצות */}
         <div className="corner-buttons">
-          <button
-            title={isFullscreen ? 'יציאה ממסך מלא' : 'מסך מלא'}
-            onClick={toggleFullscreen}
-          >
-            {isFullscreen ? '🗗' : '⛶'}
-          </button>
+          <WindowControls />
           <button title="הגדרות" onClick={() => setSettingsOpen((open) => !open)}>
             ⚙
           </button>
@@ -2261,10 +2341,23 @@ export function GameHost({
           </button>
         </div>
 
+        {/* קליטת שלטים בלחיצה — החלונית הגדולה שמראה מה נקלט */}
+        {captureOn && (
+          <CaptureOverlay
+            flash={captureFlash}
+            total={roster.players.length}
+            waitingNames={roster.pendingNames.length}
+            aside={rosterOpen}
+            onStop={() => setCaptureOn(false)}
+          />
+        )}
+
         {rosterOpen && (
           <RosterPanel
             roster={roster}
             onChange={updateRoster}
+            captureOn={captureOn}
+            onToggleCapture={setCaptureOn}
             onClose={() => setRosterOpen(false)}
             onOpenConnect={(categoryId) => {
               setConnectCategory(categoryId);

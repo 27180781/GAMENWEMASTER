@@ -14,6 +14,22 @@ import { VoteWindow, type LiveVoteAdapter, type RawVote } from './socketAdapter.
 
 type Status = 'connected' | 'reconnecting' | 'offline';
 
+/**
+ * "קליטת שלטים בלחיצה" פעילה. יש זרם קליקרים אחד לכל התוכנה, ולכן זה דגל
+ * יחיד. בזמן קליטה הלחיצות משמשות *רק* לרישום השלטים: הן אינן הצבעות, אינן
+ * מצרפות ללובי ואינן מגיעות לשלט המנחה — אחרת רישום החדר היה מצביע בשאלה
+ * פתוחה או מקדם את המשחק.
+ */
+let captureMode = false;
+
+export function setClickerCaptureMode(on: boolean): void {
+  captureMode = on;
+}
+
+export function isClickerCaptureMode(): boolean {
+  return captureMode;
+}
+
 export class ClickerVoteAdapter implements LiveVoteAdapter {
   private snapshotListener: ((snapshot: VoteSnapshot) => void) | null = null;
   private statusListener: ((status: Status) => void) | null = null;
@@ -61,6 +77,8 @@ export class ClickerVoteAdapter implements LiveVoteAdapter {
       this.pushStatus();
       return;
     }
+    // בזמן קליטת שלטים הלחיצה היא רישום, לא הצבעה — ולכן נעצרת כאן לגמרי.
+    if (captureMode) return;
     // לחיצת כפתור → הצבעה גולמית. כפתור F (השלט-אצבע) מגיע כ-7 ומשמעו 0:
     // לשחקן — תשובה 0; למנחה — פקודת "הבא" (כמו 0 בטלפון / רווח במקלדת).
     const phone = String(ev.remoteId);

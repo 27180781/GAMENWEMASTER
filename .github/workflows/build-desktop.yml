@@ -43,13 +43,21 @@ jobs:
       # run_number עולה מונוטונית, ולכן הגרסה תמיד גדולה מזו שכבר מותקנת.
       - name: Set build version
         shell: bash
-        run: npm version "0.1.${{ github.run_number }}" --no-git-tag-version --allow-same-version
+        run: |
+          npm version "0.1.${{ github.run_number }}" --no-git-tag-version --allow-same-version
+          echo "APP_VERSION=0.1.${{ github.run_number }}" >> "$GITHUB_ENV"
       - run: npm run dist:win
-      # כלי "חתום EXE" הוא אותה גרסה ניידת בשם ייעודי: היא משמשת גם כבסיס
-      # לחתימה (הקובץ הנייד חותם על עצמו), ולכן אין צורך בבינארי שני.
-      - name: Duplicate portable EXE as the sealing tool
-        run: copy release\TriviaEngine-Portable.exe release\SealEXE.exe
+      # שמות הקבצים נושאים את הגרסה (HavayaBeClick-0.1.N.exe), אבל שלושה
+      # דברים תלויים בשם *קבוע*: קישורי ההורדה בעמוד ההורדות, הורדת הבסיס של
+      # כלי החתימה, וסימניות ישנות. לכן מפורסמים גם עותקים בשמות היציבים.
+      # כלי "חתום EXE" הוא אותה גרסה ניידת בשם ייעודי — הקובץ הנייד חותם על
+      # עצמו, ולכן אין צורך בבינארי שני.
+      - name: Copy stable-named aliases
         shell: cmd
+        run: |
+          copy release\HavayaBeClick-${{ env.APP_VERSION }}.exe release\TriviaEngine-Portable.exe
+          copy release\HavayaBeClick-Setup-${{ env.APP_VERSION }}.exe release\TriviaEngine-Setup.exe
+          copy release\HavayaBeClick-${{ env.APP_VERSION }}.exe release\SealEXE.exe
       # אם latest.yml לא נוצר, העדכון האוטומטי פשוט לא יעבוד — ובשקט. עדיף
       # שהבנייה תיפול כאן ונדע מיד, מאשר לגלות את זה אצל משתמש בשטח.
       - name: Verify update metadata exists
@@ -59,18 +67,26 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: desktop-latest
-          name: Trivia Engine — מנוע אופליין (Windows)
+          name: חוויה בקליק — תוכנת אופליין (Windows)
           body: |
-            גרסת שולחן עבודה אופליין ל-Windows, נבנית אוטומטית מהקומיט האחרון ב-main:
-            - **TriviaEngine-Setup.exe** — מתקין עם קיצור דרך בשולחן העבודה ובתפריט התחל.
-              **מתעדכן לבד**: בכל פעם שיש רשת הוא בודק אם יצאה גרסה חדשה, מוריד ברקע,
-              ומתקין בסגירת התוכנה — בלי להתקין ידנית שוב.
-            - **TriviaEngine-Portable.exe** — נייד, רץ בלי התקנה (בלי עדכון אוטומטי).
+            **חוויה בקליק** — גרסת שולחן עבודה אופליין ל-Windows, נבנית אוטומטית
+            מהקומיט האחרון ב-main. שם הקובץ נושא את מספר הגרסה המלא:
+
+            - **HavayaBeClick-Setup-${{ env.APP_VERSION }}.exe** — מתקין עם קיצור דרך
+              בשולחן העבודה ובתפריט התחל. **מתעדכן לבד**: בכל פעם שיש רשת הוא בודק אם
+              יצאה גרסה חדשה, מוריד ברקע, ומתקין בסגירת התוכנה.
+            - **HavayaBeClick-${{ env.APP_VERSION }}.exe** — נייד, רץ בלי התקנה
+              (בלי עדכון אוטומטי).
             - **SealEXE.exe** — כלי "חתום EXE": סוגר ZIP של משחק לקובץ EXE בודד.
               הוא חותם תמיד על גרסת המנוע האחרונה, גם אם הכלי עצמו ישן.
+
+            `TriviaEngine-Portable.exe` ו-`TriviaEngine-Setup.exe` הם אותם קבצים
+            בשמות הקבועים, לקישורי ההורדה היציבים.
           # latest.yml הוא הקובץ ש-electron-updater קורא כדי לדעת מה הגרסה
           # האחרונה ואיפה המתקין. בלעדיו העדכון האוטומטי לא יעבוד.
           files: |
+            release/HavayaBeClick-Setup-${{ env.APP_VERSION }}.exe
+            release/HavayaBeClick-${{ env.APP_VERSION }}.exe
             release/TriviaEngine-Setup.exe
             release/TriviaEngine-Portable.exe
             release/SealEXE.exe

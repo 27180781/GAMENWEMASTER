@@ -234,8 +234,11 @@ export function SlideEditor({ game, currentSlideId, phase, onChange }: SlideEdit
                         onChange={() => patch((s) => setCorrect(s, ai))}
                       />
                     )}
-                    <input
+                    {/* textarea ולא input: כדי ש-Enter יכניס שורה חדשה בתשובה,
+                        כמו בשאלה. גדל לגובה התוכן ולא מוסיף פס גלילה. */}
+                    <textarea
                       className="se-input se-answer-text"
+                      rows={a.ans.includes('\n') ? 2 : 1}
                       defaultValue={a.ans}
                       onBlur={(e) =>
                         patch((s) => ({
