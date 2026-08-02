@@ -27,6 +27,29 @@ const {
 } = require('./contentCrypto.cjs');
 
 /**
+ * רשת ביטחון להגירה: אם תיקיית היעד עדיין לא קיימת אבל קיימת תיקייה מהשמות
+ * הישנים/החלופיים — משתמשים בה. מריצים *לפני* הנעילה שלמטה, כך שמשתמש שהתקין
+ * גרסה שבה נגזר שם אחר לא "מאבד" את המשחק האחרון, המרשמים והגיבויים.
+ */
+function migrateLegacyUserData(appData, target) {
+  try {
+    const targetPath = path.join(appData, target);
+    if (fs.existsSync(targetPath)) return; // כבר יש נתונים במקום הנכון
+    for (const legacy of ['Trivia Engine', 'חוויה בקליק']) {
+      const legacyPath = path.join(appData, legacy);
+      if (fs.existsSync(legacyPath)) {
+        fs.renameSync(legacyPath, targetPath);
+        console.log('[userData] הועברה תיקיית נתונים ישנה:', legacy, '→', target);
+        return;
+      }
+    }
+  } catch (err) {
+    // כישלון הגירה אינו מפיל את התוכנה — פשוט מתחילים מתיקייה חדשה.
+    console.warn('[userData] הגירת תיקיית נתונים נכשלה:', /** @type {Error} */ (err).message);
+  }
+}
+
+/**
  * תיקיית הנתונים ננעלת לשם הקבוע 'trivia-engine'.
  *
  * שם התוכנה שמוצג למשתמש הוא "חוויה בקליק", ו-Electron גוזר את נתיב ה-userData
@@ -34,6 +57,7 @@ const {
  * "נעלמים" המשחק האחרון, המרשמים, הגיבויים והתוצאות של המשתמש. הנעילה
  * המפורשת מנתקת את הקשר בין השם המוצג לבין מיקום הנתונים, לתמיד.
  */
+migrateLegacyUserData(app.getPath('appData'), 'trivia-engine');
 app.setPath('userData', path.join(app.getPath('appData'), 'trivia-engine'));
 
 // סכימת מדיה מהדיסק (trivia-media://) — חייבת להירשם כ"מיוחסת" לפני app.ready
@@ -148,7 +172,11 @@ function pushUpdateState(state) {
 function startAutoUpdate() {
   if (!updateAllowed()) {
     // לא כישלון — פשוט אין עדכון אוטומטי לקובץ הזה. חשוב לומר את זה למשתמש,
-    // אחרת אין לו שום דרך לדעת אם התוכנה מתעדכנת או לא.
+    // אחרת אין לו שום דרך לדעת אם התוכנה מתעדכנת או לא. שני סייגים:
+    //   • כלי החתימה כן מתעדכן (selfUpdateSealer) — הודעת "נייד לא מתעדכן"
+    //     שם הייתה שקרית.
+    //   • לא דורסים מצב שכבר שודר (למשל 'sealer' מהעדכון העצמי שרץ קודם).
+    if (isSealerBuild() || lastUpdateState !== null) return;
     pushUpdateState({
       state: 'unsupported',
       version: app.getVersion(),
@@ -223,9 +251,14 @@ async function selfUpdateSealer() {
         pushUpdateState({ state: 'downloading', percent: Math.round((p.received / p.total) * 100) });
       }
     });
-    if (latest === null) return; // אין רשת — נמשיך לעבוד עם מה שיש
+    if (latest === null) {
+      // אין רשת — ממשיכים לעבוד עם מה שיש, אבל אומרים זאת: בלי הדיווח הזה
+      // שורת הגרסה הייתה נשארת על "בודק עדכון…" לנצח.
+      pushUpdateState({ state: 'offline', version: app.getVersion() });
+      return;
+    }
     if (sameFile(latest, selfPath)) {
-      pushUpdateState(null); // כבר הגרסה האחרונה — מסירים חיווי הורדה אם הוצג
+      pushUpdateState({ state: 'current', version: app.getVersion() }); // הגרסה האחרונה
       return;
     }
     if (replaceSelf(selfPath, latest)) {
@@ -238,6 +271,7 @@ async function selfUpdateSealer() {
     }
   } catch (err) {
     console.warn('[seal-update] עדכון הכלי נכשל:', /** @type {Error} */ (err).message);
+    pushUpdateState({ state: 'offline', version: app.getVersion() });
   }
 }
 

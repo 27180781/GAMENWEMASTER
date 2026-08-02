@@ -130,7 +130,9 @@ function importNames(roster: RosterData, rows: ImportRow[], categoryName: string
       skipped += 1;
       continue;
     }
-    names.push({ name: row.name, group: row.group });
+    // הקטגוריה נצרבת בשם עצמו: הלחיצה שתתפוס אותו יכולה להגיע הרבה אחרי
+    // הייבוא, ואסור שהקבוצה תיווצר אז תחת קטגוריית ברירת המחדל.
+    names.push({ name: row.name, group: row.group, category: categoryName });
   }
   const before = roster.players.filter((p) => p.name.trim() === '').length;
   const next = addPendingNames(roster, names, categoryName);

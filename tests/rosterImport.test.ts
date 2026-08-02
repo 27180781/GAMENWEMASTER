@@ -124,6 +124,18 @@ describe('importSheet — השלמת שמות לקליטה חכמה', () => {
     expect(playerGroupNames(next.roster, '503')).toEqual(['פיתוח']);
   });
 
+  it('שם שנתפס בלחיצה מאוחרת שומר את הקטגוריה מהכותרת — לא את ברירת המחדל', () => {
+    // ★ הבאג: captureRemote רץ עם קטגוריית ברירת המחדל ("קבוצות"), והשם
+    // שהמתין מהקובץ היה יוצר את הקבוצה שלו מחדש תחתיה במקום תחת "מחלקה".
+    const s = importSheet(EMPTY_ROSTER, [['שם', 'מחלקה'], ['נועם', 'הנהלה']], 'names');
+    expect(s.waiting).toBe(1);
+    const next = captureRemote(s.roster, '601'); // בלי להעביר קטגוריה — כמו במשחק
+    expect(next.name).toBe('נועם');
+    const cats = next.roster.categories.map((c) => c.name);
+    expect(cats).toEqual(['מחלקה']); // ★ לא נוצרה קטגוריית "קבוצות" מיותרת
+    expect(playerGroupNames(next.roster, '601')).toEqual(['הנהלה']);
+  });
+
   it('בלי שלטים שממתינים — כל השמות נשארים בתור', () => {
     const s = importSheet(EMPTY_ROSTER, [['שם'], ['א'], ['ב']], 'names');
     expect(s.updated).toBe(0);
