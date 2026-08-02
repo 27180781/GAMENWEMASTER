@@ -909,6 +909,12 @@ body {
   opacity: 0.4;
 }
 
+/* סגירה — אדום בריחוף, שלא ילחצו עליו במקום מזעור */
+.corner-buttons--floating .win-btn--close:hover {
+  background: #b91c1c;
+  border-color: #ef4444;
+}
+
 /* ---- טיימר ---- */
 
 .timer-ring {
@@ -5143,4 +5149,28 @@ body {
   0% { transform: translateY(-40px) rotate(0deg); opacity: 0; }
   10% { opacity: 0.95; }
   100% { transform: translateY(1100px) rotate(720deg); opacity: 0.9; }
+}
+
+
+/* ---- מסך התחברות שנפתח במקש X באמצע המשחק ---- */
+.lobby-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background: #0b0e1a;
+}
+
+.lobby-overlay-hint {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 20px;
+  border-radius: 99px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 20px;
+  font-weight: 600;
+  white-space: nowrap;
 }

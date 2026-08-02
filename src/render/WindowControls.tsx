@@ -8,7 +8,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
+  canQuit,
   desktopBridge,
+  desktopQuit,
   getWindowState,
   minimizeWindow,
   onWindowState,
@@ -82,7 +84,11 @@ export function WindowControls() {
   );
 }
 
-/** אותם כפתורים כשכבה צפה — למסכים שאינם המשחק (הגדרות, פתיחה, עורך). */
+/**
+ * אותם כפתורים כשכבה צפה — למסכים שאינם המשחק (טעינת קובץ, הגדרות, עורך).
+ * נוסף כאן גם כפתור סגירה: במשחק עצמו ESC פותח אישור יציאה, אבל במסכים
+ * שלפניו לא הייתה שום דרך לסגור את החלון (הוא נפתח בלי מסגרת).
+ */
 export function FloatingWindowControls() {
   const { canMinimize: showMinimize } = useWindowMode();
   // בדפדפן אין מה להוסיף: המסכים האלה ניתנים לגרירה ממילא, וכפתור מסך-מלא
@@ -90,6 +96,17 @@ export function FloatingWindowControls() {
   if (!showMinimize) return null;
   return (
     <div className="corner-buttons corner-buttons--floating">
+      {canQuit() && (
+        <button
+          className="win-btn win-btn--close"
+          title="סגירת התוכנה"
+          onClick={() => {
+            if (window.confirm('לסגור את התוכנה?')) desktopQuit();
+          }}
+        >
+          ✕
+        </button>
+      )}
       <WindowControls />
     </div>
   );
