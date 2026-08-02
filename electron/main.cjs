@@ -20,6 +20,7 @@ const { canAutoUpdate } = require('./updateGate.cjs');
 const { findGameEntryName, mapStrings } = require('./gameZip.cjs');
 const { sameFile, replaceSelf, cleanupOldSelf } = require('./selfUpdate.cjs');
 const { remoteErrorMessage } = require('./remoteErrors.cjs');
+const { hasZipEndRecord, tailLength } = require('./zipIntegrity.cjs');
 const {
   writeEncryptedMedia,
   readEncryptedMediaRange,
@@ -466,6 +467,25 @@ function downloadGameByCode(code, onProgress) {
             if (received === 0) {
               fs.rmSync(partPath, { force: true });
               finish({ ok: false, error: 'התקבלה חבילה ריקה מהשרת' });
+              return;
+            }
+            // השרת אורז בסטרימינג ולכן אין Content-Length — אין גודל צפוי
+            // להשוות אליו. בלי הבדיקה הזו, חיבור שנפל ב-90% היה כותב חבילה
+            // חתוכה *במקום* המשחק הקודם שעבד, והתקלה הייתה מתגלה רק באירוע.
+            const tail = Buffer.alloc(tailLength(received));
+            const fd = fs.openSync(partPath, 'r');
+            try {
+              fs.readSync(fd, tail, 0, tail.length, received - tail.length);
+            } finally {
+              fs.closeSync(fd);
+            }
+            if (!hasZipEndRecord(tail, received)) {
+              fs.rmSync(partPath, { force: true });
+              console.warn('[remote] חבילה חתוכה — אין EOCD:', clean, received, 'בתים');
+              finish({
+                ok: false,
+                error: 'ההורדה נקטעה באמצע — המשחק הקודם נשמר. בדקו את החיבור ונסו שוב',
+              });
               return;
             }
             fs.rmSync(lastGameZipPath(), { force: true });
