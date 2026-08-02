@@ -40,15 +40,20 @@ win:
   icon: build/icon.png
 
 portable:
-  # שם קובץ קבוע כדי שקישור ההורדה יישאר יציב
-  artifactName: TriviaEngine-Portable.exe
+  # שם הקובץ נושא את שם התוכנה ואת מספר הגרסה המלא, כדי שיהיה ברור מה הורד
+  # ואיזו גרסה זו — גם אחרי שכמה קבצים יושבים באותה תיקיית הורדות.
+  # בלטינית ולא בעברית: GitHub מנרמל תווים שאינם [A-Za-z0-9._-] בשמות נכסי
+  # Release, ושם עברי היה מגיע מסולף — ובמקרה של המתקין גם שובר את העדכון
+  # האוטומטי, שמאתר את הקובץ לפי השם שב-latest.yml.
+  # (שם התוכנה עצמו — בקיצור הדרך, בכותרת ובמאפייני הקובץ — הוא "חוויה בקליק".)
+  artifactName: HavayaBeClick-${version}.${ext}
   # תמונת "התוכנה נטענת" בזמן *חילוץ* ה-EXE — השלב הארוך שלפני שהקוד שלנו רץ
   # בכלל. בלעדיה אין שום סימן חיים אחרי הלחיצה, והמשתמש לוחץ שוב.
   # (את מה שאחרי החילוץ מכסה חלון הטעינה ב-electron/splash.html.)
   splashImage: build/splash.bmp
 
 nsis:
-  artifactName: TriviaEngine-Setup.exe
+  artifactName: HavayaBeClick-Setup-${version}.${ext}
   oneClick: false # אשף התקנה (לא התקנה שקטה)
   perMachine: false # התקנה למשתמש הנוכחי — בלי צורך בהרשאות מנהל
   allowToChangeInstallationDirectory: true

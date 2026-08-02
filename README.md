@@ -132,7 +132,8 @@ https://<host>/?game=<URL של game.json>&demo=1     ← מצב דמו: שחקנ
 - **עמוד הורדה:** `<host>/download/` (מצביע ל-Release האחרון בגיטהאב; `<host>/download.html` מפנה לשם).
 - **בנייה אוטומטית:** `.github/workflows/build-desktop.yml` בונה את ה-EXE על `windows-latest` בכל דחיפה ל-`main` ומפרסם אותו ל-Release בשם `desktop-latest`. הקישור היציב:
   `https://github.com/27180781/GAMENWEMASTER/releases/download/desktop-latest/TriviaEngine-Portable.exe`
-- **שני יעדים:** `TriviaEngine-Setup.exe` (מתקין עם קיצור דרך בשולחן העבודה ובתפריט התחל, בלי הרשאות מנהל) ו-`TriviaEngine-Portable.exe` (נייד, בלי התקנה). שניהם מתעדכנים באותו Release בכל דחיפה ל-main.
+- **שני יעדים:** `HavayaBeClick-Setup-<גרסה>.exe` (מתקין עם קיצור דרך בשולחן העבודה ובתפריט התחל, בלי הרשאות מנהל) ו-`HavayaBeClick-<גרסה>.exe` (נייד, בלי התקנה). שניהם מתעדכנים באותו Release בכל דחיפה ל-main. שם התוכנה עצמו — בקיצור הדרך, בכותרת החלון וברשימת התוכנות המותקנות — הוא **חוויה בקליק**; שם *הקובץ* בלטינית כי GitHub מנרמל תווים שאינם `[A-Za-z0-9._-]` בשמות נכסי Release.
+- **שמות קבועים:** לצד הקבצים הממוספרים מפורסמים גם `TriviaEngine-Portable.exe` ו-`TriviaEngine-Setup.exe` — אותם קבצים בדיוק, בשמות שאינם משתנים, כדי שקישורי ההורדה והורדת הבסיס של כלי החתימה יישארו יציבים.
 - **בנייה מקומית** (על Windows): `npm run dist:win` → הפלט ב-`release/`.
 - **פיתוח מקומי:** `npm run electron:dev` (דורש הורדת בינארי Electron — חסום בחלק מהסביבות המבודדות).
 
