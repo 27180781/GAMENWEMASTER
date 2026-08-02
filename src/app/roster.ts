@@ -37,6 +37,12 @@ export interface PendingName {
   name: string;
   /** שם הקבוצה מהקובץ; '' = בלי קבוצה. */
   group: string;
+  /**
+   * שם הקטגוריה שאליה שייכת הקבוצה — נקבע בזמן ההוספה (כותרת עמודת הקבוצה
+   * באקסל). בלעדיו, שם שנתפס בלחיצה *מאוחרת* היה יוצר את הקבוצה מחדש תחת
+   * קטגוריית ברירת המחדל במקום תחת הקטגוריה שממנה הגיע.
+   */
+  category?: string;
 }
 
 export interface RosterData {
@@ -310,7 +316,9 @@ export function reconcilePending(roster: RosterData, categoryName: string): Rost
     const next = pending[i]!;
     r = upsertPlayer(r, player.id, next.name);
     if (next.group.trim() !== '') {
-      const ensured = ensureGroupByName(r, categoryName, next.group);
+      // הקטגוריה של השם עצמו קודמת — כך שם מקובץ "מחלקה" נשאר תחת "מחלקה"
+      // גם כשהלחיצה שתופסת אותו מגיעה הרבה אחרי הייבוא.
+      const ensured = ensureGroupByName(r, next.category ?? categoryName, next.group);
       r = assignGroup(ensured.roster, player.id, ensured.categoryId, ensured.groupId);
     }
   }
@@ -360,7 +368,11 @@ export function addPendingNames(
   categoryName: string = DEFAULT_IMPORT_CATEGORY,
 ): RosterData {
   const clean = names
-    .map((n) => ({ name: n.name.trim(), group: n.group.trim() }))
+    .map((n) => ({
+      name: n.name.trim(),
+      group: n.group.trim(),
+      ...(n.category !== undefined && n.category.trim() !== '' ? { category: n.category.trim() } : {}),
+    }))
     .filter((n) => n.name !== '');
   if (clean.length === 0) return roster;
   return reconcilePending({ ...roster, pendingNames: [...roster.pendingNames, ...clean] }, categoryName);
@@ -499,7 +511,13 @@ export function normalizeRoster(raw: unknown): RosterData {
   const pendingNames: PendingName[] = Array.isArray(obj.pendingNames)
     ? obj.pendingNames
         .filter((p): p is Record<string, unknown> => p !== null && typeof p === 'object')
-        .map((p) => ({ name: String(p.name ?? '').trim(), group: String(p.group ?? '').trim() }))
+        .map((p) => ({
+          name: String(p.name ?? '').trim(),
+          group: String(p.group ?? '').trim(),
+          ...(typeof p.category === 'string' && p.category.trim() !== ''
+            ? { category: p.category.trim() }
+            : {}),
+        }))
         .filter((p) => p.name !== '')
     : [];
 
