@@ -12,6 +12,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 const eventSubs = new Set();
 /** @type {Set<(info: unknown) => void>} */
 const clientSubs = new Set();
+/** @type {Set<(info: unknown) => void>} */
+const serverSubs = new Set();
 
 /**
  * הסטטוס האחרון של כל אחד משני הזרמים, כדי לשדר אותו למנויים חדשים. הרכיבים
@@ -26,6 +28,8 @@ const clientSubs = new Set();
 let lastStatusEvent = null;
 /** @type {unknown} */
 let lastClientInfo = null;
+/** מצב שרת הקליקרים שלנו (מאזין / הפורט תפוס). @type {unknown} */
+let lastServerInfo = null;
 
 ipcRenderer.on('rf317:event', (_e, ev) => {
   // לחיצות אינן "מצב" — רק סטטוס הדונגל נשמר לשידור חוזר.
@@ -37,6 +41,10 @@ ipcRenderer.on('rf317:event', (_e, ev) => {
 ipcRenderer.on('rf317:client', (_e, info) => {
   lastClientInfo = info;
   for (const cb of clientSubs) cb(info);
+});
+ipcRenderer.on('rf317:server', (_e, info) => {
+  lastServerInfo = info;
+  for (const cb of serverSubs) cb(info);
 });
 
 /**
@@ -64,6 +72,12 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
     clientSubs.add(cb);
     replayLastStatus(lastClientInfo, cb);
     return () => clientSubs.delete(cb);
+  },
+  /** מנוי למצב שרת הקליקרים שלנו — { listening, port, busy? }. */
+  onClickerServer(/** @type {(info: unknown) => void} */ cb) {
+    serverSubs.add(cb);
+    replayLastStatus(lastServerInfo, cb);
+    return () => serverSubs.delete(cb);
   },
   /** הפעלת תוכנת הקליטה RF317SocketForm המצורפת (בבחירת "שחק עם שלטים"). */
   launchReceiver() {

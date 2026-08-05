@@ -45,6 +45,32 @@ describe('clickerLinkMessage', () => {
     expect(clickerLinkMessage(null, 'connected')).toBeNull();
   });
 
+  it('★ הפורט תפוס — זו החוליה הראשונה, וההודעה גוברת על השאר', () => {
+    // גם כששני הצדדים האחרים "תקינים", אם איננו מאזינים שום דבר לא יעבוד —
+    // והודעה על "לחצו Connect" רק תשלח את המנחה לרדוף אחרי הדבר הלא נכון.
+    const msg = clickerLinkMessage(false, 'disconnected', { listening: false, port: 8090, busy: true });
+    expect(msg).toContain('8090');
+    expect(msg).toContain('תפוס');
+    expect(msg).toContain('תתחבר לבד'); // ★ אומר שההתאוששות אוטומטית
+    expect(msg).not.toContain('Connect');
+  });
+
+  it('השרת מאזין — לא מוסיף רעש, ההודעות הרגילות חלות', () => {
+    const ok = { listening: true, port: 8090 };
+    expect(clickerLinkMessage(true, 'connected', ok)).toBeNull();
+    expect(clickerLinkMessage(false, 'connected', ok)).toContain('אינה מחוברת לתוכנת המשחק');
+  });
+
+  it('כשל פתיחת פורט שאינו "תפוס" — הודעה אחרת', () => {
+    const msg = clickerLinkMessage(null, null, { listening: false, port: 8090 });
+    expect(msg).toContain('לא הצלחנו לפתוח');
+  });
+
+  it('אין דיווח שרת (גרסה ישנה) — התנהגות כמו קודם', () => {
+    expect(clickerLinkMessage(true, 'connected', null)).toBeNull();
+    expect(clickerLinkMessage(true, 'connected')).toBeNull();
+  });
+
   it('כל מצב שאינו תקין מחזיר הודעה — אף מצב לא נשאר שקט', () => {
     const states: [boolean | null, string | null][] = [
       [false, null],

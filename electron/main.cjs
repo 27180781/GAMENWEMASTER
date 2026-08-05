@@ -704,7 +704,16 @@ function startClickerServer() {
     // נראית (ותיאום עם הבהוב סטטוס הדונגל יצביע על המקור), ולא תיעלם בשקט.
     onDropped: (dropped, total) =>
       console.warn(`[RF317] ${dropped} בתים לא מיושרים נדחו (סה"כ ${total}) — הזרם התיישר מחדש`),
-    onListening: (p) => console.log(`[RF317] מאזין לקליקרים על 127.0.0.1:${p}`),
+    onListening: (p) => {
+      console.log(`[RF317] מאזין לקליקרים על 127.0.0.1:${p}`);
+      sendToRenderer('rf317:server', (lastServerState = { listening: true, port: p }));
+    },
+    // פורט תפוס = תוכנת הקליטה לא תוכל להתחבר לעולם. עד היום זה נרשם ללוג
+    // בלבד והמנחה לא ראה דבר.
+    onPortBusy: (p) => {
+      console.error(`[RF317] הפורט ${p} תפוס בידי תהליך אחר — מנסה שוב`);
+      sendToRenderer('rf317:server', (lastServerState = { listening: false, port: p, busy: true }));
+    },
     onError: (err) => console.error('[RF317] שגיאת שרת קליקרים:', err.message),
   });
 }
@@ -713,6 +722,14 @@ function startClickerServer() {
 const RECEIVER_EXE = 'RF317SocketForm.exe';
 /** האם כבר הפעלנו את תוכנת הקליטה בהרצה הנוכחית (מונע הפעלה כפולה). */
 let receiverStarted = false;
+/**
+ * מצב שרת הקליקרים האחרון — משודר מחדש לחלון שנפתח אחרי האירוע (המעבר ממסך
+ * ההגדרות למשחק מרכיב את המאזינים מחדש, ובלי השידור החוזר הם היו מתחילים
+ * מאפס ומפספסים "הפורט תפוס" שכבר קרה).
+ * @type {{ listening: boolean, port: number, busy?: boolean } | null}
+ */
+let lastServerState = null;
+
 /** תהליך ה"שומר" שממזער את חלון הקליטה אחרי ההפעלה (ראו hideReceiverWindow). */
 /** @type {import('node:child_process').ChildProcess | null} */
 let receiverHideProc = null;
@@ -1352,6 +1369,8 @@ app.whenReady().then(() => {
   ipcMain.handle('app:online', () => {
     checkForUpdate();
   });
+  /** מצב שרת הקליקרים האחרון — לחלון שנפתח אחרי שהאירוע כבר שודר. */
+  ipcMain.handle('rf317:serverState', () => lastServerState);
   /** מצב העדכון האחרון — לחלון שנפתח אחרי שהאירוע כבר שודר. */
   ipcMain.handle('app:updateState', () => lastUpdateState);
   /** מספר הגרסה של התוכנה הרצה — מוצג תמיד, גם בלי עדכון אוטומטי. */

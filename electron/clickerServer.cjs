@@ -99,6 +99,8 @@ function parseClickerStream(buffer) {
  *   onDropped?: (dropped: number, total: number) => void,
  *   onListening?: (port: number, host: string) => void,
  *   onError?: (err: Error) => void,
+ *   onPortBusy?: (port: number) => void,
+ *   retryMs?: number,
  * }} [opts]
  * @returns {import('node:net').Server}
  */
@@ -111,6 +113,10 @@ function createClickerServer(opts = {}) {
     onDropped,
     onListening,
     onError,
+    onPortBusy,
+    // ניסיון חוזר על פורט תפוס: אם התהליך שתפס אותו נסגר, החיבור מתאושש לבד
+    // בלי לסגור ולפתוח את התוכנה באמצע אירוע.
+    retryMs = 5000,
   } = opts;
 
   const server = net.createServer((socket) => {
@@ -137,8 +143,32 @@ function createClickerServer(opts = {}) {
     socket.on('error', (err) => onError?.(err));
   });
 
-  server.on('error', (err) => onError?.(err));
-  server.listen(port, host, () => onListening?.(port, host));
+  /** @type {NodeJS.Timeout | null} */
+  let retryTimer = null;
+  server.on('error', (err) => {
+    // EADDRINUSE אינו כשל של הרשת אלא של המחשב: תהליך אחר מחזיק את הפורט,
+    // ולכן תוכנת הקליטה לא תוכל להתחבר לעולם. עד היום זה נרשם ללוג בלבד,
+    // כלומר היה בלתי-נראה למנחה. מדווחים, וממשיכים לנסות.
+    if (/** @type {NodeJS.ErrnoException} */ (err).code === 'EADDRINUSE') {
+      onPortBusy?.(port);
+      if (retryMs > 0 && retryTimer === null) {
+        retryTimer = setTimeout(() => {
+          retryTimer = null;
+          server.listen(port, host);
+        }, retryMs);
+        // טיימר ההמתנה לא יחזיק את התוכנה פתוחה ביציאה
+        retryTimer.unref?.();
+      }
+      return;
+    }
+    onError?.(err);
+  });
+  server.on('listening', () => onListening?.(port, host));
+  server.on('close', () => {
+    if (retryTimer !== null) clearTimeout(retryTimer);
+    retryTimer = null;
+  });
+  server.listen(port, host);
   return server;
 }
 
