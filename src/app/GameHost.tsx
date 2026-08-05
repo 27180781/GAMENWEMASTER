@@ -52,6 +52,7 @@ import { VotesBreakdown } from '../render/VotesBreakdown.tsx';
 import { GroupStandingsOverlay } from '../render/GroupStandingsOverlay.tsx';
 import { HostCommandBar } from '../render/HostCommandBar.tsx';
 import { ClickerDiagnostic } from '../render/ClickerDiagnostic.tsx';
+import { useClickerLink } from '../render/useClickerLink.ts';
 import { WindowControls } from '../render/WindowControls.tsx';
 import { Stage } from '../render/Stage.tsx';
 import { themeStyle } from '../render/theme.ts';
@@ -265,6 +266,8 @@ export function GameHost({
   applyGroupPressesRef.current = applyGroupPresses;
   const rosterRef = useRef(roster);
   rosterRef.current = roster;
+  /** איזו חוליה בשרשרת הקליקרים שבורה (null = הכול תקין). */
+  const clickerLinkHint = useClickerLink();
 
   /**
    * "קליטת שלטים בלחיצה": כל לחיצה מוסיפה את השלט לרשימה ותופסת את השם הבא
@@ -2228,12 +2231,12 @@ export function GameHost({
             ))}
           </div>
         )}
-        {/* מצב קליקרים: כשהריסיבר לא מחובר — אזהרה (לא מציגים דמו במקום). */}
-        {useClicker && effClickerStatus !== 'connected' && (
+        {/* מצב קליקרים: כשהשרשרת שבורה — אזהרה שאומרת *איזו* חוליה נפלה.
+            חלון הקליטה מציג רק את חיבור הדונגל, ולכן "מחובר" שם אינו מעיד
+            שהוא מחובר *אלינו* — ראו clickerLink.ts. */}
+        {useClicker && effClickerStatus !== 'connected' && clickerLinkHint !== null && (
           <div className="conn-warnings">
-            <div className="conn-warning conn-warning--error">
-              ⛔ אין חיבור לריסיבר — ודאו ש-RF317SocketForm פועל (פורט 8090) והדונגל מחובר
-            </div>
+            <div className="conn-warning conn-warning--error">⛔ {clickerLinkHint}</div>
           </div>
         )}
         {stage === 'opening' && (
