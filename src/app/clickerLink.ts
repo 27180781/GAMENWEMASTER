@@ -8,6 +8,9 @@
  * (1) הדונגל מחובר לתוכנת הקליטה — זה מה שחלון הקליטה עצמו מציג.
  * (2) תוכנת הקליטה מחוברת לשקע המקומי שלנו (127.0.0.1:8090).
  *
+ * ולפני שתיהן — השקע עצמו: אם תהליך אחר תפס את הפורט, *אנחנו* לא מאזינים,
+ * ואז שום חוליה אחרת לא יכולה להיסגר. לכן זה נבדק ראשון.
+ *
  * המנחה רואה בחלון הקליטה "מחובר", מסיק שהכול תקין, ולא מבין למה המשחק
  * מתריע — כי החיווי שם מדבר על חוליה (1) בלבד. ההודעה כאן אומרת איזו מהשתיים
  * נפלה, במקום הודעה כללית שמכסה את שתיהן ולכן לא עוזרת לאף אחת.
@@ -15,8 +18,28 @@
  * טהור — כדי שיהיה ניתן לבדיקת יחידה.
  */
 
+/** מצב שרת הקליקרים שלנו. null = טרם ידוע (גרסה ישנה / עוד לא דיווח). */
+export interface ClickerServerState {
+  listening: boolean;
+  port: number;
+  /** הפורט תפוס בידי תהליך אחר. */
+  busy?: boolean;
+}
+
 /** null = השרשרת שלמה, אין מה להתריע. */
-export function clickerLinkMessage(software: boolean | null, dongle: string | null): string | null {
+export function clickerLinkMessage(
+  software: boolean | null,
+  dongle: string | null,
+  server: ClickerServerState | null = null,
+): string | null {
+  // החוליה שלפני כולן: אם איננו מאזינים, תוכנת הקליטה לא תוכל להתחבר לעולם —
+  // וכל הודעה על "לחצו Connect" רק תשלח את המנחה לרדוף אחרי הדבר הלא נכון.
+  if (server !== null && !server.listening) {
+    return server.busy === true
+      ? `הפורט ${server.port} תפוס בידי תוכנה אחרת במחשב — סגרו אותה, או הפעילו מחדש את המחשב. התוכנה תתחבר לבד ברגע שהפורט יתפנה`
+      : `לא הצלחנו לפתוח את הפורט ${server.port} לקליטת השלטים — הפעילו מחדש את התוכנה`;
+  }
+
   // חוליה (2) נפלה: תוכנת הקליטה אינה מחוברת אלינו. זה המצב שבו חלון הקליטה
   // יכול להיראות תקין לגמרי — ולכן ההודעה מציינת זאת במפורש.
   if (software === false) {
@@ -42,6 +65,10 @@ export function clickerLinkMessage(software: boolean | null, dongle: string | nu
  * האם השרשרת שלמה. מקביל ל-clickerLinkMessage(...) === null, ומופרד לקריאוּת
  * במקומות שרק שואלים "מחובר?".
  */
-export function clickerLinkOk(software: boolean | null, dongle: string | null): boolean {
-  return clickerLinkMessage(software, dongle) === null;
+export function clickerLinkOk(
+  software: boolean | null,
+  dongle: string | null,
+  server: ClickerServerState | null = null,
+): boolean {
+  return clickerLinkMessage(software, dongle, server) === null;
 }

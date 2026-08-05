@@ -19,6 +19,10 @@ export interface ClickerStatusEvent {
 }
 export type ClickerEvent = ClickerKeyEvent | ClickerStatusEvent;
 
+/** מצב שרת הקליקרים המקומי — ראו clickerLink.ts. */
+export type { ClickerServerState } from './clickerLink.ts';
+import type { ClickerServerState } from './clickerLink.ts';
+
 /** התחברות/ניתוק של תוכנת הריסיבר (RF317SocketForm) לסוקט המקומי. */
 export interface ReceiverClient {
   connected: boolean;
@@ -67,6 +71,8 @@ interface TriviaDesktop {
   platform?: string;
   onClicker?: (cb: (ev: ClickerEvent) => void) => () => void;
   onReceiver?: (cb: (info: ReceiverClient) => void) => () => void;
+  /** מנוי למצב שרת הקליקרים המקומי (מאזין / הפורט תפוס). */
+  onClickerServer?: (cb: (info: ClickerServerState) => void) => () => void;
   /** הפעלת תוכנת הריסיבר (RF317SocketForm) שמצורפת ל-EXE — מתחברת לשרת המקומי. */
   launchReceiver?: () => void;
   /** הקפצת חלון הריסיבר לחזית — להגדרת טווח שלטים / לחיצת Connect. */
@@ -254,6 +260,13 @@ export function onClickerEvent(cb: (ev: ClickerEvent) => void): () => void {
 }
 
 /** מנוי להתחברות/ניתוק של תוכנת הריסיבר לסוקט. מחזיר פונקציית ביטול-מנוי. */
+/** מנוי למצב שרת הקליקרים שלנו (מאזין / הפורט תפוס). */
+export function onClickerServer(cb: (info: ClickerServerState) => void): () => void {
+  const d = desktop();
+  if (typeof d?.onClickerServer !== 'function') return () => {};
+  return d.onClickerServer(cb);
+}
+
 export function onReceiverClient(cb: (info: ReceiverClient) => void): () => void {
   const d = desktop();
   if (typeof d?.onReceiver !== 'function') return () => {};
