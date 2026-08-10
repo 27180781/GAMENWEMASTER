@@ -51,7 +51,8 @@ export function evaluateHealth(input: HealthInputs): HealthWarning[] {
     warnings.push({
       code: 'socket-down',
       severity: 'error',
-      message: 'מנותק משרת ההצבעות — מנסה להתחבר מחדש…',
+      message:
+        'מנותק משרת ההצבעות — מנסה להתחבר מחדש… רעננו את העמוד, או בדקו אם יש סינון על חיבור האינטרנט שלכם.',
     });
   }
 
