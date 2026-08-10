@@ -35,6 +35,15 @@ describe('evaluateHealth', () => {
     );
   });
 
+  it('נוסח הניתוק מהשרת מפנה לפעולה — ריענון ובדיקת סינון', () => {
+    // המנחה עומד מול קהל: "מנסה להתחבר מחדש" לבדו אינו אומר לו מה לעשות.
+    const w = evaluateHealth({ ...base, socketStatus: 'reconnecting', reconnectingMs: 6000 });
+    const msg = w.find((x) => x.code === 'socket-down')?.message ?? '';
+    expect(msg).toContain('מנותק משרת ההצבעות');
+    expect(msg).toContain('רעננו את העמוד');
+    expect(msg).toContain('סינון');
+  });
+
   it('ניתוקים חוזרים → אזהרת unstable', () => {
     expect(codes({ ...base, disconnectsInWindow: 2 })).not.toContain('unstable');
     expect(codes({ ...base, disconnectsInWindow: 3 })).toContain('unstable');
