@@ -8,7 +8,7 @@
 import type { z } from 'zod';
 import type { GameFile, Slide, SlideType } from '../engine/index.ts';
 import { functionConfigSchema } from '../engine/schema.ts';
-import type { FieldNode } from './schemaForm.ts';
+import { describeObject, type FieldNode } from './schemaForm.ts';
 
 /** הקונפיג של שקופית "פעולת מערכת", כפי שהסכימה מגדירה אותו. */
 type FunctionConfig = NonNullable<Slide['function']>;
@@ -76,20 +76,59 @@ export function addSlide(game: GameFile, index: number): GameFile {
 }
 
 /**
- * סוגי השקופיות שאפשר לבחור בעורך, עם שם קריא והסבר קצר.
+ * סוגי השקופיות שאפשר לבחור בעורך, עם שם קריא, אייקון והסבר קצר.
  * הסדר הוא סדר התצוגה — מהנפוץ לנדיר.
  */
-export const SLIDE_TYPES: { value: SlideType; label: string; hint: string }[] = [
-  { value: 'trivia', label: 'שאלת טריוויה', hint: 'תשובות עם תשובה נכונה אחת — ניקוד לפי נכונות ומהירות' },
-  { value: 'survey', label: 'סקר', hint: 'תשובות בלי נכון/לא נכון — מציג התפלגות' },
-  { value: 'ans_images', label: 'תשובות תמונה', hint: 'כמו טריוויה, אבל כל תשובה היא תמונה' },
-  { value: 'media', label: 'מדיה', hint: 'תמונה/וידאו במסך מלא, בלי הצבעה' },
-  { value: 'subject', label: 'כותרת / נושא', hint: 'טקסט גדול על המסך, בלי הצבעה' },
-  { value: 'function', label: 'פעולת מערכת', hint: 'איפוס ניקוד, מסך מנצחים, קריאת API, הסרת משתתפים' },
+export const SLIDE_TYPES: { value: SlideType; label: string; icon: string; hint: string }[] = [
+  { value: 'trivia', label: 'שאלת טריוויה', icon: '📄', hint: 'תשובות עם תשובה נכונה אחת — ניקוד לפי נכונות ומהירות' },
+  { value: 'survey', label: 'סקר', icon: '◔', hint: 'תשובות בלי נכון/לא נכון — מציג התפלגות' },
+  { value: 'ans_images', label: 'תשובות תמונה', icon: '🖼', hint: 'כמו טריוויה, אבל כל תשובה היא תמונה' },
+  { value: 'media', label: 'מדיה', icon: '🎬', hint: 'תמונה/וידאו במסך מלא, בלי הצבעה' },
+  { value: 'subject', label: 'כותרת / נושא', icon: '📒', hint: 'טקסט גדול על המסך, בלי הצבעה' },
+  { value: 'function', label: 'פעולת מערכת', icon: '⚡', hint: 'איפוס ניקוד, מסך מנצחים, קריאת API, הסרת משתתפים' },
 ];
 
+/** התיאור של סוג שקופית (אייקון/תווית) — עם נפילה שקטה לסוג שאינו ברשימה. */
+export function slideTypeInfo(type: string): { label: string; icon: string; hint: string } {
+  return SLIDE_TYPES.find((t) => t.value === type) ?? { label: type, icon: '❓', hint: '' };
+}
+
+/**
+ * שורת המשנה בכרטיס השקופית — מה שעוזר לזהות אותה ברשימה בלי לפתוח:
+ * בשקופית מצביעה התשובה הנכונה (או התשובות), בפעולה — הפעולה, ואחרת סוג השקופית.
+ */
+export function slideSubtitle(slide: Slide): string {
+  if (slide.type === 'function') {
+    const action = slide.function?.action ?? '';
+    const label = ACTION_LABELS.find((o) => o.value === action)?.label;
+    return label ?? slideTypeInfo(slide.type).label;
+  }
+  if (!VOTABLE_TYPES.has(slide.type)) return slideTypeInfo(slide.type).label;
+  // בסקר אין תשובה נכונה. הדגל `correct` עדיין יכול להיות שם — הוא נשמר בכוונה
+  // בהחלפת סוג — ולכן חייבים לסנן לפי הסוג, אחרת הכרטיס היה מסמן ✓ בסקר.
+  if (slide.type !== 'survey') {
+    const text = slide.question.answers.find((a) => a.correct)?.ans.trim();
+    if (text !== undefined && text !== '') return `✓ ${text}`;
+  }
+  const all = slide.question.answers.map((a) => a.ans.trim()).filter((a) => a !== '');
+  return all.length > 0 ? all.join(' · ') : slideTypeInfo(slide.type).label;
+}
+
+/** הוספת שקופית מסוג מבוקש מיד אחרי המיקום (הרכבה של addSlide + changeSlideType). */
+export function addSlideOfType(game: GameFile, index: number, type: SlideType): GameFile {
+  const added = addSlide(game, index);
+  if (added === game) return game;
+  return changeSlideType(added, Math.min(index + 1, added.questions.length - 1), type);
+}
+
 /** האם השקופית מקבלת הצבעות (ולכן צריכה תשובות). */
-const VOTABLE_TYPES = new Set<string>(['trivia', 'survey', 'ans_images']);
+export const VOTABLE_TYPES = new Set<string>(['trivia', 'survey', 'ans_images']);
+
+/** תוויות הפעולות — נגזרות מהסכימה פעם אחת (ראו functionConfigSchema). */
+const ACTION_LABELS: { value: string; label: string }[] = (() => {
+  const node = describeObject(functionConfigSchema).find((n) => n.key === 'action');
+  return node?.kind === 'enum' ? node.options : [];
+})();
 
 /**
  * החלפת סוג השקופית — עם השלמת מה שהסוג החדש *מחייב*.
