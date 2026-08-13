@@ -5,9 +5,12 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  addSlideOfType,
   changeSlideType,
   functionFormNodes,
   normalizeFunctionSlide,
+  slideSubtitle,
+  slideTypeInfo,
   SLIDE_TYPES,
   withActionDefaults,
 } from '../src/app/slideEdit.ts';
@@ -117,7 +120,71 @@ describe('changeSlideType', () => {
     expect(SLIDE_TYPES.map((t) => t.value).sort()).toEqual(
       ['ans_images', 'function', 'media', 'subject', 'survey', 'trivia'],
     );
-    for (const t of SLIDE_TYPES) expect(t.hint.length).toBeGreaterThan(10);
+    for (const t of SLIDE_TYPES) {
+      expect(t.hint.length).toBeGreaterThan(10);
+      expect(t.icon).not.toBe(''); // לסרגל הסוגים בעורך
+    }
+  });
+});
+
+/** סרגל הסוגים בעורך — לחיצה על סוג מוסיפה שקופית *מהסוג הזה*. */
+describe('addSlideOfType', () => {
+  it('★ מוסיפה שקופית מהסוג הנבחר מיד אחרי המיקום', () => {
+    const g = gameWith(two);
+    for (const t of SLIDE_TYPES) {
+      const out = addSlideOfType(g, 0, t.value);
+      expect(out.questions).toHaveLength(2);
+      expect(out.questions[1]?.type, `סוג ${t.value}`).toBe(t.value);
+      expect(slideSchema.safeParse(out.questions[1]).success, `סוג ${t.value}`).toBe(true);
+      expect(out.questions[0]?.type).toBe('trivia'); // המקורית לא נגעה
+    }
+  });
+
+  it('מזהה חדש ולא כפול', () => {
+    const out = addSlideOfType(gameWith(two), 0, 'media');
+    const ids = out.questions.map((q) => q.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
+/** מה שמופיע בכרטיס ברשימת השקופיות — כדי לזהות שקופית בלי לפתוח אותה. */
+describe('slideSubtitle', () => {
+  const at = (game: GameFile) => slideSubtitle(game.questions[0]!);
+
+  it('שקופית מצביעה — התשובה הנכונה', () => {
+    expect(at(gameWith(two))).toBe('✓ א');
+  });
+
+  it('★ סקר — כל התשובות, בלי לסמן "נכונה"', () => {
+    // בהחלפת סוג הדגל correct נשמר בכוונה (כדי שחזרה לטריוויה תשחזר אותו),
+    // ולכן הכרטיס היה מסמן ✓ בסקר — שבו אין בכלל תשובה נכונה.
+    const survey = changeSlideType(gameWith(two), 0, 'survey');
+    expect(survey.questions[0]?.question.answers[0]?.correct).toBe(true); // הדגל אכן נשאר
+    expect(at(survey)).toBe('א · ב');
+  });
+
+  it('תשובות ריקות — נופל לשם הסוג ולא למחרוזת ריקה', () => {
+    const blank = gameWith([
+      { ans: '  ', correct: true, id: 1 },
+      { ans: '', correct: false, id: 2 },
+    ]);
+    expect(at(blank)).toBe('שאלת טריוויה');
+  });
+
+  it('שקופית בלי הצבעה — שם הסוג', () => {
+    expect(at(changeSlideType(gameWith(two), 0, 'media'))).toBe('מדיה');
+  });
+
+  it('★ פעולת מערכת — שם הפעולה בעברית, נגזר מהסכימה', () => {
+    const fn = changeSlideType(gameWith(two), 0, 'function');
+    expect(at(fn)).toBe('הצגת מסך (מנצחים / מובילים)');
+  });
+
+  it('סוג שאינו מוכר אינו מפיל את הרשימה', () => {
+    const odd = { ...gameWith(two) };
+    odd.questions = [{ ...odd.questions[0]!, type: 'משהו' as never }];
+    expect(slideSubtitle(odd.questions[0]!)).toBe('משהו');
+    expect(slideTypeInfo('משהו').icon).not.toBe('');
   });
 });
 

@@ -2337,174 +2337,406 @@ body {
 }
 
 /* ---- עורך המשחק המקומי ---- */
+/*
+ * המבנה: סרגל עליון · עמודת הגדרות · רשימת שקופיות · לוח עריכה.
+ * לוח הצבעים והמידות מיושרים לעורך האונליין, כדי שהמעבר בין השניים יהיה מיידי.
+ */
+.editor-screen {
+  --ge-bg: #f2f0f7;
+  --ge-panel: #ffffff;
+  --ge-ink: #4b3f6b;
+  --ge-soft: #8a80a8;
+  --ge-line: #e6e2f0;
+  --ge-primary: #6c5ce7;
+  --ge-green: #22b573;
+  --ge-yellow: #fbc02d;
+  --ge-yellow-soft: #fff8e1;
+  --ge-red: #e5566a;
+  --ge-shadow: 0 2px 10px rgba(76, 63, 107, 0.08);
+  --ge-shadow-lg: 0 8px 28px rgba(76, 63, 107, 0.16);
+}
 .settings-screen.editor-screen {
-  background: #eef0f4;
-  color: #171a2b;
+  background: var(--ge-bg);
+  color: var(--ge-ink);
   display: flex;
   flex-direction: column;
   padding: 0;
+  overflow: hidden;
 }
-.editor-bar {
+
+/* ---- סרגל עליון ---- */
+.ge-topbar {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 14px 26px;
-  background: #fff;
-  border-bottom: 1px solid #dfe2ea;
-  box-shadow: 0 2px 10px rgba(20, 20, 40, 0.06);
+  gap: 12px;
+  padding: 10px 18px;
+  background: var(--ge-panel);
+  border-bottom: 1px solid var(--ge-line);
+  box-shadow: var(--ge-shadow);
+  z-index: 5;
+}
+.ge-mark {
+  width: 38px;
+  height: 38px;
   flex: 0 0 auto;
+  border-radius: 11px;
+  background: linear-gradient(135deg, var(--ge-primary), #a06ce7);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
 }
-.editor-bar-fields { display: flex; gap: 18px; flex-wrap: wrap; }
-.editor-field { display: flex; align-items: center; gap: 8px; font-size: 17px; }
-.editor-field span { color: #4a4f63; white-space: nowrap; }
-.editor-field input {
-  font-size: 17px;
-  padding: 7px 12px;
-  border: 2px solid #cfd4e2;
+.ge-name { display: flex; align-items: center; gap: 9px; font-size: 16px; }
+.ge-name span { color: var(--ge-soft); white-space: nowrap; font-size: 14px; }
+.ge-name input {
+  border: 1px solid transparent;
+  background: transparent;
   border-radius: 10px;
-  background: #f9fafc;
-  min-width: 210px;
+  padding: 7px 11px;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ge-ink);
+  min-width: 190px;
 }
-.editor-bar-actions { display: flex; align-items: center; gap: 14px; }
-.editor-saved { color: #1a7f4b; font-size: 16px; font-weight: 600; }
-.editor-error { color: #c0263f; font-size: 16px; font-weight: 600; max-width: 340px; }
+.ge-name input:hover { background: #f6f4fb; }
+.ge-name input:focus { outline: none; background: #fff; border-color: var(--ge-line); }
+.ge-state { font-size: 15px; min-height: 20px; }
+.ge-dirty { color: var(--ge-yellow); font-weight: 700; }
+.ge-spacer { flex: 1 1 auto; }
+.editor-saved { color: #1a7f4b; font-size: 15px; font-weight: 700; }
+.editor-error { color: #c0263f; font-size: 15px; font-weight: 700; max-width: 340px; }
 .editor-save {
-  font-size: 18px;
-  font-weight: 800;
-  padding: 10px 22px;
-  border-radius: 12px;
-  border: 2px solid #2e8b57;
-  background: #f0fbf4;
-  color: #17603a;
+  flex: 0 0 auto;
+  background: var(--ge-green);
+  border: 1px solid var(--ge-green);
+  color: #fff;
+  border-radius: 11px;
+  padding: 10px 18px;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: inherit;
   cursor: pointer;
 }
 .editor-save:disabled { opacity: 0.45; cursor: default; }
-.editor-save:not(:disabled):hover { background: #e2f6ea; }
+.editor-save:not(:disabled):hover { filter: brightness(1.06); }
 .editor-close {
-  font-size: 17px;
-  font-weight: 600;
-  padding: 10px 18px;
-  border-radius: 12px;
-  border: 2px solid #cfd4e2;
-  background: #fff;
-  color: #3a3f52;
-  cursor: pointer;
-}
-.editor-tabs {
-  display: flex;
-  gap: 8px;
-  padding: 12px 26px 0;
   flex: 0 0 auto;
-}
-.editor-tab {
-  font-size: 17px;
+  background: #fff;
+  border: 1px solid var(--ge-red);
+  color: var(--ge-red);
+  border-radius: 11px;
+  padding: 10px 16px;
+  font-size: 16px;
   font-weight: 700;
-  padding: 9px 22px;
-  border-radius: 12px 12px 0 0;
-  border: 1px solid #dfe2ea;
-  border-bottom: none;
-  background: #e8ebf2;
-  color: #4a4f63;
+  font-family: inherit;
   cursor: pointer;
 }
-.editor-tab--on { background: #fff; color: #171a2b; }
-.editor-body { flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 0 26px 18px; }
-.editor-pane {
-  height: 100%;
-  overflow-y: auto;
-  background: #fff;
-  border: 1px solid #dfe2ea;
-  border-radius: 0 18px 18px 18px;
-  padding: 18px 22px;
+.editor-close:hover { background: #fdeef0; }
+
+/* ---- שלוש העמודות ---- */
+.ge-main { flex: 1 1 auto; display: flex; min-height: 0; }
+
+/* עמודת ההגדרות */
+.ge-sidebar {
+  flex: 0 0 300px;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  background: var(--ge-panel);
+  border-inline-start: 1px solid var(--ge-line);
+  min-height: 0;
 }
-.editor-hint { font-size: 15px; color: #5a6076; margin: 0 0 14px; }
-.editor-slide-pick { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; font-size: 17px; }
-.editor-slide-pick select {
-  font-size: 16px;
-  padding: 7px 12px;
-  border: 2px solid #cfd4e2;
+.ge-sidebar-scroll { flex: 1 1 auto; overflow-y: auto; padding: 8px 10px; min-height: 0; }
+.ge-sidebar-foot { flex: 0 0 auto; border-top: 1px solid var(--ge-line); padding: 10px 12px; }
+.ge-hint { margin: 0; font-size: 12.5px; color: var(--ge-soft); line-height: 1.5; }
+.ge-acc { border-bottom: 1px solid var(--ge-line); }
+.ge-acc-head {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 8px;
+  font-weight: 700;
+  font-size: 15px;
+}
+.ge-acc-head::-webkit-details-marker { display: none; }
+.ge-acc-icon { flex: 0 0 auto; width: 22px; text-align: center; font-size: 16px; }
+.ge-acc-title { flex: 1 1 auto; min-width: 0; }
+.ge-acc-chev { flex: 0 0 auto; color: var(--ge-soft); transition: transform 0.15s; }
+.ge-acc[open] > .ge-acc-head .ge-acc-chev { transform: rotate(180deg); }
+.ge-acc-body { padding: 2px 8px 16px; display: flex; flex-direction: column; gap: 12px; }
+.ge-field { display: flex; flex-direction: column; gap: 5px; }
+.ge-field > span { font-size: 12.5px; color: var(--ge-soft); }
+.ge-field input {
+  border: 1px solid var(--ge-line);
   border-radius: 10px;
-  background: #f9fafc;
-  max-width: 480px;
+  padding: 9px 11px;
+  font: inherit;
+  font-size: 14px;
+  background: #fff;
+  color: var(--ge-ink);
+  width: 100%;
+  box-sizing: border-box;
+}
+.ge-field input:focus {
+  outline: none;
+  border-color: var(--ge-primary);
+  box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.12);
 }
 
-/* ---- שדות שנגזרו מהסכימה ---- */
+/* עמודת רשימת השקופיות */
+.ge-slides {
+  flex: 0 0 330px;
+  width: 330px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  min-height: 0;
+}
+.ge-search {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid var(--ge-line);
+  border-radius: 12px;
+  padding: 6px 12px;
+}
+.ge-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ge-ink);
+  padding: 6px 0;
+}
+.ge-search-icon { flex: 0 0 auto; color: var(--ge-soft); }
+.ge-count { flex: 0 0 auto; text-align: center; line-height: 1.1; }
+.ge-count b { display: block; font-size: 20px; color: var(--ge-primary); }
+.ge-count > span { font-size: 10.5px; color: var(--ge-soft); }
+.ge-cards {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--ge-panel);
+  border: 1px solid var(--ge-line);
+  border-radius: 14px;
+  padding: 8px;
+}
+
+/* עמודת לוח העריכה */
+.ge-editor {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 0 12px 12px;
+}
+.ge-typebar { flex: 0 0 auto; display: flex; gap: 9px; flex-wrap: wrap; }
+.ge-type {
+  position: relative;
+  width: 92px;
+  background: #fff;
+  border: 1px solid var(--ge-line);
+  border-radius: 14px;
+  padding: 12px 4px 9px;
+  text-align: center;
+  box-shadow: var(--ge-shadow);
+  font-family: inherit;
+  color: var(--ge-ink);
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+.ge-type:hover { transform: translateY(-2px); box-shadow: var(--ge-shadow-lg); }
+.ge-type-plus {
+  position: absolute;
+  top: -9px;
+  inset-inline-start: 50%;
+  transform: translateX(50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid var(--ge-line);
+  color: var(--ge-soft);
+  font-size: 13px;
+  line-height: 18px;
+  box-shadow: var(--ge-shadow);
+}
+.ge-type-icon { display: block; font-size: 19px; margin-bottom: 4px; }
+.ge-type-label { display: block; font-size: 12px; }
+.ge-canvas {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--ge-panel);
+  border: 1px solid var(--ge-line);
+  border-radius: 14px;
+  padding: 18px 22px;
+}
+.ge-slide-settings {
+  margin-top: 22px;
+  border-top: 1px solid var(--ge-line);
+  padding-top: 14px;
+}
+.ge-slide-settings > summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ge-soft);
+  padding: 4px 0;
+}
+.ge-slide-settings[open] > summary { margin-bottom: 12px; }
+
+@media (max-width: 1400px) {
+  .ge-sidebar { flex-basis: 260px; width: 260px; }
+  .ge-slides { flex-basis: 290px; width: 290px; }
+}
+
+/* ---- הטופס מונע-הסכימה ---- */
 .sf-group { display: flex; flex-direction: column; gap: 10px; }
 .sf-section {
-  border: 1px solid #e3e5ea;
-  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
   padding: 10px 14px;
-  background: #f9fafc;
 }
-.sf-summary { font-size: 17px; font-weight: 800; cursor: pointer; color: #2b3048; padding: 4px 0; }
+.sf-summary { font-size: 17px; font-weight: 800; cursor: pointer; padding: 4px 0; }
 .sf-section > .sf-group { margin-top: 10px; }
 .sf-row { display: flex; align-items: center; gap: 12px; font-size: 16px; }
 .sf-row--check { gap: 10px; }
 .sf-row--check input { width: 20px; height: 20px; cursor: pointer; }
 .sf-row--json { align-items: flex-start; }
-.sf-label { flex: 0 0 auto; min-width: 230px; color: #3a3f52; }
+.sf-label { flex: 0 0 auto; min-width: 230px; }
 .sf-input-wrap { flex: 1 1 auto; display: flex; align-items: center; gap: 8px; }
 .sf-input {
   flex: 1 1 auto;
   min-width: 0;
-  font-size: 16px;
-  padding: 8px 12px;
-  border: 2px solid #cfd4e2;
+  box-sizing: border-box;
   border-radius: 10px;
-  background: #fff;
+  padding: 9px 11px;
   font-family: inherit;
+  font-size: 15px;
 }
-.sf-input:focus { outline: none; border-color: #8b2fc9; }
-.sf-color { flex: 0 0 auto; width: 42px; height: 36px; padding: 0; border: 2px solid #cfd4e2; border-radius: 8px; background: #fff; cursor: pointer; }
+.sf-color {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid #cfd4e2;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+}
 .sf-json { min-height: 60px; resize: vertical; font-family: ui-monospace, monospace; font-size: 14px; }
 .sf-error { color: #c0263f; font-size: 14px; font-weight: 600; }
 
-/*
- * SlideEditor נבנה למסך המנחה — רקע כהה וטקסט בהיר. כאן הוא יושב על מסך בהיר,
- * ולכן צריך היפוך צבעים ממוקד. הכללים מוגבלים ל-.editor-screen בלבד, כדי
- * שמסך המנחה יישאר בדיוק כפי שהוא.
- */
-.editor-screen .se-root {
-  height: 100%;
-  grid-template-columns: 380px 1fr;
-  gap: 26px;
-  align-items: stretch;
-}
-.editor-screen .se-list-col,
-.editor-screen .se-form-col {
+/* בעמודה הצרה של ההגדרות התווית יושבת מעל השדה ולא לצדו */
+.ge-sidebar .sf-group { gap: 12px; }
+.ge-sidebar .sf-row { flex-direction: column; align-items: stretch; gap: 5px; font-size: 14px; }
+.ge-sidebar .sf-row--check { flex-direction: row; align-items: center; gap: 9px; }
+.ge-sidebar .sf-label { min-width: 0; font-size: 12.5px; color: var(--ge-soft); }
+.ge-sidebar .sf-section { border: none; padding: 0; }
+.ge-sidebar .sf-summary { font-size: 14px; color: var(--ge-soft); }
+
+.editor-screen .sf-section { border-color: var(--ge-line); }
+.editor-screen .sf-summary { color: var(--ge-ink); }
+.editor-screen .sf-label { color: var(--ge-soft); }
+.editor-screen .sf-input {
   background: #fff;
-  border: 1px solid #dfe2ea;
-  border-radius: 18px;
-  padding: 16px 18px;
-  min-height: 0;
-  overflow-y: auto;
+  border: 1px solid var(--ge-line);
+  color: var(--ge-ink);
 }
-.editor-screen .hc-section-title { color: #171a2b; font-size: 20px; }
+.editor-screen .sf-input:focus {
+  outline: none;
+  border-color: var(--ge-primary);
+  box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.12);
+}
+.editor-screen .sf-row--check input { accent-color: var(--ge-green); }
+
+/*
+ * SlideList/SlideForm נבנו למסך המנחה — רקע כהה וטקסט בהיר. כאן הם יושבים על
+ * מסך בהיר, ולכן צריך היפוך צבעים ממוקד. הכללים מוגבלים ל-.editor-screen
+ * בלבד, כדי שמסך המנחה יישאר בדיוק כפי שהוא.
+ */
+.editor-screen .se-list-col { padding: 0; }
+.editor-screen .se-list { max-height: none; gap: 8px; }
 .editor-screen .se-item {
-  background: #f4f6fb;
-  border-color: #dfe2ea;
+  background: #fff;
+  border-color: var(--ge-line);
+  border-radius: 12px;
+  padding: 9px 10px;
 }
-.editor-screen .se-item--sel { border-color: #8b2fc9; background: #f6eefc; }
-.editor-screen .se-item-main { color: #171a2b; }
-.editor-screen .se-item-num { background: #e3e7f2; color: #2b3048; }
-.editor-screen .se-item-ops button { background: #e6e9f2; color: #2b3048; }
-.editor-screen .se-item-ops button:hover:not(:disabled) { background: #d4d9e8; }
-.editor-screen .se-label { color: #3a3f52; opacity: 1; }
+.editor-screen .se-item:hover { border-color: #c9c0e6; box-shadow: var(--ge-shadow); }
+.editor-screen .se-item--sel { border-color: var(--ge-yellow); background: var(--ge-yellow-soft); }
+.editor-screen .se-item-main { color: var(--ge-ink); font-size: 14px; }
+.editor-screen .se-item-num { background: transparent; color: var(--ge-soft); font-size: 15px; }
+.editor-screen .se-item-sub { color: var(--ge-soft); }
+/* בעורך המקומי פעולות הכרטיס נחשפות במעבר עכבר/בבחירה — כדי שלשם השקופית
+   יישאר מקום אמיתי ברשימה הצרה, ולא ייחתך אחרי שתי מילים. */
+/* ארבע הפעולות בשתי שורות — רצועה אחת הייתה בולעת את רוחב שם השקופית */
+.editor-screen .se-item-ops {
+  opacity: 0;
+  transition: opacity 0.12s;
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 1px;
+}
+.editor-screen .se-item:hover .se-item-ops,
+.editor-screen .se-item--sel .se-item-ops,
+.editor-screen .se-item-ops:focus-within { opacity: 1; }
+.editor-screen .se-item-ops button { background: transparent; color: var(--ge-soft); width: 26px; height: 26px; font-size: 13px; }
+.editor-screen .se-item-ops button:hover:not(:disabled) { background: #f0ecfa; color: var(--ge-ink); }
+.editor-screen .se-del:hover:not(:disabled) { background: #fdeef0 !important; color: var(--ge-red); }
+.editor-screen .se-list-empty { color: var(--ge-soft); }
+.editor-screen .se-form-col { min-height: 0; }
+.editor-screen .se-label { color: var(--ge-soft); opacity: 1; font-weight: 600; }
 .editor-screen .se-input {
-  background: #f9fafc;
-  border: 2px solid #cfd4e2;
-  color: #171a2b;
+  background: #fff;
+  border: 1px solid var(--ge-line);
+  color: var(--ge-ink);
 }
-.editor-screen .se-input:focus { border-color: #8b2fc9; }
-.editor-screen .se-empty { color: #5a6076; }
+.editor-screen .se-input:focus {
+  border-color: var(--ge-primary);
+  box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.12);
+}
+.editor-screen .se-empty { color: var(--ge-primary); opacity: 0.6; font-size: 19px; font-weight: 700; }
+.editor-screen .se-chip { background: #f0ecfa; color: var(--ge-primary); }
+.editor-screen .se-head-title { color: var(--ge-ink); }
+.editor-screen .se-type-hint { color: var(--ge-soft); }
+.editor-screen .se-tick { border-color: var(--ge-line); }
+.editor-screen .se-tick:checked { background: var(--ge-green); border-color: var(--ge-green); }
 .editor-screen .se-add,
 .editor-screen .se-add-answer {
-  background: #f0fbf4;
-  border: 2px solid #2e8b57;
-  color: #17603a;
+  background: #faf8ff;
+  border: 1px dashed #c9c0e6;
+  color: var(--ge-primary);
 }
+.editor-screen .se-answer-del { background: transparent; color: var(--ge-soft); }
+.editor-screen .se-answer-del:hover:not(:disabled) { background: #fdeef0; color: var(--ge-red); }
+.editor-screen .se-drop {
+  border-color: #d5cee9;
+  background: #fbfaff;
+  color: var(--ge-soft);
+}
+.editor-screen .se-drop:hover { border-color: var(--ge-primary); color: var(--ge-primary); }
+.editor-screen .se-media-clear { background: #fff; border-color: var(--ge-line); color: var(--ge-soft); }
+.editor-screen .se-media-clear:hover:not(:disabled) { background: #fdeef0; color: var(--ge-red); }
+.editor-screen .se-range { accent-color: #12a3a3; }
 .editor-screen .se-note { color: #a8620d; }
+.editor-screen .se-type-note {
+  background: #f0ecfa;
+  border-color: #d5cee9;
+  color: var(--ge-ink);
+}
 
 /* שתי פעולות משניות זו לצד זו במסך ההגדרות */
 .settings-secondary { display: flex; gap: 18px; align-items: center; justify-content: center; }
@@ -4777,65 +5009,119 @@ body {
 .se-list-head { display: flex; align-items: center; justify-content: space-between; }
 .se-add, .se-add-answer {
   background: #2a7d4f; border: none; color: #fff; border-radius: 10px;
-  padding: 8px 16px; font-size: 16px; font-weight: 700; cursor: pointer;
+  padding: 8px 16px; font-size: 16px; font-weight: 700; font-family: inherit; cursor: pointer;
 }
 .se-add:hover, .se-add-answer:hover { background: #329159; }
 .se-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 74vh; overflow-y: auto; }
+.se-list-empty { text-align: center; padding: 26px 12px; font-size: 15px; line-height: 1.7; opacity: 0.7; }
 .se-item {
   display: flex; align-items: center; gap: 6px;
   background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 12px; padding: 8px 10px;
+  border-radius: 12px; padding: 8px 10px; transition: border-color .12s, box-shadow .12s;
 }
 .se-item--sel { border-color: #7b8cff; background: rgba(123, 140, 255, 0.12); }
 .se-item-main {
-  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 10px;
-  background: transparent; border: none; color: #eef1ff; text-align: right;
-  font-size: 17px; cursor: pointer;
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 9px;
+  background: transparent; border: none; color: #eef1ff; text-align: start;
+  font-size: 17px; font-family: inherit; cursor: pointer;
 }
+.se-item-icon { flex: 0 0 auto; font-size: 15px; }
 .se-item-num {
   flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%;
   background: rgba(255, 255, 255, 0.12); display: flex; align-items: center;
   justify-content: center; font-weight: 800; font-size: 14px;
 }
-.se-item-que { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* שם השקופית ושורת המשנה שמתחתיו — שתיהן נחתכות ולא שוברות את הכרטיס */
+.se-item-txt { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.se-item-que { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.se-item-sub {
+  font-size: 11.5px; opacity: 0.65; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .se-item-now { flex: 0 0 auto; font-size: 12px; font-weight: 800; color: #ffd23f; background: rgba(255,210,63,0.16); border-radius: 999px; padding: 2px 8px; }
 .se-item-ops { display: flex; gap: 2px; flex: 0 0 auto; }
 .se-item-ops button {
   background: rgba(255, 255, 255, 0.08); border: none; color: #eef1ff;
-  border-radius: 8px; width: 30px; height: 30px; font-size: 15px; cursor: pointer;
+  border-radius: 8px; width: 30px; height: 30px; font-size: 15px; font-family: inherit; cursor: pointer;
 }
 .se-item-ops button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.18); }
 .se-item-ops button:disabled { opacity: 0.35; cursor: default; }
 .se-del:hover:not(:disabled) { background: rgba(220, 60, 80, 0.4) !important; }
 .se-form { display: flex; flex-direction: column; gap: 12px; }
 .se-empty { opacity: 0.5; padding: 30px; text-align: center; }
-.se-label { font-size: 14px; font-weight: 700; opacity: 0.65; display: block; margin-bottom: 4px; }
+
+/* כותרת הטופס: שבב הסוג · מספר השקופית · בורר הסוג */
+.se-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.se-chip {
+  flex: 0 0 auto; font-size: 13px; font-weight: 700; border-radius: 999px;
+  padding: 5px 12px; background: rgba(123, 140, 255, 0.18); color: #cdd4ff;
+}
+.se-head-title { flex: 1 1 auto; margin: 0; font-size: 17px; font-weight: 800; }
+.se-type { flex: 0 1 auto; width: auto; min-width: 170px; max-width: 240px; }
+.se-type-hint { margin: -4px 0 0; font-size: 13px; opacity: 0.7; line-height: 1.5; }
+.se-type-note {
+  margin: 0; border-radius: 10px; padding: 10px 14px; font-size: 14px; line-height: 1.6;
+  background: rgba(123, 140, 255, 0.12); border: 1px solid rgba(123, 140, 255, 0.3);
+}
+.se-function { display: flex; flex-direction: column; gap: 10px; }
+
+.se-label { font-size: 14px; font-weight: 700; opacity: 0.65; display: block; }
 .se-input {
   width: 100%; box-sizing: border-box; background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.15); color: #eef1ff; border-radius: 10px;
   padding: 10px 12px; font-size: 16px; font-family: inherit;
 }
 .se-input:focus { outline: none; border-color: #7b8cff; }
-.se-textarea { min-height: 64px; resize: vertical; }
-.se-num-row { display: flex; gap: 12px; }
-.se-num-row > div { flex: 1 1 0; }
-.se-num { width: 100%; }
-.se-media-row { display: flex; gap: 8px; }
-.se-media-row .se-input { flex: 1 1 auto; }
-.se-file-btn {
-  flex: 0 0 auto; display: inline-flex; align-items: center; background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.18); color: #eef1ff; border-radius: 10px;
-  padding: 0 14px; font-size: 15px; font-weight: 700; cursor: pointer; white-space: nowrap;
+.se-textarea { min-height: 64px; resize: vertical; font-size: 17px; font-weight: 600; }
+
+/* זמן/ניקוד: מחוון לכוונון מהיר + תיבת מספר לערך מדויק (גם מעבר לתקרה) */
+.se-num-row { display: flex; gap: 18px; flex-wrap: wrap; }
+.se-slider { flex: 1 1 260px; min-width: 0; }
+.se-slider-row { display: flex; align-items: center; gap: 10px; }
+.se-range { flex: 1 1 auto; min-width: 0; accent-color: #7b8cff; height: 5px; }
+.se-num { flex: 0 0 84px; width: 84px; text-align: center; }
+
+/* מדיה: תצוגה מקדימה + קישור + ניקוי */
+.se-media-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 900px) { .se-media-grid { grid-template-columns: 1fr; } }
+.se-media { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.se-drop {
+  display: grid; place-items: center; min-height: 84px; padding: 10px;
+  border: 1.5px dashed rgba(255, 255, 255, 0.25); border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04); font-size: 13px; cursor: pointer; overflow: hidden;
 }
-.se-file-btn:hover { background: rgba(255, 255, 255, 0.18); }
-.se-note { color: #ffd23f; font-size: 14px; margin: 4px 0 0; }
-.se-answers { display: flex; flex-direction: column; gap: 8px; }
-.se-answer { display: flex; align-items: center; gap: 8px; }
-.se-answer input[type="radio"] { width: 20px; height: 20px; flex: 0 0 auto; accent-color: #2a7d4f; }
-.se-answer-text { flex: 1 1 auto; resize: vertical; min-height: 34px; font: inherit; line-height: 1.3; }
+.se-drop:hover { border-color: #7b8cff; }
+.se-drop-empty { opacity: 0.7; }
+.se-drop-preview { max-width: 100%; max-height: 120px; border-radius: 8px; display: block; }
+.se-media-row { display: flex; gap: 8px; }
+.se-media-url { flex: 1 1 auto; min-width: 0; font-size: 13px; padding: 7px 10px; }
+.se-media-clear {
+  flex: 0 0 auto; width: 36px; background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15); color: #eef1ff; border-radius: 10px;
+  font-size: 14px; font-family: inherit; cursor: pointer;
+}
+.se-media-clear:disabled { opacity: 0.35; cursor: default; }
+.se-note { color: #ffd23f; font-size: 13px; margin: 0; }
+
+/* תשובות — שתי עמודות, עם עיגול סימון לתשובה הנכונה */
+.se-answers-wrap { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.se-answers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; width: 100%; }
+@media (max-width: 1150px) { .se-answers { grid-template-columns: 1fr; } }
+.se-answer { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.se-tick {
+  flex: 0 0 auto; width: 30px; height: 30px; margin: 0; border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.25); background: transparent;
+  appearance: none; -webkit-appearance: none; cursor: pointer; position: relative;
+}
+.se-tick::after {
+  content: '✓'; position: absolute; inset: 0; display: grid; place-items: center;
+  font-size: 14px; color: rgba(255, 255, 255, 0.35);
+}
+.se-tick:checked { background: #2a7d4f; border-color: #2a7d4f; }
+.se-tick:checked::after { color: #fff; }
+.se-answer-text { flex: 1 1 auto; min-width: 0; resize: vertical; min-height: 34px; font: inherit; font-size: 15px; line-height: 1.3; }
 .se-answer-del {
   flex: 0 0 auto; background: rgba(255, 255, 255, 0.08); border: none; color: #eef1ff;
-  border-radius: 8px; width: 34px; height: 34px; font-size: 16px; cursor: pointer;
+  border-radius: 8px; width: 32px; height: 32px; font-size: 15px; font-family: inherit; cursor: pointer;
 }
 .se-answer-del:hover:not(:disabled) { background: rgba(220, 60, 80, 0.4); }
 .se-answer-del:disabled { opacity: 0.35; cursor: default; }
@@ -5204,31 +5490,3 @@ body {
 }
 
 
-/* ---- בורר סוג השקופית בעורך ---- */
-.se-type { width: 100%; }
-
-.se-type-hint {
-  margin: -4px 0 4px;
-  font-size: 13px;
-  line-height: 1.5;
-  opacity: 0.65;
-}
-
-.se-type-note {
-  margin: 4px 0;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px dashed rgba(255, 255, 255, 0.2);
-  font-size: 13px;
-  line-height: 1.6;
-  opacity: 0.8;
-}
-
-.se-function { display: flex; flex-direction: column; gap: 6px; }
-
-/* מסך העורך בהיר — התאמת הרמזים שנוספו (כמו שאר דריסות ה-.editor-screen) */
-.editor-screen .se-type-note {
-  background: rgba(0, 0, 0, 0.04);
-  border-color: rgba(0, 0, 0, 0.18);
-}
