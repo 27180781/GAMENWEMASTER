@@ -5,7 +5,13 @@
  * כך ששקופית פגומה זמנית לא מפילה את המשחק.
  */
 
-import type { GameFile, Slide } from '../engine/index.ts';
+import type { z } from 'zod';
+import type { GameFile, Slide, SlideType } from '../engine/index.ts';
+import { functionConfigSchema } from '../engine/schema.ts';
+import type { FieldNode } from './schemaForm.ts';
+
+/** הקונפיג של שקופית "פעולת מערכת", כפי שהסכימה מגדירה אותו. */
+type FunctionConfig = NonNullable<Slide['function']>;
 
 const clone = <T>(x: T): T => structuredClone(x);
 
@@ -67,6 +73,104 @@ export function addSlide(game: GameFile, index: number): GameFile {
   const questions = [...game.questions];
   questions.splice(index + 1, 0, blank);
   return { ...game, questions };
+}
+
+/**
+ * סוגי השקופיות שאפשר לבחור בעורך, עם שם קריא והסבר קצר.
+ * הסדר הוא סדר התצוגה — מהנפוץ לנדיר.
+ */
+export const SLIDE_TYPES: { value: SlideType; label: string; hint: string }[] = [
+  { value: 'trivia', label: 'שאלת טריוויה', hint: 'תשובות עם תשובה נכונה אחת — ניקוד לפי נכונות ומהירות' },
+  { value: 'survey', label: 'סקר', hint: 'תשובות בלי נכון/לא נכון — מציג התפלגות' },
+  { value: 'ans_images', label: 'תשובות תמונה', hint: 'כמו טריוויה, אבל כל תשובה היא תמונה' },
+  { value: 'media', label: 'מדיה', hint: 'תמונה/וידאו במסך מלא, בלי הצבעה' },
+  { value: 'subject', label: 'כותרת / נושא', hint: 'טקסט גדול על המסך, בלי הצבעה' },
+  { value: 'function', label: 'פעולת מערכת', hint: 'איפוס ניקוד, מסך מנצחים, קריאת API, הסרת משתתפים' },
+];
+
+/** האם השקופית מקבלת הצבעות (ולכן צריכה תשובות). */
+const VOTABLE_TYPES = new Set<string>(['trivia', 'survey', 'ans_images']);
+
+/**
+ * החלפת סוג השקופית — עם השלמת מה שהסוג החדש *מחייב*.
+ *
+ * הסכימה אוכפת מגבלות לפי סוג (שקופית מצביעה חייבת ≥2 תשובות, ו-trivia חייבת
+ * תשובה נכונה אחת לפחות), ולכן החלפה "נאיבית" של השדה הייתה יכולה לייצר קובץ
+ * שלא ייטען יותר. הפונקציה משלימה את החסר, ו**אינה מוחקת** נתונים של הסוג
+ * הקודם — כך שהחלפה הלוך-ושוב מחזירה את המצב, ולא מאבדת תשובות שנכתבו.
+ */
+export function changeSlideType(game: GameFile, index: number, type: SlideType): GameFile {
+  return updateSlide(game, index, (slide) => {
+    const next: Slide = { ...slide, type };
+
+    if (VOTABLE_TYPES.has(type)) {
+      const answers = [...next.question.answers];
+      // ≥2 תשובות — אחרת הקובץ נפסל בטעינה
+      while (answers.length < 2) {
+        answers.push({ ans: `תשובה ${answers.length + 1}`, correct: false, id: answers.length + 1 });
+      }
+      // trivia — חייבת תשובה נכונה אחת לפחות
+      if (type === 'trivia' && !answers.some((a) => a.correct)) {
+        answers[0] = { ...answers[0]!, correct: true };
+      }
+      next.question = { ...next.question, answers };
+    }
+
+    // פעולת מערכת — בלי קונפיג היא לא תעשה דבר; ברירת מחדל שמישה ובטוחה
+    // (מסך מנצחים — עושה משהו נראה לעין מיד, בניגוד ל-API בלי כתובת).
+    if (type === 'function' && next.function === undefined) {
+      next.function = withActionDefaults({ action: 'screen' });
+    }
+    return next;
+  });
+}
+
+/**
+ * השלמת תת-הקונפיג של הפעולה הנבחרת מברירות המחדל **של הסכימה**.
+ *
+ * `api`/`screen`/`score`/`players` הם אופציונליים בסכימה, ולכן בבחירת פעולה
+ * חדשה בעורך הבלוק שלה היה מוצג ריק (ובזמן ריצה המנוע היה מדווח שגיאה על
+ * קונפיג חסר). כאן ממלאים אותו בדיוק במה שהסכימה מגדירה — בלי טבלת ברירות
+ * מחדל משוכפלת שתפגר אחריה.
+ */
+export function withActionDefaults(config: FunctionConfig): FunctionConfig {
+  const action = config.action;
+  const bag = config as unknown as Record<string, unknown>;
+  if (action === '' || bag[action] !== undefined) return config;
+  const shape = functionConfigSchema.shape as unknown as Record<string, z.ZodTypeAny | undefined>;
+  const field = shape[action];
+  if (field === undefined) return config; // פעולה שאין לה תת-קונפיג בסכימה
+  const parsed = field.safeParse({});
+  if (!parsed.success || parsed.data === undefined) return config;
+  return { ...config, [action]: parsed.data } as FunctionConfig;
+}
+
+/**
+ * חלוקת שדות טופס הפעולה: מה שמוצג תמיד (בורר הפעולה, וכל שדה עתידי שאינו
+ * בלוק), והבלוק של הפעולה הנבחרת בלבד — כדי שהמנחה לא יראה במקביל את הגדרות
+ * ה-API, המסך והניקוד כשהוא בכלל בחר "הסרת משתתפים".
+ * פעולה שאין לה בלוק בסכימה (ערך מקובץ ישן) מחזירה את הכול, כדי ששום הגדרה
+ * שנמצאת בקובץ לא תהפוך לבלתי-נגישה.
+ */
+export function functionFormNodes(
+  nodes: FieldNode[],
+  action: string,
+): { top: FieldNode[]; section: FieldNode | null } {
+  const section = nodes.find((n) => n.key === action && n.kind === 'object') ?? null;
+  if (section === null) return { top: nodes, section: null };
+  return { top: nodes.filter((n) => n.kind !== 'object'), section };
+}
+
+/**
+ * מריץ את ההשלמה על שקופית "פעולת מערכת" שבמיקום נתון. נקרא אחרי כל שינוי
+ * בטופס הפעולה, כך שבחירת פעולה אחרת מביאה איתה מיד את השדות שלה.
+ */
+export function normalizeFunctionSlide(game: GameFile, index: number): GameFile {
+  const slide = game.questions[index];
+  if (!slide || slide.type !== 'function' || slide.function === undefined) return game;
+  const next = withActionDefaults(slide.function);
+  if (next === slide.function) return game;
+  return updateSlide(game, index, (s) => ({ ...s, function: next }));
 }
 
 /** החלת שינוי על שקופית לפי מיקום (updater מקבל עותק ומחזיר שקופית חדשה). */

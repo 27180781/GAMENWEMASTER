@@ -5202,3 +5202,33 @@ body {
   pointer-events: none;
   white-space: nowrap;
 }
+
+
+/* ---- בורר סוג השקופית בעורך ---- */
+.se-type { width: 100%; }
+
+.se-type-hint {
+  margin: -4px 0 4px;
+  font-size: 13px;
+  line-height: 1.5;
+  opacity: 0.65;
+}
+
+.se-type-note {
+  margin: 4px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  font-size: 13px;
+  line-height: 1.6;
+  opacity: 0.8;
+}
+
+.se-function { display: flex; flex-direction: column; gap: 6px; }
+
+/* מסך העורך בהיר — התאמת הרמזים שנוספו (כמו שאר דריסות ה-.editor-screen) */
+.editor-screen .se-type-note {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.18);
+}

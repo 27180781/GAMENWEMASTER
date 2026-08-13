@@ -117,31 +117,57 @@ const VOTABLE_TYPES = new Set(['trivia', 'survey', 'ans_images']);
  * הקונפיג נשמר ברמת השקופית תחת `function` (לא בתוך setting). כל השדות
  * סלחניים כדי לתמוך בקבצים שנוצרו לפני שהוגדרו כל האפשרויות.
  */
-const functionConfigSchema = z.object({
-  action: z.string().default('api'),
+/**
+ * שדה מחרוזת עם ערכים מוכרים. הוולידציה נשארת `z.string()` **בכוונה**: קובץ
+ * משחק קיים שנשמר עם ערך אחר ימשיך להיטען (המנוע ממילא נופל לברירת מחדל),
+ * ורק העורך מציג בורר במקום שדה טקסט חופשי. הרשימה נשמרת ב-`describe` ולכן
+ * נגזרת מהסכימה כמו כל השאר — ראו parseChoice ב-schemaForm.ts.
+ */
+function choice(options: Record<string, string>, fallback: string) {
+  return z.string().describe(`choice:${JSON.stringify(options)}`).default(fallback);
+}
+
+export const functionConfigSchema = z.object({
+  action: choice(
+    {
+      api: 'שליחת נתוני המשחק ל-API',
+      screen: 'הצגת מסך (מנצחים / מובילים)',
+      score: 'פעולה על הניקוד',
+      players: 'הסרת משתתפים מהמשחק',
+    },
+    'api',
+  ),
   api: z
     .object({
       url: z.string().default(''),
-      method: z.string().default('GET'),
+      method: choice({ GET: 'GET', POST: 'POST' }, 'GET'),
     })
     .optional(),
   screen: z
     .object({
-      type: z.string().default('winners'),
+      type: choice({ winners: 'מסך מנצחים', leaderboard: 'טבלת מובילים' }, 'winners'),
     })
     .optional(),
   score: z
     .object({
-      operation: z.string().default('reset_all'),
+      operation: choice({ reset_all: 'איפוס הניקוד של כל המשתתפים' }, 'reset_all'),
     })
     .optional(),
   players: z
     .object({
-      mode: z.string().default('remove'),
-      unit: z.string().default('percent'),
+      mode: choice({ remove: 'להסיר את הנבחרים', keep: 'להשאיר רק את הנבחרים' }, 'remove'),
+      unit: choice({ percent: 'אחוזים', count: 'מספר משתתפים' }, 'percent'),
       // amount נדרש רק ל-random/top/bottom; בבחירת "groups" הוא לא נשלח.
       amount: emptyableNumber(0).optional(),
-      selection: z.string().default('random'),
+      selection: choice(
+        {
+          random: 'אקראי',
+          top: 'בעלי הניקוד הגבוה',
+          bottom: 'בעלי הניקוד הנמוך',
+          groups: 'לפי שיוך לקבוצות',
+        },
+        'random',
+      ),
       groups: z.array(z.string()).optional().default([]),
     })
     .optional(),

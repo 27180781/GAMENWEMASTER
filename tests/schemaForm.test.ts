@@ -45,6 +45,50 @@ describe('describeField — טיפוסים בסיסיים ועטיפות', () =>
     expect(describeField('seconds', emptyable)).toMatchObject({ kind: 'number', empty: '' });
   });
 
+  it('ZodEnum — אפשרויות עם ערך ותווית', () => {
+    const node = describeField('a', z.enum(['x', 'y']));
+    expect(node?.kind).toBe('enum');
+    expect(node?.kind === 'enum' && node.options).toEqual([
+      { value: 'x', label: 'x' },
+      { value: 'y', label: 'y' },
+    ]);
+  });
+
+  describe('רשימת בחירה ממטא-דאטה (choice:)', () => {
+    const meta = `choice:${JSON.stringify({ api: 'קריאת API', screen: 'מסך' })}`;
+
+    it('מחרוזת עם ערכים מוצעים הופכת לבורר — בלי להדק את הוולידציה', () => {
+      const node = describeField('action', z.string().describe(meta).default('api'));
+      expect(node?.kind).toBe('enum');
+      expect(node?.kind === 'enum' && node.options).toEqual([
+        { value: 'api', label: 'קריאת API' },
+        { value: 'screen', label: 'מסך' },
+      ]);
+    });
+
+    it('★ התיאור נקרא גם כשהוא יושב על העטיפה החיצונית', () => {
+      // .describe() נשמר על העטיפה שעליה הופעל; בלי איסוף במהלך הפירוק הוא
+      // היה הולך לאיבוד כאן, והשדה היה חוזר להיות טקסט חופשי.
+      expect(describeField('a', z.string().default('api').describe(meta))?.kind).toBe('enum');
+      expect(describeField('a', z.string().describe(meta).optional())?.kind).toBe('enum');
+    });
+
+    it('תיאור רגיל או פגום אינו הופך את השדה לבורר', () => {
+      expect(describeField('a', z.string().describe('סתם הסבר'))?.kind).toBe('string');
+      expect(describeField('a', z.string().describe('choice:{לא JSON'))?.kind).toBe('string');
+      expect(describeField('a', z.string().describe('choice:[]'))?.kind).toBe('string');
+      expect(describeField('a', z.string().describe('choice:{}'))?.kind).toBe('string');
+    });
+
+    it('ערך בלי תווית נופל לשם הערך עצמו', () => {
+      const node = describeField('a', z.string().describe('choice:{"GET":"","POST":"POST"}'));
+      expect(node?.kind === 'enum' && node.options).toEqual([
+        { value: 'GET', label: 'GET' },
+        { value: 'POST', label: 'POST' },
+      ]);
+    });
+  });
+
   it('ריקון שדה כותב את הערך שהסכימה מצפה לו', () => {
     // חובה → 0 (אין ערך "בלי ערך"), אופציונלי → null, emptyableNumber → ''
     expect(describeField('a', z.number())).toMatchObject({ empty: 0 });

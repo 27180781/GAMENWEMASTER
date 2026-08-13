@@ -91,13 +91,18 @@ function SchemaField<T>({
   }
 
   if (node.kind === 'enum') {
+    const text = String(current ?? '');
+    // ערך שאינו ברשימה (קובץ שנשמר בגרסה אחרת) נשאר מוצג כמו שהוא, כדי שלא
+    // ייראה כאילו נבחרה אפשרות אחרת — ולא ידרוס בשקט את מה שכתוב בקובץ.
+    const known = node.options.some((o) => o.value === text);
     return (
       <label className="sf-row">
         <span className="sf-label">{node.label}</span>
-        <select className="sf-input" value={String(current ?? '')} onChange={(e) => set(e.target.value)}>
+        <select className="sf-input" value={text} onChange={(e) => set(e.target.value)}>
+          {!known && <option value={text}>{text === '' ? '(לא נבחר)' : text}</option>}
           {node.options.map((o) => (
-            <option key={o} value={o}>
-              {o}
+            <option key={o.value} value={o.value}>
+              {o.label}
             </option>
           ))}
         </select>
