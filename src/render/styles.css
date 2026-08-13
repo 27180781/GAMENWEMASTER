@@ -59,6 +59,12 @@ body {
   user-select: none;
 }
 
+/* מסך עבודה שאינו על הבמה (העורך) — ממלא את החלון, ובחירת טקסט מותרת בו */
+.game-root--full {
+  background: transparent;
+  user-select: auto;
+}
+
 .stage {
   position: absolute;
   /* מיקום פיזי (לא לוגי-RTL) — ה-transform מהקומפוננטה ממרכז בפיקסלים */
@@ -2362,6 +2368,13 @@ body {
   flex-direction: column;
   padding: 0;
   overflow: hidden;
+  /*
+   * .screen ממרכז את תוכנו (align/justify: center) — נכון למסכי המשחק, שהם
+   * כרטיס באמצע הבמה. העורך הוא ההפך: מעטפת עבודה שצריכה למלא את כל הבמה,
+   * ובלי הביטול הזה הסרגל והעמודות מתכווצים לרוחב התוכן ומצטופפים באמצע.
+   */
+  align-items: stretch;
+  justify-content: flex-start;
 }
 
 /* ---- סרגל עליון ---- */
@@ -2440,8 +2453,8 @@ body {
 
 /* עמודת ההגדרות */
 .ge-sidebar {
-  flex: 0 0 300px;
-  width: 300px;
+  flex: 0 0 340px;
+  width: 340px;
   display: flex;
   flex-direction: column;
   background: var(--ge-panel);
@@ -2489,8 +2502,8 @@ body {
 
 /* עמודת רשימת השקופיות */
 .ge-slides {
-  flex: 0 0 330px;
-  width: 330px;
+  flex: 0 0 380px;
+  width: 380px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -2583,6 +2596,11 @@ body {
   border-radius: 14px;
   padding: 18px 22px;
 }
+/*
+ * הלוח עצמו ממלא את העמודה, אבל השדות שבתוכו נעצרים ברוחב קריא: על במה של
+ * 1920 שורת קלט אחת שנמתחת על 1200px מרחיקה את התווית מהערך ומקשה על הקריאה.
+ */
+.ge-canvas > .se-form-col { max-width: 1120px; margin-inline: auto; }
 .ge-slide-settings {
   margin-top: 22px;
   border-top: 1px solid var(--ge-line);
@@ -2597,9 +2615,24 @@ body {
 }
 .ge-slide-settings[open] > summary { margin-bottom: 12px; }
 
-@media (max-width: 1400px) {
-  .ge-sidebar { flex-basis: 260px; width: 260px; }
-  .ge-slides { flex-basis: 290px; width: 290px; }
+/*
+ * העורך אינו יושב על הבמה (ראו Shell fullWindow), ולכן רוחב החלון הוא באמת
+ * רוחב העורך — ושאילתות המדיה כאן משמעותיות. שתי העמודות הקבועות מקבלות
+ * עדיפות על הכללים הכלליים של מסך המנחה, שנמדדים ברוחבים אחרים.
+ */
+.editor-screen .se-answers,
+.editor-screen .se-media-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+@media (max-width: 1500px) {
+  .ge-sidebar { flex-basis: 280px; width: 280px; }
+  .ge-slides { flex-basis: 310px; width: 310px; }
+}
+@media (max-width: 1200px) {
+  .ge-sidebar { flex-basis: 240px; width: 240px; }
+  .ge-slides { flex-basis: 265px; width: 265px; }
+  .editor-screen .se-answers,
+  .editor-screen .se-media-grid { grid-template-columns: 1fr; }
+  .ge-type { width: 78px; }
 }
 
 /* ---- הטופס מונע-הסכימה ---- */
