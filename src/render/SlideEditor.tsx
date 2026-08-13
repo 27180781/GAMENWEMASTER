@@ -11,14 +11,25 @@ import type { GameFile, Slide } from '../engine/index.ts';
 import {
   addAnswer,
   addSlide,
+  changeSlideType,
+  SLIDE_TYPES,
   duplicateSlide,
+  functionFormNodes,
   moveSlide,
+  normalizeFunctionSlide,
   removeAnswer,
   removeSlide,
   setCorrect,
   updateSlide,
 } from '../app/slideEdit.ts';
 import { canAddMediaFile, desktopMediaAddFile } from '../app/clickerBridge.ts';
+import { SchemaFields } from './SchemaFields.tsx';
+import { describeObject } from '../app/schemaForm.ts';
+import { functionConfigSchema } from '../engine/schema.ts';
+import type { SlideType } from '../engine/index.ts';
+
+/** שדות ההגדרה של שקופית "פעולת מערכת" — נגזרים מהסכימה פעם אחת. */
+const FUNCTION_FIELDS = describeObject(functionConfigSchema);
 
 const VOTABLE = new Set(['trivia', 'survey', 'ans_images']);
 /** גבול לתמונה מוטמעת כ-data URL באונליין (מעבר לכך — רק קישור). */
@@ -91,6 +102,43 @@ function MediaField({ label, value, onSet }: { label: string; value: string; onS
         </label>
       </div>
       {note && <p className="se-note">{note}</p>}
+    </div>
+  );
+}
+
+/**
+ * הגדרות שקופית "פעולת מערכת". הכול נגזר מ-functionConfigSchema, ולכן פעולה
+ * או שדה שיתווספו לסכימה יופיעו כאן לבד. מוצג בורר הפעולה + הבלוק של הפעולה
+ * הנבחרת בלבד (ראו functionFormNodes).
+ */
+function FunctionConfigFields({
+  game,
+  index,
+  slide,
+  onChange,
+}: {
+  game: GameFile;
+  index: number;
+  slide: Slide;
+  onChange: (game: GameFile) => void;
+}) {
+  const base = ['questions', String(index), 'function'];
+  const action = slide.function?.action ?? '';
+  const { top, section } = functionFormNodes(FUNCTION_FIELDS, action);
+  // בחירת פעולה אחרת מביאה איתה מיד את שדות ברירת המחדל שלה
+  const change = (next: GameFile) => onChange(normalizeFunctionSlide(next, index));
+  return (
+    <div className="se-function">
+      <label className="se-label">הגדרות הפעולה</label>
+      <SchemaFields nodes={top} value={game} onChange={change} path={base} />
+      {section !== null && section.kind === 'object' && (
+        <SchemaFields
+          nodes={section.children}
+          value={game}
+          onChange={change}
+          path={[...base, section.key]}
+        />
+      )}
     </div>
   );
 }
@@ -174,6 +222,25 @@ export function SlideEditor({ game, currentSlideId, phase, onChange }: SlideEdit
                 ספירת הקולות. אפשר לערוך אותה מיד בסיום ההצבעה, או לערוך שקופית אחרת.
               </p>
             )}
+            <label className="se-label">סוג השקופית</label>
+            <select
+              className="se-input se-type"
+              value={slide.type}
+              onChange={(e) => {
+                if (locked) return;
+                onChange(changeSlideType(game, selected, e.target.value as SlideType));
+              }}
+            >
+              {SLIDE_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+            <p className="se-type-hint">
+              {SLIDE_TYPES.find((t) => t.value === slide.type)?.hint ?? ''}
+            </p>
+
             <label className="se-label">שאלה / כותרת</label>
             <textarea
               className="se-input se-textarea"
@@ -219,6 +286,19 @@ export function SlideEditor({ game, currentSlideId, phase, onChange }: SlideEdit
                 />
               </div>
             </div>
+
+            {!votable && slide.type !== 'function' && (
+              <p className="se-type-note">
+                בשקופית מסוג זה אין הצבעה, ולכן אין תשובות. התשובות שכבר נכתבו נשמרות
+                ויחזרו אם תחזירו את הסוג.
+              </p>
+            )}
+
+            {/* פעולת מערכת — הקונפיג נגזר מהסכימה, כך שפעולות שיתווספו בעתיד
+                יופיעו כאן לבד (ראו schemaForm.ts). */}
+            {slide.type === 'function' && (
+              <FunctionConfigFields game={game} index={selected} slide={slide} onChange={onChange} />
+            )}
 
             {votable && (
               <div className="se-answers">

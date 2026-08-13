@@ -21,17 +21,39 @@ export type FieldNode =
    */
   | { kind: 'number'; key: string; label: string; optional: boolean; empty: number | '' | null }
   | { kind: 'boolean'; key: string; label: string; optional: boolean }
-  | { kind: 'enum'; key: string; label: string; optional: boolean; options: string[] }
+  /** בחירה מרשימה. `options` נגזר מ-z.enum או ממטא-דאטה `choice:` שבסכימה. */
+  | {
+      kind: 'enum';
+      key: string;
+      label: string;
+      optional: boolean;
+      options: { value: string; label: string }[];
+    }
   /** טיפוס שאין לו עורך ייעודי (מערך/union מורכב) — מוצג כ-JSON גולמי. */
   | { kind: 'json'; key: string; label: string; optional: boolean };
 
-/** מסיר עטיפות (optional/default/nullable/effects) ומחזיר את הטיפוס הפנימי. */
-function unwrap(type: z.ZodTypeAny): { inner: z.ZodTypeAny; optional: boolean } {
+/**
+ * מסיר עטיפות (optional/default/nullable/effects) ומחזיר את הטיפוס הפנימי.
+ * `description` נאסף תוך כדי הפירוק, כי `.describe()` יושב על העטיפה שעליה
+ * הוא הופעל — ולכן היה הולך לאיבוד אילו היינו קוראים רק את הטיפוס הפנימי.
+ */
+function unwrap(type: z.ZodTypeAny): {
+  inner: z.ZodTypeAny;
+  optional: boolean;
+  description: string | undefined;
+} {
   let current = type;
   let optional = false;
+  let description: string | undefined;
   // הגנה מפני עטיפה מעגלית/עמוקה מדי — לא אמור לקרות, אבל לא נתקע.
   for (let i = 0; i < 20; i += 1) {
-    const def = current._def as { typeName?: string; innerType?: z.ZodTypeAny; schema?: z.ZodTypeAny };
+    const def = current._def as {
+      typeName?: string;
+      innerType?: z.ZodTypeAny;
+      schema?: z.ZodTypeAny;
+      description?: string;
+    };
+    if (description === undefined && typeof def.description === 'string') description = def.description;
     const name = def.typeName;
     if (name === 'ZodOptional' || name === 'ZodNullable' || name === 'ZodDefault') {
       optional = true;
@@ -44,7 +66,29 @@ function unwrap(type: z.ZodTypeAny): { inner: z.ZodTypeAny; optional: boolean } 
     }
     break;
   }
-  return { inner: current, optional };
+  return { inner: current, optional, description };
+}
+
+/** התחילית שמסמנת מטא-דאטה של רשימת בחירה בתיאור השדה (ראו `choice` ב-schema.ts). */
+const CHOICE_PREFIX = 'choice:';
+
+/**
+ * קורא רשימת בחירה מתיאור השדה. הפורמט: `choice:{"value":"תווית",…}`.
+ * מוחזר null כשאין מטא-דאטה כזו — ואז השדה נשאר טקסט חופשי כרגיל.
+ */
+function parseChoice(description: string | undefined): { value: string; label: string }[] | null {
+  if (description === undefined || !description.startsWith(CHOICE_PREFIX)) return null;
+  try {
+    const raw: unknown = JSON.parse(description.slice(CHOICE_PREFIX.length));
+    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const options = Object.entries(raw as Record<string, unknown>).map(([value, label]) => ({
+      value,
+      label: typeof label === 'string' && label !== '' ? label : value,
+    }));
+    return options.length > 0 ? options : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -105,6 +149,19 @@ const LABELS: Record<string, string> = {
   image: 'תמונה',
   video: 'וידאו',
   playToEnd: 'ניגון עד הסוף',
+  // שקופית "פעולת מערכת" (function)
+  action: 'הפעולה',
+  api: 'קריאת API (webhook)',
+  url: 'כתובת (URL)',
+  method: 'שיטת שליחה',
+  screen: 'מסך להצגה',
+  operation: 'הפעולה על הניקוד',
+  players: 'משתתפים',
+  mode: 'מה לעשות בנבחרים',
+  unit: 'יחידת הכמות',
+  amount: 'כמות',
+  selection: 'לפי מה בוחרים',
+  groups: 'שמות הקבוצות',
 };
 
 /** תווית להצגה: עברית אם מוכר, אחרת שם השדה עצמו. */
@@ -161,7 +218,7 @@ function numericUnion(def: { typeName?: string; options?: z.ZodTypeAny[] }): { e
 
 /** בונה צומת יחיד לשדה. מחזיר null לשדות שאין טעם להציג. */
 export function describeField(key: string, type: z.ZodTypeAny): FieldNode | null {
-  const { inner, optional } = unwrap(type);
+  const { inner, optional, description } = unwrap(type);
   const def = inner._def as {
     typeName?: string;
     shape?: () => Record<string, z.ZodTypeAny>;
@@ -172,6 +229,9 @@ export function describeField(key: string, type: z.ZodTypeAny): FieldNode | null
   // איחוד מספרי מטופל לפני ה-switch כי הוא נבדק לפי התוכן, לא לפי השם.
   const numeric = numericUnion(def);
   if (numeric !== null) return { kind: 'number', key, label, optional: true, empty: numeric.empty };
+  // רשימת בחירה מוצהרת — שדה מחרוזת שהסכימה מציעה לו ערכים מוכרים.
+  const choice = parseChoice(description);
+  if (choice !== null) return { kind: 'enum', key, label, optional, options: choice };
   switch (def.typeName) {
     case 'ZodObject': {
       const children = describeObject(inner);
@@ -184,7 +244,13 @@ export function describeField(key: string, type: z.ZodTypeAny): FieldNode | null
     case 'ZodBoolean':
       return { kind: 'boolean', key, label, optional };
     case 'ZodEnum':
-      return { kind: 'enum', key, label, optional, options: def.values ?? [] };
+      return {
+        kind: 'enum',
+        key,
+        label,
+        optional,
+        options: (def.values ?? []).map((v) => ({ value: v, label: v })),
+      };
     default:
       // מערכים, union-ים מורכבים וכל טיפוס עתידי — עריכה כ-JSON גולמי, כדי
       // שהשדה יהיה נגיש גם בלי עורך ייעודי.
