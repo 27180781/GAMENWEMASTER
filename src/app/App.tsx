@@ -121,15 +121,22 @@ function Shell({
   children,
   style,
   bare = false,
+  fullWindow = false,
 }: {
   children: ReactNode;
   style?: Record<string, string>;
   /** בלי חיווי הריסיבר — למסכים שאינם משחק (כלי "חתום EXE"), שם הוא רק רעש. */
   bare?: boolean;
+  /**
+   * בלי הבמה — למסך שאינו מוקרן. הבמה היא משטח 16:9 קבוע שמוקטן לגודל החלון,
+   * וזה נכון למסכי המשחק; סביבת עבודה כמו העורך רק מפסידה ממנו: פסים שחורים
+   * בכל חלון שאינו 16:9, וטקסט שמוקטן יחד עם הכול במקום לנצל את המסך.
+   */
+  fullWindow?: boolean;
 }) {
   return (
-    <div className="game-root" dir="rtl" style={style}>
-      <Stage>{children}</Stage>
+    <div className={`game-root${fullWindow ? ' game-root--full' : ''}`} dir="rtl" style={style}>
+      {fullWindow ? children : <Stage>{children}</Stage>}
       {!bare && <ClickerDiagnostic />}
       {/* מסכים שאינם המשחק (הגדרות/פתיחה/עורך) — גם מהם צריך לצאת ממסך מלא
           כדי לגרור את החלון למסך השני. במשחק עצמו הכפתורים כבר בפינה.
@@ -815,10 +822,10 @@ export function App() {
         </Shell>
       );
     }
-    // עורך המשחק המקומי — מסך מלא, מעל מסך ההגדרות שממנו נפתח.
+    // עורך המשחק המקומי — על כל החלון, מעל מסך ההגדרות שממנו נפתח.
     if (editorOpen) {
       return (
-        <Shell bare style={themeStyle(pendingGame.setting)}>
+        <Shell bare fullWindow style={themeStyle(pendingGame.setting)}>
           <GameEditor
             game={pendingGame}
             onApply={(edited) => setPendingGame(edited)}
