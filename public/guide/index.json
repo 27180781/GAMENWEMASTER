@@ -1,0 +1,44 @@
+[
+  {
+    "slug": "01-pticha-vetinat-mishak",
+    "index": "פרק 1",
+    "name": "פתיחת התוכנה וטעינת המשחק",
+    "blurb": "המסך הראשון: טעינת קובץ המשחק מהמחשב או לפי קוד, וכפתורי החלון.",
+    "file": "01-pticha-vetinat-mishak.webm"
+  },
+  {
+    "slug": "02-bchirat-makor-hatzbaa",
+    "index": "פרק 2",
+    "name": "בחירת מקור ההצבעה",
+    "blurb": "שלטים, טלפונים, שניהם יחד או מצב דמה — מה כל אפשרות עושה.",
+    "file": "02-bchirat-makor-hatzbaa.webm"
+  },
+  {
+    "slug": "03-chibur-hareceiver",
+    "index": "פרק 3",
+    "name": "חיבור הריסיבר והשלטים",
+    "blurb": "איך השלטים מגיעים למשחק, מה אומר כל חיווי, ומה לעשות כשאין קליטה.",
+    "file": "03-chibur-hareceiver.webm"
+  },
+  {
+    "slug": "04-shemot-vekvutzot",
+    "index": "פרק 4",
+    "name": "שמות וקבוצות לשלטים",
+    "blurb": "שלוש דרכים לשייך שם וקבוצה לכל שלט — ומתי כדאי כל אחת.",
+    "file": "04-shemot-vekvutzot.webm"
+  },
+  {
+    "slug": "05-hatzagat-hamishak",
+    "index": "פרק 5",
+    "name": "הרצת המשחק",
+    "blurb": "המקשים שמפעילים את המשחק, מסך ההתחברות, ההצבעה וחשיפת התשובה.",
+    "file": "05-hatzagat-hamishak.webm"
+  },
+  {
+    "slug": "06-arichat-hamishak",
+    "index": "פרק 6",
+    "name": "עריכת המשחק במחשב",
+    "blurb": "הוספה ועריכה של שקופיות, סוגי שקופיות, הגדרות ושמירה לקובץ.",
+    "file": "06-arichat-hamishak.webm"
+  }
+]

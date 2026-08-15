@@ -5523,3 +5523,119 @@ body {
 }
 
 
+
+/* ---- מדריך הווידאו (אופליין) ---- */
+/* גם כאן, כמו בעורך: מסך עבודה מחוץ לבמה, ולכן ממלא את החלון. */
+.guide-screen {
+  background: #f2f0f7;
+  color: #4b3f6b;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: 0;
+  overflow: hidden;
+}
+.guide-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 22px;
+  background: #fff;
+  border-bottom: 1px solid #e6e2f0;
+  box-shadow: 0 2px 10px rgba(76, 63, 107, 0.08);
+}
+.guide-title { margin: 0; font-size: 22px; font-weight: 900; }
+.guide-spacer { flex: 1 1 auto; }
+.guide-close {
+  background: #fff;
+  border: 1px solid #e5566a;
+  color: #e5566a;
+  border-radius: 11px;
+  padding: 9px 16px;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.guide-close:hover { background: #fdeef0; }
+.guide-missing { margin: 40px auto; font-size: 19px; color: #8a80a8; text-align: center; }
+
+.guide-body { flex: 1 1 auto; display: flex; min-height: 0; gap: 16px; padding: 16px; }
+.guide-list {
+  flex: 0 0 330px;
+  width: 330px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.guide-item {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  text-align: start;
+  background: #fff;
+  border: 1px solid #e6e2f0;
+  border-radius: 12px;
+  padding: 11px 12px;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.guide-item:hover { border-color: #c9c0e6; }
+.guide-item--on { border-color: #fbc02d; background: #fff8e1; }
+.guide-item-index {
+  flex: 0 0 auto;
+  background: #6c5ce7;
+  color: #fff;
+  border-radius: 999px;
+  padding: 3px 11px;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.guide-item-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.guide-item-name { font-size: 16px; font-weight: 700; }
+.guide-item-blurb { font-size: 12.5px; color: #8a80a8; line-height: 1.45; }
+
+.guide-player {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+.guide-video {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  background: #16112b;
+  border-radius: 14px;
+  border: 1px solid #e6e2f0;
+  object-fit: contain;
+}
+.guide-caption { margin: 0; font-size: 15px; color: #4b3f6b; text-align: center; }
+.guide-next {
+  flex: 0 0 auto;
+  background: #22b573;
+  border: none;
+  color: #fff;
+  border-radius: 11px;
+  padding: 10px 22px;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.guide-next:hover { filter: brightness(1.06); }
+
+@media (max-width: 1100px) {
+  .guide-list { flex-basis: 260px; width: 260px; }
+}

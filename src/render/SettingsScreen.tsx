@@ -38,6 +38,8 @@ interface SettingsScreenProps {
   onPickAnother?: () => void;
   /** EXE בלבד — פתיחת עורך המשחק המקומי (לא זמין במשחק סגור). */
   onEditGame?: () => void;
+  /** פתיחת מדריך הווידאו (אופליין בלבד — הסרטונים מצורפים לתוכנה). */
+  onOpenGuide?: () => void;
   /** משחק מוטבע ("סגור") ב-EXE — מגביל את מקורות ההצבעה שמותר לבחור. */
   sealConfig?: SealConfig;
 }
@@ -53,6 +55,7 @@ export function SettingsScreen({
   offline = false,
   onPickAnother,
   onEditGame,
+  onOpenGuide,
   sealConfig,
 }: SettingsScreenProps) {
   // אונליין-דמו (‎?demo=1‎, לא אופליין): הקהל המדומה תמיד פעיל. אופליין: תלוי
@@ -500,7 +503,7 @@ export function SettingsScreen({
 
   // "טען משחק אחר" (EXE) — מוצג רק במסך הפתיחה, כשיש אפשרות לשכוח את המשחק השמור.
   const pickAnotherLink =
-    mode === 'start' && (onPickAnother || onEditGame) ? (
+    mode === 'start' && (onPickAnother || onEditGame || onOpenGuide) ? (
       <div className="settings-secondary">
         {onPickAnother && (
           <button className="settings-pick-another" onClick={onPickAnother}>
@@ -510,6 +513,11 @@ export function SettingsScreen({
         {onEditGame && (
           <button className="settings-pick-another" onClick={onEditGame}>
             ✏️ עריכת המשחק
+          </button>
+        )}
+        {onOpenGuide && (
+          <button className="settings-pick-another" onClick={onOpenGuide}>
+            🎬 מדריך שימוש
           </button>
         )}
       </div>
