@@ -25,6 +25,7 @@ import { ClickerDiagnostic } from '../render/ClickerDiagnostic.tsx';
 import { FloatingWindowControls } from '../render/WindowControls.tsx';
 import { SealScreen } from '../render/SealScreen.tsx';
 import { GameEditor } from '../render/GameEditor.tsx';
+import { GuideScreen } from '../render/GuideScreen.tsx';
 import {
   isDesktopClicker,
   isDesktopApp,
@@ -328,6 +329,8 @@ export function App() {
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   /** עורך המשחק המקומי פתוח (EXE, משחק שאינו סגור). */
   const [editorOpen, setEditorOpen] = useState(false);
+  /** מדריך הווידאו — אופליין בלבד, הסרטונים מצורפים לתוכנה. */
+  const [guideOpen, setGuideOpen] = useState(false);
   /** קוד המשחק שהוקלד, והתקדמות ההורדה מהשרת (null = לא מוריד כרגע). */
   const [gameCode, setGameCode] = useState('');
   const [downloading, setDownloading] = useState<DownloadProgress | null>(null);
@@ -822,6 +825,14 @@ export function App() {
         </Shell>
       );
     }
+    // מדריך הווידאו — על כל החלון, מעל מסך ההגדרות שממנו נפתח.
+    if (guideOpen) {
+      return (
+        <Shell bare fullWindow style={themeStyle(pendingGame.setting)}>
+          <GuideScreen onClose={() => setGuideOpen(false)} />
+        </Shell>
+      );
+    }
     // עורך המשחק המקומי — על כל החלון, מעל מסך ההגדרות שממנו נפתח.
     if (editorOpen) {
       return (
@@ -848,6 +859,7 @@ export function App() {
           {...(offline && sealConfig === null && canSaveEdits()
             ? { onEditGame: () => setEditorOpen(true) }
             : {})}
+          {...(offline ? { onOpenGuide: () => setGuideOpen(true) } : {})}
           onSave={(saved) => {
             persistAndSetSettings(saved);
             // ברירת מחדל — חוסמים עד סיום טעינה (מסך פתיחה + ספירה); עם ההגדרה
