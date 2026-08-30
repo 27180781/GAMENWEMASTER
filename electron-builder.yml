@@ -64,13 +64,19 @@ nsis:
 
 # בלי חתימת קוד (אין תעודה) — Windows יציג אזהרת SmartScreen בהרצה ראשונה
 
-# עדכון אוטומטי (electron-updater) — ספק "generic" מול תגית המהדורה היציבה.
-# הכתובת קבועה, ולכן כל בנייה מ-main דורסת שם את latest.yml ואת המתקין, והתוכנה
-# המותקנת מוצאת את הגרסה החדשה בלי שנצטרך תגית חדשה לכל מהדורה.
+# עדכון אוטומטי (electron-updater) — ספק "generic" מול **שרת המשחק**, לא מול
+# GitHub: כל התעבורה אצל הלקוח מגיעה מהשרת שלנו בלבד. את הקבצים השרת מושך
+# מהמהדורה ב-GitHub בזמן בניית תמונת ה-Docker שלו (ראו Dockerfile), כלומר
+# שרת-לשרת. הכתובת קבועה, ולכן כל בנייה חדשה דורסת שם את latest.yml ואת
+# המתקין, והתוכנה המותקנת מוצאת את הגרסה החדשה בלי תגית חדשה לכל מהדורה.
+#
+# הכתובת חייבת להיות זהה ל-DESKTOP_BASE_URL שב-electron/desktopHost.cjs —
+# tests/desktopHost.test.ts מוודא זאת.
+#
 # חשוב: העדכון פעיל *רק* בגרסת ההתקנה (NSIS). הגרסה הניידת אינה נתמכת
 # ב-electron-updater, ו-EXE חתום בכלל אסור לעדכן — הכתיבה מעליו הייתה מוחקת את
 # המשחק המוטבע בסופו. הסינון עצמו נמצא ב-electron/main.cjs.
 publish:
   provider: generic
-  url: https://github.com/27180781/GAMENWEMASTER/releases/download/desktop-latest
+  url: https://gamemwemaster.caprover.clicker.co.il/desktop
   channel: latest
