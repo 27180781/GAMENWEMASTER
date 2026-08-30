@@ -506,9 +506,11 @@ function downloadGameByCode(code, onProgress) {
   });
 }
 
-/** ה-EXE הבסיסי העדכני — המהדורה היציבה שנבנית מכל קומיט ב-main. */
-const SEAL_BASE_URL =
-  'https://github.com/27180781/GAMENWEMASTER/releases/download/desktop-latest/TriviaEngine-Portable.exe';
+/**
+ * ה-EXE הבסיסי העדכני — המהדורה היציבה שנבנית מכל קומיט ב-main, ומוגשת
+ * משרת המשחק (ראו desktopHost.cjs). גם ההורדה הזו אינה פונה ל-GitHub.
+ */
+const SEAL_BASE_URL = `${require('./desktopHost.cjs').DESKTOP_BASE_URL}/TriviaEngine-Portable.exe`;
 /** תקרת זמן להורדת הבסיס, ופסק-זמן על *שקט* בקו (לא על הגודל). */
 const BASE_DOWNLOAD_CEILING_MS = 10 * 60 * 1000;
 const BASE_DOWNLOAD_IDLE_MS = 45 * 1000;

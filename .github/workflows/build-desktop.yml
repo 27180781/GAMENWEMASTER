@@ -23,6 +23,8 @@ on:
 
 permissions:
   contents: write
+  # להפעלת פריסת האתר מחדש בסיום — ראו השלב האחרון.
+  actions: write
 
 concurrency:
   group: desktop
@@ -92,3 +94,12 @@ jobs:
             release/SealEXE.exe
             release/latest.yml
           prerelease: false
+
+      # הלקוח מוריד ומתעדכן מהשרת של המשחק, והשרת מקבל את הקבצים בזמן בניית
+      # תמונת ה-Docker שלו. לכן מהדורה חדשה כאן אינה מגיעה לאף אחד עד שהאתר
+      # נבנה מחדש — ובלי השלב הזה העדכון האוטומטי פשוט לא היה מתקדם לעולם.
+      - name: Redeploy the site so the server serves the new version
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run deploy-caprover.yml --ref main
