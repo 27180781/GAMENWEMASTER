@@ -8,6 +8,7 @@
  */
 
 const { app, BrowserWindow, dialog, globalShortcut, ipcMain, shell, protocol, net } = require('electron');
+const { nextZoomFactor, zoomActionFor } = require('./zoom.cjs');
 const path = require('node:path');
 const fs = require('node:fs');
 const crypto = require('node:crypto');
@@ -1295,6 +1296,7 @@ function createWindow() {
   void mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
 
   hardenWindow(mainWindow);
+  applyZoomControl(mainWindow);
   reportWindowState(mainWindow);
 
   /** מעבר מחלון הטעינה לחלון האמיתי — פעם אחת, מאיזה מסלול שיגיע קודם. */
@@ -1326,6 +1328,31 @@ function hardenWindow(win) {
 }
 
 /**
+ * שליטה בזום (ראו zoom.cjs להסבר מלא על הבאג שזה פותר).
+ *
+ * שני חלקים:
+ *  1. איפוס בכל טעינה — Chromium שומר את רמת הזום לכל origin, וכאן יש origin
+ *     אחד (file://) לכל התוכנה. בלי האיפוס, זום שנעשה פעם אחת בטעות נשאר
+ *     לנצח, כולל אחרי סגירה ופתיחה מחדש.
+ *  2. הקיצורים מטופלים כאן ולא דרך תפריט המערכת — התפריט מוסתר
+ *     (autoHideMenuBar) והחלון במסך מלא, ואסור שהיכולת לאפס תלויה בו.
+ */
+function applyZoomControl(win) {
+  const wc = win.webContents;
+  // צביטה במסך מגע/משטח — מייצרת זום ויזואלי שאין לו שום כפתור איפוס.
+  // עוטפים ב-Promise.resolve: הערך המוחזר השתנה בין גרסאות Electron, ואסור
+  // שהחלון ייפול על .catch של undefined.
+  Promise.resolve(wc.setVisualZoomLevelLimits(1, 1)).catch(() => {});
+  wc.on('did-finish-load', () => wc.setZoomFactor(1));
+  wc.on('before-input-event', (event, input) => {
+    const action = zoomActionFor(input);
+    if (action === null) return;
+    event.preventDefault();
+    wc.setZoomFactor(nextZoomFactor(wc.getZoomFactor(), action));
+  });
+}
+
+/**
  * פותח את חלון "מסך המנחה" — חלון Electron רגיל (לא קיוסק) שטוען את אותה
  * אפליקציה עם ‎#host, ומציג קונסולת שליטה ויזואלית. אם כבר פתוח — מביא לחזית.
  * הסנכרון מול המסך הגדול עובר דרך ממסר control:post/control:msg שב-main.
@@ -1350,6 +1377,7 @@ function openHostWindow() {
   });
   void hostWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), { hash: 'host' });
   hardenWindow(hostWindow);
+  applyZoomControl(hostWindow);
   hostWindow.on('closed', () => {
     hostWindow = null;
   });
