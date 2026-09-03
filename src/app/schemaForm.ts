@@ -121,6 +121,7 @@ const LABELS: Record<string, string> = {
   type: 'סוג',
   number: 'מספר מרבי',
   autoTransition: 'מעברים אוטומטיים',
+  nextSlide: 'מעבר לשקופית הבאה',
   gameType: 'סוג המשחק',
   gameTypeSettings: 'הגדרות סוג המשחק',
   snakesLadders: 'סולמות ונחשים',

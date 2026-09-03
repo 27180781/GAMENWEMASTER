@@ -6,13 +6,16 @@ import { describe, expect, it } from 'vitest';
 import {
   addAnswer,
   addSlide,
+  applyToAllSlides,
   duplicateSlide,
   moveSlide,
   nextSlideId,
   removeAnswer,
   removeSlide,
   setCorrect,
+  shuffleSlides,
   updateSlide,
+  VOTABLE_TYPES,
 } from '../src/app/slideEdit.ts';
 import { fourAnswers, makeGame, rawSlide } from './helpers.ts';
 
@@ -88,5 +91,59 @@ describe('slideEdit', () => {
     const slide = game3().questions[0]!;
     const after = setCorrect(slide, 2);
     expect(after.question.answers.filter((a) => a.correct).map((a) => a.id)).toEqual([3]);
+  });
+});
+
+/**
+ * כלי "ערבוב סדר השאלות" ו"החלה על כל השקופיות" — שניהם משנים הרבה שקופיות
+ * בבת אחת ואין להם ביטול, ולכן שווה לוודא במדויק במה הם נוגעים.
+ */
+describe('כלי העורך — ערבוב והחלה קולקטיבית', () => {
+  const mixed = () =>
+    makeGame([
+      rawSlide({ id: 1, type: 'subject', que: 'פתיח' }),
+      rawSlide({ id: 2, type: 'trivia', que: 'א', answers: fourAnswers(1), timeForQue: 10, scoreForQue: 1 }),
+      rawSlide({ id: 3, type: 'media', que: 'סרטון' }),
+      rawSlide({ id: 4, type: 'trivia', que: 'ב', answers: fourAnswers(2), timeForQue: 20, scoreForQue: 2 }),
+      rawSlide({ id: 5, type: 'survey', que: 'ג', answers: fourAnswers(1), timeForQue: 30, scoreForQue: 3 }),
+    ]);
+
+  it('★ ערבוב מזיז רק שקופיות מצביעות — הפתיח והסרטון נשארים במקומם', () => {
+    // rand קבוע (0) הופך את הערבוב לתמורה ידועה: [2,4,5] → [4,5,2].
+    const out = shuffleSlides(mixed(), () => 0);
+    expect(out.questions.map((q) => q.id)).toEqual([1, 4, 3, 5, 2]);
+    // הסוגים במקומם: שקופית שאינה מצביעה לא זזה, ומצביעה נוחתת רק על מקום של מצביעה.
+    expect(out.questions.map((q) => q.type)).toEqual([
+      'subject',
+      'trivia',
+      'media',
+      'survey',
+      'trivia',
+    ]);
+  });
+
+  it('ערבוב עם פחות משתי שאלות מחזיר את המשחק כמו שהוא', () => {
+    const one = makeGame([rawSlide({ id: 1, type: 'trivia', que: 'א', answers: fourAnswers(1) })]);
+    expect(shuffleSlides(one)).toBe(one);
+  });
+
+  it('★ החלה קולקטיבית נוגעת רק בשקופיות מצביעות', () => {
+    const out = applyToAllSlides(mixed(), { timeForQue: 25, scoreForQue: 9 });
+    for (const q of out.questions) {
+      if (VOTABLE_TYPES.has(q.type)) {
+        expect(q.question.timeForQue, String(q.id)).toBe(25);
+        expect(q.question.scoreForQue, String(q.id)).toBe(9);
+      }
+    }
+    // טקסט ומדיה נשארו על ערכי הריקון שלהן
+    expect(out.questions[0]!.question.scoreForQue).toBe(0);
+    expect(out.questions[2]!.question.scoreForQue).toBe(0);
+  });
+
+  it('★ שדה שלא נמסר אינו נדרס — אפשר להחיל ניקוד בלי לגעת בזמנים', () => {
+    const out = applyToAllSlides(mixed(), { scoreForQue: 9 });
+    expect(out.questions[1]!.question.scoreForQue).toBe(9);
+    expect(out.questions[1]!.question.timeForQue).toBe(10); // כמו שהיה
+    expect(out.questions[3]!.question.timeForQue).toBe(20);
   });
 });

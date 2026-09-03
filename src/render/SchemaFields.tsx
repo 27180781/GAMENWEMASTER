@@ -52,6 +52,23 @@ function SchemaField<T>({
   const set = (next: unknown) => onChange(setAt(value, path, next));
 
   if (node.kind === 'object') {
+    /*
+     * עטיפת מדיה — אובייקט שכל תוכנו `src` (לוגו, כל אחד משבעת הצלילים, מדיית
+     * הפתיחה…). כאן המבנה הוא פרט של ה-JSON ולא משהו שמחבר המשחק צריך לפתוח:
+     * אקורדיון מקונן שבתוכו שדה בודד בשם "קובץ / קישור" מסתיר את מה שבאמת
+     * נערך. במקומו — שורה אחת עם התווית של האב.
+     */
+    const only = node.children.length === 1 ? node.children[0] : undefined;
+    if (only?.key === 'src') {
+      return (
+        <SchemaField
+          node={{ ...only, label: node.label }}
+          value={value}
+          onChange={onChange}
+          path={[...path, only.key]}
+        />
+      );
+    }
     return (
       <details className="sf-section" open={path.length <= 1}>
         <summary className="sf-summary">{node.label}</summary>

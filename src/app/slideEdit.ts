@@ -243,3 +243,53 @@ export function setCorrect(slide: Slide, ansIndex: number): Slide {
   const answers = slide.question.answers.map((a, i) => ({ ...a, correct: i === ansIndex }));
   return { ...slide, question: { ...slide.question, answers } };
 }
+
+/**
+ * ערבוב סדר השאלות — כלי מ"כלים" בעורך.
+ *
+ * מעורבבות **רק שקופיות מצביעות**, וכל אחת נוחתת במקום של שקופית מצביעה אחרת.
+ * שקופיות טקסט/מדיה/פונקציה נשארות במקומן: הן משמשות כפתיח, מעבר או סיום, ומשחק
+ * שבו "ברוכים הבאים" קופץ לאמצע אינו ערבוב אלא תקלה.
+ *
+ * `rand` מוזרק כדי שהבדיקה תוכל לקבע את התוצאה.
+ */
+export function shuffleSlides(game: GameFile, rand: () => number = Math.random): GameFile {
+  const spots: number[] = [];
+  game.questions.forEach((q, i) => {
+    if (VOTABLE_TYPES.has(q.type)) spots.push(i);
+  });
+  if (spots.length < 2) return game;
+  const pool = spots.map((i) => game.questions[i]!);
+  // Fisher–Yates
+  for (let i = pool.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rand() * (i + 1));
+    [pool[i], pool[j]] = [pool[j]!, pool[i]!];
+  }
+  const questions = [...game.questions];
+  spots.forEach((slot, k) => {
+    questions[slot] = pool[k]!;
+  });
+  return { ...game, questions };
+}
+
+/**
+ * החלת זמן תגובה וניקוד על **כל השקופיות המצביעות** בבת אחת — כלי מ"כלים".
+ * שדה שלא נמסר אינו נוגע בקובץ, כך שאפשר להחיל ניקוד בלי לדרוס זמנים.
+ */
+export function applyToAllSlides(
+  game: GameFile,
+  values: { timeForQue?: number; scoreForQue?: number },
+): GameFile {
+  const questions = game.questions.map((q) => {
+    if (!VOTABLE_TYPES.has(q.type)) return q;
+    return {
+      ...q,
+      question: {
+        ...q.question,
+        ...(values.timeForQue === undefined ? {} : { timeForQue: values.timeForQue }),
+        ...(values.scoreForQue === undefined ? {} : { scoreForQue: values.scoreForQue }),
+      },
+    };
+  });
+  return { ...game, questions };
+}
