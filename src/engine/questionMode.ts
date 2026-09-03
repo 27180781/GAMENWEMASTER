@@ -49,9 +49,21 @@ export function showsSideImage(question: QuestionLike): boolean {
 }
 
 /**
- * טקסט מזהה לשקופית — לרשימות, לתפריט המפעיל ולדוח. בשאלת תמונה אין נוסח,
- * ובלי התווית הזו כל השאלות האלה היו נראות "(ללא כותרת)" ואי אפשר היה להבדיל
- * ביניהן.
+ * הטקסט שמוצג **לשחקנים** על המסך הגדול.
+ *
+ * בשאלת תמונה אין טקסט: התמונה היא הנוסח. גם אם נשלח `que`, הוא שם פנימי
+ * בלבד — ואסור שיגיע למקרן. מסך שמציג את זה חייב לצייר את התמונה במקומו.
+ */
+export function questionDisplayText(question: QuestionLike): string {
+  return isImageQuestion(question) ? '' : question.que;
+}
+
+/**
+ * טקסט מזהה לשקופית למסכים **הפנימיים** בלבד — רשימת השקופיות, תפריט המפעיל,
+ * חיפוש ודוח התוצאות. עשוי להחזיר את השם הפנימי של שאלת תמונה, ולכן אין
+ * להשתמש בו במה שהקהל רואה (שם: questionDisplayText).
+ *
+ * בלי התווית הזו כל שאלות התמונה היו נראות "(ללא כותרת)" ברשימה ובדוח.
  */
 export function questionLabel(question: QuestionLike, fallback = ''): string {
   const text = question.que.trim();
