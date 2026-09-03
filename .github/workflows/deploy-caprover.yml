@@ -1,4 +1,14 @@
-# פריסת פרודקשן ל-CapRover בכל דחיפה ל-main.
+# פריסת פרודקשן ל-CapRover.
+#
+# ⚠ מופעל **רק** מסיום build-desktop (או ידנית) — ולא בדחיפה ל-main.
+#
+# למה: התמונה מושכת לתוכה את קובצי ההתקנה של תוכנת האופליין (ראו Dockerfile),
+# ולכן היא חייבת להיבנות *אחרי* שה-EXE של אותו קומיט כבר פורסם. כשהייתה כאן
+# גם הפעלה בדחיפה, קרה זה: הפריסה מהדחיפה רצה דקות לפני שה-EXE נבנה ולכן
+# משכה את latest.yml של הגרסה *הקודמת*; הפריסה השנייה, זו שאחרי הבנייה, רצה
+# על אותו קומיט בדיוק — ולכן Docker מצא את שכבת ההורדה במטמון ולא הריץ אותה
+# מחדש, והשרת נשאר עם הגרסה הישנה. התוצאה: השרת תמיד פיגר בגרסה אחת,
+# והתוכנה המותקנת דיווחה "מעודכן" כי זה באמת מה שהשרת הציע לה.
 #
 # הגדרה חד-פעמית (Settings → Secrets and variables → Actions → Secrets):
 #   CAPROVER_SERVER    = https://captain.<root-domain>   (כתובת ה-captain של השרת)
@@ -10,8 +20,6 @@
 name: Deploy to CapRover
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -48,3 +56,27 @@ jobs:
       - name: Deployment skipped (secrets not configured)
         if: steps.check.outputs.enabled != 'true'
         run: echo "CAPROVER_* secrets are not set — skipping production deploy."
+
+      # ⚠ השלב שהיה חסר, ובגללו התקלה נמשכה בשקט: הפריסה "הצליחה" גם כשהשרת
+      # המשיך להגיש גרסה ישנה, כי איש לא בדק *מה* הוא מגיש בפועל. כאן בודקים
+      # שהאתר החי אכן מציע את אותה גרסה שמפורסמת במהדורה — אחרת הבנייה נכשלת
+      # ברעש, במקום שהמשתמש יגלה זאת כ"מעודכן" על גרסה שאינה האחרונה.
+      - name: Verify the live site serves the newest version
+        if: steps.check.outputs.enabled == 'true'
+        run: |
+          set -euo pipefail
+          base=$(node -e "process.stdout.write(require('./electron/desktopHost.cjs').DESKTOP_BASE_URL)")
+          release=https://github.com/${{ github.repository }}/releases/download/desktop-latest
+          want=$(curl -fsSL "$release/latest.yml" | sed -n 's/^version:[[:space:]]*//p' | tr -d '\r')
+          echo "המהדורה מפרסמת: $want · בודקים מול $base"
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            got=$(curl -fsSL "$base/index.json" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>process.stdout.write(JSON.parse(s).version||''))" || echo '')
+            if [ "$got" = "$want" ]; then
+              echo "✓ השרת מגיש $got"
+              exit 0
+            fi
+            echo "  ניסיון $i: השרת מגיש '${got:-—}', מצפים ל-$want — ממתין"
+            sleep 20
+          done
+          echo "::error::השרת מגיש '${got:-—}' במקום $want — העדכון האוטומטי לא יגיע ללקוחות"
+          exit 1

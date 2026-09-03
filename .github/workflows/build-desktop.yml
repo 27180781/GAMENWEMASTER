@@ -4,21 +4,11 @@
 
 name: Build Desktop EXE
 
+# בלי מסנן paths: הבנייה הזו היא **השלב היחיד** שמפרסם את האתר (ראו השלב
+# האחרון), ולכן דחיפה שלא הייתה מפעילה אותה הייתה נשארת בלי פריסה בכלל.
 on:
   push:
     branches: [main]
-    paths:
-      - 'src/**'
-      - 'public/**'
-      - 'fixtures/**'
-      - 'electron/**'
-      - 'index.html'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'vite.config.ts'
-      - 'tsconfig*.json'
-      - 'electron-builder.yml'
-      - '.github/workflows/build-desktop.yml'
   workflow_dispatch:
 
 permissions:
