@@ -2,9 +2,14 @@
  * מוריד את קובצי ההתקנה של תוכנת האופליין אל תוך אתר המשחק, כדי שהלקוח
  * יוריד ויתעדכן **מהשרת של המשחק בלבד** ולא יפנה ל-GitHub.
  *
- * רץ בזמן בניית תמונת ה-Docker (ראו Dockerfile), כלומר בצד השרת/CI — הלקוח
- * לעולם אינו רואה את המקור. הבנייה נכשלת ברעש אם קובץ חסר או פגום, במקום
- * שהתקלה תתגלה בשקט אצל לקוח באמצע אירוע.
+ * רץ בשני זמנים, ושניהם בצד השרת — הלקוח לעולם אינו רואה את המקור:
+ *   • בזמן בניית תמונת ה-Docker (ראו Dockerfile) — כדי שהתמונה תצא שלמה.
+ *   • ובעליית המכולה, כרענון (ראו refresh-desktop-assets.mjs) — כי הבנייה
+ *     קורית לפני שה-EXE של אותו קומיט פורסם, ובלי הרענון השרת היה מגיש
+ *     לצמיתות את הגרסה הקודמת.
+ *
+ * הבנייה נכשלת ברעש אם קובץ חסר או פגום, במקום שהתקלה תתגלה בשקט אצל לקוח
+ * באמצע אירוע.
  *
  * שימוש: node tools/fetch-desktop-assets.mjs <תיקיית-יעד>
  * משתני סביבה:
@@ -15,18 +20,31 @@
 import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync, rmSync, statSync, linkSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
-const SOURCE =
+export const SOURCE =
   process.env.DESKTOP_SOURCE_URL ??
   'https://github.com/27180781/GAMENWEMASTER/releases/download/desktop-latest';
-
-const outDir = process.argv[2] ?? 'dist/desktop';
 
 /** גודל מינימלי סביר ל-EXE של Electron — שומר מפני "הורדה" של דף שגיאה. */
 const MIN_EXE_BYTES = 40 * 1024 * 1024;
 
+/**
+ * שלושת השדות ש-electron-updater קורא מ-latest.yml. מופרד כדי שגם הרענון
+ * יוכל לקרוא את הגרסה בלי לחזור על ניתוח הפורמט — וכדי שיהיה ניתן לבדיקה.
+ */
+export function parseFeed(text) {
+  const version = /^version:\s*(.+)$/m.exec(text)?.[1]?.trim();
+  const installer = /^path:\s*(.+)$/m.exec(text)?.[1]?.trim();
+  const sha512 = /^sha512:\s*(.+)$/m.exec(text)?.[1]?.trim();
+  if (!version || !installer || !sha512) {
+    throw new Error('latest.yml אינו בפורמט הצפוי (חסר version/path/sha512)');
+  }
+  return { version, installer, sha512 };
+}
+
 /** הורדה עם כמה ניסיונות — כשל רשתי חולף לא אמור להפיל בנייה שלמה. */
-async function fetchWithRetry(url, tries = 4) {
+export async function fetchWithRetry(url, tries = 4) {
   let lastErr;
   for (let i = 1; i <= tries; i += 1) {
     try {
@@ -47,10 +65,10 @@ async function fetchWithRetry(url, tries = 4) {
 
 const sha512b64 = (buf) => createHash('sha512').update(buf).digest('base64');
 
-async function main() {
+export async function fetchDesktopAssets(outDir) {
   if (process.env.DESKTOP_ASSETS === '0') {
     console.log('DESKTOP_ASSETS=0 — מדלגים על הורדת קובצי ההתקנה.');
-    return;
+    return null;
   }
 
   mkdirSync(outDir, { recursive: true });
@@ -59,12 +77,7 @@ async function main() {
   // ומה ה-sha512 שלו. לכן קוראים אותו קודם ומורידים בדיוק את מה שהוא מציין.
   console.log(`מוריד latest.yml מ-${SOURCE}`);
   const feed = (await fetchWithRetry(`${SOURCE}/latest.yml`)).toString('utf8');
-  const version = /^version:\s*(.+)$/m.exec(feed)?.[1]?.trim();
-  const installer = /^path:\s*(.+)$/m.exec(feed)?.[1]?.trim();
-  const wantHash = /^sha512:\s*(.+)$/m.exec(feed)?.[1]?.trim();
-  if (!version || !installer || !wantHash) {
-    throw new Error('latest.yml אינו בפורמט הצפוי (חסר version/path/sha512)');
-  }
+  const { version, installer, sha512: wantHash } = parseFeed(feed);
   console.log(`גרסה ${version} · מתקין ${installer}`);
   writeFileSync(join(outDir, 'latest.yml'), feed);
 
@@ -118,10 +131,16 @@ async function main() {
     total += st.size;
   }
   console.log(`סה״כ ${(total / 1048576).toFixed(0)}MB ב-${outDir} (${seen.size} קבצים ייחודיים)`);
+  return version;
 }
 
-main().catch((err) => {
-  console.error(`\n✗ הורדת קובצי ההתקנה נכשלה: ${err.message}`);
-  rmSync(outDir, { recursive: true, force: true });
-  process.exit(1);
-});
+// הרצה ישירה מהפקודה (ולא ייבוא מהרענון) — מוחקים את היעד בכישלון, כדי
+// שהבנייה לא תמשיך עם תיקייה חלקית שנראית תקינה.
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const outDir = process.argv[2] ?? 'dist/desktop';
+  fetchDesktopAssets(outDir).catch((err) => {
+    console.error(`\n✗ הורדת קובצי ההתקנה נכשלה: ${err.message}`);
+    rmSync(outDir, { recursive: true, force: true });
+    process.exit(1);
+  });
+}
