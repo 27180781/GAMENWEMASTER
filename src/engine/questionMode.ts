@@ -54,7 +54,9 @@ export function showsSideImage(question: QuestionLike): boolean {
  * ביניהן.
  */
 export function questionLabel(question: QuestionLike, fallback = ''): string {
-  if (isImageQuestion(question)) return IMAGE_QUESTION_LABEL;
   const text = question.que.trim();
+  // בשאלת תמונה `que` אינו מוצג לשחקנים, אבל אם נשלח בכל זאת טקסט הוא משמש
+  // כשם פנימי — שימושי בדוח ובחיפוש הרבה יותר מתווית גנרית. ריק = התווית.
+  if (isImageQuestion(question)) return text !== '' ? question.que : IMAGE_QUESTION_LABEL;
   return text !== '' ? question.que : fallback;
 }
