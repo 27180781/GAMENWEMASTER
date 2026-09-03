@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import {
   IMAGE_QUESTION_LABEL,
   isImageQuestion,
+  questionDisplayText,
   questionLabel,
   questionMode,
   showsSideImage,
@@ -221,5 +222,36 @@ describe('שאלת תמונה לצד מדיה אחרת של אותה שקופי�
     expect(parsed.question.src).toBe('https://x/q.jpg');
     expect(parsed.openMedia.src).toBe('https://x/before.mp4');
     expect(parsed.backgroundMedia.src).toBe('https://x/bg.jpg');
+  });
+});
+
+/**
+ * ★ הפרדה בין מה שהקהל רואה למה שפנימי.
+ *
+ * מערכת יצירת המשחקים יכולה לשלוח `que` בשאלת תמונה כ**שם פנימי** (למשל
+ * "שאלת הלוגו"). השם הזה שימושי בדוח וברשימות — ואסור לו להגיע למקרן.
+ * בלי ההפרדה הזו מסך פירוט ההצבעות, שמוצג לקהל, היה מדפיס אותו.
+ */
+describe('שם פנימי לא מגיע למסך שהקהל רואה', () => {
+  const named = q({ que: 'שאלת הלוגו', queMode: 'image', src: 'https://x/a.jpg' });
+
+  it('★ questionDisplayText מחזיר ריק בשאלת תמונה — גם כשיש שם פנימי', () => {
+    expect(questionDisplayText(named)).toBe('');
+  });
+
+  it('questionLabel — הפנימי — כן מחזיר את השם', () => {
+    expect(questionLabel(named)).toBe('שאלת הלוגו');
+  });
+
+  it('בשאלת טקסט שניהם מחזירים את הנוסח, כי הוא גם מוצג וגם מזהה', () => {
+    const text = q({ que: 'מהי בירת ישראל?' });
+    expect(questionDisplayText(text)).toBe('מהי בירת ישראל?');
+    expect(questionLabel(text)).toBe('מהי בירת ישראל?');
+  });
+
+  it('שאלת תמונה בלי שם פנימי — אין מה להדליף', () => {
+    const plain = q({ que: '', queMode: 'image', src: 'https://x/a.jpg' });
+    expect(questionDisplayText(plain)).toBe('');
+    expect(questionLabel(plain)).toBe(IMAGE_QUESTION_LABEL);
   });
 });
