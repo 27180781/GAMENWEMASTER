@@ -179,7 +179,34 @@ export const functionConfigSchema = z.object({
     .optional(),
 });
 
+/**
+ * ניקוד ברירת המחדל לשקופית מנוקדת שהגיעה בלי ערך ניקוד.
+ *
+ * מערכת יצירת המשחקים מציגה למחבר 7 כשלא נבחר ניקוד, ולכן 7 הוא הערך הנכון.
+ * (בעבר המסלול המקוון נפל ל-7 והמסלול האופליין ל-3, ואותה שקופית הייתה שווה
+ * ניקוד שונה לפי הדרך שבה הרצת את המשחק. תוקן אצלם ל-7 בשני המסלולים.)
+ *
+ * חל **רק על שקופיות מנוקדות**: בטקסט/מדיה/פונקציה ‎""‎ הוא כלל הריקון הרגיל
+ * ומשמעותו "אין ניקוד", ושם הוא נשאר 0.
+ */
+const DEFAULT_SCORE_FOR_VOTABLE = 7;
+
 export const slideSchema = z
+  .preprocess((raw) => {
+    // רשת ביטחון בלבד: בקבצים אמיתיים שקופית מנוקדת תמיד נושאת מספר. אם בכל
+    // זאת יגיע ‎""‎, עדיף להסכים עם המסלול המקוון מאשר לשתוק ולנקד באפס.
+    if (typeof raw !== 'object' || raw === null) return raw;
+    const slide = raw as Record<string, unknown>;
+    const question = slide['question'];
+    if (typeof question !== 'object' || question === null) return raw;
+    if ((question as Record<string, unknown>)['scoreForQue'] !== '') return raw;
+    const type = slideTypeSchema.safeParse(slide['type']);
+    if (!type.success || !VOTABLE_TYPES.has(type.data)) return raw;
+    return {
+      ...slide,
+      question: { ...question, scoreForQue: DEFAULT_SCORE_FOR_VOTABLE },
+    };
+  }, z
   .object({
     id: z.number(),
     type: slideTypeSchema,
@@ -247,7 +274,7 @@ export const slideSchema = z
         answers: slide.question.answers.map((a, i) => ({ ...a, id: i + 1 })),
       },
     };
-  });
+  }));
 
 // ---------------------------------------------------------------------------
 // הגדרות גלובליות (SPEC 3.4)

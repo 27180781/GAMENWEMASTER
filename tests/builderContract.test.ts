@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { GameEngine, parseGameFile, slideTypeSchema } from '../src/engine/index.ts';
-import { makeSnapshot } from './helpers.ts';
+import { FIXTURE_NAMES, loadFixtureRaw, makeSnapshot } from './helpers.ts';
 
 const T0 = 1_000_000;
 
@@ -205,6 +205,45 @@ describe('סעיף 5 — כלל הריקון', () => {
     for (const type of ['media', 'function']) {
       const g = gameOf([{ ...emptied, type, function: { action: 'screen', screen: { type: 'winners' } } }]);
       expect(g.questions[0]!.question.timeForQue, type).toBe(15);
+    }
+  });
+});
+
+/**
+ * ניקוד ברירת מחדל. אצלם התגלה שאותה שקופית בלי ערך ניקוד קיבלה 7 באונליין
+ * ו-3 באופליין — כמעט שליש מהשקופיות המנוקדות במסד. תוקן ל-7 בשני המסלולים,
+ * וכאן מוודאים שגם המנוע מסכים על 7, ורק בשקופיות שבאמת מנוקדות.
+ */
+describe('ניקוד ברירת מחדל — 7, כמו שהעורך מציג', () => {
+  const withScore = (type: string, scoreForQue: number | '') =>
+    gameOf([{ ...DOC_SLIDE, type, question: { ...DOC_SLIDE.question, scoreForQue } }])
+      .questions[0]!.question.scoreForQue;
+
+  it('★ שקופית מנוקדת בלי ערך ניקוד — 7, ולא 0', () => {
+    for (const type of ['trivia', 'survey', 'ans_images']) {
+      expect(withScore(type, ''), type).toBe(7);
+    }
+  });
+
+  it('★ ערך שנקבע במפורש גובר — כולל 0', () => {
+    expect(withScore('trivia', 3)).toBe(3);
+    expect(withScore('trivia', 0)).toBe(0); // מחבר שביקש 0 מקבל 0
+  });
+
+  it('בטקסט/מדיה/פונקציה "" נשאר 0 — כלל הריקון, לא ניקוד חסר', () => {
+    for (const type of ['subject', 'media', 'function']) {
+      expect(withScore(type, ''), type).toBe(0);
+    }
+  });
+
+  it('הקבצים האמיתיים אינם מושפעים — שקופית מנוקדת תמיד נושאת מספר', () => {
+    // הרשת נדרכת רק על "" בשקופית מנוקדת, מצב שלא קיים באף fixture.
+    for (const name of FIXTURE_NAMES) {
+      const raw = loadFixtureRaw(name) as { questions: { type: string; question: { scoreForQue: unknown } }[] };
+      const offenders = raw.questions.filter(
+        (q) => ['trivia', 'survey', 'ans_images'].includes(q.type) && q.question.scoreForQue === '',
+      );
+      expect(offenders, name).toHaveLength(0);
     }
   });
 });

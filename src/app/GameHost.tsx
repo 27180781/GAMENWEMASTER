@@ -62,6 +62,7 @@ import { SettingsScreen } from '../render/SettingsScreen.tsx';
 import { AudioManager } from './AudioManager.ts';
 import { decodeSlideMedia } from './mediaDecode.ts';
 import { extractHostVote } from './hostRemote.ts';
+import { autoSkipDelayMs } from './autoSkip.ts';
 import { completedQuestionCount, shouldShowLeaderboard } from './leaderboardSchedule.ts';
 import {
   assignGroupByNumber,
@@ -1734,14 +1735,12 @@ export function GameHost({
 
   // automaticSkip: מעבר אוטומטי אחרי X שניות כשאין מדיה פעילה
   useEffect(() => {
-    if (stage !== 'playing' || state.activeMedia !== null) return;
-    const skip = slide.setting.automaticSkip;
-    const waiting =
-      state.phase === 'results' || (state.phase === 'showing' && !isVotableSlide(slide));
-    if (!skip.active || !waiting) return;
+    if (stage !== 'playing') return;
+    const delay = autoSkipDelayMs(slide, state.phase, state.activeMedia !== null);
+    if (delay === null) return;
     const timeout = window.setTimeout(
       () => engine.dispatch({ type: 'ADVANCE', at: Date.now() }),
-      Math.max(1, skip.seconds) * 1000,
+      delay,
     );
     return () => window.clearTimeout(timeout);
   }, [stage, state.phase, state.activeMedia, state.currentSlideId, engine, slide]);
