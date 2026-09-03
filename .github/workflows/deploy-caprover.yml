@@ -3,19 +3,19 @@
 # ⚠ מופעל **רק** מסיום build-desktop (או ידנית) — ולא בדחיפה ל-main.
 #
 # למה: התמונה מושכת לתוכה את קובצי ההתקנה של תוכנת האופליין (ראו Dockerfile),
-# ולכן היא חייבת להיבנות *אחרי* שה-EXE של אותו קומיט כבר פורסם. כשהייתה כאן
-# גם הפעלה בדחיפה, קרה זה: הפריסה מהדחיפה רצה דקות לפני שה-EXE נבנה ולכן
-# משכה את latest.yml של הגרסה *הקודמת*; הפריסה השנייה, זו שאחרי הבנייה, רצה
-# על אותו קומיט בדיוק — ולכן Docker מצא את שכבת ההורדה במטמון ולא הריץ אותה
-# מחדש, והשרת נשאר עם הגרסה הישנה. התוצאה: השרת תמיד פיגר בגרסה אחת,
-# והתוכנה המותקנת דיווחה "מעודכן" כי זה באמת מה שהשרת הציע לה.
+# ולכן היא חייבת להיבנות *אחרי* שה-EXE של אותו קומיט כבר פורסם. פריסה שרצה
+# בדחיפה מושכת בהכרח את latest.yml של הגרסה הקודמת — ה-EXE של הקומיט הזה עוד
+# לא נבנה — ולכן השרת מגיש גרסה מפגרת, והתוכנה המותקנת מדווחת "מעודכן" כי זה
+# באמת מה שהשרת מציע לה.
 #
 # הגדרה חד-פעמית (Settings → Secrets and variables → Actions → Secrets):
 #   CAPROVER_SERVER    = https://captain.<root-domain>   (כתובת ה-captain של השרת)
 #   CAPROVER_APP       = שם האפליקציה ב-CapRover (למשל trivia-engine)
 #   CAPROVER_APP_TOKEN = App Token (באפליקציה: Deployment → Enable App Token)
 #
-# עד שה-secrets מוגדרים — שלב הפריסה מדלג בשקט (הבדיקות עדיין רצות).
+# ⚠ אם ה-secrets חסרים — הריצה **נכשלת**. עד עכשיו היא דילגה בשקט וסיימה
+# בירוק, ולכן 188 ריצות "מוצלחות" ברצף לא פרסמו דבר ואיש לא ידע. פריסה שלא
+# קרתה חייבת להיראות ככישלון.
 
 name: Deploy to CapRover
 
@@ -53,9 +53,13 @@ jobs:
             --appToken "${{ secrets.CAPROVER_APP_TOKEN }}" \
             --branch "${GITHUB_REF_NAME}"
 
-      - name: Deployment skipped (secrets not configured)
+      - name: Fail loudly when the deploy could not run
         if: steps.check.outputs.enabled != 'true'
-        run: echo "CAPROVER_* secrets are not set — skipping production deploy."
+        run: |
+          echo "::error::CAPROVER_SERVER / CAPROVER_APP / CAPROVER_APP_TOKEN אינם מוגדרים — האתר לא נפרס."
+          echo "הגדירו אותם ב-Settings → Secrets and variables → Actions, או מחקו את ה-workflow הזה"
+          echo "אם הפריסה נעשית בדרך אחרת. workflow שמתיימר לפרוס ולא פורס גרוע משאין."
+          exit 1
 
       # ⚠ השלב שהיה חסר, ובגללו התקלה נמשכה בשקט: הפריסה "הצליחה" גם כשהשרת
       # המשיך להגיש גרסה ישנה, כי איש לא בדק *מה* הוא מגיש בפועל. כאן בודקים
