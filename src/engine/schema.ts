@@ -375,7 +375,15 @@ export const globalSettingsSchema = z.object({
     .string()
     .optional()
     .default('classic')
-    .transform((v) => (v === 'snakes_ladders_team' ? v : 'classic')),
+    .transform((v) => (v === 'snakes_ladders_team' ? v : 'classic'))
+    // המטא-דאטה נשמרת גם אחרי ה-transform, כדי שהעורך יציג בורר בעברית ולא
+    // תיבת טקסט עם הערך האנגלי הגולמי (ראו parseChoice ב-schemaForm.ts).
+    .describe(
+      `choice:${JSON.stringify({
+        classic: 'משחק קלאסי',
+        snakes_ladders_team: 'סולמות וחבלים קבוצתי',
+      })}`,
+    ),
   /** הגדרות ייעודיות לסוג המשחק. כולן אופציונליות עם ברירות מחדל שמישות. */
   gameTypeSettings: z
     .object({
@@ -390,7 +398,13 @@ export const globalSettingsSchema = z.object({
             .string()
             .optional()
             .default('percent')
-            .transform((v) => (v === 'dice' ? 'dice' : 'percent')),
+            .transform((v) => (v === 'dice' ? 'dice' : 'percent'))
+            .describe(
+              `choice:${JSON.stringify({
+                percent: 'לפי אחוז ההצלחה של כל קבוצה',
+                dice: 'הטלת קובייה לקבוצה המובילה',
+              })}`,
+            ),
         })
         .optional()
         .default({ progression: 'percent' }),

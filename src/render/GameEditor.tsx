@@ -14,30 +14,30 @@ import { useEffect, useRef, useState } from 'react';
 import type { GameFile } from '../engine/index.ts';
 import { SlideForm, SlideList } from './SlideEditor.tsx';
 import { SchemaFields } from './SchemaFields.tsx';
-import { describeObject, type FieldNode } from '../app/schemaForm.ts';
-import { globalSettingsSchema, slideSettingsSchema } from '../engine/schema.ts';
-import { addSlideOfType, SLIDE_TYPES } from '../app/slideEdit.ts';
+import { describeObject } from '../app/schemaForm.ts';
+import { globalSettingsSchema } from '../engine/schema.ts';
+import {
+  SETTINGS_SECTIONS,
+  sectionNodes,
+  unassignedSettings,
+} from '../app/editorLayout.ts';
+import {
+  addSlideOfType,
+  applyToAllSlides,
+  shuffleSlides,
+  SLIDE_TYPES,
+  VOTABLE_TYPES,
+} from '../app/slideEdit.ts';
 import { saveEditedGame } from '../app/clickerBridge.ts';
 
-/**
- * שדות שכבר נערכים בטופס הייעודי — לא מציגים אותם פעמיים. כל *שאר* השדות
- * בסכימה (כולל כאלה שיתווספו בעתיד) נגזרים אוטומטית.
- */
-const SETTING_HANDLED = ['titleThroughoutGame'];
-
 /** עץ השדות נגזר פעם אחת — הסכימה קבועה לאורך חיי התוכנה. */
-const SETTING_FIELDS = describeObject(globalSettingsSchema, SETTING_HANDLED);
-const SLIDE_SETTING_FIELDS = describeObject(slideSettingsSchema);
+const SETTING_FIELDS = describeObject(globalSettingsSchema);
 
 /**
- * העמודה הצדית מסודרת כאקורדיונים. שדות "שטוחים" (צבע, מספר זוכים…) אין להם
- * קבוצה משלהם בסכימה, ולכן הם נאספים לאקורדיון אחד — כדי שהעמודה תיראה אחידה
- * ולא חצי רשימה שטוחה וחצי מקופלת.
+ * שדות שאינם משויכים לאף קבוצה. בדרך כלל ריק — אבל אם יתווסף שדה לסכימה, עדיף
+ * שיופיע כאן מאשר שייעלם מהעורך בשקט (ראו editorLayout.ts).
  */
-const FLAT_SETTINGS = SETTING_FIELDS.filter((n) => n.kind !== 'object');
-const GROUP_SETTINGS = SETTING_FIELDS.filter((n): n is FieldNode & { kind: 'object' } =>
-  n.kind === 'object',
-);
+const EXTRA_SETTINGS = unassignedSettings(SETTING_FIELDS);
 
 interface GameEditorProps {
   game: GameFile;
@@ -53,22 +53,69 @@ type SaveState =
   | { kind: 'error'; message: string };
 
 /**
- * אייקון לקבוצת הגדרות. קבוצה שאין לה אייקון מוכר מקבלת ברירת מחדל — כדי
- * שקבוצה שתתווסף לסכימה תיראה תקין בלי לגעת כאן.
+ * "כלים" — פעולות מיידיות על כל השקופיות יחד, כמו בעורך המקוון. שתיהן משנות
+ * הרבה שקופיות בבת אחת ואין להן ביטול, ולכן שתיהן מאחורי אישור.
  */
-const SECTION_ICONS: Record<string, string> = {
-  sound: '🔊',
-  limit: '🔑',
-  gameTypeSettings: '🎲',
-  gameMedia: '🎬',
-  logo: '🏷',
-  triviaMedia: '❓',
-  winnersMedia: '🏆',
-  winnersListMedia: '📊',
-  autoTransition: '⏭',
-};
-function sectionIcon(key: string): string {
-  return SECTION_ICONS[key] ?? '🎛';
+function GameTools({ game, onChange }: { game: GameFile; onChange: (g: GameFile) => void }) {
+  const [time, setTime] = useState('');
+  const [score, setScore] = useState('');
+  const votable = game.questions.filter((q) => VOTABLE_TYPES.has(q.type)).length;
+
+  const applyAll = () => {
+    const values: { timeForQue?: number; scoreForQue?: number } = {};
+    if (time.trim() !== '') values.timeForQue = Number(time);
+    if (score.trim() !== '') values.scoreForQue = Number(score);
+    if (values.timeForQue === undefined && values.scoreForQue === undefined) return;
+    if (!window.confirm(`להחיל על ${votable} השקופיות המצביעות? הערכים הקיימים יידרסו.`)) return;
+    onChange(applyToAllSlides(game, values));
+    setTime('');
+    setScore('');
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        className="ge-tool"
+        disabled={votable < 2}
+        onClick={() => {
+          if (window.confirm('לערבב את סדר השאלות? אי אפשר לבטל.')) {
+            onChange(shuffleSlides(game));
+          }
+        }}
+      >
+        🔀 ערבוב סדר השאלות
+      </button>
+      <p className="ge-hint">
+        מעורבבות השאלות בלבד. שקופיות טקסט, מדיה ופונקציה נשארות במקומן.
+      </p>
+
+      <div className="ge-tool-block">
+        <b>החלה על כל השקופיות</b>
+        <p className="ge-hint">
+          עדכון זמן מענה וניקוד לכל {votable} השאלות בבת אחת. שדה שנשאר ריק לא ישתנה.
+        </p>
+        <div className="ge-tool-row">
+          <label className="ge-field">
+            <span>זמן מענה (שניות)</span>
+            <input type="number" dir="ltr" value={time} onChange={(e) => setTime(e.target.value)} />
+          </label>
+          <label className="ge-field">
+            <span>ניקוד</span>
+            <input type="number" dir="ltr" value={score} onChange={(e) => setScore(e.target.value)} />
+          </label>
+        </div>
+        <button
+          type="button"
+          className="ge-tool"
+          disabled={votable === 0 || (time.trim() === '' && score.trim() === '')}
+          onClick={applyAll}
+        >
+          החל על כל השקופיות
+        </button>
+      </div>
+    </>
+  );
 }
 
 /** אקורדיון בעמודת ההגדרות. */
@@ -191,42 +238,44 @@ export function GameEditor({ game, onApply, onClose }: GameEditorProps) {
       <div className="ge-main">
         <aside className="ge-sidebar">
           <div className="ge-sidebar-scroll">
-            {/* שם המשחק נערך בסרגל העליון בלבד — שני שדות לאותו ערך היו יוצאים
-                מסנכרון זה עם זה. */}
-            <Section title="כללי" icon="⚙️" open>
-              <label className="ge-field">
-                <span>כותרת קבועה במשחק</span>
-                <input
-                  type="text"
-                  defaultValue={draft.setting.titleThroughoutGame}
-                  key={`title-${game.id}`}
-                  onBlur={(e) =>
-                    edit({
-                      ...draft,
-                      setting: { ...draft.setting, titleThroughoutGame: e.target.value },
-                    })
-                  }
-                />
-              </label>
-              <SchemaFields nodes={FLAT_SETTINGS} value={draft} onChange={edit} path={['setting']} />
-            </Section>
-
-            {/* כל קבוצה בסכימה מקבלת אקורדיון משלה — קבוצה שתתווסף תופיע כאן לבד */}
-            {GROUP_SETTINGS.map((node) => (
-              <Section key={node.key} title={node.label} icon={sectionIcon(node.key)}>
+            {/* הקבוצות מוצהרות (editorLayout.ts) ולא נגזרות ממבנה ה-JSON, כדי
+                שהעמודה תיראה כמו במערכת יצירת המשחקים ולא כמו הסכימה. */}
+            {SETTINGS_SECTIONS.map((section, i) => (
+              <Section
+                key={section.id}
+                title={section.title}
+                icon={section.icon}
+                open={i === 0}
+              >
                 <SchemaFields
-                  nodes={node.children}
+                  nodes={sectionNodes(SETTING_FIELDS, section).filter(
+                    // הגדרות סוג המשחק רלוונטיות רק כשנבחר סוג שאינו הקלאסי;
+                    // אחרת זו קבוצה שלמה שאי אפשר לעשות בה כלום.
+                    (n) => n.key !== 'gameTypeSettings' || draft.setting.gameType !== 'classic',
+                  )}
                   value={draft}
                   onChange={edit}
-                  path={['setting', node.key]}
+                  path={['setting']}
                 />
               </Section>
             ))}
-          </div>
-          <div className="ge-sidebar-foot">
-            <p className="ge-hint">
-              כל השדות כאן נגזרים אוטומטית מסכימת המשחק — כולל שדות שיתווספו בעתיד.
-            </p>
+
+            <Section title="כלים" icon="🔧">
+              <GameTools game={draft} onChange={edit} />
+            </Section>
+
+            {/* רשת ביטחון: שדה שנוסף לסכימה ולא שויך לאף קבוצה — עדיף שיופיע
+                כאן מאשר שייעלם מהעורך בלי שאיש ישים לב. */}
+            {EXTRA_SETTINGS.length > 0 && (
+              <Section title="שדות נוספים" icon="🧩">
+                <SchemaFields
+                  nodes={EXTRA_SETTINGS}
+                  value={draft}
+                  onChange={edit}
+                  path={['setting']}
+                />
+              </Section>
+            )}
           </div>
         </aside>
 
@@ -274,24 +323,14 @@ export function GameEditor({ game, onApply, onClose }: GameEditorProps) {
           </div>
           <div className="ge-canvas">
             {/* currentSlideId=-1: אין שקופית "בהצבעה", ולכן שום שקופית אינה נעולה */}
+            {/* הגדרות השקופית המתקדמות נפתחות בכפתור ⚙ שליד נוסח השאלה, כמו
+                במערכת יצירת המשחקים — ולא כרשימת שדות שנגזרת מה-JSON. */}
             <SlideForm
               game={draft}
               selected={selected}
               currentSlideId={-1}
               onChange={edit}
-              footer={
-                draft.questions[selected] !== undefined ? (
-                  <details className="ge-slide-settings">
-                    <summary>הגדרות מתקדמות לשקופית</summary>
-                    <SchemaFields
-                      nodes={SLIDE_SETTING_FIELDS}
-                      value={draft}
-                      onChange={edit}
-                      path={['questions', String(selected), 'setting']}
-                    />
-                  </details>
-                ) : null
-              }
+              showAdvanced
             />
           </div>
         </section>

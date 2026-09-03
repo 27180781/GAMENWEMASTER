@@ -28,6 +28,8 @@ import {
   VOTABLE_TYPES,
 } from '../app/slideEdit.ts';
 import { canAddMediaFile, desktopMediaAddFile } from '../app/clickerBridge.ts';
+import { hasAdvancedSettings, isMultiCorrect, toggleCorrect } from '../app/slideAdvanced.ts';
+import { SlideAdvanced } from './SlideAdvanced.tsx';
 import { SchemaFields } from './SchemaFields.tsx';
 import { describeObject } from '../app/schemaForm.ts';
 import { functionConfigSchema } from '../engine/schema.ts';
@@ -60,7 +62,7 @@ interface SlideEditorProps {
  * שדה מדיה: אזור תצוגה/העלאה + קישור + ניקוי. התצוגה המקדימה חשובה — בלעדיה
  * אי אפשר לדעת *מה* הקובץ שנבחר, רק שיש כזה.
  */
-function MediaField({
+export function MediaField({
   label,
   value,
   onSet,
@@ -336,8 +338,13 @@ interface SlideFormProps {
   currentSlideId: number;
   phase?: string;
   onChange: (game: GameFile) => void;
-  /** תוכן נוסף בתחתית הטופס (בעורך המקומי — הגדרות השקופית מהסכימה). */
+  /** תוכן נוסף בתחתית הטופס. */
   footer?: React.ReactNode;
+  /**
+   * כפתור ⚙ "הגדרות שקופית מתקדמות" ליד נוסח השאלה. פעיל בעורך המקומי בלבד —
+   * במסך המנחה, באמצע משחק, אין טעם לפתוח חלון הגדרות.
+   */
+  showAdvanced?: boolean;
 }
 
 /** טופס עריכת השקופית הנבחרת. */
@@ -348,7 +355,15 @@ export function SlideForm({
   phase,
   onChange,
   footer,
+  showAdvanced = false,
 }: SlideFormProps) {
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  /**
+   * "מספר תשובות נכונות" שהודלק זה עתה. הקובץ עצמו מעיד על המצב רק כשכבר יש
+   * *שתי* תשובות נכונות — ולכן בלי הדגל הזה הדלקת המתג לא הייתה משנה כלום,
+   * והמשתמש לא היה מקבל את תיבות הסימון שנועדו לאפשר לו לסמן את השנייה.
+   */
+  const [multiOn, setMultiOn] = useState(false);
   const slide: Slide | undefined = game.questions[selected];
   const votable = slide ? VOTABLE_TYPES.has(slide.type) : false;
   /** השקופית שמוצגת כרגע בהצבעה פעילה — נעולה לעריכה עד סיום ההצבעה. */
@@ -367,6 +382,7 @@ export function SlideForm({
   }
 
   const info = slideTypeInfo(slide.type);
+  const multiCorrect = multiOn || isMultiCorrect(slide);
   // מה שנשמר בקובץ, לא מה שמוצג בפועל: בעורך רוצים לראות "תמונה" גם לפני
   // שנבחרה תמונה — אחרת הלחיצה על הכפתור לא הייתה מראה כלום.
   const queMode = slide.question.queMode === 'image' ? 'image' : 'text';
@@ -407,6 +423,16 @@ export function SlideForm({
             השאלה — ולכן הוא נערך כאן, במקום נוסח השאלה, ולא פעמיים. */}
         <div className="se-que-head">
           <label className="se-label">שאלה / כותרת</label>
+          {showAdvanced && hasAdvancedSettings(slide.type) && (
+            <button
+              type="button"
+              className="se-adv-btn"
+              title="הגדרות שקופית מתקדמות"
+              onClick={() => setAdvancedOpen(true)}
+            >
+              ⚙
+            </button>
+          )}
           <div className="se-que-mode" role="group" aria-label="נוסח השאלה">
             {(
               [
@@ -467,16 +493,28 @@ export function SlideForm({
             <div className="se-answers">
               {slide.question.answers.map((a, ai) => (
                 <div className="se-answer" key={`${slide.id}-ans-${ai}`}>
-                  {slide.type === 'trivia' && (
-                    <input
-                      type="radio"
-                      className="se-tick"
-                      name={`correct-${slide.id}`}
-                      title="התשובה הנכונה"
-                      checked={a.correct}
-                      onChange={() => patch((s) => setCorrect(s, ai))}
-                    />
-                  )}
+                  {/* במצב "מספר תשובות נכונות" הסימון הוא תיבות סימון ולא
+                      בחירה יחידה — אחרת אי אפשר היה לסמן שתי תשובות נכונות
+                      בעורך המקומי, אף שהמנוע והמערכת המקוונת תומכים בכך. */}
+                  {slide.type === 'trivia' &&
+                    (multiCorrect ? (
+                      <input
+                        type="checkbox"
+                        className="se-tick"
+                        title="תשובה נכונה"
+                        checked={a.correct}
+                        onChange={() => patch((s) => toggleCorrect(s, ai))}
+                      />
+                    ) : (
+                      <input
+                        type="radio"
+                        className="se-tick"
+                        name={`correct-${slide.id}`}
+                        title="התשובה הנכונה"
+                        checked={a.correct}
+                        onChange={() => patch((s) => setCorrect(s, ai))}
+                      />
+                    ))}
                   {/* textarea ולא input: כדי ש-Enter יכניס שורה חדשה בתשובה,
                       כמו בשאלה. גדל לגובה התוכן ולא מוסיף פס גלילה. */}
                   <textarea
@@ -549,6 +587,17 @@ export function SlideForm({
 
         {footer}
       </fieldset>
+
+      {advancedOpen && (
+        <SlideAdvanced
+          game={game}
+          slide={slide}
+          patch={patch}
+          multiCorrect={multiCorrect}
+          onMultiCorrect={setMultiOn}
+          onClose={() => setAdvancedOpen(false)}
+        />
+      )}
     </div>
   );
 }
