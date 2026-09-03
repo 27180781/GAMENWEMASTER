@@ -8,7 +8,7 @@
  * שייך: בקישור (‎?demo=1‎) באונליין, ובמסך בחירת מקור ההצבעות באופליין.
  */
 
-import type { GameEngine, GameState } from '../engine/index.ts';
+import { questionLabel, type GameEngine, type GameState } from '../engine/index.ts';
 
 interface OperatorMenuProps {
   engine: GameEngine;
@@ -118,7 +118,7 @@ export function OperatorMenu({
                     onClose();
                   }}
                 >
-                  {index + 1}. [{slide.type}] {slide.question.que.slice(0, 40) || '(מדיה)'}
+                  {index + 1}. [{slide.type}] {questionLabel(slide.question, '(מדיה)').slice(0, 40)}
                 </button>
               </li>
             ))}

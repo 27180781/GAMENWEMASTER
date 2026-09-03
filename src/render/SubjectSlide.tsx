@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import type { Slide, SubjectCommand } from '../engine/index.ts';
+import { isImageQuestion, type Slide, type SubjectCommand } from '../engine/index.ts';
 import { FitText } from './FitText.tsx';
 import { displayText } from './multiline.ts';
 
@@ -19,6 +19,14 @@ export function SubjectSlide({ slide, command }: { slide: Slide; command: Subjec
       <div className="subject-slide subject-slide--processing">
         <div className="spinner" />
         <p>מעבד נתונים...</p>
+      </div>
+    );
+  }
+  // שקופית כותרת שנוסחה הוא תמונה — התמונה היא התוכן, במסך מלא.
+  if (isImageQuestion(slide.question)) {
+    return (
+      <div className="subject-slide subject-slide--image">
+        <img className="subject-image" src={slide.question.src} alt="" />
       </div>
     );
   }

@@ -15,7 +15,7 @@
  */
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import type { GameState, Slide } from '../engine/index.ts';
+import { isImageQuestion, showsSideImage, type GameState, type Slide } from '../engine/index.ts';
 import { slideGroupRestriction } from '../app/groupRestriction.ts';
 import { FitText } from './FitText.tsx';
 import { displayText } from './multiline.ts';
@@ -252,7 +252,10 @@ export function QuestionSlide({
   // פס מובילים מוצג רק ב-trivia אחרי חשיפת התשובה הנכונה.
   const showBoard = reveal.revealCorrect && isTrivia && leaders.length > 0;
 
-  const hasImage = slide.question.src !== '';
+  // שאלת תמונה: התמונה היא נוסח השאלה, ולכן היא מוצגת בבועת השאלה — ולא גם
+  // ככרטיס בצד. ראו questionMode.ts.
+  const imageQuestion = isImageQuestion(slide.question);
+  const hasImage = showsSideImage(slide.question);
   /** שם הקבוצה שהשקופית מוגבלת אליה (null = פתוחה לכולם). */
   const restrictedGroup = slideGroupRestriction(slide, gameType);
   const low = timer !== null && !timer.paused && timer.remaining <= 5;
@@ -318,10 +321,14 @@ export function QuestionSlide({
           <div className={`q-question${reveal.questionShown ? '' : ' reveal-hidden'}`}>
             <div className="q-question-row">
               {isSurvey && <SurveyIcon />}
-              {/* min נמוך במכוון: עדיף שאלה ארוכה בפונט קטן על שאלה שסופה נעלם. */}
-              <FitText className="q-question-text" min={13}>
-                {displayText(slide.question.que)}
-              </FitText>
+              {imageQuestion ? (
+                <img className="q-question-main-image" src={slide.question.src} alt="שאלה" />
+              ) : (
+                /* min נמוך במכוון: עדיף שאלה ארוכה בפונט קטן על שאלה שסופה נעלם. */
+                <FitText className="q-question-text" min={13}>
+                  {displayText(slide.question.que)}
+                </FitText>
+              )}
             </div>
           </div>
 

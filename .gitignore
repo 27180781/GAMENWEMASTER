@@ -7,3 +7,6 @@ coverage
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# הקלטות ביניים של סקריפט המדריך (ראו tools/guide/harness.mjs)
+/public/guide/.raw/

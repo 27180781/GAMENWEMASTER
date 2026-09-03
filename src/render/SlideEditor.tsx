@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import type { GameFile, Slide } from '../engine/index.ts';
+import { questionLabel, type GameFile, type Slide } from '../engine/index.ts';
 import {
   addAnswer,
   addSlide,
@@ -253,7 +253,7 @@ export function SlideList({
     .filter(
       ({ q }) =>
         needle === '' ||
-        `${q.question.que} ${slideSubtitle(q)}`.toLowerCase().includes(needle),
+        `${questionLabel(q.question)} ${slideSubtitle(q)}`.toLowerCase().includes(needle),
     );
 
   return (
@@ -285,7 +285,9 @@ export function SlideList({
                   </span>
                   <span className="se-item-num">{i + 1}</span>
                   <span className="se-item-txt">
-                    <span className="se-item-que">{q.question.que || '(ללא כותרת)'}</span>
+                    <span className="se-item-que">
+                      {questionLabel(q.question, '(ללא כותרת)')}
+                    </span>
                     <span className="se-item-sub">{slideSubtitle(q)}</span>
                   </span>
                   {q.id === currentSlideId && <span className="se-item-now">עכשיו</span>}
@@ -365,6 +367,9 @@ export function SlideForm({
   }
 
   const info = slideTypeInfo(slide.type);
+  // מה שנשמר בקובץ, לא מה שמוצג בפועל: בעורך רוצים לראות "תמונה" גם לפני
+  // שנבחרה תמונה — אחרת הלחיצה על הכפתור לא הייתה מראה כלום.
+  const queMode = slide.question.queMode === 'image' ? 'image' : 'text';
   return (
     <div className="se-form-col">
       <fieldset className="se-form" key={slide.id} disabled={locked}>
@@ -398,13 +403,49 @@ export function SlideForm({
         </div>
         <p className="se-type-hint">{info.hint}</p>
 
-        <label className="se-label">שאלה / כותרת</label>
-        <textarea
-          className="se-input se-textarea"
-          defaultValue={slide.question.que}
-          key={`${slide.id}-que`}
-          onBlur={(e) => patch((s) => ({ ...s, question: { ...s.question, que: e.target.value } }))}
-        />
+        {/* נוסח השאלה: טקסט או תמונה. במצב תמונה זהו אותו שדה src של תמונת
+            השאלה — ולכן הוא נערך כאן, במקום נוסח השאלה, ולא פעמיים. */}
+        <div className="se-que-head">
+          <label className="se-label">שאלה / כותרת</label>
+          <div className="se-que-mode" role="group" aria-label="נוסח השאלה">
+            {(
+              [
+                ['text', 'טקסט'],
+                ['image', 'תמונה'],
+              ] as const
+            ).map(([mode, label]) => (
+              <button
+                key={mode}
+                type="button"
+                className={queMode === mode ? 'se-que-mode-btn on' : 'se-que-mode-btn'}
+                onClick={() =>
+                  patch((s) => ({ ...s, question: { ...s.question, queMode: mode } }))
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {queMode === 'image' ? (
+          <>
+            <MediaField
+              label=""
+              value={slide.question.src}
+              onSet={(url) => patch((s) => ({ ...s, question: { ...s.question, src: url } }))}
+            />
+            <p className="se-type-note">
+              התמונה תוצג במשחק במקום נוסח השאלה. התשובות, הזמן והניקוד נשארים כרגיל.
+            </p>
+          </>
+        ) : (
+          <textarea
+            className="se-input se-textarea"
+            defaultValue={slide.question.que}
+            key={`${slide.id}-que`}
+            onBlur={(e) => patch((s) => ({ ...s, question: { ...s.question, que: e.target.value } }))}
+          />
+        )}
 
         {!votable && slide.type !== 'function' && (
           <p className="se-type-note">
@@ -491,11 +532,14 @@ export function SlideForm({
 
         <label className="se-label">מדיה</label>
         <div className="se-media-grid">
-          <MediaField
-            label="מדיית השאלה"
-            value={slide.question.src}
-            onSet={(url) => patch((s) => ({ ...s, question: { ...s.question, src: url } }))}
-          />
+          {/* במצב תמונה השדה הזה כבר נערך למעלה, כנוסח השאלה. */}
+          {queMode !== 'image' && (
+            <MediaField
+              label="מדיית השאלה"
+              value={slide.question.src}
+              onSet={(url) => patch((s) => ({ ...s, question: { ...s.question, src: url } }))}
+            />
+          )}
           <MediaField
             label="רקע השקופית"
             value={slide.backgroundMedia.src}
