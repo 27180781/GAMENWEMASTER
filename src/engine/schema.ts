@@ -191,7 +191,14 @@ export const slideSchema = z
       timeForQue: emptyableNumber(15),
       answers: z.array(answerSchema),
       src: z.string(),
-    }),
+    })
+      /**
+       * שדות שאיננו מכירים נשמרים ולא נמחקים. Zod מסנן כברירת מחדל מפתחות
+       * לא ידועים, והעורך המקומי שומר את האובייקט ה*מפוענח* — כלומר כל שדה
+       * שמערכת יצירת המשחקים תוסיף היה נמחק מהקובץ לצמיתות ברגע שמישהו יערוך
+       * אותו כאן. עדיף לשמור נתון שאיננו מציגים מאשר להשמיד אותו.
+       */
+      .passthrough(),
     openMedia: mediaRef,
     endMedia: mediaRef,
     backgroundMedia: mediaRef,
@@ -199,6 +206,8 @@ export const slideSchema = z
     // רק בשקופית "פונקציה"; אופציונלי כדי לא לפגוע בשאר סוגי השקופיות.
     function: functionConfigSchema.optional(),
   })
+  // כמו ב-question: לא מוחקים שדות שאיננו מכירים.
+  .passthrough()
   .superRefine((slide, ctx) => {
     if (VOTABLE_TYPES.has(slide.type)) {
       if (slide.question.answers.length < 2) {
