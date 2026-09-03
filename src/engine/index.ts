@@ -1,6 +1,7 @@
 export * from './schema.ts';
 export * from './loader.ts';
 export * from './classify.ts';
+export * from './questionMode.ts';
 export * from './gameEngine.ts';
 export * from './replayAdapter.ts';
 export type {

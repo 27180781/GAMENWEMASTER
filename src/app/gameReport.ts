@@ -7,7 +7,7 @@
  * טהור (פרט לפונקציית ההורדה) — buildReportSheets ניתן לבדיקה ביחידה.
  */
 
-import { isVotableSlide, type GameFile } from '../engine/index.ts';
+import { isVotableSlide, questionLabel, type GameFile } from '../engine/index.ts';
 import type { GameState } from '../engine/types.ts';
 import type { RosterData } from './roster.ts';
 import { groupStandings } from './groupScore.ts';
@@ -93,7 +93,7 @@ export function buildReportSheets(
       const perOption: Cell[] = Array.from({ length: maxOption }, (_, i) =>
         optionIds.has(i + 1) ? chosen.filter((a) => a === i + 1).length : null,
       );
-      return [idx + 1, s.question.que, correctLabel, numVotes, correctVotes, `${pct}%`, ...perOption];
+      return [idx + 1, questionLabel(s.question), correctLabel, numVotes, correctVotes, `${pct}%`, ...perOption];
     }),
   ];
 

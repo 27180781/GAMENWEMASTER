@@ -5,7 +5,7 @@
  * (עם סימון התשובה הנכונה), סקר, ותשובות-תמונה (ans_images).
  */
 
-import type { Slide } from '../engine/index.ts';
+import { questionLabel, type Slide } from '../engine/index.ts';
 import { ANSWER_LETTERS, COIN_COLORS } from './QuestionSlide.tsx';
 import { FitText } from './FitText.tsx';
 import { displayText } from './multiline.ts';
@@ -45,7 +45,9 @@ export function VotesBreakdown({ slide, votes, nameOf, ansIsNumber, onClose }: V
       <div className="votes-panel" dir="rtl" onClick={(e) => e.stopPropagation()}>
         <div className="votes-head">
           <h2 className="votes-title">
-            <FitText className="votes-question">{displayText(slide.question.que) || 'הצבעות השחקנים'}</FitText>
+            <FitText className="votes-question">
+            {displayText(questionLabel(slide.question)) || 'הצבעות השחקנים'}
+          </FitText>
           </h2>
           <span className="votes-total">{total} הצבעות</span>
           <button className="votes-close" title="סגירה (5)" onClick={onClose}>

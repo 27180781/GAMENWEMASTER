@@ -5639,3 +5639,67 @@ body {
 @media (max-width: 1100px) {
   .guide-list { flex-basis: 260px; width: 260px; }
 }
+
+/* ---- שאלת תמונה (queMode: image) ---- */
+/*
+ * התמונה מחליפה את נוסח השאלה, ולכן היא יושבת בתוך בועת השאלה במקום הטקסט.
+ * הגובה מוגבל כדי שהתשובות יישארו על המסך — שאלה שדוחקת את התשובות מתחת לקצה
+ * גרועה יותר משאלה קטנה קצת.
+ */
+.q-question-main-image {
+  display: block;
+  /* ‎width‎ ולא ‎max-width‎: נוסח טקסט ממלא את רוחב הבועה דרך FitText, והתמונה
+     צריכה להתנהג כמוהו. עם max-width בלבד תמונה בת 800px הייתה מוצגת ב-800px
+     על במה של 1920 — בול דואר על מקרן. contain שומר על היחס, ו-max-height
+     מבטיח שהתשובות יישארו על המסך. */
+  /* רוחב מפורש ולא אחוזים: בועת השאלה נמתחת לפי תוכנה (shrink-to-fit), ולכן
+     ‎width:100%‎ היה מתייחס לתמונה עצמה ולא משנה דבר. הבמה קבועה ב-1920, ולכן
+     מידה בפיקסלים כאן דטרמיניסטית — כמו שאר המידות במסך המשחק. */
+  width: 1000px;
+  max-width: 100%;
+  max-height: 42vh;
+  min-width: 0;
+  border-radius: 18px;
+  object-fit: contain;
+}
+
+/* שקופית כותרת שנוסחה תמונה — התמונה היא התוכן, כמעט על כל המסך */
+.subject-slide--image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2vh 2vw;
+}
+.subject-image {
+  max-width: 100%;
+  max-height: 92vh;
+  object-fit: contain;
+  border-radius: 20px;
+}
+
+/* בורר "טקסט / תמונה" בעורך */
+.se-que-head { display: flex; align-items: center; gap: 12px; }
+.se-que-head .se-label { margin: 0; }
+.se-que-mode { display: flex; gap: 4px; }
+.se-que-mode-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: inherit;
+  border-radius: 999px;
+  padding: 4px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.se-que-mode-btn.on { background: #2a7d4f; border-color: #2a7d4f; color: #fff; }
+.editor-screen .se-que-mode-btn {
+  background: #fff;
+  border-color: var(--ge-line);
+  color: var(--ge-soft);
+}
+.editor-screen .se-que-mode-btn.on {
+  background: var(--ge-primary);
+  border-color: var(--ge-primary);
+  color: #fff;
+}

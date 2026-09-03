@@ -179,6 +179,14 @@ export const slideSchema = z
     type: slideTypeSchema,
     question: z.object({
       que: z.string(),
+      /**
+       * האם נוסח השאלה הוא טקסט או **תמונה**. במצב 'image' מערכת יצירת המשחקים
+       * שולחת ‎que: ""‎ ואת התמונה ב-`src`, והיא מוצגת במקום נוסח השאלה —
+       * התשובות, הזמן והניקוד נשארים כרגיל. חסר = 'text', כמו כל הקבצים שנוצרו
+       * עד עכשיו. סלחני בכוונה (z.string ולא enum): ערך לא מוכר נופל ל'טקסט'
+       * בזמן ההצגה במקום לפסול את הקובץ כולו.
+       */
+      queMode: choice({ text: 'טקסט', image: 'תמונה' }, 'text'),
       scoreForQue: emptyableNumber(0),
       timeForQue: emptyableNumber(15),
       answers: z.array(answerSchema),
