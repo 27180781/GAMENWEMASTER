@@ -4,11 +4,28 @@
 
 name: Build Desktop EXE
 
-# בלי מסנן paths: הבנייה הזו היא **השלב היחיד** שמפרסם את האתר (ראו השלב
-# האחרון), ולכן דחיפה שלא הייתה מפעילה אותה הייתה נשארת בלי פריסה בכלל.
+# רץ רק כשמשהו שמשפיע על ה-EXE באמת השתנה. שינוי תיעוד, .gitignore או קבצי
+# האתר (Dockerfile/nginx) אינו מצדיק בנייה של Windows בת שש דקות.
+#
+# בטוח לסנן כאן משתי סיבות:
+#   • את פריסת האתר עושה CapRover בעצמו, ישירות מ-GitHub — לא ה-workflow הזה.
+#   • deploy-pages רץ על *כל* דחיפה ל-main ומריץ npm test, ולכן שינוי שאינו
+#     ברשימה כאן עדיין נבדק.
 on:
   push:
     branches: [main]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'fixtures/**'
+      - 'electron/**'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - 'tsconfig*.json'
+      - 'electron-builder.yml'
+      - '.github/workflows/build-desktop.yml'
   workflow_dispatch:
 
 permissions:
