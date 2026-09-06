@@ -36,6 +36,13 @@ export interface HostStateSnapshot {
   connected: number;
   /** מובילים כלליים (שם + ניקוד), כבר עם שמות מהמרשם. */
   leaders: { name: string; score: number }[];
+  /**
+   * ניקוד **כל** המשתתפים לפי מזהה. `leaders` מספיק לתצוגה, אבל מסך הניהול
+   * צריך להראות ניקוד לצד כל שם ברשימה כדי שאפשר יהיה לתקן אותו.
+   */
+  scores?: Record<string, number>;
+  /** בונוסים ידניים לקבוצות (ראו scoreAdjust.ts). */
+  groupBonus?: Record<string, number>;
   /** שם הקבוצה שהשקופית הנוכחית מוגבלת אליה (חסר = פתוחה לכולם). */
   restrictedGroup?: string;
   reveal: { questionShown: boolean; answersShown: number; revealCorrect: boolean };
@@ -55,7 +62,13 @@ export type HostCommand =
   | { t: 'goto'; slideId: number }
   | { t: 'roster' } // המרשם (localStorage) עודכן במסך המנחה — לטעון מחדש
   | { t: 'setGame'; game: GameFile } // עריכה חיה — החלת משחק מעודכן (hot-swap)
-  | { t: 'connect'; categoryId: string | null }; // מסך התחברות לקבוצות בתצוגה (null = סגירה)
+  | { t: 'connect'; categoryId: string | null } // מסך התחברות לקבוצות בתצוגה (null = סגירה)
+  /**
+   * תיקון ניקוד ידני ממסך הניהול. התצוגה היא שמחזיקה את המנוע, ולכן היא
+   * שמבצעת — מסך הניהול רק מבקש. `target` מפריד בין ניקוד אישי לבונוס קבוצתי,
+   * שהם שני דברים שונים לגמרי (ראו scoreAdjust.ts).
+   */
+  | { t: 'score'; target: 'player' | 'group'; id: string; delta: number };
 
 export type ControlMessage = HostStateSnapshot | HostGameMessage | HostCommand;
 

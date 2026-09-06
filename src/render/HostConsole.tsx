@@ -123,6 +123,16 @@ export function HostConsole() {
     post({ t: 'roster' });
   };
 
+  /**
+   * תיקון ניקוד ממסך הניהול. הבקשה נשלחת לתצוגה — שם יושב המנוע — ולא מוחלת
+   * כאן, כדי ששתי העמדות יראו תמיד את אותו ניקוד. התוצאה חוזרת בתמונת-המצב
+   * הבאה, שמתפרסמת מיד עם השינוי.
+   */
+  const adjustPlayer = (voterId: string, delta: number) =>
+    post({ t: 'score', target: 'player', id: voterId, delta });
+  const adjustGroup = (groupId: string, delta: number) =>
+    post({ t: 'score', target: 'group', id: groupId, delta });
+
   const applyGameEdit = (g: GameFile) => {
     setEditGame(g);
     post({ t: 'setGame', game: g });
@@ -217,6 +227,10 @@ export function HostConsole() {
           <RosterPanel
             roster={roster}
             onChange={updateRoster}
+            scores={snap?.scores ?? {}}
+            groupBonus={snap?.groupBonus ?? {}}
+            onAdjustPlayer={adjustPlayer}
+            onAdjustGroup={adjustGroup}
             onClose={() => {
               setView('control');
               if (connectOpen) {

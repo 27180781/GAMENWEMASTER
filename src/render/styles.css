@@ -3868,6 +3868,61 @@ body {
 }
 .roster-name-input { flex: 1; }
 
+/* ---- תיקון ניקוד ידני (פאנל השמות והקבוצות, בתצוגה ובמסך הניהול) ---- */
+.roster-name-row,
+.roster-groups li { flex-wrap: wrap; }
+.rs-adjust {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-start: auto;
+  padding-inline-start: 10px;
+  border-inline-start: 1px solid rgba(255, 255, 255, 0.14);
+}
+.rs-step {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  font: inherit;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+.rs-step:hover { background: rgba(255, 255, 255, 0.18); }
+.rs-value {
+  min-width: 46px;
+  text-align: center;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.rs-value b { display: block; font-size: 16px; }
+.rs-value small { display: block; font-size: 10px; opacity: 0.65; }
+.rs-amount {
+  width: 62px;
+  flex: 0 0 auto;
+  text-align: center;
+}
+.rs-apply {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.rs-apply:hover:not(:disabled) { background: rgba(255, 255, 255, 0.18); }
+.rs-apply:disabled { opacity: 0.4; cursor: not-allowed; }
+.roster-name-row--unnamed { opacity: 0.85; }
+.roster-unnamed { flex: 1; font-size: 13px; opacity: 0.6; }
+.gs-bonus { white-space: nowrap; }
+
 .roster-del {
   background: transparent;
   color: #f87171;

@@ -18,6 +18,7 @@
 
 import { classifySubjectSlide, extractDynamicImageUrl } from './classify.ts';
 import { isVotableSlide, type GameFile, type Slide } from './schema.ts';
+import { adjustPlayerScore } from './scoreAdjust.ts';
 import type {
   EngineOptions,
   GameEvent,
@@ -277,6 +278,20 @@ export class GameEngine {
     this.awardedBySlide = {};
     this.timeBySlide = {};
     this.setState({ scores: {}, answerTimes: {} });
+  }
+
+  /**
+   * תיקון ניקוד ידני למשתתף בודד (המנחה, באמצע משחק).
+   *
+   * נכנס ישירות ל-scores ולא נשמר בנפרד — וזה בטוח בזכות המנגנון הקיים:
+   * כשחוזרים על שקופית ומנקדים אותה מחדש, closeVoting מקזז **בדיוק** את מה
+   * ש-awardedBySlide רשם עבורה ואז מוסיף את הניקוד החדש. התיקון הידני אינו
+   * רשום שם, ולכן הוא שורד גם חזרה אחורה וגם ניקוד מחדש. גם הגיבוי שומר ניקוד
+   * סופי, כך שהתיקון שורד קריסה בלי טיפול מיוחד.
+   */
+  adjustScore(voterId: string, delta: number): void {
+    const next = adjustPlayerScore(this.state.scores, voterId, delta);
+    this.setState({ scores: next });
   }
 
   /**

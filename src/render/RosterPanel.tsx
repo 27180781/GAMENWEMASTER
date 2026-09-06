@@ -29,6 +29,7 @@ import {
   upsertPlayer,
   type RosterData,
 } from '../app/roster.ts';
+import { groupBonusOf, normalizeDelta } from '../engine/scoreAdjust.ts';
 import { importSheet, summaryText, type ImportMode } from '../app/rosterImport.ts';
 import { readSheetRows } from '../app/xlsxRead.ts';
 
@@ -41,6 +42,75 @@ interface RosterPanelProps {
   /** מצב "קליטה חכמה" פעיל — כל לחיצת שלט נקלטת לרשימה. */
   captureOn?: boolean;
   onToggleCapture?: (on: boolean) => void;
+  /**
+   * תיקון ניקוד ידני. ארבעת השדות האלה מגיעים יחד, ורק כשיש משחק פעיל —
+   * לפני תחילת משחק אין ניקוד לתקן, ואז הפקדים כלל אינם מוצגים.
+   *
+   * אותו פאנל משמש גם בתצוגה (הפאנל הצידי) וגם במסך הניהול; ההבדל היחיד הוא
+   * מה הקריאה עושה — בתצוגה היא פונה למנוע, ובמסך הניהול היא נשלחת אליו
+   * בערוץ השליטה.
+   */
+  scores?: Record<string, number>;
+  groupBonus?: Record<string, number>;
+  onAdjustPlayer?: (voterId: string, delta: number) => void;
+  onAdjustGroup?: (groupId: string, delta: number) => void;
+}
+
+/**
+ * פקד תיקון ניקוד: ‎−‎ / ‎+‎ מהירים וקלט לסכום חופשי. מוצג ליד שם משתתף וליד
+ * שם קבוצה, ומחזיר תמיד *הפרש* (ולא ערך מוחלט) — כך שתי פעולות מקבילות משתי
+ * העמדות מצטברות במקום לדרוס זו את זו.
+ */
+function ScoreAdjuster({
+  value,
+  label,
+  onAdjust,
+}: {
+  value: number;
+  /** מה נכתב מתחת למספר (למשל "נק׳" או "בונוס"). */
+  label: string;
+  onAdjust: (delta: number) => void;
+}) {
+  const [draft, setDraft] = useState('');
+
+  const applyDraft = (sign: 1 | -1) => {
+    const n = normalizeDelta(draft);
+    if (n === 0) return;
+    onAdjust(sign * Math.abs(n));
+    setDraft('');
+  };
+
+  return (
+    <div className="rs-adjust" title="תיקון ניקוד ידני">
+      <button className="rs-step" onClick={() => onAdjust(-1)} title="הורדת נקודה">
+        −
+      </button>
+      <span className="rs-value">
+        <b>{Math.round(value)}</b>
+        <small>{label}</small>
+      </span>
+      <button className="rs-step" onClick={() => onAdjust(1)} title="הוספת נקודה">
+        +
+      </button>
+      <input
+        className="rs-amount"
+        type="number"
+        dir="ltr"
+        placeholder="סכום"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') applyDraft(1);
+        }}
+      />
+      <button className="rs-apply" onClick={() => applyDraft(1)} disabled={draft.trim() === ''}>
+        הוסף
+      </button>
+      <button className="rs-apply" onClick={() => applyDraft(-1)} disabled={draft.trim() === ''}>
+        הורד
+      </button>
+    </div>
+  );
 }
 
 export function RosterPanel({
@@ -50,6 +120,10 @@ export function RosterPanel({
   onOpenConnect,
   captureOn = false,
   onToggleCapture,
+  scores,
+  groupBonus,
+  onAdjustPlayer,
+  onAdjustGroup,
 }: RosterPanelProps) {
   const [tab, setTab] = useState<'players' | 'groups'>('players');
   const [newNum, setNewNum] = useState('');
@@ -274,9 +348,36 @@ export function RosterPanel({
                     title="מספר קליקר/טלפון"
                     onBlur={(e) => onChange(changePlayerId(roster, player.id, e.target.value))}
                   />
+                  {onAdjustPlayer && (
+                    <ScoreAdjuster
+                      value={scores?.[player.id] ?? 0}
+                      label="נק׳"
+                      onAdjust={(d) => onAdjustPlayer(player.id, d)}
+                    />
+                  )}
                 </li>
               ))}
-              {roster.players.length === 0 && (
+              {/*
+                משתתפים שצברו ניקוד אך אינם ברשימת השמות — מי שלחץ על שלט בלי
+                שקלטו אותו לרשימה. בלי השורות האלה אי אפשר היה לתקן להם ניקוד,
+                אף שהם משתתפים לכל דבר ומופיעים בטבלת המובילים.
+              */}
+              {onAdjustPlayer &&
+                Object.keys(scores ?? {})
+                  .filter((id) => !roster.players.some((p) => p.id === id))
+                  .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+                  .map((id) => (
+                    <li key={`x:${id}`} className="roster-name-row roster-name-row--unnamed">
+                      <span className="roster-unnamed">ללא שם</span>
+                      <span className="roster-num">{id}</span>
+                      <ScoreAdjuster
+                        value={scores?.[id] ?? 0}
+                        label="נק׳"
+                        onAdjust={(d) => onAdjustPlayer(id, d)}
+                      />
+                    </li>
+                  ))}
+              {roster.players.length === 0 && Object.keys(scores ?? {}).length === 0 && (
                 <li className="roster-empty">אין שחקנים עדיין — הוסיפו מספר ושם למטה</li>
               )}
             </ul>
@@ -358,6 +459,13 @@ export function RosterPanel({
                         >
                           🗑
                         </button>
+                        {onAdjustGroup && (
+                          <ScoreAdjuster
+                            value={groupBonusOf(groupBonus, g.id)}
+                            label="בונוס"
+                            onAdjust={(d) => onAdjustGroup(g.id, d)}
+                          />
+                        )}
                       </li>
                     ))}
                   </ul>

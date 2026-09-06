@@ -78,6 +78,7 @@ import {
 } from './roster.ts';
 import { selectPlayersToRemove } from './functionPlayers.ts';
 import { hasGroupData } from './groupScore.ts';
+import { adjustGroupBonus } from '../engine/scoreAdjust.ts';
 import {
   eligibleCount,
   restrictSnapshotToGroup,
@@ -246,6 +247,30 @@ export function GameHost({
     },
     [game.id],
   );
+  /**
+   * בונוסים ידניים לקבוצות (מזהה קבוצה → נקודות). יושב כאן ולא במנוע כי קבוצות
+   * הן נתון של המרשם, והמנוע אינו מכיר אותן. ניקוד *אישי* לעומת זאת נשמר במנוע
+   * עצמו — ראו GameEngine.adjustScore.
+   */
+  const [groupBonus, setGroupBonus] = useState<Record<string, number>>({});
+
+  /** תיקון ניקוד אישי — הפרש, לא ערך מוחלט (ראו scoreAdjust.ts). */
+  const adjustPlayer = useCallback(
+    (voterId: string, delta: number) => {
+      engine.adjustScore(voterId, delta);
+    },
+    [engine],
+  );
+  const adjustGroup = useCallback((groupId: string, delta: number) => {
+    setGroupBonus((b) => adjustGroupBonus(b, groupId, delta));
+  }, []);
+  const adjustPlayerRef = useRef(adjustPlayer);
+  adjustPlayerRef.current = adjustPlayer;
+  const adjustGroupRef = useRef(adjustGroup);
+  adjustGroupRef.current = adjustGroup;
+  const groupBonusRef = useRef(groupBonus);
+  groupBonusRef.current = groupBonus;
+
   /** מסך התחברות לקבוצות פעיל — מזהה הקטגוריה, או null. */
   const [connectCategory, setConnectCategory] = useState<string | null>(null);
   const connectCategoryRef = useRef<string | null>(null);
@@ -620,6 +645,7 @@ export function GameHost({
       nameOf,
       startedAtRef.current,
       [...removedRef.current], // הסרות משתתפים שורדות קריסה/רענון
+      groupBonusRef.current, // ובונוסים ידניים לקבוצות
     );
     if (backupCfg !== null) await saveBackup(backupCfg, engine.getGame().id, payload);
     else await saveDiskBackup(diskBackupKey(engine.getGame()), payload, false); // אופליין → דיסק
@@ -663,6 +689,7 @@ export function GameHost({
         startedAtRef.current = data.meta.startedAt || Date.now();
         // שחזור המשתתפים שהוסרו (שקופית players) — שההסרה תמשיך להיאכף
         removedRef.current = new Set(data.meta.removedIds ?? []);
+        setGroupBonus({ ...(data.meta.groupBonus ?? {}) }); // בונוסים קבוצתיים ידניים
         // מסנכרנים את מונה טבלת המובילים למצב המשוחזר, כדי שלא תקפוץ מיד בשחזור.
         autoLeadersShownAtRef.current = completedQuestionCount(game, engine.getState().slidesCompleted);
         if (rosterRef.current.categories.length === 0 && rosterRef.current.players.length === 0) {
@@ -744,6 +771,7 @@ export function GameHost({
             nameOf,
             startedAtRef.current,
             [...removedRef.current],
+            groupBonusRef.current,
           );
           await saveDiskBackup(diskBackupKey(engine.getGame()), payload, true);
         }
@@ -836,6 +864,9 @@ export function GameHost({
       const op = s.function?.score?.operation ?? 'reset_all';
       if (op === 'reset_all') {
         engine.resetScores();
+        // "איפוס הניקוד של כל המשתתפים" כולל את הבונוסים הקבוצתיים — אחרת
+        // הקבוצות היו נשארות עם יתרון משקופיות שכבר אופסו.
+        setGroupBonus({});
         setFunctionStatus('sent');
         setFunctionDetail('');
         debugLog('game', 'שקופית פונקציה — איפוס ניקוד כל המשתתפים');
@@ -1463,6 +1494,10 @@ export function GameHost({
       // המנחה היה רואה יחס מטעה (למשל 4/40 כשרק 5 רשאים לענות).
       connected: eligibleCount(rosterRef.current, connectedIdsRef.current, restricted),
       leaders,
+      // ניקוד מלא (ולא רק המובילים) — מסך הניהול מציג אותו ליד כל שם ברשימה,
+      // כדי שאפשר יהיה לתקן ניקוד גם למי שאינו בשמונת הראשונים.
+      scores: { ...st.scores },
+      groupBonus: { ...groupBonusRef.current },
       reveal: { ...revealRef.current },
       ...(restricted !== null ? { restrictedGroup: restricted } : {}),
     };
@@ -1495,6 +1530,12 @@ export function GameHost({
           // פתיחת/סגירת מסך ההתחברות לקבוצות בתצוגה — ממסך המנחה.
           if (msg.categoryId === null) setConnectCategory(null);
           else if (stageRef.current === 'playing') setConnectCategory(msg.categoryId);
+          break;
+        case 'score':
+          // תיקון ניקוד ידני ממסך הניהול. התצוגה מחזיקה את המנוע, ולכן היא
+          // שמבצעת בפועל — וכך שתי העמדות תמיד מסכימות על אותו ניקוד.
+          if (msg.target === 'player') adjustPlayerRef.current(msg.id, msg.delta);
+          else adjustGroupRef.current(msg.id, msg.delta);
           break;
       }
     },
@@ -1534,7 +1575,9 @@ export function GameHost({
   // פרסום-מחדש בכל שינוי רלוונטי (שלב/שקופית/הצבעות חיות/מרשם/מחוברים).
   useEffect(() => {
     controlRef.current?.post(buildSnapshot());
-  }, [stage, state, reveal, connectedIds, roster, buildSnapshot]);
+    // groupBonus נשמר ב-ref (לא ב-deps של buildSnapshot), ולכן הוא חייב
+    // להופיע כאן — אחרת בונוס שניתן בתצוגה לא היה מגיע למסך הניהול.
+  }, [stage, state, reveal, connectedIds, roster, groupBonus, buildSnapshot]);
 
   // פרסום המשחק המלא (לעריכה) בכל החלפת תוכן — כולל אחרי עריכה חיה (hot-swap).
   useEffect(() => {
@@ -2329,6 +2372,7 @@ export function GameHost({
             answerTimes={state.answerTimes}
             nameOf={nameOf}
             categoryIndex={groupsCatIndex}
+            groupBonus={groupBonus}
             onClose={() => setGroupsOverlay(false)}
           />
         )}
@@ -2361,6 +2405,10 @@ export function GameHost({
             onChange={updateRoster}
             captureOn={captureOn}
             onToggleCapture={setCaptureOn}
+            scores={state.scores}
+            groupBonus={groupBonus}
+            onAdjustPlayer={adjustPlayer}
+            onAdjustGroup={adjustGroup}
             onClose={() => setRosterOpen(false)}
             onOpenConnect={(categoryId) => {
               setConnectCategory(categoryId);

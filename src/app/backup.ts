@@ -105,6 +105,12 @@ export interface BackupMeta {
    * קריסה/רענון. best-effort: אם השרת משמיט את ה-meta, ההסרה אובדת (כמו קודם).
    */
   removedIds?: string[];
+  /**
+   * בונוסים ידניים לקבוצות (ראו scoreAdjust.ts) — כדי שתיקון שהמנחה עשה
+   * באמצע אירוע ישרוד קריסה. best-effort, כמו removedIds: שרת שמשמיט את
+   * ה-meta פשוט מאבד אותם, ולא נופל.
+   */
+  groupBonus?: Record<string, number>;
 }
 
 /** המטען שנשמר (POST /save-backup). האובייקטים ממורים ל-JSON לפני השליחה. */
