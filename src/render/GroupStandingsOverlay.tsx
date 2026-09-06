@@ -24,6 +24,8 @@ interface GroupStandingsOverlayProps {
   nameOf: (voterId: string) => string;
   /** איזו קטגוריה (סוג קבוצות) מוצגת — מקש 5 מגדיל; ממופה מודולו. */
   categoryIndex: number;
+  /** בונוסים ידניים לקבוצות (ראו scoreAdjust.ts). */
+  groupBonus?: Record<string, number>;
   onClose: () => void;
 }
 
@@ -38,6 +40,7 @@ export function GroupStandingsOverlay({
   answerTimes,
   nameOf,
   categoryIndex,
+  groupBonus,
   onClose,
 }: GroupStandingsOverlayProps) {
   const cats = groupCategories(roster);
@@ -45,7 +48,7 @@ export function GroupStandingsOverlay({
   // מודולו בטוח (גם לאינדקס שגדל ללא הגבלה מלחיצות 5 חוזרות).
   const idx = ((categoryIndex % cats.length) + cats.length) % cats.length;
   const cat = cats[idx]!;
-  const standings = groupStandings(roster, cat.id, scores, answerTimes);
+  const standings = groupStandings(roster, cat.id, scores, answerTimes, groupBonus);
   const multi = cats.length > 1;
 
   return (
@@ -80,6 +83,14 @@ export function GroupStandingsOverlay({
                 </div>
                 <div className="gs-meta">
                   {st.memberCount} משתתפים · {Math.round(st.totalScore)} נק׳ סה״כ
+                  {/* בונוס ידני מוצג במפורש — אחרת הממוצע שמעל לא מסתדר עם
+                      הסכום, וזה נראה כתקלה. */}
+                  {st.bonus !== 0 && (
+                    <span className="gs-bonus">
+                      {' · '}
+                      {st.bonus > 0 ? `בונוס +${st.bonus}` : `קנס ${st.bonus}`}
+                    </span>
+                  )}
                 </div>
                 <ul className="gs-leaders">
                   {leaders.map((m, j) => (

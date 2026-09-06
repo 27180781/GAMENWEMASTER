@@ -6,6 +6,7 @@
  */
 
 import type { RosterData } from './roster.ts';
+import { groupBonusOf } from '../engine/scoreAdjust.ts';
 
 export type AnswerTimes = Record<string, { totalMs: number; count: number }>;
 
@@ -15,9 +16,18 @@ export interface GroupStanding {
   /** מספר הקבוצה בקטגוריה (1-based, לפי הסדר). */
   number: number;
   memberCount: number;
+  /** סכום הניקוד האישי של החברים — בלי הבונוס. */
   totalScore: number;
-  /** totalScore / memberCount — הבסיס לדירוג ההוגן (0 אם אין חברים). */
+  /**
+   * הניקוד שהקבוצה מדורגת לפיו: ממוצע החברים **ועוד הבונוס הידני**.
+   *
+   * הבונוס מתווסף לממוצע ולא לסכום — בדיוק בגלל הסיבה שבגללה מדרגים לפי
+   * ממוצע מלכתחילה: "10 נקודות לקבוצה א" צריך להיות שווה בערכו בין אם יש בה
+   * שני חברים או עשרים. חלוקה בסכום הייתה נותנת לקבוצה קטנה פי עשרה.
+   */
   avgScore: number;
+  /** הבונוס הידני שניתן לקבוצה (0 כשאין). מוצג בנפרד כדי שיהיה ברור מאיפה הניקוד. */
+  bonus: number;
   /** מהירות הקבוצה: ממוצע זמני התגובה של החברים שענו (Infinity אם אף אחד לא ענה). */
   avgMs: number;
 }
@@ -37,6 +47,8 @@ export function groupStandings(
   categoryId: string,
   scores: Record<string, number>,
   answerTimes: AnswerTimes,
+  /** בונוסים ידניים לקבוצות (ראו scoreAdjust.ts). חסר = אין בונוסים. */
+  groupBonus?: Readonly<Record<string, number>>,
 ): GroupStanding[] {
   const category = roster.categories.find((c) => c.id === categoryId);
   if (!category) return [];
@@ -53,13 +65,26 @@ export function groupStandings(
   const standings: GroupStanding[] = category.groups.map((g, i) => {
     const members = membersByGroup[g.id] ?? [];
     const totalScore = members.reduce((sum, m) => sum + (scores[m] ?? 0), 0);
-    const avgScore = members.length > 0 ? totalScore / members.length : 0;
+    const base = members.length > 0 ? totalScore / members.length : 0;
+    const bonus = groupBonusOf(groupBonus, g.id);
+    // קנס שגדול מהניקוד לא מציג מספר שלילי על המסך הגדול — הוא נעצר באפס.
+    // הבונוס עצמו נשמר כמו שהוא, כדי שהמנחה יראה בפאנל את מה שהזין.
+    const avgScore = Math.max(0, base + bonus);
     const answered = members
       .map((m) => avgResponseMs(answerTimes, m))
       .filter((ms) => Number.isFinite(ms));
     const avgMs =
       answered.length > 0 ? answered.reduce((a, b) => a + b, 0) / answered.length : Number.POSITIVE_INFINITY;
-    return { groupId: g.id, name: g.name, number: i + 1, memberCount: members.length, totalScore, avgScore, avgMs };
+    return {
+      groupId: g.id,
+      name: g.name,
+      number: i + 1,
+      memberCount: members.length,
+      totalScore,
+      avgScore,
+      bonus,
+      avgMs,
+    };
   });
 
   standings.sort((a, b) => b.avgScore - a.avgScore || a.avgMs - b.avgMs || a.number - b.number);

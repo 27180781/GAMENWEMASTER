@@ -30,6 +30,7 @@ export function buildBackupPayload(
   nameOf: (voterId: string) => string,
   startedAt: number,
   removedIds: readonly string[] = [],
+  groupBonus: Readonly<Record<string, number>> = {},
 ): BackupPayload {
   const correctBySlide = correctAnswersBySlide(game);
   const votesBySlide = state.votesBySlide;
@@ -114,6 +115,7 @@ export function buildBackupPayload(
       phase: state.phase,
       startedAt,
       ...(removedIds.length > 0 ? { removedIds: [...removedIds] } : {}),
+      ...(Object.keys(groupBonus).length > 0 ? { groupBonus: { ...groupBonus } } : {}),
     },
   };
 }
