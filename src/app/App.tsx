@@ -38,6 +38,10 @@ import {
   getAppVersion,
   canSaveEdits,
   canDownloadByCode,
+  canBrowseLibrary,
+  gameLibrary,
+  gameLibrarySelect,
+  gameLibraryDelete,
   downloadGameByCode,
   onDownloadProgress,
   canStreamMedia,
@@ -46,6 +50,7 @@ import {
   type SealConfig,
   type UpdateStatus,
   type DownloadProgress,
+  type LibraryGame,
 } from './clickerBridge.ts';
 import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.ts';
 import { decodeInitialMedia } from './mediaDecode.ts';
@@ -339,6 +344,14 @@ export function App() {
    * וקוד שגוי הוא טעות קלדה שממנה רוצים פשוט לתקן ולנסות שוב באותו מסך.
    */
   const [codeError, setCodeError] = useState<string | null>(null);
+  /**
+   * המשחקים שכבר הורדו למחשב. בלעדיהם הדרך היחידה לחזור למשחק שכבר הורד הייתה
+   * להקליד שוב את הקוד ולהוריד מאות מגה-בייט מחדש — גם באולם בלי רשת.
+   */
+  const [library, setLibrary] = useState<LibraryGame[]>([]);
+  const refreshLibrary = useCallback(() => {
+    if (canBrowseLibrary()) void gameLibrary().then(setLibrary);
+  }, []);
   /** כלי "חתום EXE" — זמין רק בקובץ הנייד שאינו חתום בעצמו, ורק לפי בקשה. */
   const [sealCapable, setSealCapable] = useState(false);
   const [showSeal, setShowSeal] = useState(false);
@@ -492,6 +505,9 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- ריצה חד-פעמית בעליית התוכנה
   }, [sealTool]);
 
+  // ספריית המשחקים שהורדו — נטענת בעלייה, כדי שמסך הפתיחה יציג אותם מיד.
+  useEffect(refreshLibrary, [refreshLibrary]);
+
   // מצב החתימה — נבדק פעם אחת בעלייה, *לפני* הטעינה האוטומטית. אם הקובץ שרץ
   // הוא כלי החתימה, נפתחים ישר על מסכו ולא טוענים שום משחק שמור.
   useEffect(() => {
@@ -619,31 +635,63 @@ export function App() {
    * ישר לדיסק (חבילה עם וידאו שוקלת מאות MB), ומשם נטענת במסלול המהיר הרגיל
    * של "המשחק האחרון" — בלי להעביר בייטים דרך ה-renderer.
    */
-  const loadFromCode = async (code: string) => {
-    setCodeError(null);
-    setDownloading({ phase: 'connect' });
-    const res = await downloadGameByCode(code);
-    if (!res.ok) {
-      setDownloading(null);
-      setCodeError(res.error ?? 'הורדת המשחק נכשלה');
-      return;
-    }
+  /** טעינת המשחק שנבחר כ"נוכחי" (אחרי הורדה או בחירה מהספרייה). */
+  const openCurrentGame = async (failMessage: string) => {
     const saved = await desktopLoadSavedGame('last');
-    setDownloading(null);
     if (saved === null || saved.dataJson === '') {
-      setCodeError('החבילה שהתקבלה מהשרת אינה תקינה');
+      setCodeError(failMessage);
       return;
     }
     try {
       applyLoadedZip(loadGameFromExtracted(saved));
     } catch (e) {
-      setCodeError(`טעינת המשחק שהורד נכשלה: ${(e as Error).message}`);
+      setCodeError(`טעינת המשחק נכשלה: ${(e as Error).message}`);
     }
+  };
+
+  /** פתיחת משחק שכבר הורד — מיידית, בלי רשת ובלי הורדה מחדש. */
+  const openFromLibrary = async (code: string) => {
+    setCodeError(null);
+    if (!(await gameLibrarySelect(code))) {
+      setCodeError('המשחק השמור לא נמצא — נסו להוריד אותו מחדש');
+      refreshLibrary();
+      return;
+    }
+    setLoadNotice(null);
+    await openCurrentGame('העותק השמור אינו תקין — נסו להוריד מחדש');
+  };
+
+  const removeFromLibrary = async (code: string) => {
+    if (!window.confirm(`למחוק את המשחק ${code} מהמחשב? אפשר יהיה להוריד אותו שוב עם הקוד.`)) return;
+    await gameLibraryDelete(code);
+    refreshLibrary();
+  };
+
+  const loadFromCode = async (code: string, force = false) => {
+    setCodeError(null);
+    // המשחק כבר אצלנו? פותחים אותו מיד. זו כל הנקודה: אחרי שיוצאים לבחור משחק
+    // אחר, חזרה אליו לא אמורה לדרוש הורדה של מאות מגה-בייט מחדש.
+    const clean = code.trim();
+    if (!force && library.some((g) => g.code === clean)) {
+      await openFromLibrary(clean);
+      return;
+    }
+    setDownloading({ phase: 'connect' });
+    const res = await downloadGameByCode(clean);
+    if (!res.ok) {
+      setDownloading(null);
+      setCodeError(res.error ?? 'הורדת המשחק נכשלה');
+      return;
+    }
+    setDownloading(null);
+    refreshLibrary();
+    await openCurrentGame('החבילה שהתקבלה מהשרת אינה תקינה');
   };
 
   // "טען משחק אחר" (EXE) — שכחת המשחק השמור וחזרה לבורר קובץ ה-ZIP.
   const pickAnotherGame = () => {
     forgetGame();
+    refreshLibrary(); // חוזרים למסך הפתיחה — שהרשימה תהיה מעודכנת
     zipRevokeRef.current?.();
     zipRevokeRef.current = null;
     setOffline(false);
@@ -1008,6 +1056,52 @@ export function App() {
               )}
               {downloading !== null && <DownloadBar progress={downloading} />}
               {codeError !== null && <p className="offline-open-error">{codeError}</p>}
+
+              {/* משחקים שכבר הורדו — פתיחה מיידית בלי רשת ובלי הורדה מחדש. */}
+              {library.length > 0 && downloading === null && (
+                <section className="lib">
+                  <h2 className="lib-title">משחקים שהורדו למחשב</h2>
+                  <ul className="lib-list">
+                    {library.map((g) => (
+                      <li key={g.code} className="lib-item">
+                        <button
+                          type="button"
+                          className="lib-open"
+                          title={`פתיחת ${g.name || g.code} — בלי הורדה מחדש`}
+                          onClick={() => void openFromLibrary(g.code)}
+                        >
+                          <span className="lib-name">{g.name || `משחק ${g.code}`}</span>
+                          <span className="lib-meta">
+                            קוד {g.code}
+                            {g.savedAt > 0 && ` · הורד ${new Date(g.savedAt).toLocaleDateString('he-IL')}`}
+                            {g.size > 0 && ` · ${(g.size / 1048576).toFixed(0)}MB`}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          className="lib-refresh"
+                          title="הורדה מחדש מהשרת (אם המשחק עודכן)"
+                          onClick={() => void loadFromCode(g.code, true)}
+                        >
+                          ⟳
+                        </button>
+                        <button
+                          type="button"
+                          className="lib-del"
+                          title="מחיקה מהמחשב"
+                          onClick={() => void removeFromLibrary(g.code)}
+                        >
+                          🗑
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="lib-hint">
+                    פתיחה מכאן היא מיידית ואינה דורשת אינטרנט. אם ערכתם את המשחק
+                    באתר מאז ההורדה — לחצו ⟳ כדי למשוך את הגרסה המעודכנת.
+                  </p>
+                </section>
+              )}
               {error !== null && <p className="offline-open-error">{error}</p>}
               {updateStatus !== null && <UpdateBadge status={updateStatus} />}
         <VersionLine status={updateStatus} />

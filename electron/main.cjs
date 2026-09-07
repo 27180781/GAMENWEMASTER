@@ -296,7 +296,7 @@ async function selfUpdateSealer() {
  * @returns {Promise<{ ok: boolean, error?: string, addedMedia?: number }>}
  */
 async function saveEditedGame(dataJson) {
-  const zipPath = lastGameZipPath();
+  const zipPath = currentGameZipPath();
   if (!fs.existsSync(zipPath)) return { ok: false, error: 'לא נמצאה חבילת משחק לשמירה' };
   let parsed;
   try {
@@ -379,7 +379,9 @@ function downloadGameByCode(code, onProgress) {
       return;
     }
     const url = `${REMOTE_BASE_URL}/download-by-code?code=${encodeURIComponent(clean)}`;
-    const partPath = `${lastGameZipPath()}.part`;
+    // מורידים ישירות לתוך הספרייה — כך משחק שכבר הורד נשאר זמין גם אחרי
+    // שבוחרים משחק אחר, ואין צורך להוריד אותו שוב.
+    const partPath = `${libraryZipPath(clean)}.part`;
     let settled = false;
     /** @type {NodeJS.Timeout | null} */
     let idleTimer = null;
@@ -489,12 +491,9 @@ function downloadGameByCode(code, onProgress) {
               });
               return;
             }
-            fs.rmSync(lastGameZipPath(), { force: true });
-            fs.renameSync(partPath, lastGameZipPath());
-            fs.writeFileSync(
-              lastGameMetaPath(),
-              JSON.stringify({ name: `משחק ${clean}`, savedAt: Date.now(), code: clean }),
-            );
+            fs.rmSync(libraryZipPath(clean), { force: true });
+            fs.renameSync(partPath, libraryZipPath(clean));
+            libraryStore(clean, `משחק ${clean}`);
             console.log('[remote] משחק הורד לפי קוד:', clean, `${(received / 1048576).toFixed(1)}MB`);
             finish({ ok: true, bytes: received });
           } catch (err) {
@@ -958,19 +957,25 @@ function stopReceiver() {
 // שבפתיחה הבאה של ה-EXE המשחק כבר יהיה טעון (בלי לבחור קובץ שוב). שמירת
 // הבייטים עצמם (ולא נתיב) — עמיד גם אם קובץ המקור הוזז/נמחק.
 // ---------------------------------------------------------------------------
-/** נתיב קובץ ה-ZIP השמור של המשחק האחרון. */
-function lastGameZipPath() {
-  return path.join(app.getPath('userData'), 'last-game.zip');
-}
-/** נתיב קובץ המטא (שם המשחק) של המשחק האחרון. */
-function lastGameMetaPath() {
-  return path.join(app.getPath('userData'), 'last-game.json');
-}
+// ספריית המשחקים שהורדו — הלוגיקה ב-gameLibrary.cjs (מקבל תיקיית נתונים,
+// ולכן ניתן לבדיקה מול תיקייה זמנית). כאן רק חיבור ל-userData של Electron.
+const lib = require('./gameLibrary.cjs');
+const userData = () => app.getPath('userData');
+
+const lastGameZipPath = () => lib.lastGameZipPath(userData());
+const lastGameMetaPath = () => lib.lastGameMetaPath(userData());
+const libraryZipPath = (code) => lib.libraryZipPath(userData(), code);
+const currentGameZipPath = () => lib.currentGameZipPath(userData());
+const libraryList = () => lib.libraryList(userData());
+const librarySelect = (code) => lib.librarySelect(userData(), code);
+const libraryStore = (code, name) => lib.libraryStore(userData(), code, name);
+const libraryDelete = (code) => lib.libraryDelete(userData(), code);
 
 /** שמירת המשחק האחרון (בייטי ZIP + שם) לטעינה אוטומטית בפתיחה הבאה. */
 function rememberLastGame(name, bytes) {
   try {
     fs.writeFileSync(lastGameZipPath(), Buffer.from(bytes));
+    // בלי code: המשחק הנוכחי הוא הקובץ הזה ולא אחד מהספרייה.
     fs.writeFileSync(lastGameMetaPath(), JSON.stringify({ name: String(name ?? ''), savedAt: Date.now() }));
   } catch (err) {
     console.error('[game] שמירת המשחק האחרון נכשלה:', /** @type {Error} */ (err).message);
@@ -980,7 +985,7 @@ function rememberLastGame(name, bytes) {
 /** שליפת המשחק האחרון שנשמר, או null אם אין. מחזיר בייטים + שם. */
 function getLastGame() {
   try {
-    const zip = lastGameZipPath();
+    const zip = currentGameZipPath();
     if (!fs.existsSync(zip)) return null;
     const bytes = fs.readFileSync(zip);
     let name = '';
@@ -998,15 +1003,12 @@ function getLastGame() {
   }
 }
 
-/** מחיקת המשחק האחרון השמור ("טען משחק אחר"). */
+/**
+ * ביטול בחירת המשחק הנוכחי ("טען משחק אחר"). המשחקים שהורדו נשארים בספרייה —
+ * יציאה לבחירת משחק אחר אינה אמורה למחוק את מה שכבר הורדת.
+ */
 function forgetLastGame() {
-  for (const p of [lastGameZipPath(), lastGameMetaPath()]) {
-    try {
-      if (fs.existsSync(p)) fs.unlinkSync(p);
-    } catch {
-      /* התעלמות */
-    }
-  }
+  lib.forgetCurrent(userData());
 }
 
 // ---------------------------------------------------------------------------
@@ -1450,8 +1452,14 @@ app.whenReady().then(() => {
   // משחק מוטבע ("סגור") ב-EXE — { bytes, config } או null.
   ipcMain.handle('game:sealed', () => sealedGame);
   ipcMain.handle('game:forget', () => {
+    // מבטל את הבחירה בלבד. המשחקים שהורדו נשארים בספרייה — "טען משחק אחר"
+    // אינו אמור למחוק את מה שכבר הורדת.
     forgetLastGame();
   });
+  // ספריית המשחקים שהורדו — רשימה, בחירה מחדש (בלי הורדה) ומחיקה.
+  ipcMain.handle('game:library', () => (isSealerBuild() ? [] : libraryList()));
+  ipcMain.handle('game:librarySelect', (_e, code) => librarySelect(String(code ?? '')));
+  ipcMain.handle('game:libraryDelete', (_e, code) => libraryDelete(String(code ?? '')));
   // גיבוי אופליין לדיסק — שמירה/שליפה/מחיקה לפי מזהה המשחק.
   ipcMain.handle('backup:save', (_e, id, json) => {
     try {
@@ -1632,7 +1640,7 @@ app.whenReady().then(() => {
         config = sealedGame.config;
       } else {
         if (isSealerBuild()) return null; // כלי החתימה אינו נגן — ראו game:getLast
-        const zipPath = lastGameZipPath();
+        const zipPath = currentGameZipPath();
         if (!fs.existsSync(zipPath)) return null;
         bytes = fs.readFileSync(zipPath);
       }

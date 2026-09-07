@@ -103,9 +103,21 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
   getSealedGame() {
     return ipcRenderer.invoke('game:sealed');
   },
-  /** מחיקת המשחק האחרון השמור ("טען משחק אחר"). */
+  /** ביטול בחירת המשחק הנוכחי ("טען משחק אחר"). הספרייה נשארת. */
   forgetGame() {
     void ipcRenderer.invoke('game:forget');
+  },
+  /** המשחקים שכבר הורדו — [{ code, name, savedAt, size }], החדש קודם. */
+  gameLibrary() {
+    return ipcRenderer.invoke('game:library');
+  },
+  /** בחירת משחק שכבר הורד כמשחק הנוכחי — בלי הורדה מחדש. */
+  gameLibrarySelect(/** @type {string} */ code) {
+    return ipcRenderer.invoke('game:librarySelect', code);
+  },
+  /** מחיקת משחק מהספרייה. */
+  gameLibraryDelete(/** @type {string} */ code) {
+    return ipcRenderer.invoke('game:libraryDelete', code);
   },
   /** גיבוי אופליין לדיסק — שמירת מצב המשחק (JSON) לפי מזהה. */
   backupSave(/** @type {string} */ id, /** @type {string} */ json) {

@@ -87,6 +87,12 @@ interface TriviaDesktop {
   getSealedGame?: () => Promise<{ bytes: Uint8Array; config: SealConfig } | null>;
   /** מחיקת המשחק האחרון השמור ("טען משחק אחר"). */
   forgetGame?: () => void;
+  /** המשחקים שכבר הורדו ונשמרו במחשב. */
+  gameLibrary?: () => Promise<LibraryGame[]>;
+  /** בחירת משחק שכבר הורד כמשחק הנוכחי — בלי הורדה מחדש. */
+  gameLibrarySelect?: (code: string) => Promise<boolean>;
+  /** מחיקת משחק מהספרייה. */
+  gameLibraryDelete?: (code: string) => Promise<boolean>;
   /** גיבוי אופליין לדיסק — שמירת מצב המשחק (JSON) לפי מזהה. */
   backupSave?: (id: string, json: string) => Promise<boolean>;
   /** שליפת גיבוי אופליין (JSON) לפי מזהה, או null. */
@@ -316,9 +322,60 @@ export async function getLastGame(): Promise<{ name: string; bytes: Uint8Array }
   }
 }
 
-/** מחיקת המשחק האחרון השמור (EXE) — "טען משחק אחר". no-op בדפדפן. */
+/**
+ * מחיקת בחירת המשחק הנוכחי (EXE) — "טען משחק אחר". המשחקים שהורדו נשארים
+ * בספרייה, ואפשר לבחור מהם שוב בלי הורדה. no-op בדפדפן.
+ */
 export function forgetGame(): void {
   desktop()?.forgetGame?.();
+}
+
+/** משחק שכבר הורד ונשמר במחשב. */
+export interface LibraryGame {
+  code: string;
+  name: string;
+  /** חותמת זמן ההורדה (ms). 0 כשאין מטא. */
+  savedAt: number;
+  /** גודל החבילה בבתים. */
+  size: number;
+}
+
+/** האם ה-EXE מנהל ספריית משחקים שהורדו. */
+export function canBrowseLibrary(): boolean {
+  return typeof desktop()?.gameLibrary === 'function';
+}
+
+/** המשחקים שכבר הורדו, החדש קודם. רשימה ריקה בדפדפן או בגרסה ישנה. */
+export async function gameLibrary(): Promise<LibraryGame[]> {
+  const fn = desktop()?.gameLibrary;
+  if (typeof fn !== 'function') return [];
+  try {
+    return (await fn()) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+/** בחירת משחק שכבר הורד כמשחק הנוכחי — בלי הורדה מחדש. */
+export async function gameLibrarySelect(code: string): Promise<boolean> {
+  const fn = desktop()?.gameLibrarySelect;
+  if (typeof fn !== 'function') return false;
+  try {
+    return (await fn(code)) === true;
+  } catch {
+    return false;
+  }
+}
+
+/** מחיקת משחק מהספרייה. */
+export async function gameLibraryDelete(code: string): Promise<boolean> {
+  const fn = desktop()?.gameLibraryDelete;
+  if (typeof fn !== 'function') return false;
+  try {
+    return (await fn(code)) === true;
+  } catch {
+    return false;
+  }
 }
 
 /** משחק מוטבע ("סגור") ב-EXE — { bytes, config } או null (בדפדפן/EXE גנרי). */
