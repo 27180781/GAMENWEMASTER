@@ -960,6 +960,7 @@ function stopReceiver() {
 // ספריית המשחקים שהורדו — הלוגיקה ב-gameLibrary.cjs (מקבל תיקיית נתונים,
 // ולכן ניתן לבדיקה מול תיקייה זמנית). כאן רק חיבור ל-userData של Electron.
 const lib = require('./gameLibrary.cjs');
+const gate = require('./gameGate.cjs');
 const userData = () => app.getPath('userData');
 
 const lastGameZipPath = () => lib.lastGameZipPath(userData());
@@ -1460,6 +1461,14 @@ app.whenReady().then(() => {
   ipcMain.handle('game:library', () => (isSealerBuild() ? [] : libraryList()));
   ipcMain.handle('game:librarySelect', (_e, code) => librarySelect(String(code ?? '')));
   ipcMain.handle('game:libraryDelete', (_e, code) => libraryDelete(String(code ?? '')));
+  // קוד גישה להחלפת/עריכת המשחק. האימות נעשה כאן ולא ב-renderer, כדי שהגיבוב
+  // לא ייצא מהתהליך הראשי כלל.
+  ipcMain.handle('gate:status', () => gate.gateStatus(userData()));
+  ipcMain.handle('gate:set', (_e, code) => gate.setGate(userData(), code ?? null));
+  ipcMain.handle('gate:verify', (_e, code) => gate.verifyGate(userData(), String(code ?? '')));
+  ipcMain.handle('gate:change', (_e, current, next) =>
+    gate.changeGate(userData(), String(current ?? ''), next ?? null),
+  );
   // גיבוי אופליין לדיסק — שמירה/שליפה/מחיקה לפי מזהה המשחק.
   ipcMain.handle('backup:save', (_e, id, json) => {
     try {

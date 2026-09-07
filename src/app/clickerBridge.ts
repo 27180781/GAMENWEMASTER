@@ -93,6 +93,11 @@ interface TriviaDesktop {
   gameLibrarySelect?: (code: string) => Promise<boolean>;
   /** מחיקת משחק מהספרייה. */
   gameLibraryDelete?: (code: string) => Promise<boolean>;
+  /** מצב קוד הגישה להחלפת/עריכת המשחק. */
+  gateStatus?: () => Promise<GateStatus>;
+  gateSet?: (code: string | null) => Promise<boolean>;
+  gateVerify?: (code: string) => Promise<boolean>;
+  gateChange?: (current: string, next: string | null) => Promise<boolean>;
   /** גיבוי אופליין לדיסק — שמירת מצב המשחק (JSON) לפי מזהה. */
   backupSave?: (id: string, json: string) => Promise<boolean>;
   /** שליפת גיבוי אופליין (JSON) לפי מזהה, או null. */
@@ -373,6 +378,64 @@ export async function gameLibraryDelete(code: string): Promise<boolean> {
   if (typeof fn !== 'function') return false;
   try {
     return (await fn(code)) === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * מצב קוד הגישה. `configured: false` = המשתמש עוד לא נשאל, ואז מוצג לו חלון
+ * ההגדרה פעם אחת.
+ */
+export interface GateStatus {
+  configured: boolean;
+  enabled: boolean;
+}
+
+/** האם ה-EXE מכיר קוד גישה (גרסה חדשה מספיק). */
+export function canGate(): boolean {
+  return typeof desktop()?.gateStatus === 'function';
+}
+
+/** מצב קוד הגישה. בדפדפן/גרסה ישנה — "מוגדר וכבוי", כלומר בלי מחסום. */
+export async function gateStatus(): Promise<GateStatus> {
+  const fn = desktop()?.gateStatus;
+  if (typeof fn !== 'function') return { configured: true, enabled: false };
+  try {
+    return (await fn()) ?? { configured: true, enabled: false };
+  } catch {
+    return { configured: true, enabled: false };
+  }
+}
+
+/** קביעת הקוד בפעם הראשונה. null/ריק = ויתור על קוד. */
+export async function gateSet(code: string | null): Promise<boolean> {
+  const fn = desktop()?.gateSet;
+  if (typeof fn !== 'function') return false;
+  try {
+    return (await fn(code)) === true;
+  } catch {
+    return false;
+  }
+}
+
+/** בדיקת קוד. מחזיר true גם כשאין מחסום — הקורא אינו צריך לבדוק בנפרד. */
+export async function gateVerify(code: string): Promise<boolean> {
+  const fn = desktop()?.gateVerify;
+  if (typeof fn !== 'function') return true;
+  try {
+    return (await fn(code)) === true;
+  } catch {
+    return false;
+  }
+}
+
+/** החלפת/הסרת הקוד — דורשת את הנוכחי. */
+export async function gateChange(current: string, next: string | null): Promise<boolean> {
+  const fn = desktop()?.gateChange;
+  if (typeof fn !== 'function') return false;
+  try {
+    return (await fn(current, next)) === true;
   } catch {
     return false;
   }
