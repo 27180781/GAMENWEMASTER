@@ -2924,6 +2924,78 @@ body {
 /* שתי פעולות משניות זו לצד זו במסך ההגדרות */
 .settings-secondary { display: flex; gap: 18px; align-items: center; justify-content: center; }
 
+/* ---- משחקים שכבר הורדו למחשב ---- */
+.lib {
+  width: 100%;
+  max-width: 560px;
+  margin-top: 6px;
+  text-align: right;
+}
+.lib-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 800;
+  color: #3d4256;
+}
+.lib-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 210px;
+  overflow-y: auto;
+}
+.lib-item {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+.lib-open {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: right;
+  padding: 9px 13px;
+  border: 2px solid #cfd4e2;
+  border-radius: 13px;
+  background: #f9fafc;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.lib-open:hover { border-color: #6c5ce7; background: #fff; }
+.lib-name {
+  font-size: 17px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lib-meta { font-size: 12.5px; color: #5a6076; }
+.lib-refresh,
+.lib-del {
+  flex: 0 0 auto;
+  width: 42px;
+  border: 2px solid #cfd4e2;
+  border-radius: 13px;
+  background: #f9fafc;
+  color: #5a6076;
+  font-size: 17px;
+  cursor: pointer;
+}
+.lib-refresh:hover { border-color: #6c5ce7; color: #6c5ce7; }
+.lib-del:hover { border-color: #e5566a; color: #e5566a; }
+.lib-hint {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #5a6076;
+}
+
 /* טעינת משחק מהשרת לפי קוד — חלופה לטעינת ZIP */
 .offline-open-code {
   display: flex;
