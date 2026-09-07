@@ -119,6 +119,22 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
   gameLibraryDelete(/** @type {string} */ code) {
     return ipcRenderer.invoke('game:libraryDelete', code);
   },
+  /** מצב קוד הגישה — { configured, enabled }. */
+  gateStatus() {
+    return ipcRenderer.invoke('gate:status');
+  },
+  /** קביעת קוד הגישה בפעם הראשונה. null/ריק = ויתור על קוד. */
+  gateSet(/** @type {string|null} */ code) {
+    return ipcRenderer.invoke('gate:set', code);
+  },
+  /** בדיקת קוד. true גם כשאין קוד מוגדר. */
+  gateVerify(/** @type {string} */ code) {
+    return ipcRenderer.invoke('gate:verify', code);
+  },
+  /** החלפת/הסרת הקוד — דורשת את הנוכחי. */
+  gateChange(/** @type {string} */ current, /** @type {string|null} */ next) {
+    return ipcRenderer.invoke('gate:change', current, next);
+  },
   /** גיבוי אופליין לדיסק — שמירת מצב המשחק (JSON) לפי מזהה. */
   backupSave(/** @type {string} */ id, /** @type {string} */ json) {
     return ipcRenderer.invoke('backup:save', id, json);

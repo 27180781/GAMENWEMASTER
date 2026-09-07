@@ -2924,6 +2924,63 @@ body {
 /* שתי פעולות משניות זו לצד זו במסך ההגדרות */
 .settings-secondary { display: flex; gap: 18px; align-items: center; justify-content: center; }
 
+/* ---- קוד גישה להחלפת/עריכת המשחק ---- */
+.gate-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(24, 20, 38, 0.62);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.gate-box {
+  background: #fff;
+  color: #2f3446;
+  border-radius: 18px;
+  box-shadow: 0 20px 56px rgba(24, 20, 38, 0.4);
+  width: min(430px, 100%);
+  padding: 24px 26px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  text-align: right;
+}
+.gate-title { margin: 0; font-size: 22px; font-weight: 800; }
+.gate-lead { margin: 0; font-size: 14.5px; line-height: 1.6; color: #4b5165; }
+.gate-field { display: flex; flex-direction: column; gap: 5px; }
+.gate-field > span { font-size: 13px; color: #5a6076; }
+.gate-field input {
+  padding: 11px 13px;
+  border: 2px solid #cfd4e2;
+  border-radius: 12px;
+  background: #f9fafc;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-align: center;
+  color: inherit;
+}
+.gate-field input:focus { outline: none; border-color: #6c5ce7; background: #fff; }
+.gate-error { margin: 0; font-size: 14px; font-weight: 700; color: #d33a4e; }
+.gate-actions { display: flex; gap: 9px; flex-wrap: wrap; }
+.gate-primary,
+.gate-plain {
+  flex: 1 1 auto;
+  padding: 11px 14px;
+  border-radius: 12px;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+.gate-primary { border: none; background: #22b573; color: #fff; }
+.gate-primary:hover:not(:disabled) { filter: brightness(1.06); }
+.gate-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.gate-plain { border: 2px solid #cfd4e2; background: #fff; color: #4b5165; }
+.gate-plain:hover { border-color: #6c5ce7; color: #6c5ce7; }
+.gate-note { margin: 2px 0 0; font-size: 12.5px; line-height: 1.55; color: #7a8095; }
+
 /* ---- משחקים שכבר הורדו למחשב ---- */
 .lib {
   width: 100%;

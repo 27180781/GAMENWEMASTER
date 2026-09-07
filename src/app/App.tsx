@@ -26,6 +26,7 @@ import { FloatingWindowControls } from '../render/WindowControls.tsx';
 import { SealScreen } from '../render/SealScreen.tsx';
 import { GameEditor } from '../render/GameEditor.tsx';
 import { GuideScreen } from '../render/GuideScreen.tsx';
+import { GateChange, GateSetup, GateUnlock } from '../render/GateDialog.tsx';
 import {
   isDesktopClicker,
   isDesktopApp,
@@ -39,6 +40,11 @@ import {
   canSaveEdits,
   canDownloadByCode,
   canBrowseLibrary,
+  canGate,
+  gateStatus,
+  gateSet,
+  gateVerify,
+  gateChange,
   gameLibrary,
   gameLibrarySelect,
   gameLibraryDelete,
@@ -51,6 +57,7 @@ import {
   type UpdateStatus,
   type DownloadProgress,
   type LibraryGame,
+  type GateStatus,
 } from './clickerBridge.ts';
 import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.ts';
 import { decodeInitialMedia } from './mediaDecode.ts';
@@ -352,6 +359,78 @@ export function App() {
   const refreshLibrary = useCallback(() => {
     if (canBrowseLibrary()) void gameLibrary().then(setLibrary);
   }, []);
+
+  /**
+   * קוד גישה להחלפת/עריכת המשחק. null = עוד לא נבדק.
+   * `configured: false` מפעיל את חלון ההגדרה — פעם אחת, גם בהתקנות קיימות
+   * שמתעדכנות לגרסה הזו (אין להן עדיין קובץ הגדרות).
+   */
+  const [gate, setGate] = useState<GateStatus | null>(null);
+  /** פעולה שממתינה לקוד. `run` מורץ רק אחרי אימות מוצלח. */
+  const [locked, setLocked] = useState<{ what: string; run: () => void } | null>(null);
+  const [changeGate, setChangeGate] = useState(false);
+  const zipInputRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * חלונות קוד הגישה. נשתלים בשני המסכים שלפני המשחק (פתיחה והגדרות) — שם
+   * מתרחשות כל הפעולות החסומות. במשחק עצמו אין מה לחסום.
+   */
+  const gateLayer = (
+    <>
+      {desktopApp && canGate() && gate !== null && !gate.configured && (
+        <GateSetup
+          onDone={(code) => {
+            void gateSet(code).then(() => setGate({ configured: true, enabled: code !== null }));
+          }}
+        />
+      )}
+      {locked !== null && (
+        <GateUnlock
+          what={locked.what}
+          onVerify={async (code) => {
+            const ok = await gateVerify(code);
+            if (ok) {
+              const { run } = locked;
+              setLocked(null);
+              run();
+            }
+            return ok;
+          }}
+          onClose={() => setLocked(null)}
+        />
+      )}
+      {changeGate && (
+        <GateChange
+          onChange={async (current, next) => {
+            const ok = await gateChange(current, next);
+            if (ok) {
+              setGate({ configured: true, enabled: next !== null });
+              setChangeGate(false);
+            }
+            return ok;
+          }}
+          onClose={() => setChangeGate(false)}
+        />
+      )}
+    </>
+  );
+
+
+  /**
+   * עוטף פעולה חסומה: בלי קוד — רצה מיד; עם קוד — נפתח חלון, והפעולה מורצת
+   * רק אחרי אימות. כל מסלולי החלפת המשחק עוברים כאן, כולל טעינת ZIP מהדיסק —
+   * אחרת אפשר היה פשוט לפתוח מחדש את התוכנה ולעקוף.
+   */
+  const guard = useCallback(
+    (what: string, run: () => void) => {
+      if (gate?.enabled !== true) {
+        run();
+        return;
+      }
+      setLocked({ what, run });
+    },
+    [gate],
+  );
   /** כלי "חתום EXE" — זמין רק בקובץ הנייד שאינו חתום בעצמו, ורק לפי בקשה. */
   const [sealCapable, setSealCapable] = useState(false);
   const [showSeal, setShowSeal] = useState(false);
@@ -507,6 +586,12 @@ export function App() {
 
   // ספריית המשחקים שהורדו — נטענת בעלייה, כדי שמסך הפתיחה יציג אותם מיד.
   useEffect(refreshLibrary, [refreshLibrary]);
+
+  // מצב קוד הגישה — נקרא פעם אחת בעלייה.
+  useEffect(() => {
+    if (canGate()) void gateStatus().then(setGate);
+    else setGate({ configured: true, enabled: false });
+  }, []);
 
   // מצב החתימה — נבדק פעם אחת בעלייה, *לפני* הטעינה האוטומטית. אם הקובץ שרץ
   // הוא כלי החתימה, נפתחים ישר על מסכו ולא טוענים שום משחק שמור.
@@ -903,9 +988,9 @@ export function App() {
           offline={offline}
           qrAvailable={!offline && (pendingGame.room ?? '') !== ''}
           {...(sealConfig !== null ? { sealConfig } : {})}
-          {...(desktopApp && sealConfig === null ? { onPickAnother: () => pickAnotherGame() } : {})}
+          {...(desktopApp && sealConfig === null ? { onPickAnother: () => guard('החלפת המשחק', pickAnotherGame) } : {})}
           {...(offline && sealConfig === null && canSaveEdits()
-            ? { onEditGame: () => setEditorOpen(true) }
+            ? { onEditGame: () => guard('עריכת המשחק', () => setEditorOpen(true)) }
             : {})}
           {...(offline ? { onOpenGuide: () => setGuideOpen(true) } : {})}
           onSave={(saved) => {
@@ -918,6 +1003,7 @@ export function App() {
         />
         {updateStatus !== null && <UpdateBadge status={updateStatus} />}
         <VersionLine status={updateStatus} />
+        {gateLayer}
         {mediaIssues.length > 0 && !mediaAlertDismissed && (
           <MediaIssuesAlert issues={mediaIssues} onClose={() => setMediaAlertDismissed(true)} />
         )}
@@ -984,6 +1070,7 @@ export function App() {
   // הדוגמה וטעינת ה-JSON שייכים לפיתוח/אונליין ואינם מוצגים ב-EXE.
   const zipInput = (
     <input
+      ref={zipInputRef}
       type="file"
       accept=".zip,application/zip"
       hidden
@@ -995,6 +1082,16 @@ export function App() {
       }}
     />
   );
+
+  /**
+   * בורר הקבצים נפתח בלחיצה על ה-label, ולכן אי אפשר "לעטוף" אותו — עוצרים את
+   * הלחיצה, מבקשים קוד, ורק אז פותחים אותו בתוכנה.
+   */
+  const onPickZip = (e: React.MouseEvent) => {
+    if (gate?.enabled !== true) return;
+    e.preventDefault();
+    guard('טעינת קובץ משחק', () => zipInputRef.current?.click());
+  };
 
   // כלי החתימה נפתח ישר על מסכו. ב-SealEXE אין "חזרה" — אין מאחוריו משחק.
   if (desktopApp && showSeal) {
@@ -1022,7 +1119,7 @@ export function App() {
                   ? 'בחרו קובץ משחק (ZIP), או הקלידו את קוד המשחק כדי למשוך אותו מהשרת'
                   : 'בחרו את קובץ המשחק (ZIP) כדי להתחיל'}
               </p>
-              <label className="picker-button offline-open-load">
+              <label className="picker-button offline-open-load" onClick={onPickZip}>
                 📦 טעינת משחק (ZIP)
                 {zipInput}
               </label>
@@ -1033,7 +1130,8 @@ export function App() {
                   className="offline-open-code"
                   onSubmit={(e) => {
                     e.preventDefault();
-                    if (gameCode.trim() !== '' && downloading === null) void loadFromCode(gameCode);
+                    if (gameCode.trim() === '' || downloading !== null) return;
+                    guard('טעינת משחק לפי קוד', () => void loadFromCode(gameCode));
                   }}
                 >
                   <span className="offline-open-code-or">או</span>
@@ -1068,7 +1166,7 @@ export function App() {
                           type="button"
                           className="lib-open"
                           title={`פתיחת ${g.name || g.code} — בלי הורדה מחדש`}
-                          onClick={() => void openFromLibrary(g.code)}
+                          onClick={() => guard('החלפת המשחק', () => void openFromLibrary(g.code))}
                         >
                           <span className="lib-name">{g.name || `משחק ${g.code}`}</span>
                           <span className="lib-meta">
@@ -1081,7 +1179,7 @@ export function App() {
                           type="button"
                           className="lib-refresh"
                           title="הורדה מחדש מהשרת (אם המשחק עודכן)"
-                          onClick={() => void loadFromCode(g.code, true)}
+                          onClick={() => guard('הורדת המשחק מחדש', () => void loadFromCode(g.code, true))}
                         >
                           ⟳
                         </button>
@@ -1089,7 +1187,7 @@ export function App() {
                           type="button"
                           className="lib-del"
                           title="מחיקה מהמחשב"
-                          onClick={() => void removeFromLibrary(g.code)}
+                          onClick={() => guard('מחיקת משחק', () => void removeFromLibrary(g.code))}
                         >
                           🗑
                         </button>
@@ -1103,8 +1201,24 @@ export function App() {
                 </section>
               )}
               {error !== null && <p className="offline-open-error">{error}</p>}
+              {canGate() && gate?.configured === true && (
+                <button
+                  type="button"
+                  className="offline-open-clear gate-link"
+                  // כשאין קוד — פותחים שוב את חלון ההגדרה (אותו מסלול של
+                  // ההתקנה); כשיש — חלון החלפה שדורש את הקוד הנוכחי.
+                  onClick={() =>
+                    gate.enabled
+                      ? setChangeGate(true)
+                      : setGate({ configured: false, enabled: false })
+                  }
+                >
+                  🔒 {gate.enabled ? 'שינוי קוד הגישה' : 'הגדרת קוד גישה'}
+                </button>
+              )}
               {updateStatus !== null && <UpdateBadge status={updateStatus} />}
         <VersionLine status={updateStatus} />
+              {gateLayer}
               {sealCapable && (
                 <button
                   type="button"
