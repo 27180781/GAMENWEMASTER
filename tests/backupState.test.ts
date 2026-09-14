@@ -161,11 +161,13 @@ describe('שחזור מלא: הצבעות פר-שקופית + משתתפים ש�
     const p = buildBackupPayload(game, state, EMPTY_ROSTER, (id) => id, 42);
     expect(p.meta.betStakes).toEqual({ 1: { a: 5 } });
     expect(p.meta.betOutcomes?.[2]?.a).toMatchObject({ won: true, delta: 5 });
-    const snap = backupToSnapshot(game, { ...p, completed: false });
+    const snap = backupToSnapshot(game, { ...p, id: 'b1', completed: false });
     expect(snap.betStakes).toEqual({ 1: { a: 5 } });
     expect(snap.betOutcomes?.[2]?.a?.delta).toBe(5);
     // שקופית שלא קיימת בקובץ — נזרקת; גיבוי בלי השדות — ריק
-    const stray = backupToSnapshot(game, { ...p, completed: false, meta: { ...p.meta, betStakes: { 99: { a: 1 } }, betOutcomes: undefined } });
+    const strayMeta = { ...p.meta, betStakes: { 99: { a: 1 } } };
+    delete strayMeta.betOutcomes;
+    const stray = backupToSnapshot(game, { ...p, id: 'b1', completed: false, meta: strayMeta });
     expect(stray.betStakes).toEqual({});
     expect(stray.betOutcomes).toEqual({});
     const clean = buildBackupPayload(game, engine.getState(), EMPTY_ROSTER, (id) => id, 42);

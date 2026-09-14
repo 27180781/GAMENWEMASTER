@@ -139,7 +139,7 @@ describe('המנוע', () => {
     expect(payload.meta.majorityBySlide).toEqual({ 1: [2] });
     // הדוח בגיבוי סופר "ענו נכון" לפי ההכרעה
     expect(payload.questions['1']?.correctVotes).toBe(2);
-    const snap = backupToSnapshot(majorityGame(), { ...payload, completed: false });
+    const snap = backupToSnapshot(majorityGame(), { ...payload, id: 'b1', completed: false });
     expect(snap.majorityBySlide).toEqual({ 1: [2] });
   });
 
