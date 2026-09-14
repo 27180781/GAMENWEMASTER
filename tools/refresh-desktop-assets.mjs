@@ -65,7 +65,8 @@ async function refreshOnce() {
   const next = `${dir}.new`;
   const old = `${dir}.old`;
   rmSync(next, { recursive: true, force: true });
-  await fetchDesktopAssets(next);
+  // ברקע לא ממתינים דקות: שני סבבים, והסבב הבא ממילא בעוד כמה שעות.
+  await fetchDesktopAssets(next, { attempts: 2, waitMs: 30_000 });
 
   rmSync(old, { recursive: true, force: true });
   if (existsSync(dir)) renameSync(dir, old);

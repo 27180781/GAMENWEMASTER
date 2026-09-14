@@ -11,10 +11,20 @@
  * הבנייה נכשלת ברעש אם קובץ חסר או פגום, במקום שהתקלה תתגלה בשקט אצל לקוח
  * באמצע אירוע.
  *
+ * אבל לא מיד: אותה דחיפה ל-main מפעילה במקביל גם את build-desktop, שמחליף את
+ * קובצי המהדורה `desktop-latest` בזמן שהבנייה הזו רצה. בחלון הזה GitHub עונה
+ * 504 / 404, או ש-latest.yml כבר חדש והמתקין עדיין ישן (sha512 לא תואם). לכן
+ * המשיכה כולה (פיד + מתקין + נייד) נעשית בסבבים: כישלון מכל סוג מנקה את
+ * היעד וממתין לסבב הבא, עד תקציב של כמה דקות — מספיק כדי שהמהדורה החדשה
+ * תסיים להתפרסם. רק אחרי כל הסבבים הבנייה נופלת. (כך נכשלה הפריסה ב-14.9.2026:
+ * שלושה ניסיונות בתוך 15 שניות, כולם בתוך חלון ההחלפה.)
+ *
  * שימוש: node tools/fetch-desktop-assets.mjs <תיקיית-יעד>
  * משתני סביבה:
- *   DESKTOP_SOURCE_URL — מקור הקבצים (ברירת מחדל: המהדורה היציבה ב-GitHub)
- *   DESKTOP_ASSETS     — '0' כדי לדלג (בנייה מקומית מהירה בלי 200MB הורדות)
+ *   DESKTOP_SOURCE_URL          — מקור הקבצים (ברירת מחדל: המהדורה היציבה ב-GitHub)
+ *   DESKTOP_ASSETS              — '0' כדי לדלג (בנייה מקומית מהירה בלי 200MB הורדות)
+ *   DESKTOP_FETCH_ATTEMPTS      — כמה סבבים מלאים לנסות (ברירת מחדל 8)
+ *   DESKTOP_FETCH_WAIT_SECONDS  — המתנה בין סבבים (ברירת מחדל 45 → ‎~5 דקות סה"כ)
  */
 
 import { createHash } from 'node:crypto';
@@ -28,6 +38,14 @@ export const SOURCE =
 
 /** גודל מינימלי סביר ל-EXE של Electron — שומר מפני "הורדה" של דף שגיאה. */
 const MIN_EXE_BYTES = 40 * 1024 * 1024;
+
+/** מספר שלם חיובי ממשתנה סביבה, או ברירת המחדל. */
+function envInt(name, fallback) {
+  const n = Number(process.env[name]);
+  return Number.isInteger(n) && n > 0 ? n : fallback;
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * שלושת השדות ש-electron-updater קורא מ-latest.yml. מופרד כדי שגם הרענון
@@ -43,8 +61,11 @@ export function parseFeed(text) {
   return { version, installer, sha512 };
 }
 
-/** הורדה עם כמה ניסיונות — כשל רשתי חולף לא אמור להפיל בנייה שלמה. */
-export async function fetchWithRetry(url, tries = 4) {
+/**
+ * הורדה עם כמה ניסיונות — כשל רשתי חולף לא אמור להפיל בנייה שלמה.
+ * `baseMs` הוא בסיס ההשהיה (2·base, 4·base, …); ניתן לקיצור בבדיקות.
+ */
+export async function fetchWithRetry(url, tries = 4, baseMs = 1000) {
   let lastErr;
   for (let i = 1; i <= tries; i += 1) {
     try {
@@ -54,9 +75,9 @@ export async function fetchWithRetry(url, tries = 4) {
     } catch (err) {
       lastErr = err;
       if (i < tries) {
-        const wait = 2 ** i * 1000;
+        const wait = 2 ** i * baseMs;
         console.warn(`  ניסיון ${i} נכשל (${err.message}) — ממתין ${wait / 1000} שנ׳`);
-        await new Promise((r) => setTimeout(r, wait));
+        await sleep(wait);
       }
     }
   }
@@ -65,18 +86,47 @@ export async function fetchWithRetry(url, tries = 4) {
 
 const sha512b64 = (buf) => createHash('sha512').update(buf).digest('base64');
 
-export async function fetchDesktopAssets(outDir) {
+/**
+ * משיכה מלאה בסבבים (ראו הכותרת): כל סבב מוריד פיד + מתקין + נייד כיחידה
+ * אחת, וכישלון מכל סוג — רשת, HTTP, sha512 לא תואם, קובץ קטן מדי — מנקה את
+ * היעד וממתין לסבב הבא. אפשרויות (לבדיקות ולרענון): attempts, waitMs,
+ * retryBaseMs, minExeBytes.
+ */
+export async function fetchDesktopAssets(outDir, options = {}) {
   if (process.env.DESKTOP_ASSETS === '0') {
     console.log('DESKTOP_ASSETS=0 — מדלגים על הורדת קובצי ההתקנה.');
     return null;
   }
+  const attempts = options.attempts ?? envInt('DESKTOP_FETCH_ATTEMPTS', 8);
+  const waitMs = options.waitMs ?? envInt('DESKTOP_FETCH_WAIT_SECONDS', 45) * 1000;
 
+  let lastErr;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await fetchOnce(outDir, options);
+    } catch (err) {
+      lastErr = err;
+      // תיקייה חלקית (פיד חדש בלי המתקין שלו) נראית תקינה ומסוכנת — מוחקים.
+      rmSync(outDir, { recursive: true, force: true });
+      if (attempt < attempts) {
+        console.warn(
+          `\nסבב ${attempt}/${attempts} נכשל: ${err.message}\n` +
+            `  המהדורה כנראה מתעדכנת ברגע זה — ממתין ${waitMs / 1000} שנ׳ לסבב הבא`,
+        );
+        await sleep(waitMs);
+      }
+    }
+  }
+  throw new Error(`${lastErr?.message ?? 'לא ידוע'} (אחרי ${attempts} סבבים)`);
+}
+
+async function fetchOnce(outDir, { retryBaseMs = 1000, minExeBytes = MIN_EXE_BYTES } = {}) {
   mkdirSync(outDir, { recursive: true });
 
   // ‎latest.yml‎ הוא מקור האמת: הוא קובע איזה קובץ התקנה ה-updater יבקש,
   // ומה ה-sha512 שלו. לכן קוראים אותו קודם ומורידים בדיוק את מה שהוא מציין.
   console.log(`מוריד latest.yml מ-${SOURCE}`);
-  const feed = (await fetchWithRetry(`${SOURCE}/latest.yml`)).toString('utf8');
+  const feed = (await fetchWithRetry(`${SOURCE}/latest.yml`, 4, retryBaseMs)).toString('utf8');
   const { version, installer, sha512: wantHash } = parseFeed(feed);
   console.log(`גרסה ${version} · מתקין ${installer}`);
   writeFileSync(join(outDir, 'latest.yml'), feed);
@@ -84,20 +134,20 @@ export async function fetchDesktopAssets(outDir) {
   // (1) המתקין — זה מה שהעדכון האוטומטי מוריד. מאמתים מול ה-sha512 שבפיד:
   // קובץ שלא תואם יידחה על ידי electron-updater אצל הלקוח, ועדיף לגלות כאן.
   console.log(`מוריד ${installer} …`);
-  const setup = await fetchWithRetry(`${SOURCE}/${installer}`);
+  const setup = await fetchWithRetry(`${SOURCE}/${installer}`, 4, retryBaseMs);
   const gotHash = sha512b64(setup);
   if (gotHash !== wantHash) {
-    throw new Error(`sha512 של ${installer} אינו תואם ל-latest.yml — הקובץ פגום`);
+    throw new Error(`sha512 של ${installer} אינו תואם ל-latest.yml — הקובץ פגום או המהדורה באמצע עדכון`);
   }
-  if (setup.length < MIN_EXE_BYTES) throw new Error(`${installer} קטן מדי (${setup.length})`);
+  if (setup.length < minExeBytes) throw new Error(`${installer} קטן מדי (${setup.length})`);
   writeFileSync(join(outDir, installer), setup);
   console.log(`  ✓ ${(setup.length / 1048576).toFixed(0)}MB · sha512 תואם`);
 
   // (2) הקובץ הנייד — להורדה ישירה, וגם הבסיס שכלי החתימה מוריד.
   const portable = `HavayaBeClick-${version}.exe`;
   console.log(`מוריד ${portable} …`);
-  const exe = await fetchWithRetry(`${SOURCE}/${portable}`);
-  if (exe.length < MIN_EXE_BYTES) throw new Error(`${portable} קטן מדי (${exe.length})`);
+  const exe = await fetchWithRetry(`${SOURCE}/${portable}`, 4, retryBaseMs);
+  if (exe.length < minExeBytes) throw new Error(`${portable} קטן מדי (${exe.length})`);
   writeFileSync(join(outDir, portable), exe);
   console.log(`  ✓ ${(exe.length / 1048576).toFixed(0)}MB`);
 
@@ -134,8 +184,8 @@ export async function fetchDesktopAssets(outDir) {
   return version;
 }
 
-// הרצה ישירה מהפקודה (ולא ייבוא מהרענון) — מוחקים את היעד בכישלון, כדי
-// שהבנייה לא תמשיך עם תיקייה חלקית שנראית תקינה.
+// הרצה ישירה מהפקודה (ולא ייבוא מהרענון) — אחרי כל הסבבים הבנייה נופלת,
+// והיעד כבר נוקה: עדיף שהפריסה לא תעלה מאשר שתעלה בלי קובצי ההתקנה.
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const outDir = process.argv[2] ?? 'dist/desktop';
   fetchDesktopAssets(outDir).catch((err) => {
