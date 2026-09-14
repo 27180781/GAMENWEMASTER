@@ -114,7 +114,12 @@ describe('סכימה — שקופית bet', () => {
   });
 
   it('פחות משתי אפשרויות — נדחית כמו כל שקופית מצביעה', () => {
-    expect(() => makeGame([{ ...rawBet(1), question: { ...rawBet(1).question, answers: [BET_ANSWERS[0]] } }])).toThrow();
+    const oneCard = {
+      ...rawSlide({ id: 1, type: 'trivia', que: 'הימור', answers: [BET_ANSWERS[0]!], scoreForQue: '', timeForQue: 15 }),
+      type: 'bet',
+      bet: CLASSIC as unknown as Record<string, unknown>,
+    };
+    expect(() => makeGame([oneCard])).toThrow();
   });
 
   it('קובץ בלי שקופיות הימור נטען כרגיל (השדות החדשים ב-state ריקים)', () => {
