@@ -23,6 +23,16 @@ describe('completedQuestionCount', () => {
     expect(completedQuestionCount(game, [1, 2, 3, 5])).toBe(3);
     expect(completedQuestionCount(game, [1, 99])).toBe(1); // id לא קיים
   });
+
+  it('שקופית הימור מצביעה אבל אינה שאלה — לא נספרת', () => {
+    const withBet = makeGame([
+      rawSlide({ id: 1, type: 'trivia', answers: fourAnswers(1) }),
+      { ...rawSlide({ id: 7, type: 'survey', answers: fourAnswers(0) }), type: 'bet' },
+      rawSlide({ id: 2, type: 'trivia', answers: fourAnswers(2) }),
+    ]);
+    expect(completedQuestionCount(withBet, [1, 7])).toBe(1);
+    expect(completedQuestionCount(withBet, [1, 7, 2])).toBe(2);
+  });
 });
 
 describe('shouldShowLeaderboard', () => {

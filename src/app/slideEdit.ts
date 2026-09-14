@@ -7,7 +7,8 @@
 
 import type { z } from 'zod';
 import type { GameFile, Slide, SlideType } from '../engine/index.ts';
-import { functionConfigSchema } from '../engine/schema.ts';
+import { describeBetOptionShort, type BetConfig, type BetOption } from '../engine/bet.ts';
+import { betOptionSchema, functionConfigSchema } from '../engine/schema.ts';
 import { describeObject, type FieldNode } from './schemaForm.ts';
 
 /** הקונפיג של שקופית "פעולת מערכת", כפי שהסכימה מגדירה אותו. */
@@ -83,6 +84,7 @@ export const SLIDE_TYPES: { value: SlideType; label: string; icon: string; hint:
   { value: 'trivia', label: 'שאלת טריוויה', icon: '📄', hint: 'תשובות עם תשובה נכונה אחת — ניקוד לפי נכונות ומהירות' },
   { value: 'survey', label: 'סקר', icon: '◔', hint: 'תשובות בלי נכון/לא נכון — מציג התפלגות' },
   { value: 'ans_images', label: 'תשובות תמונה', icon: '🖼', hint: 'כמו טריוויה, אבל כל תשובה היא תמונה' },
+  { value: 'bet', label: 'הימור', icon: '🎲', hint: 'המשתתפים מהמרים על השאלה הבאה — מי שצודק מכפיל, מי שטועה מאבד' },
   { value: 'media', label: 'מדיה', icon: '🎬', hint: 'תמונה/וידאו במסך מלא, בלי הצבעה' },
   { value: 'subject', label: 'כותרת / נושא', icon: '📒', hint: 'טקסט גדול על המסך, בלי הצבעה' },
   { value: 'function', label: 'פעולת מערכת', icon: '⚡', hint: 'איפוס ניקוד, מסך מנצחים, קריאת API, הסרת משתתפים' },
@@ -104,9 +106,14 @@ export function slideSubtitle(slide: Slide): string {
     return label ?? slideTypeInfo(slide.type).label;
   }
   if (!VOTABLE_TYPES.has(slide.type)) return slideTypeInfo(slide.type).label;
+  // הימור — האפשרויות בקצרה ("בלי · 25% · 50% · הכול")
+  if (slide.type === 'bet') {
+    const options = slide.bet?.options ?? [];
+    return slide.question.answers.map((_, i) => describeBetOptionShort(options[i] ?? null)).join(' · ');
+  }
   // בסקר אין תשובה נכונה. הדגל `correct` עדיין יכול להיות שם — הוא נשמר בכוונה
   // בהחלפת סוג — ולכן חייבים לסנן לפי הסוג, אחרת הכרטיס היה מסמן ✓ בסקר.
-  if (slide.type !== 'survey') {
+  if (slide.type !== 'survey' && !slide.setting.majorityDecides) {
     const text = slide.question.answers.find((a) => a.correct)?.ans.trim();
     if (text !== undefined && text !== '') return `✓ ${text}`;
   }
@@ -122,7 +129,53 @@ export function addSlideOfType(game: GameFile, index: number, type: SlideType): 
 }
 
 /** האם השקופית מקבלת הצבעות (ולכן צריכה תשובות). */
-export const VOTABLE_TYPES = new Set<string>(['trivia', 'survey', 'ans_images']);
+export const VOTABLE_TYPES = new Set<string>(['trivia', 'survey', 'ans_images', 'bet']);
+
+/** סוגי אפשרויות ההימור — נגזרים מהסכימה (betOptionSchema.kind). */
+export const BET_KINDS: { value: string; label: string }[] = (() => {
+  const node = describeObject(betOptionSchema).find((n) => n.key === 'kind');
+  return node?.kind === 'enum' ? node.options : [];
+})();
+
+/** הכיתוב שהעורך נותן לכרטיס לפי האפשרות — ברירת מחדל שאפשר לערוך. */
+function betOptionLabel(option: BetOption): string {
+  if (option.kind === 'all') return 'הכול!';
+  if (option.kind === 'percent') {
+    if (option.value === 25) return 'רבע מהניקוד';
+    if (option.value === 50) return 'חצי מהניקוד';
+    return `${option.value ?? 0}% מהניקוד`;
+  }
+  if (option.kind === 'fixed') return `${option.value ?? 0} נקודות`;
+  return 'בלי הימור';
+}
+
+/** ערכת ברירת המחדל לפי מספר הכרטיסים: בלי · רבע · חצי · הכול (ל-2: בלי · הכול). */
+export function defaultBetOptions(count: number): BetOption[] {
+  const classic: BetOption[] =
+    count <= 2
+      ? [{ kind: 'none' }, { kind: 'all' }]
+      : count === 3
+        ? [{ kind: 'none' }, { kind: 'percent', value: 50 }, { kind: 'all' }]
+        : [{ kind: 'none' }, { kind: 'percent', value: 25 }, { kind: 'percent', value: 50 }, { kind: 'all' }];
+  const options = classic.slice(0, count);
+  while (options.length < count) options.push({ kind: 'none' });
+  return options;
+}
+
+/** קונפיג הימור ברירת מחדל לשקופית עם `count` כרטיסים. */
+export function defaultBetConfig(count: number): BetConfig {
+  return { options: defaultBetOptions(count), payout: 1, allowNegative: false };
+}
+
+/** מיישר את רשימת האפשרויות למספר הכרטיסים (אחרי הוספה/הסרה של תשובה). */
+export function syncBetOptions(slide: Slide): Slide {
+  if (slide.type !== 'bet') return slide;
+  const count = slide.question.answers.length;
+  const base = slide.bet ?? defaultBetConfig(count);
+  const options = base.options.slice(0, count);
+  while (options.length < count) options.push({ kind: 'none' });
+  return { ...slide, bet: { ...base, options } };
+}
 
 /** תוויות הפעולות — נגזרות מהסכימה פעם אחת (ראו functionConfigSchema). */
 const ACTION_LABELS: { value: string; label: string }[] = (() => {
@@ -148,8 +201,8 @@ export function changeSlideType(game: GameFile, index: number, type: SlideType):
       while (answers.length < 2) {
         answers.push({ ans: `תשובה ${answers.length + 1}`, correct: false, id: answers.length + 1 });
       }
-      // trivia — חייבת תשובה נכונה אחת לפחות
-      if (type === 'trivia' && !answers.some((a) => a.correct)) {
+      // trivia — חייבת תשובה נכונה אחת לפחות (אלא אם "הרוב קובע")
+      if (type === 'trivia' && !slide.setting.majorityDecides && !answers.some((a) => a.correct)) {
         answers[0] = { ...answers[0]!, correct: true };
       }
       next.question = { ...next.question, answers };
@@ -159,6 +212,22 @@ export function changeSlideType(game: GameFile, index: number, type: SlideType):
     // (מסך מנצחים — עושה משהו נראה לעין מיד, בניגוד ל-API בלי כתובת).
     if (type === 'function' && next.function === undefined) {
       next.function = withActionDefaults({ action: 'screen' });
+    }
+    // הימור — ערכת ברירת מחדל (בלי · רבע · חצי · הכול). כשהתשובות הן עדיין
+    // "תשובה 1/2" האוטומטיות, מחליפים גם את הכיתובים; תשובות שנכתבו נשמרות.
+    if (type === 'bet' && next.bet === undefined) {
+      const placeholder = next.question.answers.every((a) => /^תשובה \d+$/.test(a.ans.trim()));
+      const count = placeholder ? 4 : next.question.answers.length;
+      const options = defaultBetOptions(count);
+      const answers = placeholder
+        ? options.map((o, i) => ({ ans: betOptionLabel(o), correct: false, id: i + 1 }))
+        : next.question.answers.map((a) => ({ ...a, correct: false }));
+      next.question = {
+        ...next.question,
+        que: next.question.que.trim() === '' || /^שאלה חדשה$/.test(next.question.que.trim()) ? 'על כמה מהנקודות שלכם אתם מהמרים?' : next.question.que,
+        answers,
+      };
+      next.bet = { options, payout: 1, allowNegative: false };
     }
     return next;
   });
@@ -223,7 +292,7 @@ export function updateSlide(game: GameFile, index: number, updater: (s: Slide) =
 export function addAnswer(slide: Slide): Slide {
   const answers = [...slide.question.answers];
   answers.push({ ans: `תשובה ${answers.length + 1}`, correct: false, id: answers.length + 1 });
-  return { ...slide, question: { ...slide.question, answers } };
+  return syncBetOptions({ ...slide, question: { ...slide.question, answers } });
 }
 
 /** הסרת תשובה לפי מיקום — לא יורדים מתחת ל-2 תשובות בשקופית מצביעה. */
@@ -232,10 +301,13 @@ export function removeAnswer(slide: Slide, ansIndex: number): Slide {
   let answers = slide.question.answers.filter((_, i) => i !== ansIndex);
   // מזהים לפי מיקום; ולדאות שנשארת תשובה נכונה אחת בטריוויה.
   answers = answers.map((a, i) => ({ ...a, id: i + 1 }));
-  if (slide.type === 'trivia' && !answers.some((a) => a.correct) && answers[0]) {
+  if (slide.type === 'trivia' && !slide.setting.majorityDecides && !answers.some((a) => a.correct) && answers[0]) {
     answers[0] = { ...answers[0], correct: true };
   }
-  return { ...slide, question: { ...slide.question, answers } };
+  const bet = slide.type === 'bet' && slide.bet !== undefined
+    ? { ...slide.bet, options: slide.bet.options.filter((_, i) => i !== ansIndex) }
+    : slide.bet;
+  return syncBetOptions({ ...slide, question: { ...slide.question, answers }, ...(bet !== undefined ? { bet } : {}) });
 }
 
 /** קביעת התשובה הנכונה (טריוויה) לפי מיקום — בדיוק אחת נכונה. */

@@ -4,7 +4,15 @@
  * ותוכן לפי סוג השקופית.
  */
 
-import { type GameEngine, type GameState, type Slide } from '../engine/index.ts';
+import {
+  betSlideFor,
+  betSummary,
+  scoredLikeTrivia,
+  type GameEngine,
+  type GameState,
+  type Slide,
+} from '../engine/index.ts';
+import { BetSlide } from './BetSlide.tsx';
 import { MediaPlayer } from './MediaPlayer.tsx';
 import { QuestionSlide, type RailPlayer, type RevealState } from './QuestionSlide.tsx';
 import { SubjectSlide } from './SubjectSlide.tsx';
@@ -89,7 +97,8 @@ export function slideBackgroundSrc(slide: Slide, triviaMedia: string): string {
   if (isNotQuestionImage(slide.setting.slidBackgroundMedia.src)) {
     return slide.setting.slidBackgroundMedia.src;
   }
-  const votable = slide.type === 'trivia' || slide.type === 'survey' || slide.type === 'ans_images';
+  const votable =
+    slide.type === 'trivia' || slide.type === 'survey' || slide.type === 'ans_images' || slide.type === 'bet';
   if (votable) return triviaMedia;
   return '';
 }
@@ -108,6 +117,18 @@ export function SlideView({
   onBlockingMediaEnded,
 }: SlideViewProps) {
   const slide = engine.getCurrentSlide();
+  const game = engine.getGame();
+
+  // הימור שהשאלה הנוכחית מכריעה — לפס "הימור פעיל" בכותרת (רק בשאלה מנוקדת).
+  const armedBet = scoredLikeTrivia(slide) ? betSlideFor(game, state.currentSlideIndex) : null;
+  const armedStakes = armedBet === null ? undefined : state.betStakes[armedBet.id];
+  const betPill =
+    armedStakes !== undefined && Object.keys(armedStakes).length > 0
+      ? (() => {
+          const s = betSummary(armedStakes, 0);
+          return { bettors: s.bettors, total: s.total };
+        })()
+      : null;
 
   // שקופית "פונקציה" — לפי הפעולה: מסך מנצחים/מובילים, או חיווי API/ניקוד/משתתפים.
   if (slide.type === 'function') {
@@ -154,6 +175,19 @@ export function SlideView({
         ) : slide.type === 'media' ? (
           // שקופית מדיה בלי מדיה פעילה — מצב חולף בלבד (רקע נקי, בלי טקסט)
           <span aria-hidden="true" />
+        ) : slide.type === 'bet' ? (
+          <BetSlide
+            slide={slide}
+            state={state}
+            ansIsNumber={game.setting.ansIsNumber}
+            timer={timer}
+            reveal={reveal}
+            players={players}
+            title={game.setting.titleThroughoutGame}
+            logo={game.setting.logo.src}
+            nameOf={nameOf ?? ((id) => id)}
+            gameType={game.setting.gameType}
+          />
         ) : (
           <QuestionSlide
             slide={slide}
@@ -166,6 +200,7 @@ export function SlideView({
             title={engine.getGame().setting.titleThroughoutGame}
             logo={engine.getGame().setting.logo.src}
             gameType={engine.getGame().setting.gameType}
+            betPill={betPill}
           />
         )}
       </div>

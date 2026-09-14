@@ -27,11 +27,13 @@ const triviaSlide = (): Slide =>
   makeGame([rawSlide({ id: 1, type: 'trivia', que: 'ש', answers: ANSWERS })]).questions[0]!;
 
 describe('אילו הגדרות מתקדמות מוצגות לכל סוג שקופית', () => {
-  it('★ טריוויה — תשע ההגדרות, בסדר של העורך המקוון', () => {
+  it('★ טריוויה — אחת-עשרה ההגדרות, בסדר של העורך המקוון', () => {
     expect(advancedSettingsFor('trivia')).toEqual([
       'multiCorrect',
+      'majorityDecides',
       'groupRestriction',
       'allowChangeVote',
+      'liveVoteCounts',
       'firstClicker',
       'automaticSkip',
       'slidBackgroundMedia',
@@ -45,14 +47,27 @@ describe('אילו הגדרות מתקדמות מוצגות לכל סוג שקו
     expect(advancedSettingsFor('ans_images')).not.toContain('multiCorrect');
     expect(advancedSettingsFor('ans_images')).toContain('descendingScore');
     expect(advancedSettingsFor('ans_images')).toContain('imageReveal');
-    expect(advancedSettingsFor('ans_images')).toHaveLength(8);
+    expect(advancedSettingsFor('ans_images')).toContain('majorityDecides');
+    expect(advancedSettingsFor('ans_images')).toHaveLength(10);
   });
 
   it('★ סקר — בלי "מספר תשובות נכונות", בלי ניקוד יורד ובלי חשיפה: אין בו תשובה נכונה', () => {
     expect(advancedSettingsFor('survey')).not.toContain('multiCorrect');
     expect(advancedSettingsFor('survey')).not.toContain('descendingScore');
     expect(advancedSettingsFor('survey')).not.toContain('imageReveal');
-    expect(advancedSettingsFor('survey')).toHaveLength(6);
+    expect(advancedSettingsFor('survey')).not.toContain('majorityDecides');
+    expect(advancedSettingsFor('survey')).toContain('liveVoteCounts');
+    expect(advancedSettingsFor('survey')).toHaveLength(7);
+  });
+
+  it('★ הימור — רק מה שנוגע להצבעה: קבוצה, שינוי הצבעה, מונה חי, מעבר אוטומטי, רקע', () => {
+    expect(advancedSettingsFor('bet')).toEqual([
+      'groupRestriction',
+      'allowChangeVote',
+      'liveVoteCounts',
+      'automaticSkip',
+      'slidBackgroundMedia',
+    ]);
   });
 
   it('★ טקסט — רק רקע ספציפי; מדיה ופונקציה — אין חלון בכלל', () => {
@@ -66,7 +81,7 @@ describe('אילו הגדרות מתקדמות מוצגות לכל סוג שקו
     // slideStartVoting, playAfterClicking, exitGame, answerIsSequenceClicks,
     // fullscreen, showInLoop, correctlyAnsweredBefore — שרידים מהמערכת הישנה.
     const all = new Set(
-      ['trivia', 'survey', 'ans_images', 'subject', 'media', 'function'].flatMap(
+      ['trivia', 'survey', 'ans_images', 'bet', 'subject', 'media', 'function'].flatMap(
         advancedSettingsFor,
       ),
     );

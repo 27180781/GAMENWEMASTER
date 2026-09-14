@@ -4,6 +4,7 @@
  */
 
 import { isVotableSlide, type GameFile } from '../engine/index.ts';
+import type { BetOutcome } from '../engine/types.ts';
 import type { GamePhase, GameSnapshot, GameState } from '../engine/types.ts';
 import type { RosterData } from './roster.ts';
 import type { BackupData, BackupGroup, BackupPayload, BackupQuestion, BackupUser } from './backup.ts';
@@ -116,9 +117,41 @@ export function buildBackupPayload(
       startedAt,
       ...(removedIds.length > 0 ? { removedIds: [...removedIds] } : {}),
       ...(Object.keys(groupBonus).length > 0 ? { groupBonus: { ...groupBonus } } : {}),
+      // הימורים והכרעות "הרוב קובע" — כדי ששחזור אחרי קריסה ידע גם אותם
+      ...(Object.keys(state.betStakes).length > 0 ? { betStakes: structuredClone(state.betStakes) } : {}),
+      ...(Object.keys(state.betOutcomes).length > 0 ? { betOutcomes: structuredClone(state.betOutcomes) } : {}),
+      ...(Object.keys(state.majorityBySlide).length > 0
+        ? { majorityBySlide: structuredClone(state.majorityBySlide) }
+        : {}),
     },
   };
 }
+
+/** מפה שמפתחותיה מזהי שקופיות (מחרוזות ב-JSON) — רק לשקופיות שקיימות בקובץ. */
+function bySlideId<T>(
+  raw: Readonly<Record<string, T>> | undefined,
+  known: ReadonlyMap<number, number>,
+  keep: (value: unknown) => value is T,
+): Record<number, T> {
+  const out: Record<number, T> = {};
+  if (raw === undefined || typeof raw !== 'object') return out;
+  for (const [key, value] of Object.entries(raw)) {
+    const slideId = Number(key);
+    if (!known.has(slideId) || !keep(value)) continue;
+    out[slideId] = value;
+  }
+  return out;
+}
+
+const isNumberMap = (v: unknown): v is Record<string, number> =>
+  v !== null && typeof v === 'object' && Object.values(v as object).every((n) => typeof n === 'number');
+const isOutcomeMap = (v: unknown): v is Record<string, BetOutcome> =>
+  v !== null &&
+  typeof v === 'object' &&
+  Object.values(v as object).every(
+    (o) => o !== null && typeof o === 'object' && typeof (o as BetOutcome).stake === 'number' && typeof (o as BetOutcome).delta === 'number',
+  );
+const isIdList = (v: unknown): v is number[] => Array.isArray(v) && v.every((n) => typeof n === 'number');
 
 /** מיפוי מחרוזת השלב מהגיבוי לשלב המנוע (תומך גם במחרוזות תיאוריות). */
 function mapPhase(phase: string): GamePhase {
@@ -136,11 +169,11 @@ function mapPhase(phase: string): GamePhase {
  * correctlyAnsweredBefore ממשיך לעבוד גם אחרי קריסה. גיבויים ישנים בלי
  * details.votes משוחזרים עם votesBySlide ריק (ההתנהגות הקודמת).
  *
- * המיקום (`currentQueId`) נלקח קודם מ-meta; אך שרת הגיבוי ממזג רק שדות מוכרים
- * (id/users/questions/groups/completed) ועלול להשמיט את שדות ה-meta, ואז נחזור
- * לשאלה הראשונה. לכן, אם אין meta תקין, מסיקים את המיקום מדגלי ה-display של
- * השאלות (שכן הם נשמרים בתוך מחרוזת ה-JSON של questions ותמיד חוזרים): השקופית
- * המתקדמת ביותר שסומנה כמוצגת היא המקום שבו המשחק נעצר.
+ * המיקום (`currentQueId`) נלקח קודם מ-meta. שרת הגיבוי שומר את ה-meta מספטמבר
+ * 2026 (p_meta); גיבוי ישן, או שרת שעדיין לא עודכן, מגיע בלי meta תקין — ואז
+ * מסיקים את המיקום מדגלי ה-display של השאלות (שכן הם נשמרים בתוך מחרוזת ה-JSON
+ * של questions ותמיד חוזרים): השקופית המתקדמת ביותר שסומנה כמוצגת היא המקום שבו
+ * המשחק נעצר. הימורים והכרעות "הרוב קובע" חוזרים רק עם meta.
  */
 export function backupToSnapshot(game: GameFile, backup: BackupData): GameSnapshot {
   const scores: Record<string, number> = {};
@@ -186,6 +219,9 @@ export function backupToSnapshot(game: GameFile, backup: BackupData): GameSnapsh
     votesBySlide,
     slidesCompleted,
     firstClickWinners: {},
+    betStakes: bySlideId(backup.meta.betStakes, orderIndex, isNumberMap),
+    betOutcomes: bySlideId(backup.meta.betOutcomes, orderIndex, isOutcomeMap),
+    majorityBySlide: bySlideId(backup.meta.majorityBySlide, orderIndex, isIdList),
   };
 }
 

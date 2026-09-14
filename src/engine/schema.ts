@@ -46,6 +46,18 @@ export const slideSettingsSchema = z.object({
   // ב-JSON. חסר/false = כמו קודם, ההצבעה הראשונה ננעלת ואי אפשר לשנות. אופציונלי
   // עם ברירת מחדל false כדי שקבצים בלי השדה ייטענו כרגיל (בלי אפשרות שינוי).
   allowChangeVote: z.boolean().optional().default(false),
+  /**
+   * מונה הצבעות חי: בזמן ההצבעה מוצג ליד כל תשובה כמה בחרו בה (ואחוז), כדי
+   * שהקהל יראה איפה הרוב ואם יש "אפקט עדר". חסר/false = כמו קודם — המספרים
+   * נחשפים רק אחרי סגירת ההצבעה.
+   */
+  liveVoteCounts: z.boolean().optional().default(false),
+  /**
+   * "הרוב קובע": אין תשובה נכונה מראש — בסגירת ההצבעה התשובה (או התשובות,
+   * בתיקו) שקיבלה הכי הרבה קולות נעשית הנכונה, ומי שבחר בה מקבל את הניקוד.
+   * דגלי `correct` שהגיעו בקובץ מתאפסים בטעינה. ראו majority.ts.
+   */
+  majorityDecides: z.boolean().optional().default(false),
   slideStartVoting: z.boolean(),
   playAfterClicking: z.boolean(),
   exitGame: z.boolean(),
@@ -132,10 +144,11 @@ const SLIDE_TYPE_ALIASES: Record<string, string> = {
 
 export const slideTypeSchema = z.preprocess(
   (v) => (typeof v === 'string' && SLIDE_TYPE_ALIASES[v] !== undefined ? SLIDE_TYPE_ALIASES[v] : v),
-  z.enum(['trivia', 'survey', 'ans_images', 'media', 'subject', 'function']),
+  z.enum(['trivia', 'survey', 'ans_images', 'media', 'subject', 'function', 'bet']),
 );
 
-const VOTABLE_TYPES = new Set(['trivia', 'survey', 'ans_images']);
+/** שקופיות שמקבלות הצבעות. ההימור מצביע כמו סקר (בלי תשובה נכונה) — ראו bet.ts. */
+const VOTABLE_TYPES = new Set(['trivia', 'survey', 'ans_images', 'bet']);
 
 /**
  * שקופית "פונקציה" (type: "function") — כשמגיעים אליה היא מבצעת פעולת מערכת:
@@ -206,6 +219,45 @@ export const functionConfigSchema = z.object({
 });
 
 /**
+ * שקופית "הימור" (type: "bet") — שקופית הצבעה שבה הכרטיסים הם אפשרויות
+ * הימור על השאלה המנוקדת הבאה. `question.answers` הם הכיתובים על הכרטיסים
+ * (וכפתורי ההצבעה 1..N, כמו בסקר), ו-`bet.options` — באותו סדר — המשמעות של
+ * כל כרטיס: `none` (בלי הימור) · `percent` (value = אחוז מהניקוד) · `fixed`
+ * (value = נקודות) · `all` (כל הניקוד). `payout` הוא מכפיל הזכייה (1 = כפול
+ * או כלום), ניתן לדריסה לכל אפשרות; `allowNegative` מאפשר לרדת מתחת לאפס.
+ * הכללים המלאים ב-bet.ts ו-SPEC §5.3. סלחני כמו function: קונפיג חסר או קצר
+ * מושלם ב"בלי הימור", כדי שקובץ לא ייפסל בגלל השדה הזה.
+ */
+export const betOptionSchema = z
+  .object({
+    kind: choice(
+      { none: 'בלי הימור', percent: 'אחוז מהניקוד', fixed: 'סכום קבוע', all: 'כל הניקוד' },
+      'none',
+    ),
+    value: emptyableNumber(0).optional(),
+    payout: emptyableNumber(1).optional(),
+  })
+  .passthrough();
+
+export const betConfigSchema = z
+  .object({
+    options: z.array(betOptionSchema).optional().default([]),
+    payout: emptyableNumber(1).optional().default(1),
+    allowNegative: z.boolean().optional().default(false),
+  })
+  .passthrough();
+
+type BetConfigParsed = z.infer<typeof betConfigSchema>;
+
+/** משלים/מקצר את רשימת האפשרויות למספר הכרטיסים — אפשרות חסרה = "בלי הימור". */
+function normalizeBetConfig(config: BetConfigParsed | undefined, answerCount: number): BetConfigParsed {
+  const base = config ?? { options: [], payout: 1, allowNegative: false };
+  const options = base.options.slice(0, answerCount);
+  while (options.length < answerCount) options.push({ kind: 'none' });
+  return { ...base, options };
+}
+
+/**
  * ניקוד ברירת המחדל לשקופית מנוקדת שהגיעה בלי ערך ניקוד.
  *
  * מערכת יצירת המשחקים מציגה למחבר 7 כשלא נבחר ניקוד, ולכן 7 הוא הערך הנכון.
@@ -228,6 +280,8 @@ export const slideSchema = z
     if ((question as Record<string, unknown>)['scoreForQue'] !== '') return raw;
     const type = slideTypeSchema.safeParse(slide['type']);
     if (!type.success || !VOTABLE_TYPES.has(type.data)) return raw;
+    // הימור מצביע אבל אינו מנוקד — "" הוא כלל הריקון הרגיל, לא ניקוד חסר.
+    if (type.data === 'bet') return raw;
     return {
       ...slide,
       question: { ...question, scoreForQue: DEFAULT_SCORE_FOR_VOTABLE },
@@ -264,6 +318,8 @@ export const slideSchema = z
     setting: slideSettingsSchema,
     // רק בשקופית "פונקציה"; אופציונלי כדי לא לפגוע בשאר סוגי השקופיות.
     function: functionConfigSchema.optional(),
+    // רק בשקופית "הימור"; מנורמל בהמשך למספר הכרטיסים.
+    bet: betConfigSchema.optional(),
   })
   // כמו ב-question: לא מוחקים שדות שאיננו מכירים.
   .passthrough()
@@ -276,7 +332,11 @@ export const slideSchema = z
           message: `שקופית מסוג ${slide.type} חייבת לפחות 2 תשובות`,
         });
       }
-      if (slide.type === 'trivia' && !slide.question.answers.some((a) => a.correct)) {
+      if (
+        slide.type === 'trivia' &&
+        !slide.setting.majorityDecides &&
+        !slide.question.answers.some((a) => a.correct)
+      ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['question', 'answers'],
@@ -292,14 +352,31 @@ export const slideSchema = z
     // no-op; קובץ עם מזהים לא-רציפים/מעורבבים מיושר, ודגלי correct נשארים
     // צמודים לתשובה שלהם.
     if (!VOTABLE_TYPES.has(slide.type)) return slide;
-    if (slide.question.answers.every((a, i) => a.id === i + 1)) return slide;
-    return {
-      ...slide,
-      question: {
-        ...slide.question,
-        answers: slide.question.answers.map((a, i) => ({ ...a, id: i + 1 })),
-      },
-    };
+    let next = slide;
+    if (!next.question.answers.every((a, i) => a.id === i + 1)) {
+      next = {
+        ...next,
+        question: {
+          ...next.question,
+          answers: next.question.answers.map((a, i) => ({ ...a, id: i + 1 })),
+        },
+      };
+    }
+    // הימור: אפשרות לכל כרטיס, תמיד — כך התצוגה והניקוד לא בודקים גבולות.
+    if (next.type === 'bet') {
+      next = { ...next, bet: normalizeBetConfig(next.bet, next.question.answers.length) };
+    }
+    // "הרוב קובע": הנכונה נקבעת בזמן אמת — סימון שהגיע בקובץ אינו תקף.
+    if (next.setting.majorityDecides && next.question.answers.some((a) => a.correct)) {
+      next = {
+        ...next,
+        question: {
+          ...next.question,
+          answers: next.question.answers.map((a) => ({ ...a, correct: false })),
+        },
+      };
+    }
+    return next;
   }));
 
 // ---------------------------------------------------------------------------

@@ -16,7 +16,9 @@
  * מתנגן/נפתח אוטומטית בכניסה לשקופית — הצגת מדיה ופתיחת הצבעה הן שלבים.
  */
 
+import { betConfigOf, betSlideFor, resolveBets, stakesFor } from './bet.ts';
 import { classifySubjectSlide, extractDynamicImageUrl } from './classify.ts';
+import { applyMajority, majorityAnswerIds, usesMajority } from './majority.ts';
 import { isVotableSlide, type GameFile, type Slide } from './schema.ts';
 import { adjustPlayerScore } from './scoreAdjust.ts';
 import { descendingScoreAt, descendingScoreOf, scoredLikeTrivia } from './scoring.ts';
@@ -88,6 +90,8 @@ export class GameEngine {
   private awardedBySlide: Record<number, Record<string, number>> = {};
   /** זמן תגובה (ms) פר שקופית — voterId → latency; מאפשר חישוב מחדש הפיך. */
   private timeBySlide: Record<number, Record<string, number>> = {};
+  /** שינויי הניקוד מהימורים שהוכרעו בשקופית — voterId → delta; מקוזז בחזרה עליה. */
+  private betDeltaBySlide: Record<number, Record<string, number>> = {};
   private saveSeq = 0;
 
   constructor(game: GameFile, options: EngineOptions = {}) {
@@ -100,6 +104,9 @@ export class GameEngine {
       votesBySlide: {},
       slidesCompleted: [],
       firstClickWinners: {},
+      betStakes: {},
+      betOutcomes: {},
+      majorityBySlide: {},
     });
   }
 
@@ -213,6 +220,9 @@ export class GameEngine {
       votesBySlide: structuredClone(this.state.votesBySlide),
       slidesCompleted: [...this.state.slidesCompleted],
       firstClickWinners: structuredClone(this.state.firstClickWinners),
+      betStakes: structuredClone(this.state.betStakes),
+      betOutcomes: structuredClone(this.state.betOutcomes),
+      majorityBySlide: structuredClone(this.state.majorityBySlide),
     };
   }
 
@@ -237,6 +247,7 @@ export class GameEngine {
     // שכבר נוקדה תוסיף ניקוד חדש בלי להפחית את הישן (מגבלה מתועדת).
     this.awardedBySlide = {};
     this.timeBySlide = {};
+    this.betDeltaBySlide = {};
 
     const slide = index !== -1 ? this.game.questions[index] : undefined;
     const showOpenMedia = snapshot.phase === 'showing' && slide?.openMedia.src !== '';
@@ -256,7 +267,23 @@ export class GameEngine {
       votesBySlide: structuredClone(snapshot.votesBySlide),
       slidesCompleted: [...snapshot.slidesCompleted],
       firstClickWinners: structuredClone(snapshot.firstClickWinners),
+      // הימורים ותוצאותיהם — snapshot מלפני שקופית ההימור בא בלעדיהם
+      betStakes: structuredClone(snapshot.betStakes ?? {}),
+      betOutcomes: structuredClone(snapshot.betOutcomes ?? {}),
+      majorityBySlide: structuredClone(snapshot.majorityBySlide ?? {}),
     });
+    this.reapplyMajority();
+  }
+
+  /**
+   * "הרוב קובע": מחיל מחדש על הקובץ את ההכרעות שנשמרו ב-state — אחרי שחזור
+   * מגיבוי ואחרי רענון תוכן, כששקופיות הקובץ הן אובייקטים חדשים בלי הדגלים.
+   */
+  private reapplyMajority(): void {
+    for (const slide of this.game.questions) {
+      if (!usesMajority(slide)) continue;
+      applyMajority(slide, this.state.majorityBySlide[slide.id] ?? []);
+    }
   }
 
   /**
@@ -266,6 +293,8 @@ export class GameEngine {
   reset(): void {
     this.awardedBySlide = {};
     this.timeBySlide = {};
+    this.betDeltaBySlide = {};
+    for (const slide of this.game.questions) if (usesMajority(slide)) applyMajority(slide, []);
     this.setState(
       this.enterSlideState(0, {
         scores: {},
@@ -273,6 +302,9 @@ export class GameEngine {
         votesBySlide: {},
         slidesCompleted: [],
         firstClickWinners: {},
+        betStakes: {},
+        betOutcomes: {},
+        majorityBySlide: {},
       }),
     );
   }
@@ -284,7 +316,9 @@ export class GameEngine {
   resetScores(): void {
     this.awardedBySlide = {};
     this.timeBySlide = {};
-    this.setState({ scores: {}, answerTimes: {} });
+    // הימורים פתוחים מתבטלים יחד עם הניקוד — אין ממה להמר.
+    this.betDeltaBySlide = {};
+    this.setState({ scores: {}, answerTimes: {}, betStakes: {}, betOutcomes: {} });
   }
 
   /**
@@ -325,7 +359,20 @@ export class GameEngine {
     }
     for (const bySlide of Object.values(this.awardedBySlide)) for (const id of remove) delete bySlide[id];
     for (const bySlide of Object.values(this.timeBySlide)) for (const id of remove) delete bySlide[id];
-    this.setState({ scores, answerTimes, votesBySlide });
+    for (const bySlide of Object.values(this.betDeltaBySlide)) for (const id of remove) delete bySlide[id];
+    const betStakes: GameState['betStakes'] = {};
+    for (const [slideId, stakes] of Object.entries(this.state.betStakes)) {
+      const next: Record<string, number> = {};
+      for (const [voterId, stake] of Object.entries(stakes)) if (!remove.has(voterId)) next[voterId] = stake;
+      betStakes[Number(slideId)] = next;
+    }
+    const betOutcomes: GameState['betOutcomes'] = {};
+    for (const [slideId, outcomes] of Object.entries(this.state.betOutcomes)) {
+      const next: GameState['betOutcomes'][number] = {};
+      for (const [voterId, o] of Object.entries(outcomes)) if (!remove.has(voterId)) next[voterId] = o;
+      betOutcomes[Number(slideId)] = next;
+    }
+    this.setState({ scores, answerTimes, votesBySlide, betStakes, betOutcomes });
     return remove.size;
   }
 
@@ -354,6 +401,7 @@ export class GameEngine {
       throw new Error('קובץ המשחק המעודכן חייב לכלול לפחות שקופית אחת');
     }
     this.game = newGame;
+    this.reapplyMajority();
 
     if (this.state.phase === 'ended') {
       // המשחק הסתיים — הזוכים מחושבים מ-scores; רק מיישרים את המיקום לסוף
@@ -521,6 +569,34 @@ export class GameEngine {
       ? { ...(this.voting.latestVoters ?? {}) }
       : { ...this.voting.lockedVotes };
 
+    // שקופית הימור: לא מנקדים — רושמים כמה כל משתתף שם על הכף, לפי הניקוד
+    // שלו ברגע הסגירה. ההכרעה בשאלה המנוקדת הבאה (bet.ts). חזרה על השקופית
+    // מחשבת את ההימורים מחדש מהניקוד הנוכחי.
+    if (slide.type === 'bet') {
+      const config = betConfigOf(slide);
+      const stakes = config === null ? {} : stakesFor(config, finalVotes, this.state.scores);
+      this.setState({
+        phase: 'results',
+        votesBySlide: { ...this.state.votesBySlide, [slideId]: finalVotes },
+        betStakes: { ...this.state.betStakes, [slideId]: stakes },
+        liveVotes: {
+          counts: countsOfVotes(finalVotes),
+          total: Object.keys(finalVotes).length,
+        },
+        activeMedia: null,
+      });
+      return;
+    }
+
+    // "הרוב קובע": התשובה (או התשובות, בתיקו) שקיבלה הכי הרבה קולות נעשית
+    // הנכונה — נכתב אל השקופית עצמה, ומכאן הניקוד והחשיפה רגילים לגמרי.
+    const majorityBySlide = { ...this.state.majorityBySlide };
+    if (usesMajority(slide)) {
+      const winners = majorityAnswerIds(finalVotes, new Set(slide.question.answers.map((a) => a.id)));
+      applyMajority(slide, winners);
+      majorityBySlide[slideId] = winners;
+    }
+
     const firstClickWinners = { ...this.state.firstClickWinners };
     if (slide.setting.firstClicker && this.voting.latestFirstVoter !== null) {
       firstClickWinners[slideId] = this.voting.latestFirstVoter;
@@ -530,20 +606,51 @@ export class GameEngine {
 
     const awards = this.computeAwards(slide, finalVotes, firstClickWinners[slideId]);
 
-    // חזרה על שקופית: מפחיתים את הניקוד הקודם שלה לפני הוספת החדש
+    // חזרה על שקופית: מפחיתים את הניקוד הקודם שלה (וגם את ההימור שהוכרע בה)
+    // לפני הוספת החדש
     const scores = { ...this.state.scores };
-    const previousAwards = this.awardedBySlide[slideId];
-    if (previousAwards) {
-      for (const [voterId, points] of Object.entries(previousAwards)) {
+    const takeBack = (delta: Record<string, number> | undefined) => {
+      if (!delta) return;
+      for (const [voterId, points] of Object.entries(delta)) {
         const next = (scores[voterId] ?? 0) - points;
         if (next === 0) delete scores[voterId];
         else scores[voterId] = next;
       }
-    }
+    };
+    takeBack(this.awardedBySlide[slideId]);
+    takeBack(this.betDeltaBySlide[slideId]);
     for (const [voterId, points] of Object.entries(awards)) {
       scores[voterId] = (scores[voterId] ?? 0) + points;
     }
     this.awardedBySlide[slideId] = awards;
+
+    // הכרעת ההימור: שאלה מנוקדת "כמו טריוויה" פותרת את שקופית ההימור הסמוכה
+    // לפניה (bet.ts). נכון → הרווח על הניקוד שכבר נצבר; טעה/לא ענה → ההפסד.
+    const betOutcomes = { ...this.state.betOutcomes };
+    delete betOutcomes[slideId];
+    const betDeltas: Record<string, number> = {};
+    const armed = scoredLikeTrivia(slide) ? betSlideFor(this.game, this.state.currentSlideIndex) : null;
+    const betConfig = armed === null ? null : betConfigOf(armed);
+    const stakes = armed === null ? undefined : this.state.betStakes[armed.id];
+    if (armed !== null && betConfig !== null && stakes !== undefined && Object.keys(stakes).length > 0) {
+      const outcomes = resolveBets({
+        stakes,
+        betVotes: this.state.votesBySlide[armed.id] ?? {},
+        config: betConfig,
+        finalVotes,
+        correctIds: new Set(slide.question.answers.filter((a) => a.correct).map((a) => a.id)),
+        scores,
+      });
+      for (const [voterId, outcome] of Object.entries(outcomes)) {
+        if (outcome.delta === 0) continue;
+        const next = (scores[voterId] ?? 0) + outcome.delta;
+        if (next === 0) delete scores[voterId];
+        else scores[voterId] = next;
+        betDeltas[voterId] = outcome.delta;
+      }
+      betOutcomes[slideId] = outcomes;
+    }
+    this.betDeltaBySlide[slideId] = betDeltas;
 
     // זמני תגובה (ms) של מי שהצביע בשקופית זו — לשובר-שוויון לפי מהירות.
     // latency = מתי נראתה הצבעתו לראשונה פחות זמן פתיחת ההצבעה (≥0).
@@ -578,6 +685,8 @@ export class GameEngine {
       answerTimes,
       votesBySlide: { ...this.state.votesBySlide, [slideId]: finalVotes },
       firstClickWinners,
+      betOutcomes,
+      majorityBySlide,
       // הפילוח שמוצג בחשיפה (עוגת סקר / אחוזי תשובות) נגזר מ-liveVotes — מיישרים
       // אותו להצבעות הסופיות שנשמרו ונוקדו, כך שהמסך, הדוח וה-API תמיד זהים.
       liveVotes: {
@@ -697,7 +806,17 @@ export class GameEngine {
   private enterSlideState(
     index: number,
     carried: Partial<
-      Pick<GameState, 'scores' | 'answerTimes' | 'votesBySlide' | 'slidesCompleted' | 'firstClickWinners'>
+      Pick<
+        GameState,
+        | 'scores'
+        | 'answerTimes'
+        | 'votesBySlide'
+        | 'slidesCompleted'
+        | 'firstClickWinners'
+        | 'betStakes'
+        | 'betOutcomes'
+        | 'majorityBySlide'
+      >
     >,
     _at?: number,
   ): GameState {
@@ -724,6 +843,9 @@ export class GameEngine {
       votesBySlide: carried.votesBySlide ?? this.state.votesBySlide,
       slidesCompleted: carried.slidesCompleted ?? this.state.slidesCompleted,
       firstClickWinners: carried.firstClickWinners ?? this.state.firstClickWinners,
+      betStakes: carried.betStakes ?? this.state.betStakes,
+      betOutcomes: carried.betOutcomes ?? this.state.betOutcomes,
+      majorityBySlide: carried.majorityBySlide ?? this.state.majorityBySlide,
     };
     return next;
   }

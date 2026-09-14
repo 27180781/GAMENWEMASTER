@@ -80,10 +80,12 @@ interface QuestionSlideProps {
   logo: string;
   /** סוג המשחק — הגבלת שאלה לקבוצה רלוונטית רק ל-'classic'. */
   gameType?: string;
+  /** הימור פעיל שהשאלה הזאת מכריעה (ראו bet.ts) — לפס בכותרת; null = אין. */
+  betPill?: { bettors: number; total: number } | null;
 }
 
 /** אווטרים שמתעופפים כלפי מעלה בכל תשובה חדשה שנכנסת. */
-function Flyers({ players }: { players: RailPlayer[] }) {
+export function Flyers({ players }: { players: RailPlayer[] }) {
   interface Flyer {
     key: number;
     name: string;
@@ -328,8 +330,12 @@ export function QuestionSlide({
   title,
   logo,
   gameType = 'classic',
+  betPill = null,
 }: QuestionSlideProps) {
   const isVoting = state.phase === 'voting';
+  // מונה הצבעות חי (setting.liveVoteCounts) — כמה בחרו בכל תשובה, בזמן ההצבעה.
+  const liveCounts = isVoting && slide.setting.liveVoteCounts;
+  const majority = slide.setting.majorityDecides;
   const isTrivia = slide.type === 'trivia';
   const isImages = slide.type === 'ans_images';
   const isSurvey = slide.type === 'survey';
@@ -408,6 +414,12 @@ export function QuestionSlide({
               </div>
             )}
             {title !== '' && <div className="q-title-pill">{title}</div>}
+            {majority && <div className="q-mode-pill q-mode-pill--majority">🗳 הרוב קובע את התשובה</div>}
+            {betPill !== null && (
+              <div className="q-mode-pill q-mode-pill--bet">
+                🎲 הימור פעיל · {betPill.bettors} מהמרים · {betPill.total.toLocaleString('en-US')} נק׳ על הכף
+              </div>
+            )}
             {/* שקופית המוגבלת לקבוצה — חיווי ברור למשתתפים מי אמור לענות */}
             {restrictedGroup !== null && (
               <div className="q-group-pill">🔒 שאלה לקבוצת {restrictedGroup} בלבד</div>
@@ -508,6 +520,12 @@ export function QuestionSlide({
                       {displayText(answer.ans)}
                     </FitText>
                   )}
+                  {liveCounts && (
+                    <span className="q-live" dir="ltr">
+                      <b>{count}</b>
+                      <small>{percent}%</small>
+                    </span>
+                  )}
                 </li>
               );
             })}
@@ -519,6 +537,13 @@ export function QuestionSlide({
         <div className={`q-footer${showBoard ? ' q-footer--board' : ''}`}>
           {showBoard ? (
             <Leaderboard leaders={leaders} />
+          ) : isVoting && majority ? (
+            // "הרוב קובע" — אין עדיין נכונה, ולכן אין "צדקו/טעו" בזמן ההצבעה
+            <div className="q-splitbar q-splitbar--majority">
+              <div className="q-splitbar-text q-splitbar-text--center">
+                🗳 הרוב קובע — התשובה הנכונה תיקבע בסיום ההצבעה לפי מה שרוב העונים בחרו
+              </div>
+            </div>
           ) : isVoting && isTrivia ? (
             <div className="q-splitbar">
               {total > 0 ? (

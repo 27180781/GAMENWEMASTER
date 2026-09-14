@@ -154,6 +154,24 @@ describe('שחזור מלא: הצבעות פר-שקופית + משתתפים ש�
     expect(restored.getState().scores).toEqual({ a: 20 });
   });
 
+  it('★ הימורים נשמרים ב-meta וחוזרים ב-snapshot (רק לשקופיות שקיימות)', () => {
+    const engine = playedEngine();
+    const game = engine.getGame();
+    const state = { ...engine.getState(), betStakes: { 1: { a: 5 } }, betOutcomes: { 2: { a: { stake: 5, won: true, delta: 5, answerId: 1 } } } };
+    const p = buildBackupPayload(game, state, EMPTY_ROSTER, (id) => id, 42);
+    expect(p.meta.betStakes).toEqual({ 1: { a: 5 } });
+    expect(p.meta.betOutcomes?.[2]?.a).toMatchObject({ won: true, delta: 5 });
+    const snap = backupToSnapshot(game, { ...p, completed: false });
+    expect(snap.betStakes).toEqual({ 1: { a: 5 } });
+    expect(snap.betOutcomes?.[2]?.a?.delta).toBe(5);
+    // שקופית שלא קיימת בקובץ — נזרקת; גיבוי בלי השדות — ריק
+    const stray = backupToSnapshot(game, { ...p, completed: false, meta: { ...p.meta, betStakes: { 99: { a: 1 } }, betOutcomes: undefined } });
+    expect(stray.betStakes).toEqual({});
+    expect(stray.betOutcomes).toEqual({});
+    const clean = buildBackupPayload(game, engine.getState(), EMPTY_ROSTER, (id) => id, 42);
+    expect('betStakes' in clean.meta).toBe(false);
+  });
+
   it('removedIds נשמרים ב-meta וחוזרים בשחזור', () => {
     const p = buildBackupPayload(twoTrivia(), playedEngine().getState(), roster(), (id) => id, 42, ['b', 'x']);
     expect(p.meta.removedIds).toEqual(['b', 'x']);

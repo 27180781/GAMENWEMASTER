@@ -17,6 +17,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   GameEngine,
   ReplayAdapter,
+  betOutcomeSummary,
+  betSlideFor,
   classifyMediaUrl,
   countsOfVotes,
   isVotableSlide,
@@ -47,6 +49,7 @@ import { AllScoresScreen, LobbyScreen, WinnersListScreen, WinnersScreen } from '
 import { OperatorMenu } from '../render/OperatorMenu.tsx';
 import { RaffleOverlay, type RaffleEntry } from '../render/RaffleOverlay.tsx';
 import type { RailPlayer, RevealState } from '../render/QuestionSlide.tsx';
+import { BetResultsOverlay } from '../render/BetResultsOverlay.tsx';
 import { RosterPanel } from '../render/RosterPanel.tsx';
 import { SlideView } from '../render/SlideView.tsx';
 import { VotesBreakdown } from '../render/VotesBreakdown.tsx';
@@ -441,6 +444,15 @@ export function GameHost({
   /** מסך דירוג קבוצות (פקודת מנחה 4, בשלב חשיפת התשובה). */
   const [groupsOverlay, setGroupsOverlay] = useState(false);
   const groupsOverlayRef = useRef(false);
+  /**
+   * מסך "תוצאות ההימור" — צעד משלו ברווח אחרי חשיפת התשובה בשאלה שהכריעה
+   * הימור (ראו bet.ts). betShownForRef זוכר לאיזו שקופית הוא כבר הוצג, כדי
+   * שהרווח הבא ימשיך הלאה ולא יפתח אותו שוב.
+   */
+  const [betOverlay, setBetOverlay] = useState(false);
+  const betOverlayRef = useRef(false);
+  betOverlayRef.current = betOverlay;
+  const betShownForRef = useRef<number | null>(null);
   groupsOverlayRef.current = groupsOverlay;
   /** איזה סוג קבוצות (קטגוריה) מוצג במסך הקבוצות — מקש 5 מחליף (מודולו). */
   const [groupsCatIndex, setGroupsCatIndex] = useState(0);
@@ -966,7 +978,14 @@ export function GameHost({
     setAnswerers([]);
     setCorrectAnswerers([]);
     lastHostAnswerRef.current = null;
+    setBetOverlay(false);
   }, [state.currentSlideId, engine, audio]);
+
+  // תוצאות ההימור מוצגות פעם אחת לכל סגירה: יציאה משלב התוצאות (חזרה להצבעה,
+  // שקופית אחרת) מאפסת את הזיכרון, כך שהכרעה מחדש תוצג שוב.
+  useEffect(() => {
+    if (state.phase !== 'results') betShownForRef.current = null;
+  }, [state.phase, state.currentSlideId]);
 
   // דיבוג: רישום מעברי שלב/שקופית/מדיה
   useEffect(() => {
@@ -1261,6 +1280,19 @@ export function GameHost({
         audio.play('inShowAns', sounds.inShowAnsMediaSound.src);
         return;
       }
+      // תוצאות ההימור — צעד משלו אחרי חשיפת התשובה, פעם אחת לשקופית: מי זכה,
+      // מי הפסיד, ההימור הגדול. רק כשהשאלה הזאת הכריעה הימור.
+      const outcomes = current.betOutcomes[current.currentSlideId];
+      if (
+        outcomes !== undefined &&
+        Object.keys(outcomes).length > 0 &&
+        betShownForRef.current !== current.currentSlideId
+      ) {
+        betShownForRef.current = current.currentSlideId;
+        setBetOverlay(true);
+        if (betOutcomeSummary(outcomes).won > 0) audio.playCue('fanfare');
+        return;
+      }
       // מדיית סיום (אם יש) ואז השקופית הבאה
       engine.dispatch({ type: 'ADVANCE', at: now });
       return;
@@ -1292,6 +1324,11 @@ export function GameHost({
 
   /** צעד אחד אחורה בכל שלב — מקש 2; בתחילת שקופית חוזר לשקופית הקודמת. */
   const stepBack = useCallback(() => {
+    // תוצאות ההימור פתוחות — אחורה סוגר אותן (החשיפה נשארת)
+    if (betOverlayRef.current) {
+      setBetOverlay(false);
+      return;
+    }
     const current = engine.getState();
     const s = engine.getCurrentSlide();
     const now = Date.now();
@@ -1384,6 +1421,11 @@ export function GameHost({
     // מסך דירוג הקבוצות (מקש 4) פתוח — רווח סוגר אותו וממשיך, במקום לקדם.
     if (groupsOverlayRef.current) {
       setGroupsOverlay(false);
+      return;
+    }
+    // תוצאות ההימור פתוחות — רווח סוגר וממשיך (הצעד הבא הוא השקופית הבאה).
+    if (betOverlayRef.current) {
+      setBetOverlay(false);
       return;
     }
     // לוח המרוץ (סולמות וחבלים) פתוח — רווח סוגר אותו וממשיך לשקופית הבאה.
@@ -1840,6 +1882,7 @@ export function GameHost({
     leadersOverlay ||
     votesOverlay ||
     groupsOverlay ||
+    betOverlay || // תוצאות ההימור — המשחק ממתין עד רווח
     boardOverlay ||
     boardPending !== null || // הלוח מחושב וממתין לרווח — לא מדלגים עליו אוטומטית
     raffle !== null ||
@@ -1920,10 +1963,26 @@ export function GameHost({
           audio.play('inShowAns', sounds.inShowAnsMediaSound.src);
         };
       } else if (autoT.nextSlide.active && reveal.revealCorrect) {
-        // מעבר אוטומטי לשקופית הבאה — רק אחרי שהפילוח כבר נחשף.
-        label = 'שקופית הבאה';
-        action = () => engine.dispatch({ type: 'ADVANCE', at: Date.now() });
-        delayMs = Math.max(1, autoT.nextSlide.seconds) * 1000;
+        const outcomes = state.betOutcomes[state.currentSlideId];
+        if (
+          outcomes !== undefined &&
+          Object.keys(outcomes).length > 0 &&
+          betShownForRef.current !== state.currentSlideId
+        ) {
+          // קודם תוצאות ההימור (נסגרות לבד אחרי ההשהיה, ראו למטה), ורק אז השקופית הבאה
+          label = 'תוצאות ההימור';
+          action = () => {
+            betShownForRef.current = state.currentSlideId;
+            setBetOverlay(true);
+            if (betOutcomeSummary(outcomes).won > 0) audio.playCue('fanfare');
+          };
+          delayMs = Math.max(1, autoT.nextSlide.seconds) * 1000;
+        } else {
+          // מעבר אוטומטי לשקופית הבאה — רק אחרי שהפילוח כבר נחשף.
+          label = 'שקופית הבאה';
+          action = () => engine.dispatch({ type: 'ADVANCE', at: Date.now() });
+          delayMs = Math.max(1, autoT.nextSlide.seconds) * 1000;
+        }
       }
     }
 
@@ -1935,7 +1994,18 @@ export function GameHost({
       fire();
     }, delayMs);
     return () => window.clearTimeout(timeout);
-  }, [stage, state.phase, state.currentSlideId, state.activeMedia, reveal, autoT, overlayActive, engine, audio, sounds]);
+  }, [stage, state.phase, state.currentSlideId, state.activeMedia, state.betOutcomes, reveal, autoT, overlayActive, engine, audio, sounds]);
+
+  // במעבר אוטומטי — מסך תוצאות ההימור נסגר לבד אחרי זמן קריאה (ההשהיה של
+  // "השקופית הבאה" ועוד שתי שניות), ואז האפקט שלמעלה ממשיך לשקופית הבאה.
+  useEffect(() => {
+    if (stage !== 'playing' || !betOverlay || !autoT.nextSlide.active) return;
+    const timeout = window.setTimeout(
+      () => setBetOverlay(false),
+      Math.max(1, autoT.nextSlide.seconds) * 1000 + 2000,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [stage, betOverlay, autoT]);
 
   // מעבר אוטומטי של מדיה חוסמת (openMedia/endMedia + מסכי מדיה עצמאיים):
   //   • תמונה — מעבר אחרי autoT.media.image.seconds (אם image.active דלוק).
@@ -2237,6 +2307,15 @@ export function GameHost({
     });
   }, [engine]);
 
+  // תוצאות הימור שממתינות להצגה — לרמז הרווח בפס ההנחיות
+  const betOutcomesNow = state.betOutcomes[state.currentSlideId];
+  const betPending =
+    state.phase === 'results' &&
+    reveal.revealCorrect &&
+    betOutcomesNow !== undefined &&
+    Object.keys(betOutcomesNow).length > 0 &&
+    betShownForRef.current !== state.currentSlideId;
+
   // קליק עכבר אינו מקדם שלבים — קידום רק ברווח/0 (בקשת המנחה)
   return (
     <div
@@ -2275,6 +2354,8 @@ export function GameHost({
               revealCorrect: reveal.revealCorrect,
               hasNextSlide: state.currentSlideIndex + 1 < engine.getGame().questions.length,
               hasGroups: hasGroupData(roster),
+              betPending,
+              betOverlay,
             }).map((h) => (
               <span key={h.key} className="host-hint">
                 <b className="host-hint-key">{h.key}</b>
@@ -2299,6 +2380,8 @@ export function GameHost({
               revealCorrect: reveal.revealCorrect,
               hasNextSlide: state.currentSlideIndex + 1 < engine.getGame().questions.length,
               hasGroups: hasGroupData(roster),
+              betPending,
+              betOverlay,
             })}
             onRun={runHintKey}
           />
@@ -2401,6 +2484,16 @@ export function GameHost({
             progression={setting.gameTypeSettings.snakesLadders.progression}
             onCue={(kind) => audio.playCue(kind)}
             onClose={() => setBoardOverlay(false)}
+          />
+        )}
+
+        {/* תוצאות ההימור — אחרי חשיפת התשובה בשאלה שהכריעה הימור; רווח סוגר וממשיך */}
+        {stage === 'playing' && betOverlay && (
+          <BetResultsOverlay
+            outcomes={state.betOutcomes[state.currentSlideId] ?? {}}
+            nameOf={nameOf}
+            title={betSlideFor(engine.getGame(), state.currentSlideIndex)?.question.que ?? ''}
+            onClose={() => setBetOverlay(false)}
           />
         )}
 

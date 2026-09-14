@@ -78,8 +78,8 @@ const gameOf = (slides: unknown[]) =>
   parseGameFile({ id: 'g1', name: 'משחק', users: '{}', setting: GAME_SETTING, questions: slides });
 
 describe('סעיף 1 — סוגי השקופיות', () => {
-  it('★ ששת השמות שהמנוע מקבל', () => {
-    for (const t of ['trivia', 'survey', 'ans_images', 'subject', 'media', 'function']) {
+  it('★ שבעת השמות שהמנוע מקבל', () => {
+    for (const t of ['trivia', 'survey', 'ans_images', 'subject', 'media', 'function', 'bet']) {
       expect(slideTypeSchema.safeParse(t).success, t).toBe(true);
     }
   });
@@ -289,5 +289,65 @@ describe('סעיף 3 — תשובת הקלדה', () => {
     ]);
     const setting = g.questions[0]!.setting as unknown as Record<string, unknown>;
     expect(setting['typingAnswer']).toBe('ירושלים');
+  });
+});
+
+/**
+ * ★ שקופית הימור — בדיוק כפי שהבנאי מייצא אותה: type "bet", answers = כיתובי
+ * הכרטיסים, scoreForQue "" (כלל הריקון), ואובייקט bet באותו סדר.
+ */
+describe('שקופית הימור — הפלט של הבנאי', () => {
+  const BET_SLIDE = {
+    ...DOC_SLIDE,
+    type: 'bet',
+    id: 7,
+    question: {
+      que: 'על כמה מהנקודות שלכם אתם מהמרים?',
+      queMode: 'text',
+      scoreForQue: '',
+      timeForQue: 15,
+      src: '',
+      answers: [
+        { ans: 'בלי הימור', correct: false, id: 1 },
+        { ans: 'רבע מהניקוד', correct: false, id: 2 },
+        { ans: 'חצי מהניקוד', correct: false, id: 3 },
+        { ans: 'הכול!', correct: false, id: 4 },
+      ],
+    },
+    bet: {
+      options: [{ kind: 'none' }, { kind: 'percent', value: 25 }, { kind: 'percent', value: 50 }, { kind: 'all', payout: 2 }],
+      payout: 1,
+      allowNegative: false,
+    },
+    setting: { ...DOC_SLIDE.setting, liveVoteCounts: true, descendingScore: { active: false, maxScore: '' }, imageReveal: { active: false, blur: '' }, scoringReduction: { active: false, seconds: '', score: '' } },
+  };
+
+  it('★ נטענת בקפדנות, בלי ניקוד, עם האפשרויות ומכפיל פרטי', () => {
+    const slide = gameOf([BET_SLIDE]).questions[0]!;
+    expect(slide.type).toBe('bet');
+    expect(slide.question.scoreForQue).toBe(0);
+    expect(slide.question.timeForQue).toBe(15);
+    expect(slide.bet?.options[3]).toMatchObject({ kind: 'all', payout: 2 });
+    expect(slide.bet?.payout).toBe(1);
+    expect(slide.setting.liveVoteCounts).toBe(true);
+  });
+
+  it('★ "הרוב קובע" — טריוויה בלי תשובה נכונה מתקבלת עם הדגל', () => {
+    const slide = gameOf([
+      {
+        ...DOC_SLIDE,
+        question: { ...DOC_SLIDE.question, answers: DOC_SLIDE.question.answers.map((a) => ({ ...a, correct: false })) },
+        setting: { ...DOC_SLIDE.setting, majorityDecides: true },
+      },
+    ]).questions[0]!;
+    expect(slide.setting.majorityDecides).toBe(true);
+    expect(slide.question.answers.every((a) => !a.correct)).toBe(true);
+  });
+
+  it('קובץ ישן בלי השדות החדשים — ברירות מחדל כבויות', () => {
+    const slide = gameOf([DOC_SLIDE]).questions[0]!;
+    expect(slide.setting.liveVoteCounts).toBe(false);
+    expect(slide.setting.majorityDecides).toBe(false);
+    expect(slide.bet).toBeUndefined();
   });
 });

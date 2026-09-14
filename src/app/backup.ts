@@ -13,6 +13,7 @@
  */
 
 import { debugLog } from './debugLog.ts';
+import type { BetOutcome } from '../engine/types.ts';
 
 const DEFAULT_BASE_URL = 'https://oousxptmdrrkybadikec.supabase.co/functions/v1';
 const DEFAULT_ANON_KEY =
@@ -111,6 +112,12 @@ export interface BackupMeta {
    * ה-meta פשוט מאבד אותם, ולא נופל.
    */
   groupBonus?: Record<string, number>;
+  /** הימורים פתוחים (שקופית הימור → משתתף → גובה ההימור) — ראו bet.ts. */
+  betStakes?: Record<string, Record<string, number>>;
+  /** תוצאות הימורים שהוכרעו (שאלה → משתתף → תוצאה). */
+  betOutcomes?: Record<string, Record<string, BetOutcome>>;
+  /** "הרוב קובע": שאלה → התשובות שנקבעו כנכונות (ראו majority.ts). */
+  majorityBySlide?: Record<string, number[]>;
 }
 
 /** המטען שנשמר (POST /save-backup). האובייקטים ממורים ל-JSON לפני השליחה. */
@@ -228,8 +235,9 @@ export async function saveBackup(cfg: BackupConfig, gameId: string, payload: Bac
     users: JSON.stringify(payload.users),
     questions: JSON.stringify(payload.questions),
     groups: JSON.stringify(payload.groups),
-    // מטא בשתי צורות למקסימום תאימות: כאובייקט meta, וגם כשדות שורש (כפי
-    // ש"המלצת הזהב" במסמך מציגה) — כדי שהשחזור ישוחזר למיקום/שלב הנכונים.
+    // מטא בשתי צורות למקסימום תאימות: כאובייקט meta (מספטמבר 2026 שרת הגיבוי
+    // שומר אותו ב-game_state.meta ומחזיר אותו ב-GET — כולל removedIds, groupBonus,
+    // הימורים והכרעות "הרוב קובע"), וגם כשדות שורש לשרת ישן שקורא רק אותם.
     meta: JSON.stringify(payload.meta),
     currentQueId: payload.meta.currentQueId,
     phase: payload.meta.phase,

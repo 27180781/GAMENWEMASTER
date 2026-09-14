@@ -35,6 +35,16 @@ export interface FunctionParticipant {
   groupId: string | null;
   /** מה ענה בכל שאלה שהצביע בה. */
   answers: FunctionAnswer[];
+  /** הימורים שהוכרעו (רק כשיש) — ראו bet.ts. */
+  bets?: FunctionBet[];
+}
+
+/** הימור שהוכרע בשאלה queId: כמה שם המשתתף על הכף, האם זכה, והשינוי בניקוד. */
+export interface FunctionBet {
+  queId: number;
+  stake: number;
+  won: boolean;
+  delta: number;
 }
 
 export interface FunctionQuestion {
@@ -73,7 +83,8 @@ export function buildFunctionPayload(
   nameOf: (voterId: string) => string,
   now: Date = new Date(),
 ): FunctionPayload {
-  const votable = game.questions.filter((s) => isVotableSlide(s));
+  // הימור מצביע אבל אינו שאלה — מדווח בנפרד (participants[].bets).
+  const votable = game.questions.filter((s) => isVotableSlide(s) && s.type !== 'bet');
   const correctBySlide = new Map<number, Set<number>>();
   for (const s of votable) {
     correctBySlide.set(s.id, new Set(s.question.answers.filter((a) => a.correct).map((a) => a.id)));
@@ -98,6 +109,14 @@ export function buildFunctionPayload(
     const resolved = nameOf(id);
     const byCat = roster.memberships[id];
     const groupId = byCat !== undefined ? Object.values(byCat)[0] ?? null : null;
+    // הימורים שהוכרעו — לפי השאלה שהכריעה
+    const bets: FunctionBet[] = [];
+    for (const [slideId, outcomes] of Object.entries(state.betOutcomes)) {
+      const o = outcomes[id];
+      if (o === undefined) continue;
+      bets.push({ queId: Number(slideId), stake: o.stake, won: o.won, delta: o.delta });
+    }
+    bets.sort((a, b) => a.queId - b.queId);
     return {
       number: id,
       name: resolved === id ? '' : resolved, // "" = אין שם משויך, רק מספר
@@ -106,6 +125,7 @@ export function buildFunctionPayload(
       numCorrect,
       groupId,
       answers,
+      ...(bets.length > 0 ? { bets } : {}),
     };
   });
   participants.sort((a, b) => b.score - a.score || a.number.localeCompare(b.number));

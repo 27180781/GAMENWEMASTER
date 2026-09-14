@@ -6083,3 +6083,156 @@ body {
   border-radius: 10px;
   object-fit: contain;
 }
+
+/* ==========================================================================
+   הימור (bet) · מונה הצבעות חי · "הרוב קובע"
+   ========================================================================== */
+
+/* פס מצב בכותרת השאלה — "הימור פעיל" / "הרוב קובע" (ליד שם המשחק) */
+.q-mode-pill {
+  font-weight: 800;
+  font-size: 22px;
+  padding: 8px 22px;
+  border-radius: 999px;
+  white-space: nowrap;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.3);
+  animation: qpop 0.4s ease both;
+}
+.q-mode-pill--bet { background: #f5c518; color: #3a2c05; }
+.q-mode-pill--majority { background: rgba(255, 255, 255, 0.14); color: #fff; border: 1.5px solid rgba(255, 255, 255, 0.35); }
+
+/* מונה הצבעות חי על כרטיס תשובה (setting.liveVoteCounts) */
+.q-live {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 96px;
+  padding: 6px 14px;
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.32);
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  color: #fff;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  animation: coinIn 0.35s ease both;
+}
+.q-live b { font-size: 32px; font-weight: 900; }
+.q-live small { font-size: 16px; font-weight: 700; opacity: 0.8; margin-top: 3px; }
+.q-splitbar--majority, .q-splitbar--bet { background: rgba(0, 0, 0, 0.35); }
+.q-splitbar--bet { background: rgba(245, 197, 24, 0.22); }
+
+/* שקופית ההימור */
+.bet-dice { font-size: 64px; line-height: 1; flex: 0 0 auto; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.4)); }
+.bet-card-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.bet-card-sub { font-size: 20px; font-weight: 600; color: var(--text); opacity: 0.72; white-space: nowrap; }
+.bet-card--none { opacity: 0.85; }
+.bet-card--lead { border-color: #f5c518; box-shadow: 0 0 0 4px rgba(245, 197, 24, 0.35), 0 12px 30px rgba(0, 0, 0, 0.3); }
+.q-footer--bet { min-height: 112px; }
+.bet-summary {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 40px;
+  animation: qpop 0.5s ease both;
+}
+.bet-summary-total { display: flex; align-items: baseline; gap: 12px; }
+.bet-summary-num { font-size: 52px; font-weight: 900; color: #f5c518; font-variant-numeric: tabular-nums; text-shadow: 0 4px 14px rgba(0, 0, 0, 0.45); }
+.bet-summary-lbl { font-size: 24px; font-weight: 700; color: #fff; }
+.bet-summary-top { list-style: none; display: flex; gap: 14px; margin: 0; padding: 0; }
+.bet-summary-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--pill);
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 8px 18px;
+  max-width: 360px;
+  animation: boardIn 0.5s ease both;
+}
+.bet-summary-rank { font-size: 26px; }
+.bet-summary-name { font-size: 24px; font-weight: 800; color: var(--text); max-width: 200px; white-space: nowrap; overflow: hidden; }
+.bet-summary-stake { font-size: 24px; font-weight: 900; color: #f5c518; font-variant-numeric: tabular-nums; }
+
+/* מסך תוצאות ההימור */
+.bet-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 56;
+  background: rgba(4, 2, 10, 0.86);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  animation: screen-fade 0.3s ease;
+}
+.bet-panel {
+  width: 1560px;
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, rgb(var(--main-rgb, 34, 43, 69)) 62%, #05030c),
+    color-mix(in srgb, rgb(var(--main-rgb, 34, 43, 69)) 30%, #05030c)
+  );
+  border: 2px solid rgba(245, 197, 24, 0.35);
+  border-radius: 26px;
+  padding: 26px 32px;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.6);
+  color: #fff;
+}
+.bet-head { display: flex; align-items: center; gap: 20px; }
+.bet-title { flex: 1 1 auto; margin: 0; font-size: 44px; font-weight: 900; color: #f5c518; }
+.bet-counts { display: flex; align-items: center; gap: 12px; font-size: 26px; font-weight: 800; background: rgba(255, 255, 255, 0.1); border-radius: 999px; padding: 8px 22px; }
+.bet-counts-win { color: #2ec94f; }
+.bet-counts-lose { color: #ff6b6b; }
+.bet-counts-sep { opacity: 0.5; }
+.bet-close { width: 54px; height: 54px; border-radius: 50%; border: none; background: rgba(255, 255, 255, 0.14); color: #fff; font-size: 24px; cursor: pointer; }
+.bet-close:hover { background: rgba(255, 255, 255, 0.26); }
+.bet-subtitle { margin: -6px 0 0; font-size: 22px; opacity: 0.75; }
+.bet-empty { margin: 30px 0; text-align: center; font-size: 34px; font-weight: 700; opacity: 0.85; }
+.bet-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; min-height: 0; }
+.bet-col { display: flex; flex-direction: column; gap: 10px; border-radius: 20px; padding: 16px 20px; background: rgba(255, 255, 255, 0.05); border: 2px solid rgba(255, 255, 255, 0.1); }
+.bet-col--win { border-color: rgba(46, 201, 79, 0.55); background: rgba(46, 201, 79, 0.1); }
+.bet-col--lose { border-color: rgba(229, 52, 47, 0.55); background: rgba(229, 52, 47, 0.1); }
+.bet-col-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 30px; font-weight: 900; }
+.bet-col--win .bet-col-head { color: #2ec94f; }
+.bet-col--lose .bet-col-head { color: #ff6b6b; }
+.bet-col-sum { font-size: 26px; font-variant-numeric: tabular-nums; opacity: 0.9; }
+.bet-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.bet-row { display: flex; align-items: center; gap: 14px; padding: 8px 14px; border-radius: 14px; background: rgba(0, 0, 0, 0.25); animation: leaderIn 0.4s ease both; }
+.bet-row-rank { flex: 0 0 auto; width: 36px; text-align: center; font-size: 22px; font-weight: 800; opacity: 0.7; }
+.bet-row-name { flex: 1 1 auto; min-width: 0; font-size: 28px; font-weight: 800; white-space: nowrap; overflow: hidden; }
+.bet-row-delta { flex: 0 0 auto; font-size: 30px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.bet-col--win .bet-row-delta { color: #2ec94f; }
+.bet-col--lose .bet-row-delta { color: #ff6b6b; }
+.bet-row--empty, .bet-row--more { justify-content: center; font-size: 20px; opacity: 0.7; background: transparent; }
+.bet-big {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 12px 24px;
+  border-radius: 999px;
+  background: rgba(245, 197, 24, 0.14);
+  border: 2px solid rgba(245, 197, 24, 0.5);
+  animation: qpop 0.6s ease both;
+}
+.bet-big-lbl { font-size: 24px; font-weight: 700; color: #f5c518; }
+.bet-big-name { font-size: 34px; font-weight: 900; max-width: 620px; white-space: nowrap; overflow: hidden; }
+.bet-big-delta { font-size: 40px; font-weight: 900; color: #2ec94f; font-variant-numeric: tabular-nums; }
+.bet-foot { text-align: center; font-size: 20px; opacity: 0.6; }
+
+/* העורך המקומי — הגדרות ההימור */
+.se-bet { display: flex; flex-direction: column; gap: 8px; }
+.se-bet-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.se-bet-num { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 13px; background: rgba(120, 120, 160, 0.25); }
+.se-bet-ans { flex: 1 1 120px; min-width: 0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.se-bet-val { width: 92px; flex: 0 0 auto; }
+.se-bet-kind { width: 150px; flex: 0 0 auto; }

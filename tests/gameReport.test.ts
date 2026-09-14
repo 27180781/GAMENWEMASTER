@@ -38,6 +38,39 @@ function roster(): RosterData {
   return r;
 }
 
+describe('buildReportSheets — גליון הימורים', () => {
+  it('★ מופיע רק כשיש שקופית הימור, עם שורה לכל הימור שהוכרע', () => {
+    const game = makeGame([
+      rawSlide({ id: 1, type: 'trivia', que: 'ש1', answers: fourAnswers(1), scoreForQue: 10 }),
+      { ...rawSlide({ id: 2, type: 'survey', que: 'על כמה?', answers: fourAnswers(0) }), type: 'bet', bet: { options: [{ kind: 'none' }, { kind: 'all' }, { kind: 'none' }, { kind: 'none' }] } },
+      rawSlide({ id: 3, type: 'trivia', que: 'ש3', answers: fourAnswers(2), scoreForQue: 10 }),
+    ]);
+    const e = new GameEngine(game);
+    const step = (votes: Record<string, number>, seq: number) => {
+      e.dispatch({ type: 'OPEN_VOTING', at: 0 });
+      e.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(seq, e.getCurrentSlide().id, votes), at: 1000 });
+      e.dispatch({ type: 'VOTING_TIMEOUT', at: 5000 });
+      e.dispatch({ type: 'ADVANCE', at: 6000 });
+    };
+    step({ a: 1, b: 1 }, 1); // שניהם 10
+    step({ a: 2, b: 2 }, 2); // שניהם מהמרים הכול
+    step({ a: 2, b: 1 }, 3); // a צודק, b טועה
+    const sheets = buildReportSheets(game, e.getState(), roster(), (id) => id);
+    const bets = sheets.find((s) => s.name === 'הימורים')!;
+    expect(bets).toBeDefined();
+    expect(bets.rows[0]).toEqual(['הימור', 'שאלה מכריעה', 'שם', 'מזהה', 'הימור (נק׳)', 'תוצאה', 'שינוי בניקוד']);
+    expect(bets.rows.slice(1)).toEqual([
+      ['על כמה?', 'ש3', 'a', 'a', 10, 'זכה', 10],
+      ['על כמה?', 'ש3', 'b', 'b', 10, 'הפסיד', -10],
+    ]);
+    // ההימור אינו "שאלה": בגליון המשתתפים יש ש1 ו-ש2 בלבד
+    const participants = sheets.find((s) => s.name === 'משתתפים')!;
+    expect(participants.rows[0]).toEqual(['שם', 'מזהה', 'ש1', 'ש2', 'נענו', 'נכונות', 'ניקוד']);
+    // בלי שקופית הימור — אין גליון
+    expect(buildReportSheets(twoTrivia(), playedBoth().getState(), roster(), (id) => id).map((s) => s.name)).toEqual(['משתתפים', 'שאלות', 'קבוצות']);
+  });
+});
+
 describe('buildReportSheets', () => {
   const sheets = buildReportSheets(twoTrivia(), playedBoth().getState(), roster(), (id) => id);
   const byName = Object.fromEntries(sheets.map((s) => [s.name, s.rows]));

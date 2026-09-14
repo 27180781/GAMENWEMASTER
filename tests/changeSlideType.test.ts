@@ -5,8 +5,10 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  addAnswer,
   addSlideOfType,
   changeSlideType,
+  removeAnswer,
   functionFormNodes,
   normalizeFunctionSlide,
   slideSubtitle,
@@ -36,6 +38,52 @@ function gameWith(answers: { ans: string; correct: boolean; id: number }[]): Gam
     ],
   } as unknown as GameFile;
 }
+
+describe('שקופית הימור בעורך המקומי', () => {
+  it('★ הוספה מסרגל הסוגים — ערכת ברירת מחדל: בלי · רבע · חצי · הכול', () => {
+    const g = addSlideOfType(gameWith([
+      { ans: 'א', correct: true, id: 1 },
+      { ans: 'ב', correct: false, id: 2 },
+    ]), 0, 'bet');
+    const bet = g.questions[1]!;
+    expect(bet.type).toBe('bet');
+    expect(bet.question.answers.map((a) => a.ans)).toEqual(['בלי הימור', 'רבע מהניקוד', 'חצי מהניקוד', 'הכול!']);
+    expect(bet.bet?.options.map((o) => o.kind)).toEqual(['none', 'percent', 'percent', 'all']);
+    expect(bet.question.que).toBe('על כמה מהנקודות שלכם אתם מהמרים?');
+    // עובר את הסכימה כמות שהוא
+    expect(slideSchema.safeParse(bet).success).toBe(true);
+  });
+
+  it('החלפת סוג של שקופית עם תשובות שנכתבו — התשובות נשמרות והאפשרויות מיושרות', () => {
+    const g = changeSlideType(gameWith([
+      { ans: 'זהיר', correct: true, id: 1 },
+      { ans: 'נועז', correct: false, id: 2 },
+      { ans: 'מטורף', correct: false, id: 3 },
+    ]), 0, 'bet');
+    const bet = g.questions[0]!;
+    expect(bet.question.answers.map((a) => a.ans)).toEqual(['זהיר', 'נועז', 'מטורף']);
+    expect(bet.bet?.options).toHaveLength(3);
+    expect(bet.question.answers.every((a) => !a.correct)).toBe(true);
+    expect(slideSubtitle(bet)).toBe('בלי · 50% · הכול');
+  });
+
+  it('הוספה/הסרה של תשובה מיישרת את רשימת האפשרויות', () => {
+    const g = changeSlideType(gameWith([
+      { ans: 'זהיר', correct: true, id: 1 },
+      { ans: 'נועז', correct: false, id: 2 },
+      { ans: 'מטורף', correct: false, id: 3 },
+    ]), 0, 'bet');
+    const bet = g.questions[0]!;
+    expect(bet.bet?.options.map((o) => o.kind)).toEqual(['none', 'percent', 'all']);
+    expect(addAnswer(bet).bet?.options.map((o) => o.kind)).toEqual(['none', 'percent', 'all', 'none']);
+    expect(removeAnswer(bet, 0).bet?.options.map((o) => o.kind)).toEqual(['percent', 'all']);
+  });
+
+  it('הסוג מופיע בסרגל הסוגים', () => {
+    expect(SLIDE_TYPES.some((t) => t.value === 'bet')).toBe(true);
+    expect(slideTypeInfo('bet').label).toBe('הימור');
+  });
+});
 
 const two = [
   { ans: 'א', correct: true, id: 1 },
@@ -118,7 +166,7 @@ describe('changeSlideType', () => {
 
   it('הרשימה מכסה את כל הסוגים שהמנוע מכיר', () => {
     expect(SLIDE_TYPES.map((t) => t.value).sort()).toEqual(
-      ['ans_images', 'function', 'media', 'subject', 'survey', 'trivia'],
+      ['ans_images', 'bet', 'function', 'media', 'subject', 'survey', 'trivia'],
     );
     for (const t of SLIDE_TYPES) {
       expect(t.hint.length).toBeGreaterThan(10);
