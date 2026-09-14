@@ -19,6 +19,7 @@
 import { classifySubjectSlide, extractDynamicImageUrl } from './classify.ts';
 import { isVotableSlide, type GameFile, type Slide } from './schema.ts';
 import { adjustPlayerScore } from './scoreAdjust.ts';
+import { descendingScoreAt, descendingScoreOf, scoredLikeTrivia } from './scoring.ts';
 import type {
   EngineOptions,
   GameEvent,
@@ -34,6 +35,11 @@ interface VotingBookkeeping {
   openedAt: number | null;
   /** voterId → הזמן שבו הצבעתו נראתה לראשונה (ל-scoringReduction). */
   firstSeenAt: Record<string, number>;
+  /**
+   * voterId → הזמן האפקטיבי (ms מפתיחת ההצבעה, בלי עצירות) שבו הצבעתו נראתה
+   * לראשונה — לניקוד היורד. מגיע מה-host ב-`elapsedMs`; בלעדיו נגזר מ-`at`.
+   */
+  firstSeenElapsed: Record<string, number>;
   /** allowChangeVote=false: ההצבעה הראשונה של כל מצביע ננעלת. */
   lockedVotes: Record<string, number>;
   /** מפת המצביעים האחרונה שהתקבלה (voterId → answerId). */
@@ -48,6 +54,7 @@ function freshBookkeeping(): VotingBookkeeping {
   return {
     openedAt: null,
     firstSeenAt: {},
+    firstSeenElapsed: {},
     lockedVotes: {},
     latestVoters: null,
     latestFirstVoter: null,
@@ -165,7 +172,7 @@ export class GameEngine {
         this.handleGoto(event.slideId, event.at);
         break;
       case 'VOTE_SNAPSHOT':
-        this.handleVoteSnapshot(event.snapshot, event.at);
+        this.handleVoteSnapshot(event.snapshot, event.at, event.elapsedMs);
         break;
       case 'VOTING_TIMEOUT':
         if (this.state.phase === 'voting') this.closeVoting();
@@ -441,7 +448,7 @@ export class GameEngine {
     this.reenterSlide(index, at);
   }
 
-  private handleVoteSnapshot(snapshot: VoteSnapshot, at?: number): void {
+  private handleVoteSnapshot(snapshot: VoteSnapshot, at?: number, elapsedMs?: number): void {
     if (this.state.phase !== 'voting') return;
     if (snapshot.slideId !== this.state.currentSlideId) return;
     if (snapshot.seq <= this.voting.lastSeq) return; // ישן/כפול
@@ -452,6 +459,12 @@ export class GameEngine {
       for (const [voterId, answerId] of Object.entries(snapshot.voters)) {
         if (!(voterId in this.voting.firstSeenAt) && at !== undefined) {
           this.voting.firstSeenAt[voterId] = at;
+        }
+        if (!(voterId in this.voting.firstSeenElapsed)) {
+          const elapsed =
+            elapsedMs ??
+            (at !== undefined && this.voting.openedAt !== null ? at - this.voting.openedAt : undefined);
+          if (elapsed !== undefined) this.voting.firstSeenElapsed[voterId] = Math.max(0, elapsed);
         }
         if (!(voterId in this.voting.lockedVotes)) {
           this.voting.lockedVotes[voterId] = answerId;
@@ -585,7 +598,10 @@ export class GameEngine {
     const awards: Record<string, number> = {};
     const baseScore = slide.question.scoreForQue;
 
-    const isTrivia = slide.type === 'trivia';
+    // "כמו טריוויה" = תשובה נכונה מזכה, שגויה לא: trivia תמיד, ו-ans_images
+    // כשסומנה בה תשובה נכונה (ראו scoredLikeTrivia). כל השאר — ניקוד השתתפות
+    // מאחורי קונפיג בלבד.
+    const isTrivia = scoredLikeTrivia(slide);
     const participationScoring =
       !isTrivia && this.surveyParticipationScoring && baseScore > 0;
     if (!isTrivia && !participationScoring) return awards;
@@ -609,8 +625,19 @@ export class GameEngine {
     return awards;
   }
 
-  /** scoringReduction: אחרי `seconds` שניות מפתיחת ההצבעה הניקוד יורד ל-`score`. */
+  /**
+   * הניקוד למצביע שזכאי לו:
+   *   • descendingScore דולק — הערך שהיה על המסך ברגע ההצבעה (מחליף את
+   *     scoreForQue ואת scoringReduction). בלי מידע זמן — הניקוד המקסימלי.
+   *   • scoringReduction: אחרי `seconds` שניות מפתיחת ההצבעה הניקוד יורד ל-`score`.
+   */
   private effectiveScore(slide: Slide, voterId: string, baseScore: number): number {
+    const descending = descendingScoreOf(slide);
+    if (descending !== null) {
+      const elapsed = this.voting.firstSeenElapsed[voterId];
+      if (elapsed === undefined) return descending.maxScore;
+      return descendingScoreAt(descending.maxScore, elapsed, descending.durationMs);
+    }
     const reduction = slide.setting.scoringReduction;
     if (!reduction.active) return baseScore;
     const openedAt = this.voting.openedAt;

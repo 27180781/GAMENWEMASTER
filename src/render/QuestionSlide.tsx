@@ -15,7 +15,15 @@
  */
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { isImageQuestion, showsSideImage, type GameState, type Slide } from '../engine/index.ts';
+import {
+  descendingScoreAt,
+  descendingScoreOf,
+  isImageQuestion,
+  scoredLikeTrivia,
+  showsSideImage,
+  type GameState,
+  type Slide,
+} from '../engine/index.ts';
 import { slideGroupRestriction } from '../app/groupRestriction.ts';
 import { FitText } from './FitText.tsx';
 import { displayText } from './multiline.ts';
@@ -146,6 +154,55 @@ function Leaderboard({ leaders }: { leaders: RailPlayer[] }) {
   );
 }
 
+/**
+ * ניקוד יורד — המספר צולל ברציפות מהמקסימום לאפס לאורך הטיימר, לא במנות.
+ *
+ * הערך נגזר מאותו שעון שלפיו המנוע מנקד (TimerView.elapsedMs, שנדגם ב-GameHost
+ * כל 200ms) ומוּשלם בין הדגימות ב-requestAnimationFrame, כך שהספירה חלקה
+ * וקופאת בעצירת המנחה. הנוסחה עצמה — descendingScoreAt — היא של המנוע, ולכן
+ * המספר שעל המסך ברגע הלחיצה הוא בדיוק מה שהמצביע מקבל.
+ */
+function ScoreCountdown({
+  maxScore,
+  durationMs,
+  timer,
+}: {
+  maxScore: number;
+  durationMs: number;
+  timer: TimerView;
+}) {
+  const timerRef = useRef(timer);
+  timerRef.current = timer;
+  const liveScore = () => {
+    const t = timerRef.current;
+    const sinceSample = t.paused ? 0 : Math.max(0, Date.now() - t.sampledAt);
+    return descendingScoreAt(maxScore, t.elapsedMs + sinceSample, durationMs);
+  };
+  const [score, setScore] = useState(liveScore);
+
+  useEffect(() => {
+    let frame = 0;
+    const tick = () => {
+      setScore(liveScore());
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+    // liveScore קורא רק מ-ref-ים ומהפרמטרים שברשימה — לולאה אחת לכל שקופית.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [maxScore, durationMs]);
+
+  const low = score <= maxScore * 0.25;
+  return (
+    <div className={`q-score-drop${low ? ' q-score-drop--low' : ''}`} title="הניקוד למי שעונה נכון עכשיו">
+      <span className="q-score-drop-num" dir="ltr">
+        {score.toLocaleString('en-US')}
+      </span>
+      <span className="q-score-drop-label">נקודות</span>
+    </div>
+  );
+}
+
 /** סימון קטן של עוגת סקר (תלת-מימדי) — ליד השאלה בשקופית סקר. */
 function SurveyIcon() {
   return <span className="q-survey-icon" title="שאלת סקר" aria-label="סקר" />;
@@ -261,6 +318,8 @@ export function QuestionSlide({
   const low = timer !== null && !timer.paused && timer.remaining <= 5;
   // שבר הטיימר — נותר/סה"כ, מדויק לפי השניות (מתעדכן כל 200ms מ-GameHost).
   const timerFrac = timer && timer.total > 0 ? Math.max(0, timer.remaining / timer.total) : 1;
+  // ניקוד יורד — רק בשקופית שמנוקדת "כמו טריוויה" (ראו scoring.ts), ורק כשדולק.
+  const descending = scoredLikeTrivia(slide) ? descendingScoreOf(slide) : null;
 
   // אחוז שענו נכון (מתוך מי שענה) — לפס הירוק/אדום החי בתחתית, בזמן ההצבעה.
   const correctCount = answers
@@ -315,6 +374,9 @@ export function QuestionSlide({
               <div className={`q-count-track${low ? ' q-count-track--low' : ''}`}>
                 <div className="q-count-fill" style={{ width: `${timerFrac * 100}%` }} />
               </div>
+              {descending !== null && timer !== null && (
+                <ScoreCountdown maxScore={descending.maxScore} durationMs={descending.durationMs} timer={timer} />
+              )}
             </div>
           )}
 

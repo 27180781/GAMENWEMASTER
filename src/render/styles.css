@@ -441,6 +441,7 @@ body {
 
 /* ספירה לאחור: עיגול מספר מעל בר "כמה ענו" לבן */
 .q-countdown {
+  position: relative;
   align-self: center;
   display: flex;
   flex-direction: column;
@@ -488,6 +489,39 @@ body {
   box-shadow: 0 0 18px color-mix(in srgb, var(--text) 40%, transparent);
   transition: width 0.2s linear;
 }
+/* ניקוד יורד: גלולה בקצה שורת הספירה-לאחור, המספר צולל בכל פריים (ScoreCountdown) */
+.q-score-drop {
+  position: absolute;
+  inset-inline-end: 0;
+  top: 0;
+  height: 112px;
+  min-width: 200px;
+  padding: 0 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 30px;
+  background: var(--pill);
+  border: 3px solid color-mix(in srgb, var(--text) 42%, transparent);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4);
+  color: var(--text);
+  z-index: 2;
+}
+.q-score-drop-num {
+  font-weight: 900;
+  font-size: 52px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.q-score-drop-label {
+  margin-top: 6px;
+  font-size: 16px;
+  font-weight: 700;
+  opacity: 0.85;
+}
+.q-score-drop--low .q-score-drop-num { animation: numPulse 0.5s ease-in-out infinite; }
 
 /* כרטיס השאלה */
 .q-question {

@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useRef } from 'react';
-import type { GameFile, Slide } from '../engine/index.ts';
+import { DEFAULT_DESCENDING_MAX_SCORE, type GameFile, type Slide } from '../engine/index.ts';
 import { parseGameUsers } from '../app/roster.ts';
 import {
   advancedSettingsFor,
@@ -248,6 +248,10 @@ export function SlideAdvanced({
                           : DEFAULT_REDUCTION_SECONDS,
                       score: setting.scoringReduction.score || DEFAULT_REDUCTION_SCORE,
                     },
+                    // הפחתה במדרגות וניקוד יורד אינם חיים יחד — כמו בעורך המקוון
+                    ...(on && setting.descendingScore.active
+                      ? { descendingScore: { ...setting.descendingScore, active: false } }
+                      : {}),
                   })
                 }
               />
@@ -272,6 +276,45 @@ export function SlideAdvanced({
                     }
                   />
                 </div>
+              )}
+            </>
+          )}
+
+          {shown.has('descendingScore') && (
+            <>
+              <Toggle
+                label="ניקוד יורד לפי זמן המענה"
+                checked={setting.descendingScore.active}
+                onChange={(on) =>
+                  setSetting({
+                    descendingScore: {
+                      active: on,
+                      maxScore:
+                        setting.descendingScore.maxScore > 0
+                          ? setting.descendingScore.maxScore
+                          : DEFAULT_DESCENDING_MAX_SCORE,
+                    },
+                    // ניקוד יורד והפחתה במדרגות אינם חיים יחד — כמו בעורך המקוון
+                    ...(on && setting.scoringReduction.active
+                      ? { scoringReduction: { ...setting.scoringReduction, active: false } }
+                      : {}),
+                  })
+                }
+              />
+              {setting.descendingScore.active && (
+                <>
+                  <NumBox
+                    label="ניקוד מקסימלי"
+                    value={setting.descendingScore.maxScore}
+                    min={1}
+                    max={100000}
+                    onSet={(n) => setSetting({ descendingScore: { active: true, maxScore: n } })}
+                  />
+                  <p className="sa-hint">
+                    הניקוד צולל ברציפות מהמקסימום לאפס לאורך זמן המענה, ומי שעונה נכון
+                    מקבל את המספר שהיה על המסך ברגע הלחיצה. מחליף את ניקוד השאלה.
+                  </p>
+                </>
               )}
             </>
           )}

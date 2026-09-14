@@ -39,7 +39,7 @@ interface VoteAdapter {
 |---|---|---|---|
 | `trivia` | שאלה עם תשובה נכונה (`correct: true` על תשובה אחת) | כן | כן — `scoreForQue` למי שצדק |
 | `survey` | סקר/שאלת דיון — אין תשובה נכונה (כל `correct: false`) | כן | אופציונלי — ראה 5.2 |
-| `ans_images` | התשובות הן URL של תמונות; מוצגות כגריד תמונות. בקבצים קיימים כולן `correct: true` — משמעות: בחירה חופשית, אין "טעות" | כן | כמו survey |
+| `ans_images` | התשובות הן URL של תמונות; מוצגות כגריד תמונות. מערכת יצירת המשחקים שולחת תשובה נכונה אחת (`correct: true`) ואת השאר `false`; בקבצים ישנים כולן `correct: true` — בחירה חופשית, אין "טעות" | כן | כשסומנה תשובה נכונה (לפחות אחת `true` ואחת `false`) — כמו trivia; אחרת כמו survey |
 | `media` | שקופית מדיה בלבד (`openMedia.src`) — וידאו/תמונה/YouTube. אין הצבעה | לא | לא |
 | `subject` | שקופית טקסט/כותרת (`que` הוא הטקסט). **חלק מהן פקודות מערכת — ראה סעיף 4** | לא | לא |
 
@@ -102,6 +102,7 @@ interface SlideSettings {
   answerIsSequenceClicks: boolean;  // התשובה היא רצף לחיצות
   fullscreen: boolean;
   scoringReduction: { active: boolean; seconds: number | ""; score: number | "" }; // הפחתת ניקוד אחרי X שניות
+  descendingScore?: { active: boolean; maxScore: number | "" }; // ניקוד יורד: צולל מ-maxScore לאפס לאורך timeForQue; חסר = כבוי, "" = 1000
   slidBackgroundMedia: { src: string };
   automaticSkip: { active: boolean; seconds: number | "" };  // מעבר אוטומטי
   showInLoop: boolean;
@@ -180,9 +181,17 @@ ENTER → [openMedia אם קיים] → SHOW_QUESTION (+סאונד showQuestion)
 
 - `trivia`: כל מצביע שבחר בתשובה `correct: true` בתוך החלון מקבל `scoreForQue`.
 - `scoringReduction.active`: אחרי `seconds` שניות, הניקוד יורד ל-`score`.
+- `descendingScore.active`: **ניקוד יורד** — הניקוד צולל ברציפות (לא במדרגות) מ-`maxScore`
+  לאפס לאורך `timeForQue` (1000 על 10 שניות = 100 לשנייה), ומי שצדק מקבל את הערך שהיה
+  על המסך ברגע הלחיצה. הזמן הוא הזמן האפקטיבי מפתיחת ההצבעה בלי עצירות מנחה (ה-host
+  מזריק `elapsedMs` ב-`VOTE_SNAPSHOT`; בלעדיו — `at − openedAt`; בלי שניהם — מקסימום).
+  הוספת/החסרת שניות לטיימר אינה משנה את הקצב. מחליף את `scoreForQue` ואת
+  `scoringReduction`. הנוסחה והתצוגה החיה בשקופית חולקות את `scoring.ts`.
 - `firstClicker`: רק המצביע הראשון (לפי חותמת השרת/הרצף) מקבל ניקוד.
 - `correctlyAnsweredBefore`: מסנן — רק מי שצדק בכל שאלות ה-trivia הקודמות משתתף.
-- `survey` / `ans_images`: אם `scoreForQue` מוגדר — נקודות השתתפות לכל מצביע (ברירת מחדל: בלי ניקוד; להשאיר את זה מאחורי קונפיג).
+- `ans_images` שסומנה בה תשובה נכונה (לפחות אחת `correct: true` ואחת `false`) — מנוקדת
+  **כמו trivia**: הבוחר בתמונה הנכונה מקבל `scoreForQue` (או את הניקוד היורד).
+- `survey` / `ans_images` בלי סימון כזה: אם `scoreForQue` מוגדר — נקודות השתתפות לכל מצביע (ברירת מחדל: בלי ניקוד; להשאיר את זה מאחורי קונפיג).
 - טבלת ניקוד נצברת פר `voterId`. מסך זוכים מציג `multiWinners` מובילים, עם מדיה + סאונד winners מההגדרות.
 
 ---
