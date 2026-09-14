@@ -45,7 +45,11 @@ export type GameEvent =
   | { type: 'ADVANCE'; at?: number }
   | { type: 'BACK'; at?: number }
   | { type: 'GOTO'; slideId: number; at?: number }
-  | { type: 'VOTE_SNAPSHOT'; snapshot: VoteSnapshot; at?: number }
+  /**
+   * `elapsedMs` — הזמן האפקטיבי (ms) שחלף מפתיחת ההצבעה ברגע ה-snapshot, בלי
+   * משך העצירות של המנחה — לניקוד היורד. כשחסר, המנוע נופל ל-`at − openedAt`.
+   */
+  | { type: 'VOTE_SNAPSHOT'; snapshot: VoteSnapshot; at?: number; elapsedMs?: number }
   | { type: 'VOTING_TIMEOUT'; at?: number }
   | { type: 'MEDIA_ENDED'; at?: number }
   /** פתיחת הצבעה מפורשת, בדילוג על שלב המדיה (ה-host קורא לזה אחרי חשיפת התשובות). */

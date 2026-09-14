@@ -1009,9 +1009,23 @@ export function GameHost({
   const pausedAccumMsRef = useRef(0);
   /** true = הטיימר קופא כרגע בגלל שכבה חוסמת (ולא עצירה ידנית) — לְהַפְשָׁרָה בסגירה. */
   const overlayFrozeRef = useRef(false);
+  /** ‎Date.now()‎ של פתיחת חלון ההצבעה הנוכחי (0 = אין חלון פתוח). */
+  const votingOpenedAtRef = useRef(0);
   const lastHostAnswerRef = useRef<number | null>(null);
 
   const votingActive = stage === 'playing' && state.phase === 'voting';
+
+  /**
+   * הזמן האפקטיבי שחלף מפתיחת ההצבעה (ms) — בלי משך העצירות, וקפוא בזמן עצירה.
+   * זה השעון של הניקוד היורד: המנוע מנקד לפיו (elapsedMs ב-VOTE_SNAPSHOT)
+   * והשקופית מציגה לפיו (TimerView.elapsedMs), ולכן הוספת/החסרת שניות לטיימר
+   * (4/5) אינה משנה אותו — הניקוד ממשיך לרדת באותו קצב.
+   */
+  const votingElapsedMs = useCallback(() => {
+    if (votingOpenedAtRef.current === 0) return 0;
+    const now = pausedRef.current ? pauseStartedAtRef.current : Date.now();
+    return Math.max(0, now - votingOpenedAtRef.current - pausedAccumMsRef.current);
+  }, []);
 
   // -------------------------------------------------------------------------
   // Throttle להצבעות אמת — צובר snapshot מצטבר ומעדכן את המנוע/UI בקצב מוגבל
@@ -1026,7 +1040,12 @@ export function GameHost({
     const snapshot = pendingVoteRef.current;
     if (snapshot === null) return;
     pendingVoteRef.current = null;
-    engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot, at: Date.now() });
+    engine.dispatch({
+      type: 'VOTE_SNAPSHOT',
+      snapshot,
+      at: Date.now(),
+      ...(votingOpenedAtRef.current > 0 ? { elapsedMs: votingElapsedMs() } : {}),
+    });
     const nowLog = Date.now();
     if (nowLog - lastVoteLogRef.current >= 500) {
       lastVoteLogRef.current = nowLog;
@@ -1061,7 +1080,7 @@ export function GameHost({
         });
       }
     }
-  }, [engine]);
+  }, [engine, votingElapsedMs]);
   const flushVotesRef = useRef(flushPendingVotes);
   flushVotesRef.current = flushPendingVotes;
 
@@ -1089,6 +1108,7 @@ export function GameHost({
       setTimer(null);
       pausedRef.current = false;
       pausedRemainingMsRef.current = null;
+      votingOpenedAtRef.current = 0;
       overlayFrozeRef.current = false;
       // סגירת חלון ההצבעה — ניקוי ה-throttle (השאריות כבר נשלחו לפני הסגירה)
       if (voteFlushTimerRef.current !== null) {
@@ -1103,11 +1123,13 @@ export function GameHost({
     // את ה-effect ויאפס את הטיימר לזמן מלא.
     const s = engine.getCurrentSlide();
     const total = s.question.timeForQue;
-    deadlineRef.current = Date.now() + total * 1000;
+    const openedAt = Date.now();
+    deadlineRef.current = openedAt + total * 1000;
+    votingOpenedAtRef.current = openedAt;
     pausedRemainingMsRef.current = null;
     pausedRef.current = false;
     pausedAccumMsRef.current = 0;
-    setTimer({ remaining: total, total, paused: false });
+    setTimer({ remaining: total, total, paused: false, elapsedMs: 0, sampledAt: openedAt });
     audio.play('timer', soundsRef.current.timerMediaSound.src, { loop: true });
 
     const interval = window.setInterval(() => {
@@ -1119,14 +1141,20 @@ export function GameHost({
         // הנכונה היא צעד נפרד — בלחיצה, או אוטומטית אם showCorrectAnswerAfterTimer דלוק.
         engine.dispatch({ type: 'VOTING_TIMEOUT', at: Date.now() });
       } else {
-        setTimer({ remaining: remainingMs / 1000, total, paused: false });
+        setTimer({
+          remaining: remainingMs / 1000,
+          total,
+          paused: false,
+          elapsedMs: votingElapsedMs(),
+          sampledAt: Date.now(),
+        });
       }
     }, 200);
     return () => {
       window.clearInterval(interval);
       audio.stop('timer');
     };
-  }, [votingActive, state.currentSlideId, engine, audio]);
+  }, [votingActive, state.currentSlideId, engine, audio, votingElapsedMs]);
 
   /** הוספת/החסרת שניות לטיימר הפעיל (פקודות 4/5). */
   const adjustTimer = useCallback(
@@ -1136,14 +1164,22 @@ export function GameHost({
       if (pausedRemainingMsRef.current !== null) {
         pausedRemainingMsRef.current = Math.max(0, pausedRemainingMsRef.current + deltaMs);
         const remaining = pausedRemainingMsRef.current / 1000;
-        setTimer((t) => (t ? { ...t, remaining, total: Math.max(t.total, remaining) } : t));
+        setTimer((t) =>
+          t
+            ? { ...t, remaining, total: Math.max(t.total, remaining), elapsedMs: votingElapsedMs(), sampledAt: Date.now() }
+            : t,
+        );
       } else {
         deadlineRef.current += deltaMs;
         const remaining = Math.max(0, (deadlineRef.current - Date.now()) / 1000);
-        setTimer((t) => (t ? { ...t, remaining, total: Math.max(t.total, remaining) } : t));
+        setTimer((t) =>
+          t
+            ? { ...t, remaining, total: Math.max(t.total, remaining), elapsedMs: votingElapsedMs(), sampledAt: Date.now() }
+            : t,
+        );
       }
     },
-    [engine],
+    [engine, votingElapsedMs],
   );
 
   /** עצירת/המשך הטיימר וההצבעה (פקודה 6). */
@@ -1155,16 +1191,16 @@ export function GameHost({
       pauseStartedAtRef.current = Date.now();
       audio.stop('timer');
       const remaining = pausedRemainingMsRef.current / 1000;
-      setTimer((t) => (t ? { ...t, remaining, paused: true } : t));
+      setTimer((t) => (t ? { ...t, remaining, paused: true, elapsedMs: votingElapsedMs(), sampledAt: Date.now() } : t));
     } else {
       deadlineRef.current = Date.now() + pausedRemainingMsRef.current;
       pausedAccumMsRef.current += Date.now() - pauseStartedAtRef.current;
       pausedRemainingMsRef.current = null;
       pausedRef.current = false;
       audio.play('timer', sounds.timerMediaSound.src, { loop: true });
-      setTimer((t) => (t ? { ...t, paused: false } : t));
+      setTimer((t) => (t ? { ...t, paused: false, elapsedMs: votingElapsedMs(), sampledAt: Date.now() } : t));
     }
-  }, [engine, audio, sounds]);
+  }, [engine, audio, sounds, votingElapsedMs]);
 
   // -------------------------------------------------------------------------
   // זרימת השלבים: קדימה (רווח / 0) ואחורה (2)
@@ -1825,7 +1861,11 @@ export function GameHost({
         pauseStartedAtRef.current = Date.now();
         overlayFrozeRef.current = true;
         audio.stop('timer');
-        setTimer((t) => (t ? { ...t, remaining: pausedRemainingMsRef.current! / 1000, paused: true } : t));
+        setTimer((t) =>
+          t
+            ? { ...t, remaining: pausedRemainingMsRef.current! / 1000, paused: true, elapsedMs: votingElapsedMs(), sampledAt: Date.now() }
+            : t,
+        );
       }
     } else if (overlayFrozeRef.current) {
       overlayFrozeRef.current = false;
@@ -1835,10 +1875,10 @@ export function GameHost({
         pausedRemainingMsRef.current = null;
         pausedRef.current = false;
         audio.play('timer', soundsRef.current.timerMediaSound.src, { loop: true });
-        setTimer((t) => (t ? { ...t, paused: false } : t));
+        setTimer((t) => (t ? { ...t, paused: false, elapsedMs: votingElapsedMs(), sampledAt: Date.now() } : t));
       }
     }
-  }, [overlayActive, engine, audio]);
+  }, [overlayActive, engine, audio, votingElapsedMs]);
 
   useEffect(() => {
     if (stage !== 'playing' || state.activeMedia !== null || overlayActive) return;

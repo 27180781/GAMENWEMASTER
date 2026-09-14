@@ -58,6 +58,20 @@ export const slideSettingsSchema = z.object({
     seconds: emptyableNumber(0),
     score: emptyableNumber(0),
   }),
+  /**
+   * ניקוד יורד: הניקוד צולל ברציפות מ-`maxScore` לאפס לאורך `timeForQue`, ומי
+   * שעונה נכון מקבל את הערך שהיה על המסך ברגע הלחיצה (ראו scoring.ts). כשדולק
+   * הוא מחליף את `scoreForQue` ואת `scoringReduction`. אופציונלי עם ברירת מחדל
+   * כבויה — קבצים שנוצרו לפני השדה נטענים כרגיל; ‎""‎ ב-`maxScore` הוא כלל
+   * הריקון של מערכת יצירת המשחקים ומנורמל ל-1000, כמו ברירת המחדל בעורך שלה.
+   */
+  descendingScore: z
+    .object({
+      active: z.boolean().optional().default(false),
+      maxScore: emptyableNumber(1000).optional().default(1000),
+    })
+    .optional()
+    .default({ active: false, maxScore: 1000 }),
   slidBackgroundMedia: mediaRef,
   automaticSkip: z.object({
     active: z.boolean(),

@@ -34,6 +34,7 @@ const DOC_SLIDE = {
     firstClicker: true,
     automaticSkip: { active: true, seconds: 12 },
     scoringReduction: { active: true, seconds: 8, score: 2 },
+    descendingScore: { active: true, maxScore: 1000 },
     slidBackgroundMedia: { src: 'Assets/question-0-slidbg.jpg' },
     groupRestriction: { active: true, groupName: 'קבוצה א' },
     slideStartVoting: true,
@@ -119,6 +120,7 @@ describe('סעיף 4 — כל שדה במיפוי מגיע למנוע', () => {
     expect(slide.setting.firstClicker).toBe(true);
     expect(slide.setting.automaticSkip).toEqual({ active: true, seconds: 12 });
     expect(slide.setting.scoringReduction).toEqual({ active: true, seconds: 8, score: 2 });
+    expect(slide.setting.descendingScore).toEqual({ active: true, maxScore: 1000 });
     expect(slide.setting.slidBackgroundMedia.src).toBe('Assets/question-0-slidbg.jpg');
     expect(slide.setting.groupRestriction).toEqual({ active: true, groupName: 'קבוצה א' });
   });
@@ -144,7 +146,7 @@ describe('בחירה מרובה — יותר מתשובה נכונה אחת', ()
     gameOf([
       {
         ...DOC_SLIDE,
-        setting: { ...DOC_SLIDE.setting, firstClicker: false, scoringReduction: { active: false, seconds: '', score: '' }, groupRestriction: { active: false, groupName: '' } },
+        setting: { ...DOC_SLIDE.setting, firstClicker: false, scoringReduction: { active: false, seconds: '', score: '' }, descendingScore: { active: false, maxScore: '' }, groupRestriction: { active: false, groupName: '' } },
       },
     ]);
 
@@ -189,6 +191,7 @@ describe('סעיף 5 — כלל הריקון', () => {
       ...DOC_SLIDE.setting,
       automaticSkip: { active: false, seconds: '' },
       scoringReduction: { active: false, seconds: '', score: '' },
+      descendingScore: { active: false, maxScore: '' },
     },
   };
 
@@ -199,6 +202,7 @@ describe('סעיף 5 — כלל הריקון', () => {
     expect(slide.setting.automaticSkip.seconds).toBe(0);
     expect(slide.setting.scoringReduction.seconds).toBe(0);
     expect(slide.setting.scoringReduction.score).toBe(0);
+    expect(slide.setting.descendingScore).toEqual({ active: false, maxScore: 1000 });
   });
 
   it('אותו כלל בשקופית מדיה ובשקופית פונקציה', () => {

@@ -27,7 +27,7 @@ const triviaSlide = (): Slide =>
   makeGame([rawSlide({ id: 1, type: 'trivia', que: 'ש', answers: ANSWERS })]).questions[0]!;
 
 describe('אילו הגדרות מתקדמות מוצגות לכל סוג שקופית', () => {
-  it('★ טריוויה — שבע ההגדרות, בסדר של העורך המקוון', () => {
+  it('★ טריוויה — שמונה ההגדרות, בסדר של העורך המקוון', () => {
     expect(advancedSettingsFor('trivia')).toEqual([
       'multiCorrect',
       'groupRestriction',
@@ -36,16 +36,20 @@ describe('אילו הגדרות מתקדמות מוצגות לכל סוג שקו
       'automaticSkip',
       'slidBackgroundMedia',
       'scoringReduction',
+      'descendingScore',
     ]);
   });
 
-  it('★ סקר ותשובה בתמונה — הכול חוץ מ"מספר תשובות נכונות"', () => {
-    // בסוגים האלה המנוע אינו מסמן תשובה נכונה, ומתג שלא עושה כלום הוא בדיוק
-    // מה שהוצאנו מהחלון הזה.
-    for (const type of ['survey', 'ans_images']) {
-      expect(advancedSettingsFor(type), type).not.toContain('multiCorrect');
-      expect(advancedSettingsFor(type), type).toHaveLength(6);
-    }
+  it('★ תשובה בתמונה — הכול חוץ מ"מספר תשובות נכונות" (המתג שלה מעל התשובות); ניקוד יורד כן', () => {
+    expect(advancedSettingsFor('ans_images')).not.toContain('multiCorrect');
+    expect(advancedSettingsFor('ans_images')).toContain('descendingScore');
+    expect(advancedSettingsFor('ans_images')).toHaveLength(7);
+  });
+
+  it('★ סקר — בלי "מספר תשובות נכונות" ובלי ניקוד יורד: אין בו תשובה נכונה לנקד', () => {
+    expect(advancedSettingsFor('survey')).not.toContain('multiCorrect');
+    expect(advancedSettingsFor('survey')).not.toContain('descendingScore');
+    expect(advancedSettingsFor('survey')).toHaveLength(6);
   });
 
   it('★ טקסט — רק רקע ספציפי; מדיה ופונקציה — אין חלון בכלל', () => {
