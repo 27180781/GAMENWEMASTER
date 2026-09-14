@@ -65,6 +65,18 @@ export type GamePhase = 'showing' | 'voting' | 'results' | 'ended';
 /** מדיה חוסמת שמתנגנת כרגע (openMedia לפני השאלה / endMedia אחרי התוצאות). */
 export type ActiveMedia = 'open' | 'end' | null;
 
+/** תוצאת ההימור של משתתף אחד, כפי שנפתרה בשאלה המנוקדת (ראו bet.ts). */
+export interface BetOutcome {
+  /** גובה ההימור (נקודות) כפי שנקבע בסגירת שקופית ההימור. */
+  stake: number;
+  /** האם ההימור זכה — התשובה שנבחרה בשאלה מסומנת נכונה. */
+  won: boolean;
+  /** השינוי בפועל בניקוד (אחרי רצפת האפס): חיובי בזכייה, שלילי בהפסד. */
+  delta: number;
+  /** התשובה שנבחרה בשאלה המכריעה (null = לא ענה). */
+  answerId: number | null;
+}
+
 /** פקודת מערכת שמופקת משקופית subject "קסם" (SPEC סעיף 4). ביצוע ה-side effect הוא באחריות ה-host. */
 export type SubjectCommand =
   | { kind: 'dynamic-image'; url: string }
@@ -102,6 +114,18 @@ export interface GameState {
   slidesCompleted: number[];
   /** slideId → voterId של הזוכה ב-firstClicker. */
   firstClickWinners: Record<number, string>;
+  /**
+   * הימורים שנרשמו בשקופיות הימור: betSlideId → voterId → גובה ההימור.
+   * נקבעים בסגירת שקופית ההימור ומוכרעים בשאלה המנוקדת הבאה (ראו bet.ts).
+   */
+  betStakes: Record<number, Record<string, number>>;
+  /** תוצאות ההימור בשאלות שהכריעו אותו: slideId (של השאלה) → voterId → תוצאה. */
+  betOutcomes: Record<number, Record<string, BetOutcome>>;
+  /**
+   * "הרוב קובע": slideId → מזהי התשובות שנקבעו כנכונות בסגירת ההצבעה (ראו
+   * majority.ts). נשמר כדי להחיל מחדש על הקובץ אחרי שחזור/רענון תוכן.
+   */
+  majorityBySlide: Record<number, number[]>;
 }
 
 // ---------------------------------------------------------------------------
@@ -122,6 +146,10 @@ export interface GameSnapshot {
   votesBySlide: Record<number, Record<string, number>>;
   slidesCompleted: number[];
   firstClickWinners: Record<number, string>;
+  /** הימורים ותוצאותיהם — אופציונליים כדי ש-snapshot מלפני שקופית ההימור ייטען. */
+  betStakes?: Record<number, Record<string, number>>;
+  betOutcomes?: Record<number, Record<string, BetOutcome>>;
+  majorityBySlide?: Record<number, number[]>;
 }
 
 // ---------------------------------------------------------------------------

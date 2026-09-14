@@ -7,7 +7,7 @@
  * טהור (פרט לפונקציית ההורדה) — buildReportSheets ניתן לבדיקה ביחידה.
  */
 
-import { isVotableSlide, questionLabel, type GameFile } from '../engine/index.ts';
+import { betSlideFor, isVotableSlide, questionLabel, type GameFile } from '../engine/index.ts';
 import type { GameState } from '../engine/types.ts';
 import type { RosterData } from './roster.ts';
 import { groupStandings } from './groupScore.ts';
@@ -20,7 +20,8 @@ export function buildReportSheets(
   roster: RosterData,
   nameOf: (voterId: string) => string,
 ): SheetData[] {
-  const votable = game.questions.filter((s) => isVotableSlide(s));
+  // הימור מצביע אבל אינו שאלה — הוא מקבל גליון משלו ולא עמודת "ש".
+  const votable = game.questions.filter((s) => isVotableSlide(s) && s.type !== 'bet');
   const correctBySlide = new Map<number, Set<number>>();
   for (const s of votable) {
     correctBySlide.set(s.id, new Set(s.question.answers.filter((a) => a.correct).map((a) => a.id)));
@@ -126,11 +127,33 @@ export function buildReportSheets(
   const groupsRows: Cell[][] =
     groupRows.length > 0 ? [groupHeader, ...groupRows] : [groupHeader, ['—', 'אין שיוך קבוצתי']];
 
-  return [
+  const sheets: SheetData[] = [
     { name: 'משתתפים', rows: participantsRows },
     { name: 'שאלות', rows: questionsRows },
     { name: 'קבוצות', rows: groupsRows },
   ];
+
+  // ---- גליון הימורים (רק כשיש שקופיות הימור במשחק) ----
+  if (game.questions.some((s) => s.type === 'bet')) {
+    const betHeader: Cell[] = ['הימור', 'שאלה מכריעה', 'שם', 'מזהה', 'הימור (נק׳)', 'תוצאה', 'שינוי בניקוד'];
+    const betRows: Cell[][] = [betHeader];
+    game.questions.forEach((s, index) => {
+      const outcomes = state.betOutcomes[s.id];
+      if (outcomes === undefined) return;
+      const bet = betSlideFor(game, index);
+      const betLabel = bet === null ? 'הימור' : bet.question.que.trim() || 'הימור';
+      const rows = Object.entries(outcomes).sort((a, b) => b[1].delta - a[1].delta || a[0].localeCompare(b[0]));
+      for (const [id, o] of rows) {
+        betRows.push([betLabel, questionLabel(s.question), nameOf(id), id, o.stake, o.won ? 'זכה' : 'הפסיד', o.delta]);
+      }
+    });
+    sheets.push({
+      name: 'הימורים',
+      rows: betRows.length > 1 ? betRows : [betHeader, ['—', 'לא היו הימורים']],
+    });
+  }
+
+  return sheets;
 }
 
 /** שם קובץ בטוח לפי שם/מזהה המשחק ותאריך. */

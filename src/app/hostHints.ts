@@ -27,20 +27,30 @@ export interface HostHintInput {
   hasNextSlide: boolean;
   /** האם יש חלוקה לקבוצות — אז מקש 4 בחשיפת התשובה פותח את דירוג הקבוצות. */
   hasGroups?: boolean;
+  /** תוצאות הימור ממתינות להצגה (אחרי חשיפת התשובה) — הרווח הבא פותח אותן. */
+  betPending?: boolean;
+  /** מסך תוצאות ההימור פתוח — הרווח סוגר אותו וממשיך. */
+  betOverlay?: boolean;
 }
 
 /** מה עושה הרווח (מקש 0) בשלב הנוכחי. */
 function spaceAction(a: HostHintInput): string {
+  if (a.betOverlay) return 'המשך (סגירת תוצאות ההימור)';
   if (a.activeMedia !== null) return 'המשך (סיום המדיה)';
+  const bet = a.slideType === 'bet';
   if (a.phase === 'showing' && a.votable) {
-    if (!a.questionShown) return 'הצגת השאלה';
-    if (a.answersShown < a.totalAnswers) return 'הצגת תשובה';
-    return 'פתיחת ההצבעה + טיימר';
+    if (!a.questionShown) return bet ? 'הצגת ההימור' : 'הצגת השאלה';
+    if (a.answersShown < a.totalAnswers) return bet ? 'הצגת אפשרות הימור' : 'הצגת תשובה';
+    return bet ? 'פתיחת ההימור + טיימר' : 'פתיחת ההצבעה + טיימר';
   }
   if (a.phase === 'showing') return a.hasNextSlide ? 'השקופית הבאה' : 'סיום המשחק';
-  if (a.phase === 'voting') return 'סיום ההצבעה';
+  if (a.phase === 'voting') return bet ? 'סגירת ההימור' : 'סיום ההצבעה';
   if (a.phase === 'results') {
-    if (!a.revealCorrect) return a.slideType === 'trivia' ? 'חשיפת התשובה הנכונה' : 'חשיפת התוצאות';
+    if (!a.revealCorrect) {
+      if (bet) return 'חשיפת ההימורים';
+      return a.slideType === 'trivia' ? 'חשיפת התשובה הנכונה' : 'חשיפת התוצאות';
+    }
+    if (a.betPending) return 'תוצאות ההימור';
     return a.hasNextSlide ? 'השקופית הבאה' : 'סיום המשחק';
   }
   return 'המשך';

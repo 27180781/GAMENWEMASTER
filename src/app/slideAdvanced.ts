@@ -8,7 +8,7 @@
  * `showInLoop`, `correctlyAnsweredBefore`). הם שרידים מהמערכת הישנה, לעורך
  * המקוון אין להם פקד, ומחבר משחק שהיה מזיז אותם לא היה רואה שום שינוי.
  *
- * לכן הרשימה כאן מוצהרת: **תשע** ההגדרות שהעורך המקוון מציע, בסדר שלו. השדות
+ * לכן הרשימה כאן מוצהרת: **אחת-עשרה** ההגדרות שהעורך המקוון מציע, בסדר שלו. השדות
  * האחרים ממשיכים להישמר בקובץ כרגיל — פשוט אין להם פקד, כמו באונליין.
  *
  * טהור (בלי React) כדי שיהיה ניתן לבדיקה.
@@ -18,8 +18,10 @@ import type { Slide } from '../engine/index.ts';
 
 export type AdvancedSetting =
   | 'multiCorrect'
+  | 'majorityDecides'
   | 'groupRestriction'
   | 'allowChangeVote'
+  | 'liveVoteCounts'
   | 'firstClicker'
   | 'automaticSkip'
   | 'slidBackgroundMedia'
@@ -30,8 +32,10 @@ export type AdvancedSetting =
 /** הסדר שבו ההגדרות מוצגות בחלון — זהה לסדר שבעורך המקוון. */
 const FULL: AdvancedSetting[] = [
   'multiCorrect',
+  'majorityDecides',
   'groupRestriction',
   'allowChangeVote',
+  'liveVoteCounts',
   'firstClicker',
   'automaticSkip',
   'slidBackgroundMedia',
@@ -43,12 +47,13 @@ const FULL: AdvancedSetting[] = [
 /**
  * אילו הגדרות מוצגות לסוג שקופית נתון.
  *
- * • טריוויה — כל התשע.
+ * • טריוויה — כל האחת-עשרה.
  * • תשובה בתמונה — הכול חוץ מ"מספר תשובות נכונות" (המתג שלה יושב מעל רשימת
  *   התשובות, כמו באונליין). ניקוד יורד כן — היא מנוקדת כמו טריוויה כשסומנה
  *   בה תשובה נכונה (ראו scoring.ts); וגם חשיפה הדרגתית של תמונת השאלה.
  * • סקר — בלי "מספר תשובות נכונות", בלי ניקוד יורד ובלי חשיפה הדרגתית: אין בו
  *   תשובה נכונה, ומתג שלא עושה כלום הוא בדיוק מה שביקשנו להוציא מהחלון הזה.
+ * • הימור — שיוך לקבוצה, שינוי הצבעה, מונה חי, מעבר אוטומטי ורקע; בלי ניקוד.
  * • טקסט — רק רקע ספציפי; אין בה הצבעה.
  * • מדיה / פונקציה — אין חלון מתקדם בכלל.
  */
@@ -56,7 +61,13 @@ export function advancedSettingsFor(type: string): AdvancedSetting[] {
   if (type === 'trivia') return FULL;
   if (type === 'ans_images') return FULL.filter((s) => s !== 'multiCorrect');
   if (type === 'survey') {
-    return FULL.filter((s) => s !== 'multiCorrect' && s !== 'descendingScore' && s !== 'imageReveal');
+    return FULL.filter(
+      (s) => s !== 'multiCorrect' && s !== 'majorityDecides' && s !== 'descendingScore' && s !== 'imageReveal',
+    );
+  }
+  // הימור: מצביע כמו סקר, בלי תשובה נכונה ובלי ניקוד משלו — רק מה שנוגע להצבעה.
+  if (type === 'bet') {
+    return ['groupRestriction', 'allowChangeVote', 'liveVoteCounts', 'automaticSkip', 'slidBackgroundMedia'];
   }
   if (type === 'subject') return ['slidBackgroundMedia'];
   return [];

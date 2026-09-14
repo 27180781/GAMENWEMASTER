@@ -9,7 +9,8 @@ import { isVotableSlide, type GameFile } from '../engine/index.ts';
 /** כמה שאלות (שקופיות מצביעות) כבר הושלמו, לפי slidesCompleted מהמנוע. */
 export function completedQuestionCount(game: GameFile, slidesCompleted: number[]): number {
   const done = new Set(slidesCompleted);
-  return game.questions.filter((q) => isVotableSlide(q) && done.has(q.id)).length;
+  // הימור מצביע אבל אינו שאלה — לא מזיז את הספירה.
+  return game.questions.filter((q) => isVotableSlide(q) && q.type !== 'bet' && done.has(q.id)).length;
 }
 
 /**

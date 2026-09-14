@@ -133,7 +133,7 @@ export function SlideAdvanced({
         </div>
 
         <div className="sa-body">
-          {shown.has('multiCorrect') && (
+          {shown.has('multiCorrect') && !setting.majorityDecides && (
             <>
               <Toggle
                 label="אפשר מספר תשובות נכונות"
@@ -148,6 +148,35 @@ export function SlideAdvanced({
               <p className="sa-hint">
                 כשדולק אפשר לסמן יותר מתשובה אחת כנכונה בטופס התשובות, וכל מי
                 שבחר באחת מהן מקבל את מלוא הניקוד.
+              </p>
+            </>
+          )}
+
+          {shown.has('majorityDecides') && (
+            <>
+              <Toggle
+                label="הרוב קובע את התשובה"
+                checked={setting.majorityDecides}
+                onChange={(on) => {
+                  // כשדולק אין תשובה נכונה מראש — מנקים סימון קיים (וסימון מרובה).
+                  // כשמכבים, טריוויה חייבת נכונה אחת — חוזרים לראשונה.
+                  onMultiCorrect(false);
+                  patch((s) => {
+                    const cleared = {
+                      ...s,
+                      setting: { ...s.setting, majorityDecides: on },
+                      question: {
+                        ...s.question,
+                        answers: s.question.answers.map((a) => ({ ...a, correct: false })),
+                      },
+                    };
+                    return on || s.type !== 'trivia' ? cleared : collapseToSingleCorrect(cleared);
+                  });
+                }}
+              />
+              <p className="sa-hint">
+                אין תשובה נכונה מראש: בסיום ההצבעה התשובה שרוב העונים בחרו נעשית הנכונה
+                (בתיקו — כל התשובות שבראש), ומי שבחר בה מקבל את הניקוד.
               </p>
             </>
           )}
@@ -188,6 +217,20 @@ export function SlideAdvanced({
               checked={setting.allowChangeVote}
               onChange={(on) => setSetting({ allowChangeVote: on })}
             />
+          )}
+
+          {shown.has('liveVoteCounts') && (
+            <>
+              <Toggle
+                label="הצגת ההצבעות בזמן אמת"
+                checked={setting.liveVoteCounts}
+                onChange={(on) => setSetting({ liveVoteCounts: on })}
+              />
+              <p className="sa-hint">
+                בזמן ההצבעה מוצג ליד כל תשובה כמה בחרו בה — הקהל רואה איפה הרוב ואם יש
+                אפקט עדר.
+              </p>
+            </>
           )}
 
           {shown.has('firstClicker') && (

@@ -53,6 +53,8 @@ export function descendingScoreOf(slide: Slide): { maxScore: number; durationMs:
 export function scoredLikeTrivia(slide: Slide): boolean {
   if (slide.type === 'trivia') return true;
   if (slide.type !== 'ans_images') return false;
+  // "הרוב קובע" — הנכונה תיקבע בסגירה; עד אז אין סימון, אבל השקופית מנוקדת.
+  if (slide.setting.majorityDecides) return true;
   const answers = slide.question.answers;
   return answers.some((a) => a.correct) && answers.some((a) => !a.correct);
 }

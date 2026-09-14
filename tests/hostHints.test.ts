@@ -50,6 +50,21 @@ describe('hostKeyHints — פעולת הרווח לפי שלב', () => {
   it('שקופית אחרונה → סיום המשחק', () => {
     expect(space({ phase: 'results', revealCorrect: true, hasNextSlide: false })).toBe('סיום המשחק');
   });
+  it('★ תוצאות הימור ממתינות → הרווח פותח אותן; כשהמסך פתוח → סוגר וממשיך', () => {
+    expect(space({ phase: 'results', revealCorrect: true, betPending: true })).toBe('תוצאות ההימור');
+    expect(space({ phase: 'results', revealCorrect: true, betOverlay: true })).toBe('המשך (סגירת תוצאות ההימור)');
+    // בלי הימור ממתין — כרגיל
+    expect(space({ phase: 'results', revealCorrect: true, betPending: false })).toBe('השקופית הבאה');
+  });
+  it('★ שקופית הימור — הניסוח מדבר על הימור ולא על שאלה', () => {
+    const bet = { slideType: 'bet', votable: true };
+    expect(space({ ...bet, questionShown: false })).toBe('הצגת ההימור');
+    expect(space({ ...bet, questionShown: true, answersShown: 1 })).toBe('הצגת אפשרות הימור');
+    expect(space({ ...bet, questionShown: true, answersShown: 4 })).toBe('פתיחת ההימור + טיימר');
+    expect(space({ ...bet, phase: 'voting' })).toBe('סגירת ההימור');
+    expect(space({ ...bet, phase: 'results', revealCorrect: false })).toBe('חשיפת ההימורים');
+    expect(space({ ...bet, phase: 'results', revealCorrect: true })).toBe('השקופית הבאה');
+  });
 });
 
 describe('hostKeyHints — מקשי מספרים לפי הקשר', () => {

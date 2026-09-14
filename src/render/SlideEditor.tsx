@@ -12,6 +12,8 @@ import { useEffect, useState } from 'react';
 import { questionLabel, type GameFile, type Slide } from '../engine/index.ts';
 import {
   addAnswer,
+  BET_KINDS,
+  defaultBetConfig,
   addSlide,
   changeSlideType,
   SLIDE_TYPES,
@@ -219,6 +221,103 @@ function FunctionConfigFields({
           path={[...base, section.key]}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * הגדרות שקופית ההימור: לכל כרטיס — סוג האפשרות (בלי / אחוז / סכום קבוע / הכול),
+ * הערך, ומכפיל זכייה פרטי; ולמטה מכפיל כללי ו"אפשר ניקוד שלילי". הכיתוב על
+ * הכרטיס הוא התשובה עצמה (נערך ברשימת התשובות).
+ */
+function BetConfigFields({ slide, patch }: { slide: Slide; patch: (updater: (s: Slide) => Slide) => void }) {
+  const cfg = slide.bet ?? defaultBetConfig(slide.question.answers.length);
+  const setConfig = (next: Partial<typeof cfg>) => patch((s) => ({ ...s, bet: { ...(s.bet ?? cfg), ...next } }));
+  const setOption = (i: number, part: Record<string, unknown>) =>
+    patch((s) => {
+      const base = s.bet ?? cfg;
+      const options = base.options.map((o, j) => (j === i ? { ...o, ...part } : o));
+      return { ...s, bet: { ...base, options } };
+    });
+  return (
+    <div className="se-bet">
+      <label className="se-label">אפשרויות ההימור (לפי סדר הכרטיסים)</label>
+      {slide.question.answers.map((a, i) => {
+        const o = cfg.options[i] ?? { kind: 'none' };
+        const needsValue = o.kind === 'percent' || o.kind === 'fixed';
+        return (
+          <div className="se-bet-row" key={`${slide.id}-bet-${i}`}>
+            <span className="se-bet-num">{i + 1}</span>
+            <span className="se-bet-ans" title={a.ans}>
+              {a.ans}
+            </span>
+            <select
+              className="se-input se-bet-kind"
+              value={o.kind}
+              onChange={(e) => {
+                const kind = e.target.value;
+                setOption(i, {
+                  kind,
+                  ...(kind === 'percent' ? { value: o.value && o.value <= 100 ? o.value : 50 } : {}),
+                  ...(kind === 'fixed' ? { value: o.value && o.value > 0 ? o.value : 100 } : {}),
+                });
+              }}
+            >
+              {BET_KINDS.map((k) => (
+                <option key={k.value} value={k.value}>
+                  {k.label}
+                </option>
+              ))}
+            </select>
+            {needsValue && (
+              <input
+                className="se-input se-bet-val"
+                type="number"
+                min={1}
+                max={o.kind === 'percent' ? 100 : 100000}
+                title={o.kind === 'percent' ? 'אחוז מהניקוד' : 'נקודות'}
+                value={o.value ?? 0}
+                onChange={(e) => setOption(i, { value: Number(e.target.value) || 0 })}
+              />
+            )}
+            {o.kind !== 'none' && (
+              <input
+                className="se-input se-bet-val"
+                type="number"
+                min={0.5}
+                step={0.5}
+                title="מכפיל זכייה לאפשרות זו (ריק = הכללי)"
+                placeholder={`×${cfg.payout}`}
+                value={o.payout ?? ''}
+                onChange={(e) => setOption(i, { payout: e.target.value === '' ? undefined : Number(e.target.value) || 1 })}
+              />
+            )}
+          </div>
+        );
+      })}
+      <div className="se-bet-row">
+        <span className="se-bet-ans">מכפיל זכייה כללי (1 = כפול או כלום)</span>
+        <input
+          className="se-input se-bet-val"
+          type="number"
+          min={0.5}
+          step={0.5}
+          value={cfg.payout}
+          onChange={(e) => setConfig({ payout: Number(e.target.value) > 0 ? Number(e.target.value) : 1 })}
+        />
+        <label className="se-bet-ans">
+          <input
+            type="checkbox"
+            checked={cfg.allowNegative}
+            onChange={(e) => setConfig({ allowNegative: e.target.checked })}
+          />{' '}
+          אפשר ניקוד שלילי
+        </label>
+      </div>
+      <p className="se-type-note">
+        ההימור חל על השאלה המנוקדת הבאה: מי שעונה עליה נכון מקבל את ההימור כפול המכפיל, מי
+        שטועה או לא עונה מאבד אותו. גובה ההימור נקבע מהניקוד ברגע סגירת ההימור.
+      </p>
     </div>
   );
 }
@@ -487,6 +586,8 @@ export function SlideForm({
           </>
         )}
 
+        {slide.type === 'bet' && <BetConfigFields slide={slide} patch={patch} />}
+
         {votable && (
           <div className="se-answers-wrap">
             <label className="se-label">תשובות</label>
@@ -497,6 +598,7 @@ export function SlideForm({
                       בחירה יחידה — אחרת אי אפשר היה לסמן שתי תשובות נכונות
                       בעורך המקומי, אף שהמנוע והמערכת המקוונת תומכים בכך. */}
                   {slide.type === 'trivia' &&
+                    !slide.setting.majorityDecides &&
                     (multiCorrect ? (
                       <input
                         type="checkbox"
@@ -559,13 +661,15 @@ export function SlideForm({
             max={120}
             onSet={(n) => patch((s) => ({ ...s, question: { ...s.question, timeForQue: n } }))}
           />
-          <NumberSlider
-            label="ניקוד"
-            value={slide.question.scoreForQue}
-            min={0}
-            max={50}
-            onSet={(n) => patch((s) => ({ ...s, question: { ...s.question, scoreForQue: n } }))}
-          />
+          {slide.type !== 'bet' && (
+            <NumberSlider
+              label="ניקוד"
+              value={slide.question.scoreForQue}
+              min={0}
+              max={50}
+              onSet={(n) => patch((s) => ({ ...s, question: { ...s.question, scoreForQue: n } }))}
+            />
+          )}
         </div>
 
         <label className="se-label">מדיה</label>
