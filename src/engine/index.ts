@@ -4,6 +4,7 @@ export * from './classify.ts';
 export * from './questionMode.ts';
 export * from './scoreAdjust.ts';
 export * from './scoring.ts';
+export * from './imageReveal.ts';
 export * from './gameEngine.ts';
 export * from './replayAdapter.ts';
 export type {

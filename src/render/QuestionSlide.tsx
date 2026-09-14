@@ -18,9 +18,12 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
   descendingScoreAt,
   descendingScoreOf,
+  imageRevealBlurFor,
+  imageRevealOf,
   isImageQuestion,
   scoredLikeTrivia,
   showsSideImage,
+  type GamePhase,
   type GameState,
   type Slide,
 } from '../engine/index.ts';
@@ -203,6 +206,62 @@ function ScoreCountdown({
   );
 }
 
+/**
+ * תמונת שאלה שמתבהרת עם הטיימר (setting.imageReveal) — «מה יש בתמונה?».
+ *
+ * מטושטשת לגמרי לפני ההצבעה, מתבהרת ברציפות בזמן ההצבעה לפי אותו שעון של
+ * הניקוד היורד (TimerView.elapsedMs + השלמה ב-rAF בין הדגימות, קפוא בעצירת
+ * המנחה), וחדה משנסגרה ההצבעה. הנוסחה — imageRevealBlurFor — של המנוע.
+ */
+function RevealImage({
+  src,
+  alt,
+  className,
+  reveal,
+  phase,
+  timer,
+}: {
+  src: string;
+  alt: string;
+  className: string;
+  reveal: { blur: number; durationMs: number };
+  phase: GamePhase;
+  timer: TimerView | null;
+}) {
+  const timerRef = useRef(timer);
+  timerRef.current = timer;
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+  const liveBlur = () => {
+    const t = timerRef.current;
+    const elapsed = t === null ? null : t.elapsedMs + (t.paused ? 0 : Math.max(0, Date.now() - t.sampledAt));
+    // רבע פיקסל — מספיק חלק לעין, ולא רינדור על כל שבריר שינוי
+    return Math.round(imageRevealBlurFor(phaseRef.current, reveal.blur, elapsed, reveal.durationMs) * 4) / 4;
+  };
+  const [blur, setBlur] = useState(liveBlur);
+
+  useEffect(() => {
+    let frame = 0;
+    const tick = () => {
+      setBlur(liveBlur());
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+    // liveBlur קורא רק מ-ref-ים ומהפרמטרים שברשימה — לולאה אחת לכל שקופית.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reveal.blur, reveal.durationMs]);
+
+  return (
+    <img
+      className={`${className} q-reveal-img`}
+      src={src}
+      alt={alt}
+      style={blur > 0 ? { filter: `blur(${blur}px)` } : undefined}
+    />
+  );
+}
+
 /** סימון קטן של עוגת סקר (תלת-מימדי) — ליד השאלה בשקופית סקר. */
 function SurveyIcon() {
   return <span className="q-survey-icon" title="שאלת סקר" aria-label="סקר" />;
@@ -263,7 +322,7 @@ export function QuestionSlide({
   state,
   ansIsNumber,
   timer,
-  reveal,
+  reveal: revealState,
   players,
   leaders,
   title,
@@ -291,11 +350,11 @@ export function QuestionSlide({
   const ansRows = Math.max(1, Math.ceil(answers.length / 2));
   const answersGridVars = { '--ans-rows': ansRows } as CSSProperties;
 
-  // חשיפת הפילוח/התשובה הנכונה היא צעד מפורש (reveal.revealCorrect) בכל סוגי
+  // חשיפת הפילוח/התשובה הנכונה היא צעד מפורש (revealState.revealCorrect) בכל סוגי
   // השקופיות ההצבעה — trivia, סקר ותמונות כאחד. תום הטיימר רק *סוגר* את ההצבעה
   // ואינו חושף מעצמו; החשיפה קורית בלחיצה (או אוטומטית כש-showCorrectAnswerAfterTimer
   // דלוק). כך "מעבר אוטומטי כבוי" באמת עוצר אחרי הטיימר עד ללחיצה.
-  const revealed = reveal.revealCorrect;
+  const revealed = revealState.revealCorrect;
   /**
    * האם יש לשקופית "תשובה נכונה" להצביע עליה בחשיפה.
    *
@@ -307,7 +366,7 @@ export function QuestionSlide({
   const marksCorrect =
     isTrivia || (isImages && answers.some((a) => a.correct) && answers.some((a) => !a.correct));
   // פס מובילים מוצג רק ב-trivia אחרי חשיפת התשובה הנכונה.
-  const showBoard = reveal.revealCorrect && isTrivia && leaders.length > 0;
+  const showBoard = revealState.revealCorrect && isTrivia && leaders.length > 0;
 
   // שאלת תמונה: התמונה היא נוסח השאלה, ולכן היא מוצגת בבועת השאלה — ולא גם
   // ככרטיס בצד. ראו questionMode.ts.
@@ -320,6 +379,8 @@ export function QuestionSlide({
   const timerFrac = timer && timer.total > 0 ? Math.max(0, timer.remaining / timer.total) : 1;
   // ניקוד יורד — רק בשקופית שמנוקדת "כמו טריוויה" (ראו scoring.ts), ורק כשדולק.
   const descending = scoredLikeTrivia(slide) ? descendingScoreOf(slide) : null;
+  // חשיפה הדרגתית של תמונת השאלה — כשדולקת ויש תמונה (ראו imageReveal.ts).
+  const reveal = imageRevealOf(slide);
 
   // אחוז שענו נכון (מתוך מי שענה) — לפס הירוק/אדום החי בתחתית, בזמן ההצבעה.
   const correctCount = answers
@@ -357,8 +418,12 @@ export function QuestionSlide({
         {/* תמונת השאלה — כרטיס ממוסגר בצד המסך (מעוגן ל-q-content, לא לבועת
             השאלה שיש לה transform). מוצגת יחד עם השאלה. */}
         {hasImage && (
-          <div className={`q-question-image${reveal.questionShown ? '' : ' reveal-hidden'}`}>
-            <img src={slide.question.src} alt="" />
+          <div className={`q-question-image${revealState.questionShown ? '' : ' reveal-hidden'}`}>
+            {reveal !== null ? (
+              <RevealImage src={slide.question.src} alt="" className="" reveal={reveal} phase={state.phase} timer={timer} />
+            ) : (
+              <img src={slide.question.src} alt="" />
+            )}
           </div>
         )}
 
@@ -380,11 +445,22 @@ export function QuestionSlide({
             </div>
           )}
 
-          <div className={`q-question${reveal.questionShown ? '' : ' reveal-hidden'}`}>
+          <div className={`q-question${revealState.questionShown ? '' : ' reveal-hidden'}`}>
             <div className="q-question-row">
               {isSurvey && <SurveyIcon />}
               {imageQuestion ? (
-                <img className="q-question-main-image" src={slide.question.src} alt="שאלה" />
+                reveal !== null ? (
+                  <RevealImage
+                    src={slide.question.src}
+                    alt="שאלה"
+                    className="q-question-main-image"
+                    reveal={reveal}
+                    phase={state.phase}
+                    timer={timer}
+                  />
+                ) : (
+                  <img className="q-question-main-image" src={slide.question.src} alt="שאלה" />
+                )
               ) : (
                 /* min נמוך במכוון: עדיף שאלה ארוכה בפונט קטן על שאלה שסופה נעלם. */
                 <FitText className="q-question-text" min={13}>
@@ -402,7 +478,7 @@ export function QuestionSlide({
             style={isImages ? imagesGridVars : answersGridVars}
           >
             {answers.map((answer, index) => {
-              const shown = index < reveal.answersShown;
+              const shown = index < revealState.answersShown;
               const count = counts[String(answer.id)] ?? 0;
               const percent = total > 0 ? Math.round((count / total) * 100) : 0;
               const correct = revealed && marksCorrect && answer.correct;

@@ -27,7 +27,7 @@ const triviaSlide = (): Slide =>
   makeGame([rawSlide({ id: 1, type: 'trivia', que: 'ש', answers: ANSWERS })]).questions[0]!;
 
 describe('אילו הגדרות מתקדמות מוצגות לכל סוג שקופית', () => {
-  it('★ טריוויה — שמונה ההגדרות, בסדר של העורך המקוון', () => {
+  it('★ טריוויה — תשע ההגדרות, בסדר של העורך המקוון', () => {
     expect(advancedSettingsFor('trivia')).toEqual([
       'multiCorrect',
       'groupRestriction',
@@ -37,18 +37,21 @@ describe('אילו הגדרות מתקדמות מוצגות לכל סוג שקו
       'slidBackgroundMedia',
       'scoringReduction',
       'descendingScore',
+      'imageReveal',
     ]);
   });
 
-  it('★ תשובה בתמונה — הכול חוץ מ"מספר תשובות נכונות" (המתג שלה מעל התשובות); ניקוד יורד כן', () => {
+  it('★ תשובה בתמונה — הכול חוץ מ"מספר תשובות נכונות" (המתג שלה מעל התשובות); ניקוד יורד וחשיפה כן', () => {
     expect(advancedSettingsFor('ans_images')).not.toContain('multiCorrect');
     expect(advancedSettingsFor('ans_images')).toContain('descendingScore');
-    expect(advancedSettingsFor('ans_images')).toHaveLength(7);
+    expect(advancedSettingsFor('ans_images')).toContain('imageReveal');
+    expect(advancedSettingsFor('ans_images')).toHaveLength(8);
   });
 
-  it('★ סקר — בלי "מספר תשובות נכונות" ובלי ניקוד יורד: אין בו תשובה נכונה לנקד', () => {
+  it('★ סקר — בלי "מספר תשובות נכונות", בלי ניקוד יורד ובלי חשיפה: אין בו תשובה נכונה', () => {
     expect(advancedSettingsFor('survey')).not.toContain('multiCorrect');
     expect(advancedSettingsFor('survey')).not.toContain('descendingScore');
+    expect(advancedSettingsFor('survey')).not.toContain('imageReveal');
     expect(advancedSettingsFor('survey')).toHaveLength(6);
   });
 

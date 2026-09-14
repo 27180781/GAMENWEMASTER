@@ -7,7 +7,12 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { DEFAULT_DESCENDING_MAX_SCORE, type GameFile, type Slide } from '../engine/index.ts';
+import {
+  DEFAULT_DESCENDING_MAX_SCORE,
+  DEFAULT_IMAGE_REVEAL_BLUR,
+  type GameFile,
+  type Slide,
+} from '../engine/index.ts';
 import { parseGameUsers } from '../app/roster.ts';
 import {
   advancedSettingsFor,
@@ -313,6 +318,40 @@ export function SlideAdvanced({
                   <p className="sa-hint">
                     הניקוד צולל ברציפות מהמקסימום לאפס לאורך זמן המענה, ומי שעונה נכון
                     מקבל את המספר שהיה על המסך ברגע הלחיצה. מחליף את ניקוד השאלה.
+                  </p>
+                </>
+              )}
+            </>
+          )}
+
+          {shown.has('imageReveal') && (
+            <>
+              <Toggle
+                label="התמונה מתבהרת עם הטיימר"
+                checked={setting.imageReveal.active}
+                onChange={(on) =>
+                  setSetting({
+                    imageReveal: {
+                      active: on,
+                      blur: setting.imageReveal.blur > 0 ? setting.imageReveal.blur : DEFAULT_IMAGE_REVEAL_BLUR,
+                    },
+                  })
+                }
+              />
+              {setting.imageReveal.active && (
+                <>
+                  <NumBox
+                    label="עוצמת טשטוש (px)"
+                    value={setting.imageReveal.blur}
+                    min={4}
+                    max={200}
+                    onSet={(n) => setSetting({ imageReveal: { active: true, blur: n } })}
+                  />
+                  <p className="sa-hint">
+                    תמונת השאלה מוצגת מטושטשת לגמרי, מתבהרת בהדרגה לאורך זמן המענה וחדה
+                    כשהטיימר נגמר. יחד עם ניקוד יורד — מי שמזהה מוקדם מקבל יותר.
+                    {slide.question.src.trim() === '' &&
+                      ' לשקופית זו אין עדיין תמונת שאלה — האפקט יופיע רק אחרי שתוסיף אחת.'}
                   </p>
                 </>
               )}
