@@ -522,6 +522,9 @@ body {
   opacity: 0.85;
 }
 .q-score-drop--low .q-score-drop-num { animation: numPulse 0.5s ease-in-out infinite; }
+/* תמונת שאלה שמתבהרת עם הטיימר (RevealImage): הערך מתעדכן בכל פריים; המעבר
+   הקצר מרכך את הקפיצה לחדות מלאה כשההצבעה נסגרת. */
+.q-reveal-img { transition: filter 0.3s linear; will-change: filter; }
 
 /* כרטיס השאלה */
 .q-question {

@@ -8,7 +8,7 @@
  * `showInLoop`, `correctlyAnsweredBefore`). הם שרידים מהמערכת הישנה, לעורך
  * המקוון אין להם פקד, ומחבר משחק שהיה מזיז אותם לא היה רואה שום שינוי.
  *
- * לכן הרשימה כאן מוצהרת: **שמונה** ההגדרות שהעורך המקוון מציע, בסדר שלו. השדות
+ * לכן הרשימה כאן מוצהרת: **תשע** ההגדרות שהעורך המקוון מציע, בסדר שלו. השדות
  * האחרים ממשיכים להישמר בקובץ כרגיל — פשוט אין להם פקד, כמו באונליין.
  *
  * טהור (בלי React) כדי שיהיה ניתן לבדיקה.
@@ -24,7 +24,8 @@ export type AdvancedSetting =
   | 'automaticSkip'
   | 'slidBackgroundMedia'
   | 'scoringReduction'
-  | 'descendingScore';
+  | 'descendingScore'
+  | 'imageReveal';
 
 /** הסדר שבו ההגדרות מוצגות בחלון — זהה לסדר שבעורך המקוון. */
 const FULL: AdvancedSetting[] = [
@@ -36,17 +37,18 @@ const FULL: AdvancedSetting[] = [
   'slidBackgroundMedia',
   'scoringReduction',
   'descendingScore',
+  'imageReveal',
 ];
 
 /**
  * אילו הגדרות מוצגות לסוג שקופית נתון.
  *
- * • טריוויה — כל השמונה.
+ * • טריוויה — כל התשע.
  * • תשובה בתמונה — הכול חוץ מ"מספר תשובות נכונות" (המתג שלה יושב מעל רשימת
  *   התשובות, כמו באונליין). ניקוד יורד כן — היא מנוקדת כמו טריוויה כשסומנה
- *   בה תשובה נכונה (ראו scoring.ts).
- * • סקר — בלי "מספר תשובות נכונות" ובלי ניקוד יורד: אין בו תשובה נכונה ולכן
- *   אין מה לנקד, ומתג שלא עושה כלום הוא בדיוק מה שביקשנו להוציא מהחלון הזה.
+ *   בה תשובה נכונה (ראו scoring.ts); וגם חשיפה הדרגתית של תמונת השאלה.
+ * • סקר — בלי "מספר תשובות נכונות", בלי ניקוד יורד ובלי חשיפה הדרגתית: אין בו
+ *   תשובה נכונה, ומתג שלא עושה כלום הוא בדיוק מה שביקשנו להוציא מהחלון הזה.
  * • טקסט — רק רקע ספציפי; אין בה הצבעה.
  * • מדיה / פונקציה — אין חלון מתקדם בכלל.
  */
@@ -54,7 +56,7 @@ export function advancedSettingsFor(type: string): AdvancedSetting[] {
   if (type === 'trivia') return FULL;
   if (type === 'ans_images') return FULL.filter((s) => s !== 'multiCorrect');
   if (type === 'survey') {
-    return FULL.filter((s) => s !== 'multiCorrect' && s !== 'descendingScore');
+    return FULL.filter((s) => s !== 'multiCorrect' && s !== 'descendingScore' && s !== 'imageReveal');
   }
   if (type === 'subject') return ['slidBackgroundMedia'];
   return [];

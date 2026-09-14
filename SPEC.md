@@ -103,6 +103,7 @@ interface SlideSettings {
   fullscreen: boolean;
   scoringReduction: { active: boolean; seconds: number | ""; score: number | "" }; // הפחתת ניקוד אחרי X שניות
   descendingScore?: { active: boolean; maxScore: number | "" }; // ניקוד יורד: צולל מ-maxScore לאפס לאורך timeForQue; חסר = כבוי, "" = 1000
+  imageReveal?: { active: boolean; blur: number | "" }; // תמונת השאלה מטושטשת ב-blur px לפני ההצבעה, מתבהרת לאורך timeForQue, חדה בסגירה; חסר = כבוי, "" = 48
   slidBackgroundMedia: { src: string };
   automaticSkip: { active: boolean; seconds: number | "" };  // מעבר אוטומטי
   showInLoop: boolean;
@@ -281,6 +282,7 @@ interface BackupTarget {
 ## 9. UI ועיצוב
 
 - **מסכים:** טעינה (progress) → מסך פתיחה/התחברות (gameMedia + סאונד playersConnecting + מונה מחוברים אם זמין) → שקופיות המשחק → זוכים (winnersMedia) → רשימת זוכים (winnersListMedia).
+- **חשיפה הדרגתית של תמונת השאלה** (`setting.imageReveal`): לפני ההצבעה התמונה (לצד הטקסט או במקומו) מטושטשת ב-`blur` פיקסלים; עם פתיחת הטיימר הטשטוש יורד ברציפות בכל פריים לפי אותו שעון של הניקוד היורד (עצירת מנחה מקפיאה, הארכה לא משנה את הקצב), וכשההצבעה נסגרת התמונה חדה. `imageReveal.ts` + `RevealImage` ב-QuestionSlide.
 - צבעים מ-`mainColor`/`secondaryColor` (כולל אלפא 8 ספרות) כ-CSS variables.
 - טיפוגרפיה גדולה לקריאה ממרחק (שאלה ≥ 48px על מסך מלא), אנימציות מעבר עדינות, ברים של התפלגות הצבעות מתעדכנים חלק.
 - טיימר עיגול/בר בולט + סאונד טיימר.

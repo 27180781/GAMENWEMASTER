@@ -72,6 +72,18 @@ export const slideSettingsSchema = z.object({
     })
     .optional()
     .default({ active: false, maxScore: 1000 }),
+  /**
+   * חשיפה הדרגתית של תמונת השאלה: מטושטשת ב-`blur` פיקסלים לפני ההצבעה,
+   * מתבהרת ברציפות לאורך `timeForQue` וחדה כשההצבעה נסגרת (ראו imageReveal.ts).
+   * אופציונלי עם ברירת מחדל כבויה; ‎""‎ ב-`blur` (כלל הריקון) מנורמל ל-48.
+   */
+  imageReveal: z
+    .object({
+      active: z.boolean().optional().default(false),
+      blur: emptyableNumber(48).optional().default(48),
+    })
+    .optional()
+    .default({ active: false, blur: 48 }),
   slidBackgroundMedia: mediaRef,
   automaticSkip: z.object({
     active: z.boolean(),

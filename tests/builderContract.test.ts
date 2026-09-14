@@ -35,6 +35,7 @@ const DOC_SLIDE = {
     automaticSkip: { active: true, seconds: 12 },
     scoringReduction: { active: true, seconds: 8, score: 2 },
     descendingScore: { active: true, maxScore: 1000 },
+    imageReveal: { active: true, blur: 48 },
     slidBackgroundMedia: { src: 'Assets/question-0-slidbg.jpg' },
     groupRestriction: { active: true, groupName: 'קבוצה א' },
     slideStartVoting: true,
@@ -121,6 +122,7 @@ describe('סעיף 4 — כל שדה במיפוי מגיע למנוע', () => {
     expect(slide.setting.automaticSkip).toEqual({ active: true, seconds: 12 });
     expect(slide.setting.scoringReduction).toEqual({ active: true, seconds: 8, score: 2 });
     expect(slide.setting.descendingScore).toEqual({ active: true, maxScore: 1000 });
+    expect(slide.setting.imageReveal).toEqual({ active: true, blur: 48 });
     expect(slide.setting.slidBackgroundMedia.src).toBe('Assets/question-0-slidbg.jpg');
     expect(slide.setting.groupRestriction).toEqual({ active: true, groupName: 'קבוצה א' });
   });
@@ -192,6 +194,7 @@ describe('סעיף 5 — כלל הריקון', () => {
       automaticSkip: { active: false, seconds: '' },
       scoringReduction: { active: false, seconds: '', score: '' },
       descendingScore: { active: false, maxScore: '' },
+      imageReveal: { active: false, blur: '' },
     },
   };
 
@@ -203,6 +206,7 @@ describe('סעיף 5 — כלל הריקון', () => {
     expect(slide.setting.scoringReduction.seconds).toBe(0);
     expect(slide.setting.scoringReduction.score).toBe(0);
     expect(slide.setting.descendingScore).toEqual({ active: false, maxScore: 1000 });
+    expect(slide.setting.imageReveal).toEqual({ active: false, blur: 48 });
   });
 
   it('אותו כלל בשקופית מדיה ובשקופית פונקציה', () => {
