@@ -4,7 +4,9 @@
  *
  * הזרימה זהה לשאלה (המנחה חושף את ההנחיה, את הכרטיסים אחד-אחד, פותח את
  * ההצבעה עם הטיימר וסוגר), ובחשיפה — במקום תשובה נכונה — מוצג פילוח
- * ההימורים, כמה נקודות על הכף ומי המהמרים הגדולים. ההכרעה עצמה מוצגת אחרי
+ * ההימורים בדיוק כמו בסקר (עוגה + כמה מהמרים על כל כרטיס), כמה נקודות על
+ * הכף ומי המהמרים הגדולים. אין כאן כרטיס "נכון" או "מנצח": כל משתתף מהמר על
+ * הכרטיס שהוא עצמו בחר, ולכן שום כרטיס אינו מודגש. ההכרעה עצמה מוצגת אחרי
  * חשיפת התשובה בשאלה הבאה (BetResultsOverlay).
  */
 
@@ -20,7 +22,7 @@ import {
 import { slideGroupRestriction } from '../app/groupRestriction.ts';
 import { FitText } from './FitText.tsx';
 import { displayText } from './multiline.ts';
-import { ANSWER_LETTERS, COIN_COLORS, Flyers, type RailPlayer, type RevealState } from './QuestionSlide.tsx';
+import { ANSWER_LETTERS, COIN_COLORS, Flyers, SurveyPie, type RailPlayer, type RevealState } from './QuestionSlide.tsx';
 import type { TimerView } from './TimerRing.tsx';
 
 /** ההנחיה כשהמחבר השאיר את הנוסח ריק. */
@@ -115,6 +117,11 @@ export function BetSlide({
             </div>
           </div>
 
+          {revealed ? (
+            // בחשיפה — הפילוח, כמו בסקר: כמה מהמרים על כל כרטיס. בלי כרטיס
+            // מודגש, כי אין כאן תשובה נכונה — ההימור של כל אחד הוא מה שבחר.
+            <SurveyPie answers={answers} counts={counts} total={total} />
+          ) : (
           <ul className="q-answers bet-answers" style={answersGridVars}>
             {answers.map((answer, index) => {
               const shown = index < reveal.answersShown;
@@ -125,19 +132,13 @@ export function BetSlide({
               const option = betOptionFor(config, answer.id);
               const sub = describeBetOption(option, config);
               const isNone = option === null || option.kind === 'none';
-              // בחשיפה: האפשרות הפופולרית ביותר מודגשת — "לאן הלך העדר"
-              const maxCount = revealed ? Math.max(0, ...answers.map((a) => counts[String(a.id)] ?? 0)) : 0;
-              const lead = revealed && count > 0 && count === maxCount;
               return (
                 <li
                   key={answer.id}
-                  className={`q-card bet-card${shown ? '' : ' reveal-hidden'}${isNone ? ' bet-card--none' : ''}${lead ? ' bet-card--lead' : ''}`}
+                  className={`q-card bet-card${shown ? '' : ' reveal-hidden'}${isNone ? ' bet-card--none' : ''}`}
                 >
-                  <span
-                    className={`q-coin${revealed ? ' q-coin--reveal' : ''}`}
-                    style={{ background: coin.bg, color: coin.fg }}
-                  >
-                    {revealed ? `${percent}%` : label}
+                  <span className="q-coin" style={{ background: coin.bg, color: coin.fg }}>
+                    {label}
                   </span>
                   <span className="bet-card-body">
                     <FitText className="q-card-text bet-card-text" min={11}>
@@ -155,6 +156,7 @@ export function BetSlide({
               );
             })}
           </ul>
+          )}
         </div>
 
         <div className={`q-footer${summary !== null ? ' q-footer--bet' : ''}`}>

@@ -269,8 +269,11 @@ function SurveyIcon() {
   return <span className="q-survey-icon" title="שאלת סקר" aria-label="סקר" />;
 }
 
-/** פילוח סקר בחשיפה — עוגה צבועה לפי צבעי התשובות + מקראה עם מספר העונים. */
-function SurveyPie({
+/**
+ * פילוח סקר בחשיפה — עוגה צבועה לפי צבעי התשובות + מקראה עם מספר העונים.
+ * משמש גם את שקופית ההימור (BetSlide): שם אלה הכרטיסים ומספר המהמרים על כל אחד.
+ */
+export function SurveyPie({
   answers,
   counts,
   total,
