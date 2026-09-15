@@ -897,6 +897,8 @@ body {
   background: rgba(255, 255, 255, 0.96);
   color: #111827;
   text-shadow: none;
+  /* קו מתאר עדין — כשכמה הצבעות נכנסות יחד הבועות נערמות, וכך נבדלות זו מזו */
+  border: 1px solid rgba(17, 24, 39, 0.14);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
 }
 .q-flyer--bubble .q-flyer-nm::before {
