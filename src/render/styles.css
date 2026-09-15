@@ -887,6 +887,31 @@ body {
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
 }
 .q-flyer-nm { font-weight: 800; font-size: 19px; color: #fff; white-space: nowrap; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7); }
+/* setting.voterNameStyle = 'bubble' — השם בבועת דיבור לבנה, הזנב לכיוון האווטר
+   (inset-inline-start: בדף RTL האווטר יושב מימין לשם) */
+.q-flyer--bubble { gap: 14px; }
+.q-flyer--bubble .q-flyer-nm {
+  position: relative;
+  padding: 8px 18px 9px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #111827;
+  text-shadow: none;
+  /* קו מתאר עדין — כשכמה הצבעות נכנסות יחד הבועות נערמות, וכך נבדלות זו מזו */
+  border: 1px solid rgba(17, 24, 39, 0.14);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+.q-flyer--bubble .q-flyer-nm::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  inset-inline-start: -6px;
+  width: 14px;
+  height: 14px;
+  background: inherit;
+  border-radius: 3px;
+  transform: translateY(-50%) rotate(45deg);
+}
 
 @keyframes pulseDot { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(0.55); opacity: 0.5; } }
 @keyframes qpop { 0% { transform: translateY(16px) scale(0.98); opacity: 0; } 100% { transform: translateY(0) scale(1); opacity: 1; } }

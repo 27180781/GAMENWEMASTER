@@ -22,7 +22,15 @@ import {
 import { slideGroupRestriction } from '../app/groupRestriction.ts';
 import { FitText } from './FitText.tsx';
 import { displayText } from './multiline.ts';
-import { ANSWER_LETTERS, COIN_COLORS, Flyers, SurveyPie, type RailPlayer, type RevealState } from './QuestionSlide.tsx';
+import {
+  ANSWER_LETTERS,
+  COIN_COLORS,
+  Flyers,
+  SurveyPie,
+  type RailPlayer,
+  type RevealState,
+  type VoterNameStyle,
+} from './QuestionSlide.tsx';
 import type { TimerView } from './TimerRing.tsx';
 
 /** ההנחיה כשהמחבר השאיר את הנוסח ריק. */
@@ -35,6 +43,8 @@ interface BetSlideProps {
   timer: TimerView | null;
   reveal: RevealState;
   players: RailPlayer[];
+  /** סגנון השם המתעופף (setting.voterNameStyle); חסר = טקסט על הרקע. */
+  voterNameStyle?: VoterNameStyle;
   title: string;
   logo: string;
   nameOf: (voterId: string) => string;
@@ -48,6 +58,7 @@ export function BetSlide({
   timer,
   reveal,
   players,
+  voterNameStyle = 'plain',
   title,
   logo,
   nameOf,
@@ -194,7 +205,7 @@ export function BetSlide({
         </div>
       </div>
 
-      <Flyers players={players} />
+      <Flyers players={players} style={voterNameStyle} />
     </div>
   );
 }

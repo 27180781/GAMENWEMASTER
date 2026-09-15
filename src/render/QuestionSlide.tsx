@@ -72,6 +72,8 @@ interface QuestionSlideProps {
   reveal: RevealState;
   /** עונים אחרונים (החדש ראשון) — מזינים את האווטרים המתעופפים. */
   players: RailPlayer[];
+  /** סגנון השם המתעופף (setting.voterNameStyle); חסר = טקסט על הרקע. */
+  voterNameStyle?: VoterNameStyle;
   /** חמשת הראשונים שענו נכונה על השקופית (המהיר ראשון) — לפס המובילים בחשיפה. */
   leaders: RailPlayer[];
   /** שם המשחק לכל אורכו (setting.titleThroughoutGame). */
@@ -84,8 +86,14 @@ interface QuestionSlideProps {
   betPill?: { bettors: number; total: number } | null;
 }
 
-/** אווטרים שמתעופפים כלפי מעלה בכל תשובה חדשה שנכנסת. */
-export function Flyers({ players }: { players: RailPlayer[] }) {
+/** סגנון השם המתעופף (setting.voterNameStyle). */
+export type VoterNameStyle = 'plain' | 'bubble';
+
+/**
+ * אווטרים שמתעופפים כלפי מעלה בכל תשובה חדשה שנכנסת. ב-'bubble' השם יושב
+ * בבועת דיבור לבנה עם זנב לכיוון האווטר במקום טקסט לבן על הרקע.
+ */
+export function Flyers({ players, style = 'plain' }: { players: RailPlayer[]; style?: VoterNameStyle }) {
   interface Flyer {
     key: number;
     name: string;
@@ -125,7 +133,7 @@ export function Flyers({ players }: { players: RailPlayer[] }) {
       {flyers.map((f) => (
         <div
           key={f.key}
-          className={`q-flyer q-flyer--${f.variant}`}
+          className={`q-flyer q-flyer--${f.variant}${style === 'bubble' ? ' q-flyer--bubble' : ''}`}
           style={{ left: `${f.left}px` }}
           onAnimationEnd={() => remove(f.key)}
         >
@@ -329,6 +337,7 @@ export function QuestionSlide({
   timer,
   reveal: revealState,
   players,
+  voterNameStyle = 'plain',
   leaders,
   title,
   logo,
@@ -566,7 +575,7 @@ export function QuestionSlide({
       </div>
 
       {/* אווטרים מתעופפים */}
-      <Flyers players={players} />
+      <Flyers players={players} style={voterNameStyle} />
     </div>
   );
 }

@@ -431,6 +431,22 @@ const autoTransitionSchema = z
 export const globalSettingsSchema = z.object({
   titleThroughoutGame: z.string(),
   ansIsNumber: z.boolean(),
+  /**
+   * איך מוצג שם המצביע שמתעופף בצד המסך עם כל הצבעה: 'plain' — טקסט לבן עם צל
+   * על הרקע (כפי שהיה תמיד); 'bubble' — בתוך בועת דיבור שמצביעה על האווטר.
+   * חסר/לא מוכר = 'plain', כך שקבצים ישנים נראים בדיוק כמו קודם.
+   */
+  voterNameStyle: z
+    .string()
+    .optional()
+    .default('plain')
+    .transform((v) => (v === 'bubble' ? 'bubble' : 'plain'))
+    .describe(
+      `choice:${JSON.stringify({
+        plain: 'טקסט על הרקע',
+        bubble: 'בתוך בועת דיבור',
+      })}`,
+    ),
   // שינוי הצבעה בזמן הטיימר לכל המשחק (ההצבעה האחרונה קובעת) — הגדרה גלובלית
   // שחלה על *כל* השקופיות. חסר/false = כבוי גלובלית, וכל שקופית נקבעת לפי
   // slide.setting.allowChangeVote שלה (התנהגות קודמת). true = כל המשחק מאפשר.

@@ -223,3 +223,18 @@ describe('שגיאות ולידציה בעברית עם מיקום מדויק', 
     expect(() => parseGameFile(raw)).toThrowError(/name — חייב להיות מחרוזת/);
   });
 });
+
+describe('voterNameStyle — סגנון השם שמתעופף בצד עם כל הצבעה', () => {
+  it('קובץ בלי השדה — "plain", בדיוק כמו קודם', () => {
+    const game = makeGame([rawSlide({ id: 1, type: 'trivia', answers: fourAnswers(1) })]);
+    expect(game.setting.voterNameStyle).toBe('plain');
+  });
+
+  it('"bubble" נשמר; ערך לא מוכר נופל ל-"plain" ולא מפיל את הקובץ', () => {
+    const raw = rawGame([rawSlide({ id: 1, type: 'trivia', answers: fourAnswers(1) })], {});
+    (raw.setting as Record<string, unknown>).voterNameStyle = 'bubble';
+    expect(parseGameFile(raw).setting.voterNameStyle).toBe('bubble');
+    (raw.setting as Record<string, unknown>).voterNameStyle = 'neon';
+    expect(parseGameFile(raw).setting.voterNameStyle).toBe('plain');
+  });
+});
