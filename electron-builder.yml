@@ -53,8 +53,8 @@ win:
   icon: build/icon.png
 
 portable:
-  # ראו nsis.preCompressedFileExtensions — אותה חבילה משמשת את שני היעדים.
-  preCompressedFileExtensions: []
+  # (preCompressedFileExtensions אינו קיים ביעד הזה — ראו nsis: אותה חבילה
+  # משמשת את שני היעדים, והיא נבנית לפי ההגדרות של nsis.)
   # שם הקובץ נושא את שם התוכנה ואת מספר הגרסה המלא, כדי שיהיה ברור מה הורד
   # ואיזו גרסה זו — גם אחרי שכמה קבצים יושבים באותה תיקיית הורדות.
   # בלטינית ולא בעברית: GitHub מנרמל תווים שאינם [A-Za-z0-9._-] בשמות נכסי
