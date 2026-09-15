@@ -22,6 +22,8 @@ const { findGameEntryName, mapStrings } = require('./gameZip.cjs');
 const { sameFile, replaceSelf, cleanupOldSelf } = require('./selfUpdate.cjs');
 const { remoteErrorMessage } = require('./remoteErrors.cjs');
 const { hasZipEndRecord, tailLength } = require('./zipIntegrity.cjs');
+const { downloadGameDirect } = require('./remoteGame.cjs');
+const { downloadToFile } = require('./netDownload.cjs');
 const {
   writeEncryptedMedia,
   readEncryptedMediaRange,
@@ -369,7 +371,61 @@ const REMOTE_IDLE_MS = 45 * 1000;
 const REMOTE_CEILING_MS = 20 * 60 * 1000;
 
 /**
- * מוריד חבילת משחק מהשרת לפי קוד הקליקרים, ישר אל מקום "המשחק האחרון" בדיסק.
+ * הרשימה של משחק לפי קוד — ה-JSON של המשחק וכתובות המדיה (get-offline-manifest).
+ * זורק {status} על תשובה שאינה 200, ו-Error על כשל רשת.
+ * @param {string} code
+ * @returns {Promise<{ gameJson: Record<string, unknown>, mediaFiles: unknown[] }>}
+ */
+function fetchGameManifest(code) {
+  return new Promise((resolve, reject) => {
+    const url = `${REMOTE_BASE_URL}/get-offline-manifest?code=${encodeURIComponent(code)}`;
+    const req = net.request({ method: 'GET', url });
+    req.setHeader('apikey', REMOTE_ANON_KEY);
+    req.setHeader('Authorization', `Bearer ${REMOTE_ANON_KEY}`);
+    const timer = setTimeout(() => {
+      try {
+        req.abort();
+      } catch {
+        /* נסגר */
+      }
+      reject(new Error('השרת לא ענה בזמן'));
+    }, REMOTE_IDLE_MS);
+    req.on('error', (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+    req.on('response', (res) => {
+      /** @type {Buffer[]} */
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('error', (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+      res.on('end', () => {
+        clearTimeout(timer);
+        if (res.statusCode !== 200) {
+          reject(Object.assign(new Error(`HTTP ${res.statusCode}`), { status: res.statusCode }));
+          return;
+        }
+        try {
+          resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+        } catch (err) {
+          reject(err);
+        }
+      });
+    });
+    req.end();
+  });
+}
+
+/**
+ * הורדת משחק לפי קוד הקליקרים אל הספרייה בדיסק.
+ *
+ * המסלול הראשי: ישיר — הרשימה מהשרת, הקבצים מהאחסון במקביל, עם המשך אחרי
+ * ניתוק, ואריזה במחשב (remoteGame.cjs). אם השרת לא נותן רשימה (שרת ישן,
+ * תקלה) — נופלים לחבילה המוכנה מ-download-by-code, כמו פעם. קוד שאינו קיים
+ * (404) הוא תשובה סופית בשני המסלולים ולא סיבה לנסות את השני.
  *
  * הבייטים לא עוברים דרך ה-renderer: חבילה עם וידאו שוקלת מאות MB, והמסלול
  * הקיים (game:loadSaved) ממילא יודע לחלץ אותה מהדיסק ולהחזיר רק את data.json.
@@ -378,7 +434,38 @@ const REMOTE_CEILING_MS = 20 * 60 * 1000;
  * @param {(p: object) => void} onProgress
  * @returns {Promise<{ ok: boolean, error?: string, bytes?: number }>}
  */
-function downloadGameByCode(code, onProgress) {
+async function downloadGameByCode(code, onProgress) {
+  const clean = String(code ?? '').trim();
+  if (!/^[A-Za-z0-9_-]{1,32}$/.test(clean)) return { ok: false, error: 'קוד משחק לא תקין' };
+  if (isSealerBuild()) return { ok: false, error: 'לא זמין בכלי החתימה' };
+  try {
+    return await downloadGameDirect(clean, {
+      userData: userData(),
+      fetchManifest: fetchGameManifest,
+      downloadFile: (url, dest, opts) => downloadToFile(net, url, dest, opts),
+      onProgress,
+      log: (msg) => console.log(msg),
+    });
+  } catch (err) {
+    const status = /** @type {{ status?: number }} */ (err).status;
+    if (status !== undefined && status < 500 && status !== 429) {
+      console.warn('[remote] הרשימה נדחתה:', clean, 'HTTP', status);
+      return { ok: false, error: remoteErrorMessage(status) };
+    }
+    console.warn('[remote] אין רשימה מהשרת — נופלים לחבילה המוכנה:', /** @type {Error} */ (err).message);
+    return downloadGameZipByCode(clean, onProgress);
+  }
+}
+
+/**
+ * המסלול הישן: חבילת ZIP מוכנה מ-download-by-code, בחיבור אחד, ישר לספרייה.
+ * נשאר כגיבוי למקרה שהרשימה אינה זמינה.
+ *
+ * @param {string} code קוד המשחק (clickers_game_code)
+ * @param {(p: object) => void} onProgress
+ * @returns {Promise<{ ok: boolean, error?: string, bytes?: number }>}
+ */
+function downloadGameZipByCode(code, onProgress) {
   return new Promise((resolve) => {
     const clean = String(code ?? '').trim();
     if (!/^[A-Za-z0-9_-]{1,32}$/.test(clean)) {
