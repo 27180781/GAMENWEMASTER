@@ -98,6 +98,7 @@ function parseChoice(description: string | undefined): { value: string; label: s
 const LABELS: Record<string, string> = {
   titleThroughoutGame: 'כותרת קבועה במשחק',
   ansIsNumber: 'תשובות ממוספרות (במקום אותיות)',
+  voterNameStyle: 'שמות המצביעים שעולים בצד',
   allowChangeVote: 'אפשר שינוי הצבעה בזמן הטיימר',
   multiWinners: 'מספר הזוכים במסך הסיום',
   showWinnersListAfter: 'הצגת טבלת מובילים כל N שאלות',

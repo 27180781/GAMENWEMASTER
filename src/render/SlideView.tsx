@@ -183,6 +183,7 @@ export function SlideView({
             timer={timer}
             reveal={reveal}
             players={players}
+            voterNameStyle={game.setting.voterNameStyle}
             title={game.setting.titleThroughoutGame}
             logo={game.setting.logo.src}
             nameOf={nameOf ?? ((id) => id)}
@@ -196,6 +197,7 @@ export function SlideView({
             timer={timer}
             reveal={reveal}
             players={players}
+            voterNameStyle={engine.getGame().setting.voterNameStyle}
             leaders={leaders}
             title={engine.getGame().setting.titleThroughoutGame}
             logo={engine.getGame().setting.logo.src}

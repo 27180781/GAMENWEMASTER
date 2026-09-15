@@ -51,6 +51,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     keys: [
       'mainColor',
       'secondaryColor',
+      'voterNameStyle',
       'gameMedia',
       'triviaMedia',
       'winnersMedia',
