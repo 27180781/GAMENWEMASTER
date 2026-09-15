@@ -7,9 +7,13 @@
  */
 
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
-import { load } from 'js-yaml';
 import validateSchema from '@develar/schema-utils';
+
+// js-yaml מגיע דרך electron-builder ובלי הצהרות טיפוסים; require ולא import,
+// כדי ש-tsc -b (שבודק גם את tests/ בבנייה) לא ייפול על מודול בלי d.ts.
+const { load } = createRequire(import.meta.url)('js-yaml') as { load: (text: string) => unknown };
 
 const config = load(readFileSync(new URL('../electron-builder.yml', import.meta.url), 'utf8')) as Record<string, unknown>;
 const schema = JSON.parse(
