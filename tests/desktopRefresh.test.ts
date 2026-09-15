@@ -76,9 +76,10 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
+import { gzipSync } from 'node:zlib';
 import { afterEach, vi } from 'vitest';
 // @ts-expect-error — כלי בנייה ב-JS, בלי הצהרות טיפוסים
-import { fetchDesktopAssets, SOURCE } from '../tools/fetch-desktop-assets.mjs';
+import { assertBlockmap, fetchDesktopAssets, previousBlockmapNames, SOURCE } from '../tools/fetch-desktop-assets.mjs';
 
 const b64sha = (buf: Buffer) => createHash('sha512').update(buf).digest('base64');
 const feedFor = (version: string, installer: Buffer) =>
@@ -88,6 +89,10 @@ const ok = (body: Buffer | string) =>
 const fail = (status: number) => new Response('', { status });
 
 const QUICK = { waitMs: 5, retryBaseMs: 1, minExeBytes: 4 };
+/** מפת בלוקים כפי ש-electron-builder כותב אותה: JSON דחוס ב-gzip עם רשימת קבצים. */
+const BLOCKMAP = gzipSync(
+  JSON.stringify({ version: '2', files: [{ name: 'file', offset: 0, checksums: ['abc'], sizes: [3] }] }),
+);
 
 describe('משיכה בסבבים — חלון ההחלפה של המהדורה', () => {
   let dir: string;
@@ -114,6 +119,7 @@ describe('משיכה בסבבים — חלון ההחלפה של המהדורה'
         return ok(phase === 'mid-update' ? oldExe : newExe); // sha512 לא תואם באמצע העדכון
       }
       if (url.endsWith('/HavayaBeClick-0.1.173.exe')) return ok(portable);
+      if (url.endsWith('/HavayaBeClick-Setup-0.1.173.exe.blockmap')) return ok(BLOCKMAP);
       return fail(404);
     };
     vi.stubGlobal('fetch', vi.fn(async (url: string) => responder(url)));
@@ -122,6 +128,7 @@ describe('משיכה בסבבים — חלון ההחלפה של המהדורה'
     expect(version).toBe('0.1.173');
     expect(readFileSync(join(dir, 'HavayaBeClick-Setup-0.1.173.exe'))).toEqual(newExe);
     expect(readFileSync(join(dir, 'TriviaEngine-Portable.exe'))).toEqual(portable);
+    expect(readFileSync(join(dir, 'HavayaBeClick-Setup-0.1.173.exe.blockmap'))).toEqual(BLOCKMAP);
     expect(JSON.parse(readFileSync(join(dir, 'index.json'), 'utf8')).version).toBe('0.1.173');
     expect(calls).toBeGreaterThanOrEqual(9); // באמת עברנו דרך שני הסבבים הכושלים
   });
@@ -139,6 +146,79 @@ describe('משיכה בסבבים — חלון ההחלפה של המהדורה'
     );
     await expect(fetchDesktopAssets(dir, { ...QUICK, attempts: 3 })).rejects.toThrow(/sha512.*3 סבבים/);
     expect(existsSync(dir)).toBe(false);
+  });
+
+  it('★ מפת הבלוקים של המתקין חובה — בלעדיה כל עדכון חוזר להורדה מלאה, ולכן הבנייה נופלת', async () => {
+    dir = join(mkdtempSync(join(tmpdir(), 'desktop-')), 'out');
+    const exe = Buffer.from('INSTALLER');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.endsWith('/latest.yml')) return ok(feedFor('0.1.180', exe));
+        if (url.endsWith('.blockmap')) return fail(404);
+        return ok(exe);
+      }),
+    );
+    await expect(fetchDesktopAssets(dir, { ...QUICK, attempts: 2 })).rejects.toThrow(/blockmap/);
+    expect(existsSync(dir)).toBe(false);
+  });
+
+  it('★ HTML במקום מפה (ה-SPA עונה 200 על כל נתיב) נדחה ולא נשמר כמפה', async () => {
+    dir = join(mkdtempSync(join(tmpdir(), 'desktop-')), 'out');
+    const exe = Buffer.from('INSTALLER');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.endsWith('/latest.yml')) return ok(feedFor('0.1.180', exe));
+        if (url.endsWith('.blockmap')) return ok('<!doctype html><title>app</title>');
+        return ok(exe);
+      }),
+    );
+    await expect(fetchDesktopAssets(dir, { ...QUICK, attempts: 1 })).rejects.toThrow(/מפת בלוקים תקינה/);
+    expect(existsSync(dir)).toBe(false);
+  });
+
+  it('מפות של גרסאות קודמות: מה שיש נשמר, מה שחסר מדולג, וכולן רשומות ב-index.json', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'desktop-'));
+    const exe = Buffer.from('INSTALLER');
+    const served = new Set(['0.1.180', '0.1.179', '0.1.177']); // 0.1.178 דולג, 0.1.176 מחוץ לטווח
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.endsWith('/latest.yml')) return ok(feedFor('0.1.180', exe));
+        const m = /HavayaBeClick-Setup-(\d+\.\d+\.\d+)\.exe\.blockmap$/.exec(url);
+        if (m) return served.has(m[1]!) ? ok(BLOCKMAP) : fail(404);
+        return ok(exe);
+      }),
+    );
+    expect(await fetchDesktopAssets(dir, { ...QUICK, attempts: 1, previousBlockmaps: 3 })).toBe('0.1.180');
+    expect(existsSync(join(dir, 'HavayaBeClick-Setup-0.1.180.exe.blockmap'))).toBe(true);
+    expect(existsSync(join(dir, 'HavayaBeClick-Setup-0.1.179.exe.blockmap'))).toBe(true);
+    expect(existsSync(join(dir, 'HavayaBeClick-Setup-0.1.178.exe.blockmap'))).toBe(false);
+    expect(existsSync(join(dir, 'HavayaBeClick-Setup-0.1.176.exe.blockmap'))).toBe(false);
+    const index = JSON.parse(readFileSync(join(dir, 'index.json'), 'utf8'));
+    expect(index.blockmap).toBe('HavayaBeClick-Setup-0.1.180.exe.blockmap');
+    expect(index.previousBlockmaps).toEqual([
+      'HavayaBeClick-Setup-0.1.179.exe.blockmap',
+      'HavayaBeClick-Setup-0.1.177.exe.blockmap',
+    ]);
+  });
+
+  it('previousBlockmapNames — אחורה עד count, לא מתחת למספר בנייה 1, ורק לגרסאות בפורמט הבנייה', () => {
+    expect(previousBlockmapNames('0.1.180', 3)).toEqual([
+      'HavayaBeClick-Setup-0.1.179.exe.blockmap',
+      'HavayaBeClick-Setup-0.1.178.exe.blockmap',
+      'HavayaBeClick-Setup-0.1.177.exe.blockmap',
+    ]);
+    expect(previousBlockmapNames('0.1.2', 5)).toEqual(['HavayaBeClick-Setup-0.1.1.exe.blockmap']);
+    expect(previousBlockmapNames('0.1.180', 0)).toEqual([]);
+    expect(previousBlockmapNames('dev', 5)).toEqual([]);
+  });
+
+  it('assertBlockmap — gzip של JSON עם files עובר; כל השאר נדחה', () => {
+    expect(() => assertBlockmap(BLOCKMAP, 'x')).not.toThrow();
+    expect(() => assertBlockmap(Buffer.from('not gzip'), 'x')).toThrow(/x אינו מפת בלוקים/);
+    expect(() => assertBlockmap(gzipSync('{"files":[]}'), 'x')).toThrow(/אין files/);
   });
 
   it('DESKTOP_ASSETS=0 מדלג בלי לגעת ברשת', async () => {
