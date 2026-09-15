@@ -73,6 +73,14 @@ nsis:
 # הכתובת חייבת להיות זהה ל-DESKTOP_BASE_URL שב-electron/desktopHost.cjs —
 # tests/desktopHost.test.ts מוודא זאת.
 #
+# עדכון הפרשי: הבנייה מייצרת ליד המתקין קובץ ‎.blockmap‎ (differentialPackage
+# דולק כברירת מחדל ב-nsis). electron-updater מוריד את המפה של הגרסה החדשה ואת
+# זו של הגרסה המותקנת (מהשרת בפעם הראשונה, אחר כך מהמטמון שלו), ומושך בבקשות
+# Range רק את הבלוקים שהשתנו; את השאר הוא לוקח מהמתקין הקודם, שהמתקין שומר
+# ב-‎%LOCALAPPDATA%‎. לכן ה-workflow מעלה את המפות למהדורה (ומשלים בדיעבד
+# מפות לגרסאות האחרונות), ו-fetch-desktop-assets מושך אותן לשרת. מפה שחסרה
+# ⇐ הורדה מלאה, בשקט (יומן electron-updater: "Cannot download differentially").
+#
 # חשוב: העדכון פעיל *רק* בגרסת ההתקנה (NSIS). הגרסה הניידת אינה נתמכת
 # ב-electron-updater, ו-EXE חתום בכלל אסור לעדכן — הכתיבה מעליו הייתה מוחקת את
 # המשחק המוטבע בסופו. הסינון עצמו נמצא ב-electron/main.cjs.

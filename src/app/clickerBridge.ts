@@ -183,6 +183,9 @@ export interface UpdateStatus {
     | 'unsupported';
   version?: string;
   percent?: number;
+  /** בהורדה: כמה בייטים ירדו ומהו סך ההורדה. בעדכון הפרשי הסך קטן בהרבה מהמתקין המלא. */
+  transferred?: number;
+  total?: number;
   /** למצב unsupported: למה אין עדכון אוטומטי לקובץ הזה. */
   reason?: 'sealed' | 'portable' | 'dev';
 }

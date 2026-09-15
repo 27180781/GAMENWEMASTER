@@ -69,7 +69,10 @@ jobs:
       # שהבנייה תיפול כאן ונדע מיד, מאשר לגלות את זה אצל משתמש בשטח.
       - name: Verify update metadata exists
         shell: bash
-        run: test -f release/latest.yml || { echo "::error::latest.yml חסר — העדכון האוטומטי לא יעבוד"; exit 1; }
+        run: |
+          test -f release/latest.yml || { echo "::error::latest.yml חסר — העדכון האוטומטי לא יעבוד"; exit 1; }
+          # מפת הבלוקים היא מה שהופך את העדכון להפרשי (כמה MB במקום ‎~100MB).
+          test -f "release/HavayaBeClick-Setup-${APP_VERSION}.exe.blockmap" || { echo "::error::קובץ ה-blockmap חסר — העדכון ההפרשי לא יעבוד"; exit 1; }
       - name: Publish EXE files to a stable release
         uses: softprops/action-gh-release@v2
         with:
@@ -81,7 +84,8 @@ jobs:
 
             - **HavayaBeClick-Setup-${{ env.APP_VERSION }}.exe** — מתקין עם קיצור דרך
               בשולחן העבודה ובתפריט התחל. **מתעדכן לבד**: בכל פעם שיש רשת הוא בודק אם
-              יצאה גרסה חדשה, מוריד ברקע, ומתקין בסגירת התוכנה.
+              יצאה גרסה חדשה, מוריד ברקע רק את מה שהשתנה מאז הגרסה המותקנת
+              (עדכון הפרשי), ומתקין בסגירת התוכנה.
             - **HavayaBeClick-${{ env.APP_VERSION }}.exe** — נייד, רץ בלי התקנה
               (בלי עדכון אוטומטי).
             - **SealEXE.exe** — כלי "חתום EXE": סוגר ZIP של משחק לקובץ EXE בודד.
@@ -93,11 +97,39 @@ jobs:
           # האחרונה ואיפה המתקין. בלעדיו העדכון האוטומטי לא יעבוד.
           files: |
             release/HavayaBeClick-Setup-${{ env.APP_VERSION }}.exe
+            release/HavayaBeClick-Setup-${{ env.APP_VERSION }}.exe.blockmap
             release/HavayaBeClick-${{ env.APP_VERSION }}.exe
             release/TriviaEngine-Setup.exe
             release/TriviaEngine-Portable.exe
             release/SealEXE.exe
             release/latest.yml
+      # עדכון הפרשי צריך גם את מפת הבלוקים של הגרסה *המותקנת* אצל הלקוח
+      # (electron-updater מבקש אותה מהשרת בעדכון ההפרשי הראשון). גרסאות שנבנו
+      # לפני שהמפות התחילו להתפרסם מקבלות אותה כאן בדיעבד: לכל מתקין מהגרסאות
+      # האחרונות שאין לו מפה במהדורה — מורידים, מחשבים באותו כלי שבו
+      # electron-builder משתמש, ומעלים. אחרי הריצה הראשונה הצעד כמעט תמיד ריק,
+      # כי כל בנייה מעלה את המפה שלה בצעד הקודם.
+      - name: Backfill block maps for recent versions
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEEP: 12
+        run: |
+          set -euo pipefail
+          AB="$(cygpath -u "$(node -p "require('app-builder-bin').appBuilderPath")")"
+          assets="$(gh release view desktop-latest --json assets --jq '.assets[].name')"
+          n="${APP_VERSION##*.}"
+          mkdir -p backfill
+          for ((i = n - 1; i >= n - KEEP && i > 0; i--)); do
+            setup="HavayaBeClick-Setup-0.1.${i}.exe"
+            grep -qx "$setup" <<<"$assets" || continue
+            grep -qx "${setup}.blockmap" <<<"$assets" && continue
+            echo "מחשב מפת בלוקים ל-${setup}"
+            gh release download desktop-latest --pattern "$setup" --dir backfill --clobber
+            "$AB" blockmap --input "backfill/${setup}" --output "backfill/${setup}.blockmap" > /dev/null
+            gh release upload desktop-latest "backfill/${setup}.blockmap" --clobber
+            rm -f "backfill/${setup}"
+          done
           prerelease: false
 
       # ⚠ המהדורה שפורסמה כאן **אינה מגיעה ללקוחות מיד.**

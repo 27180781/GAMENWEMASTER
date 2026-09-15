@@ -207,7 +207,14 @@ function startAutoUpdate() {
     pushUpdateState({ state: 'downloading', version: String(info.version), percent: 0 });
   });
   updater.on('download-progress', (p) => {
-    pushUpdateState({ state: 'downloading', percent: Math.round(p.percent) });
+    // transferred/total — כדי שאפשר יהיה *לראות* שהעדכון ההפרשי עובד: סך
+    // ההורדה הוא כמה MB במקום המתקין המלא.
+    pushUpdateState({
+      state: 'downloading',
+      percent: Math.round(p.percent),
+      transferred: Math.round(p.transferred),
+      total: Math.round(p.total),
+    });
   });
   updater.on('update-downloaded', (info) => {
     console.log('[update] הגרסה החדשה מוכנה ותותקן בסגירה:', info.version);

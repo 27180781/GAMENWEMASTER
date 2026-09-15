@@ -184,11 +184,25 @@ function UpdateBadge({ status }: { status: UpdateStatus }) {
   }
   if (status.state === 'downloading') {
     const pct = status.percent ?? 0;
-    return <div className="update-badge">⬇ מוריד עדכון… {pct}%</div>;
+    return (
+      <div className="update-badge">
+        ⬇ מוריד עדכון… {pct}%{downloadSizeText(status)}
+      </div>
+    );
   }
   // checking / current / offline / unsupported — מידע בלבד, מוצג בשורת הגרסה
   // ולא כפס בפינה (ראו VersionLine).
   return null;
+}
+
+/**
+ * " (6.2 מתוך 12MB)" — רק כשסך ההורדה ידוע. בעדכון הפרשי זה כמה MB במקום
+ * המתקין המלא, וזו הדרך לראות מהמסך שההפרשיות באמת עובדת.
+ */
+export function downloadSizeText(status: UpdateStatus): string {
+  if (status.total === undefined || !(status.total > 0)) return '';
+  const mb = (n: number) => (n / 1048576).toFixed(status.total! < 10 * 1048576 ? 1 : 0);
+  return ` (${mb(status.transferred ?? 0)} מתוך ${mb(status.total)}MB)`;
 }
 
 /** נוסח מצב העדכון לשורת הגרסה. מופרד כדי שיהיה ניתן לבדיקת יחידה. */
@@ -200,7 +214,7 @@ export function updateStatusText(status: UpdateStatus | null): string {
     case 'current':
       return '✅ מעודכן';
     case 'downloading':
-      return `⬇ מוריד עדכון… ${status.percent ?? 0}%`;
+      return `⬇ מוריד עדכון… ${status.percent ?? 0}%${downloadSizeText(status)}`;
     case 'ready':
       return `✅ גרסה ${status.version ?? 'חדשה'} תותקן בסגירת התוכנה`;
     case 'sealer':
