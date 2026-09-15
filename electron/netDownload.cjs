@@ -159,3 +159,97 @@ function downloadToFile(net, url, dest, opts = {}) {
 }
 
 module.exports = { downloadToFile, IDLE_MS, CEILING_MS };
+
+/**
+ * הורדת **טווח** אחד של קובץ (Range: bytes=start–end−1) אל sink — לבנייה
+ * הפרשית של מתקין (updateDownload.cjs). כל chunk נמסר ל-`sink` ורק אחר כך
+ * נספר; השרת חייב לענות 206 בדיוק על הטווח שביקשנו (200 = כל הקובץ — לא
+ * מה שביקשנו, אלא כשביקשנו מאפס).
+ *
+ * @param {typeof import('electron').net} net
+ * @param {string} url
+ * @param {number} start
+ * @param {number} end לא כולל
+ * @param {(chunk: Buffer) => void} sink
+ * @param {{ idleMs?: number, ceilingMs?: number, headers?: Record<string, string> }} [opts]
+ * @returns {Promise<FileResult>}
+ */
+function downloadRange(net, url, start, end, sink, opts = {}) {
+  const { idleMs = IDLE_MS, ceilingMs = CEILING_MS, headers = {} } = opts;
+  const expected = end - start;
+  return new Promise((resolve) => {
+    let settled = false;
+    /** @type {NodeJS.Timeout | null} */
+    let idle = null;
+    /** @type {import('electron').ClientRequest | null} */
+    let req = null;
+    let received = 0;
+    /** @param {FileResult} result */
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      if (idle !== null) clearTimeout(idle);
+      clearTimeout(ceiling);
+      try {
+        req?.abort();
+      } catch {
+        /* נסגר */
+      }
+      resolve(result);
+    };
+    const ceiling = setTimeout(() => finish({ ok: false, error: 'ההורדה ארכה יותר מדי', retryable: true }), ceilingMs);
+    const touch = () => {
+      if (idle !== null) clearTimeout(idle);
+      idle = setTimeout(() => finish({ ok: false, error: 'ההורדה נתקעה — בדקו את החיבור לאינטרנט', retryable: true }), idleMs);
+    };
+    try {
+      req = net.request({ method: 'GET', url });
+    } catch (err) {
+      finish({ ok: false, error: /** @type {Error} */ (err).message, retryable: false });
+      return;
+    }
+    for (const [k, v] of Object.entries(headers)) req.setHeader(k, v);
+    req.setHeader('Range', `bytes=${start}-${end - 1}`);
+    touch();
+    req.on('error', (err) => finish({ ok: false, error: `החיבור נכשל: ${err.message}`, retryable: true }));
+    req.on('response', (res) => {
+      const status = res.statusCode;
+      const wholeFile = status === 200 && start === 0;
+      if (status !== 206 && !wholeFile) {
+        res.resume?.();
+        finish({
+          ok: false,
+          error: status === 200 ? 'השרת אינו תומך בהורדת טווחים' : remoteErrorMessage(status),
+          retryable: status !== 200 && isRetryable(status),
+          status,
+        });
+        return;
+      }
+      touch();
+      res.on('data', (chunk) => {
+        if (settled) return;
+        // לא יותר ממה שביקשנו — שרת שמחזיר את כל הקובץ על 200 נעצר בגבול הטווח.
+        const take = Math.min(chunk.length, expected - received);
+        if (take > 0) {
+          try {
+            sink(take === chunk.length ? chunk : chunk.subarray(0, take));
+          } catch (err) {
+            finish({ ok: false, error: `כתיבה לדיסק נכשלה: ${/** @type {Error} */ (err).message}`, retryable: false });
+            return;
+          }
+          received += take;
+        }
+        touch();
+        if (received >= expected) finish({ ok: true, bytes: received });
+      });
+      res.on('error', (err) => finish({ ok: false, error: err.message, retryable: true }));
+      res.on('end', () => {
+        if (received >= expected) finish({ ok: true, bytes: received });
+        else finish({ ok: false, error: `הטווח הגיע חלקית (${received} מתוך ${expected} בתים)`, retryable: true });
+      });
+    });
+    req.end();
+  });
+}
+
+module.exports.downloadRange = downloadRange;

@@ -190,6 +190,13 @@ function UpdateBadge({ status }: { status: UpdateStatus }) {
       </div>
     );
   }
+  if (status.state === 'paused') {
+    return (
+      <div className="update-badge update-badge--warn">
+        ⏸ הורדת העדכון נעצרה{downloadSizeText(status)} — תימשך מאותה נקודה כשהרשת תחזור
+      </div>
+    );
+  }
   // checking / current / offline / unsupported — מידע בלבד, מוצג בשורת הגרסה
   // ולא כפס בפינה (ראו VersionLine).
   return null;
@@ -215,6 +222,8 @@ export function updateStatusText(status: UpdateStatus | null): string {
       return '✅ מעודכן';
     case 'downloading':
       return `⬇ מוריד עדכון… ${status.percent ?? 0}%${downloadSizeText(status)}`;
+    case 'paused':
+      return `⏸ הורדת העדכון נעצרה${downloadSizeText(status)} — תימשך כשהרשת תחזור`;
     case 'ready':
       return `✅ גרסה ${status.version ?? 'חדשה'} תותקן בסגירת התוכנה`;
     case 'sealer':

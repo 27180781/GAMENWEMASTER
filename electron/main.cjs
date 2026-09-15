@@ -23,7 +23,8 @@ const { sameFile, replaceSelf, cleanupOldSelf } = require('./selfUpdate.cjs');
 const { remoteErrorMessage } = require('./remoteErrors.cjs');
 const { hasZipEndRecord, tailLength } = require('./zipIntegrity.cjs');
 const { downloadGameDirect } = require('./remoteGame.cjs');
-const { downloadToFile } = require('./netDownload.cjs');
+const { downloadToFile, downloadRange } = require('./netDownload.cjs');
+const { downloadUpdate, parseBlockMap, oldBlockMapUrl } = require('./updateDownload.cjs');
 const {
   writeEncryptedMedia,
   readEncryptedMediaRange,
@@ -196,7 +197,9 @@ function startAutoUpdate() {
     return;
   }
   if (updater === null) return;
-  updater.autoDownload = true;
+  // ההורדה עצמה בידינו — הפרשית וניתנת להמשך (updateDownload.cjs). electron-updater
+  // רק בודק, מאמת את הקובץ המוכן ומתקין בסגירה.
+  updater.autoDownload = false;
   updater.autoInstallOnAppQuit = true;
   updater.on('checking-for-update', () => {
     pushUpdateState({ state: 'checking', version: app.getVersion() });
@@ -207,6 +210,7 @@ function startAutoUpdate() {
   updater.on('update-available', (info) => {
     console.log('[update] נמצאה גרסה חדשה:', info.version);
     pushUpdateState({ state: 'downloading', version: String(info.version), percent: 0 });
+    void downloadUpdateResumable(info);
   });
   updater.on('download-progress', (p) => {
     // transferred/total — כדי שאפשר יהיה *לראות* שהעדכון ההפרשי עובד: סך
@@ -230,6 +234,135 @@ function startAutoUpdate() {
   });
   checkForUpdate();
   setInterval(checkForUpdate, 6 * 60 * 60 * 1000);
+}
+
+/** ניסיון חוזר אחרי הורדת עדכון שנקטעה (בנוסף לבדיקה כשהרשת חוזרת). */
+const UPDATE_RETRY_MS = 2 * 60 * 1000;
+let updateDownloadRunning = false;
+/** @type {NodeJS.Timeout | null} */
+let updateRetryTimer = null;
+/** ההתקדמות האחרונה שדווחה — מוצגת גם כשההורדה נעצרה. */
+let lastUpdateProgress = { transferred: 0, total: 0 };
+
+/** GET קטן (מפת בלוקים): Buffer, או null על 404/כשל — המשמעות היא "בלי הפרש". */
+function fetchSmall(url) {
+  return new Promise((resolve) => {
+    let req;
+    try {
+      req = net.request({ method: 'GET', url });
+    } catch {
+      resolve(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      try {
+        req.abort();
+      } catch {
+        /* נסגר */
+      }
+      resolve(null);
+    }, REMOTE_IDLE_MS);
+    req.on('error', () => {
+      clearTimeout(timer);
+      resolve(null);
+    });
+    req.on('response', (res) => {
+      /** @type {Buffer[]} */
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('error', () => {
+        clearTimeout(timer);
+        resolve(null);
+      });
+      res.on('end', () => {
+        clearTimeout(timer);
+        resolve(res.statusCode === 200 ? Buffer.concat(chunks) : null);
+      });
+    });
+    req.end();
+  });
+}
+
+/** @param {string} file */
+function readFileOrNull(file) {
+  try {
+    return fs.readFileSync(file);
+  } catch {
+    return null;
+  }
+}
+
+function scheduleUpdateRetry() {
+  if (updateRetryTimer !== null) return;
+  updateRetryTimer = setTimeout(() => {
+    updateRetryTimer = null;
+    lastUpdateCheck = 0; // עוקפים את המרווח המינימלי — זה המשך, לא בדיקה חדשה
+    checkForUpdate();
+  }, UPDATE_RETRY_MS);
+}
+
+/**
+ * הורדת העדכון בידינו (updateDownload.cjs): רק הבלוקים שהשתנו מול המתקין
+ * הקודם, ועם המשך מאותה נקודה אחרי ניתוק. בסיום electron-updater מוצא את הקובץ
+ * המוכן ב-pending, מדלג על ההורדה שלו ומכריז update-downloaded כרגיל.
+ * כשההורדה שלנו אינה אפשרית (פיד בלי גודל, שגיאה שאינה רשת) — ההורדה הרגילה.
+ * @param {import('electron-updater').UpdateInfo} info
+ */
+async function downloadUpdateResumable(info) {
+  if (updater === null || updateDownloadRunning) return;
+  updateDownloadRunning = true;
+  if (updateRetryTimer !== null) {
+    clearTimeout(updateRetryTimer);
+    updateRetryTimer = null;
+  }
+  const version = String(info.version);
+  const u = updater;
+  try {
+    const files = Array.isArray(info.files) ? info.files : [];
+    const fileInfo = files.find((f) => String(f.url).toLowerCase().endsWith('.exe')) ?? files[0] ?? null;
+    const fileName = path.basename(String(fileInfo?.url ?? info.path ?? ''));
+    const newUrl = `${DESKTOP_BASE_URL}/${fileName}`;
+    // המטמון של electron-updater: pending/ לקובץ המוכן, installer.exe ו-current.blockmap של הגרסה המותקנת
+    const helper = await /** @type {any} */ (u).getOrCreateDownloadHelper();
+    const pendingDir = String(helper.cacheDirForPendingUpdate);
+    const cacheDir = String(helper.cacheDir);
+    let oldBlockMap = parseBlockMap(readFileOrNull(path.join(cacheDir, 'current.blockmap')));
+    if (oldBlockMap === null) oldBlockMap = parseBlockMap(await fetchSmall(oldBlockMapUrl(newUrl, version, app.getVersion())));
+    const newBlockMap = parseBlockMap(await fetchSmall(`${newUrl}.blockmap`));
+    const res = await downloadUpdate({
+      pendingDir,
+      fileName,
+      sha512: String(fileInfo?.sha512 ?? info.sha512 ?? ''),
+      size: Number(fileInfo?.size) || 0,
+      newUrl,
+      oldFile: path.join(cacheDir, 'installer.exe'),
+      oldBlockMap,
+      newBlockMap,
+      fetchRange: (url, start, end, sink) => downloadRange(net, url, start, end, sink),
+      onProgress: (p) => {
+        lastUpdateProgress = { transferred: p.transferred, total: p.total };
+        pushUpdateState({ state: 'downloading', version, percent: p.percent, transferred: p.transferred, total: p.total });
+      },
+      log: (msg) => console.log(msg),
+    });
+    if (res.ok) {
+      await u.downloadUpdate(); // מוצא את הקובץ המוכן — בלי הורדה
+      return;
+    }
+    console.warn('[update] ההורדה נעצרה:', res.error);
+    if (res.retryable) {
+      pushUpdateState({ state: 'paused', version, ...lastUpdateProgress });
+      scheduleUpdateRetry();
+      return;
+    }
+    await u.downloadUpdate(); // ההורדה הרגילה של electron-updater
+  } catch (err) {
+    console.warn('[update] הורדת העדכון נכשלה:', /** @type {Error} */ (err).message);
+    pushUpdateState({ state: 'paused', version, ...lastUpdateProgress });
+    scheduleUpdateRetry();
+  } finally {
+    updateDownloadRunning = false;
+  }
 }
 
 /** בדיקת עדכון בפועל, עם מרווח מינימלי בין בדיקות. */
@@ -604,7 +737,8 @@ function downloadGameZipByCode(code, onProgress) {
  * ה-EXE הבסיסי העדכני — המהדורה היציבה שנבנית מכל קומיט ב-main, ומוגשת
  * משרת המשחק (ראו desktopHost.cjs). גם ההורדה הזו אינה פונה ל-GitHub.
  */
-const SEAL_BASE_URL = `${require('./desktopHost.cjs').DESKTOP_BASE_URL}/TriviaEngine-Portable.exe`;
+const { DESKTOP_BASE_URL } = require('./desktopHost.cjs');
+const SEAL_BASE_URL = `${DESKTOP_BASE_URL}/TriviaEngine-Portable.exe`;
 /** תקרת זמן להורדת הבסיס, ופסק-זמן על *שקט* בקו (לא על הגודל). */
 const BASE_DOWNLOAD_CEILING_MS = 10 * 60 * 1000;
 const BASE_DOWNLOAD_IDLE_MS = 45 * 1000;
@@ -1494,6 +1628,8 @@ app.whenReady().then(() => {
   setTimeout(() => void selfUpdateSealer(), 8000);
   /** דיווח מה-renderer שהמחשב חזר לרשת — הזדמנות טובה לבדוק עדכון. */
   ipcMain.handle('app:online', () => {
+    // הורדת עדכון שנעצרה ממשיכה מיד כשהרשת חוזרת — בלי להמתין למרווח בין בדיקות.
+    if (lastUpdateState !== null && lastUpdateState.state === 'paused') lastUpdateCheck = 0;
     checkForUpdate();
   });
   /** מצב שרת הקליקרים האחרון — לחלון שנפתח אחרי שהאירוע כבר שודר. */
