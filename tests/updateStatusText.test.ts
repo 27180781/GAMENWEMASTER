@@ -33,6 +33,13 @@ describe('updateStatusText', () => {
     expect(downloadSizeText({ state: 'downloading', percent: 5, total: 0 })).toBe('');
   });
 
+  it('★ נעצר — נאמר שמה שירד נשמר ושההמשך אוטומטי, עם כמה כבר ירד', () => {
+    const text = updateStatusText({ state: 'paused', percent: 40, transferred: 2 * 1048576, total: 5 * 1048576 });
+    expect(text).toContain('נעצרה');
+    expect(text).toContain('2.0 מתוך 5.0MB');
+    expect(text).toContain('כשהרשת תחזור');
+  });
+
   it('מוכן — נאמר מתי זה ייכנס לתוקף', () => {
     const text = updateStatusText({ state: 'ready', version: '0.1.150' });
     expect(text).toContain('0.1.150');

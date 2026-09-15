@@ -176,6 +176,8 @@ export interface UpdateStatus {
     | 'checking'
     | 'current'
     | 'downloading'
+    /** ההורדה נקטעה (אין רשת) — מה שירד נשמר וההמשך אוטומטי. */
+    | 'paused'
     | 'ready'
     | 'sealer'
     | 'manual'
