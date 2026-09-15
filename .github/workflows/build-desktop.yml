@@ -103,6 +103,8 @@ jobs:
             release/TriviaEngine-Portable.exe
             release/SealEXE.exe
             release/latest.yml
+          prerelease: false
+
       # עדכון הפרשי צריך גם את מפת הבלוקים של הגרסה *המותקנת* אצל הלקוח
       # (electron-updater מבקש אותה מהשרת בעדכון ההפרשי הראשון). גרסאות שנבנו
       # לפני שהמפות התחילו להתפרסם מקבלות אותה כאן בדיעבד: לכל מתקין מהגרסאות
@@ -130,8 +132,6 @@ jobs:
             gh release upload desktop-latest "backfill/${setup}.blockmap" --clobber
             rm -f "backfill/${setup}"
           done
-          prerelease: false
-
       # ⚠ המהדורה שפורסמה כאן **אינה מגיעה ללקוחות מיד.**
       #
       # האתר נבנה ב-CapRover, שמחובר ישירות ל-GitHub ובונה בכל דחיפה ל-main —
