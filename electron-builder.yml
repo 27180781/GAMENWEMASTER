@@ -53,6 +53,8 @@ win:
   icon: build/icon.png
 
 portable:
+  # ראו nsis.preCompressedFileExtensions — אותה חבילה משמשת את שני היעדים.
+  preCompressedFileExtensions: []
   # שם הקובץ נושא את שם התוכנה ואת מספר הגרסה המלא, כדי שיהיה ברור מה הורד
   # ואיזו גרסה זו — גם אחרי שכמה קבצים יושבים באותה תיקיית הורדות.
   # בלטינית ולא בעברית: GitHub מנרמל תווים שאינם [A-Za-z0-9._-] בשמות נכסי
@@ -67,6 +69,12 @@ portable:
 
 nsis:
   artifactName: HavayaBeClick-Setup-${version}.${ext}
+  # electron-builder מוציא כברירת מחדל קובצי וידאו (‎.webm‎ ועוד) מחבילת ה-7z
+  # ומצרף אותם למתקין בנפרד — אבל רק למתקין: הנייד, שמשתמש באותה חבילה,
+  # יצא בלי סרטוני ההדרכה (גרסה 0.1.179). רשימה ריקה = הכול נשאר בחבילה, גם
+  # לנייד; הסרטונים ממילא אינם נדחסים, וכקבצים נפרדים (חבילה לא-solid) הם
+  # מועתקים מהמתקין הקודם בעדכון ההפרשי.
+  preCompressedFileExtensions: []
   oneClick: false # אשף התקנה (לא התקנה שקטה)
   perMachine: false # התקנה למשתמש הנוכחי — בלי צורך בהרשאות מנהל
   allowToChangeInstallationDirectory: true
