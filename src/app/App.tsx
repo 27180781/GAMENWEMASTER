@@ -265,16 +265,21 @@ function DownloadBar({ progress }: { progress: DownloadProgress }) {
   if (progress.phase === 'connect') {
     return <p className="offline-open-note">מתחבר לשרת…</p>;
   }
+  if (progress.phase === 'pack') {
+    return <p className="offline-open-note">אורז את המשחק במחשב…</p>;
+  }
   const received = progress.received ?? 0;
   const total = progress.total ?? 0;
   const mb = (n: number) => (n / 1048576).toFixed(1);
   const pct = total > 0 ? Math.round((received / total) * 100) : null;
+  // הורדה ישירה: כמה קבצים מתוך כמה כבר במחשב — נראה גם כשעוד אין אחוזים.
+  const files = progress.files !== undefined ? ` · ${progress.filesDone ?? 0} מתוך ${progress.files} קבצים` : '';
   return (
     <div className="offline-open-dl">
       <p className="offline-open-note">
         {pct !== null
-          ? `מוריד את המשחק… ${pct}% (${mb(received)}/${mb(total)}MB)`
-          : `מוריד את המשחק… ${mb(received)}MB`}
+          ? `מוריד את המשחק… ${pct}% (${mb(received)}/${mb(total)}MB)${files}`
+          : `מוריד את המשחק… ${mb(received)}MB${files}`}
       </p>
       <div className="offline-open-dl-bar">
         {/* בלי Content-Length אין אחוזים — מציגים פס בתנועה במקום 0% מטעה */}

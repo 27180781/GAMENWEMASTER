@@ -210,9 +210,14 @@ export interface SaveEditResult {
 
 /** התקדמות הורדת משחק מהשרת. */
 export interface DownloadProgress {
-  phase: 'connect' | 'download';
+  /** connect — מבקשים את הרשימה; download — הקבצים יורדים; pack — נארזים לחבילה במחשב. */
+  phase: 'connect' | 'download' | 'pack';
   received?: number;
+  /** סך הבתים; 0 כל עוד גודל אחד הקבצים אינו ידוע (בהורדה ישירה — עד שכולם התחילו). */
   total?: number;
+  /** בהורדה ישירה: כמה קבצים בחבילה וכמה מהם כבר הושלמו. */
+  files?: number;
+  filesDone?: number;
 }
 
 /** תוצאת הורדת משחק מהשרת לפי קוד. */

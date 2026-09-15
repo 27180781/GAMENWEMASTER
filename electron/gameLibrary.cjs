@@ -141,9 +141,10 @@ function forgetCurrent(userData) {
 function libraryDelete(userData, code) {
   if (!isSafeCode(code)) return false;
   const wasCurrent = readJson(lastGameMetaPath(userData))?.code === code;
-  for (const p of [libraryZipPath(userData, code), libraryMetaPath(userData, code)]) {
+  // גם הורדה ישירה שנקטעה באמצע (<קוד>.download, ראו remoteGame.cjs) — "מחיקה" צריכה לנקות הכול.
+  for (const p of [libraryZipPath(userData, code), libraryMetaPath(userData, code), path.join(gamesDir(userData), `${code}.download`)]) {
     try {
-      fs.rmSync(p, { force: true });
+      fs.rmSync(p, { force: true, recursive: true });
     } catch {
       /* התעלמות */
     }
