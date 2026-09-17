@@ -16,10 +16,14 @@
 import { numberClipKeys, participantsClipKeys, pointsClipKeys } from './hebrewNumber.ts';
 import {
   AMB_ALL_CORRECT,
+  AMB_CLOSE_RACE,
+  AMB_CONGRATS,
   AMB_LOBBY,
+  AMB_MOST_CORRECT,
   AMB_NEXT,
   AMB_NONE_CORRECT,
   AMB_RAFFLE,
+  CLOSE_RACE_RATIO,
   AMB_START,
   AMB_VOTING,
   HURRY_SECONDS,
@@ -376,7 +380,7 @@ function reactionEvent(s: DisplayedState): NarrationEvent | null {
   if (s.correctCount >= s.votedCount) return reaction('reactionAll', [{ variants: AMB_ALL_CORRECT }]);
   if (s.correctCount === 0) return reaction('reactionNone', [{ variants: AMB_NONE_CORRECT }]);
   const ratio = s.correctCount / s.votedCount;
-  if (ratio > 2 / 3) return reaction('reactionMost', ['amb_most_correct']);
+  if (ratio > 2 / 3) return reaction('reactionMost', [{ variants: AMB_MOST_CORRECT }]);
   if (ratio < 1 / 5) return reaction('reactionFew', ['amb_few_correct']);
   return null;
 }
@@ -475,10 +479,11 @@ function candidates(s: DisplayedState, memory: NarrationMemory): NarrationEvent[
       if (rank > 3) continue;
       const points = s.winners[rank - 1];
       if (points === undefined) continue;
-      const parts: NarrationPart[] = ['amb_drumroll'];
-      if (rank === 1) parts.push('lb_winner');
+      // רולאדת תופים רק לפני המקום הראשון: לפני כל חשיפה זה אותו קטע שלוש
+      // פעמים בחצי דקה.
+      const parts: NarrationPart[] = rank === 1 ? ['amb_drumroll', 'lb_winner'] : [];
       parts.push(`lb_place_${rank}`, ...pointsClipKeys(points));
-      if (rank === 1) parts.push('amb_congrats');
+      if (rank === 1) parts.push({ variants: AMB_CONGRATS });
       events.push({ key: `winner:${rank}`, parts });
     }
     return events;
@@ -525,6 +530,8 @@ function candidates(s: DisplayedState, memory: NarrationMemory): NarrationEvent[
       parts.push('amb_lead_change');
     } else if (s.leaders.length >= 2 && gap === 0) {
       parts.push('amb_tie_top');
+    } else if (s.leaders.length >= 2 && gap > 0 && gap * CLOSE_RACE_RATIO <= (s.leaders[0] ?? 0)) {
+      parts.push({ variants: AMB_CLOSE_RACE });
     } else if (s.leaders.length >= 2 && gap > 0) {
       parts.push({ pre: 'amb_lead_gap_pre', tail: pointsClipKeys(gap) });
     }
@@ -674,7 +681,10 @@ export function narrationStep(s: DisplayedState, memory: NarrationMemory): Narra
   const events: string[] = [];
 
   // עצירה/המשך של הטיימר — אירוע מעבר, לא "פעם אחת בביקור".
-  if (s.stage === 'playing' && s.phase === 'voting' && paused !== memory.lastPaused) {
+  // «עוצרים לרגע» היא עצירה של המנחה. חלון שקופץ (מובילים, הגרלה, לוח) מקפיא
+  // את הטיימר בדרך אגב, ואם נכריז על כך — ההכרזה גם תדרוס את קריאת האווירה של
+  // אותו חלון, שלא תחזור. הזיכרון מתעדכן בכל מקרה, כך שאין «ממשיכים» יתום.
+  if (s.stage === 'playing' && s.phase === 'voting' && s.overlay === 'none' && paused !== memory.lastPaused) {
     const key = paused ? 'timer_paused' : 'timer_resumed';
     const url = s.bank[key];
     if (url !== undefined && url !== '') clips.push(url);

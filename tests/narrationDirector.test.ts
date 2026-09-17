@@ -970,12 +970,13 @@ describe('קריאות אווירה', () => {
   });
 
   describe('מנצחים, הימור, הישרדות, הגרלה ולוח', () => {
-    it('★ מסך המנצחים: פתיח, רולאדה לפני כל חשיפה, וברכה אחרי המקום הראשון', () => {
+    it('★ מסך המנצחים: פתיח, רולאדה רק לפני המקום הראשון, וברכה אחריו', () => {
       const winners = [100, 90, 80];
       const at = (winnersRevealed: number) => amb({ stage: 'winners', winners, winnersRevealed });
       const clips = clipsOf([at(0), at(1), at(2), at(3)]);
       expect(clips[0]).toEqual(['amb_winners_intro.mp3', 'lb_winners.mp3']);
-      expect(clips[1]).toEqual(['amb_drumroll.mp3', 'lb_place_3.mp3', 'tens_80.mp3', 'unit_points.mp3']);
+      // הרולאדה שמורה לרגע השיא: המקומות השלישי והשני נחשפים בלעדיה.
+      expect(clips[1]).toEqual(['lb_place_3.mp3', 'tens_80.mp3', 'unit_points.mp3']);
       expect(clips[3]).toEqual([
         'amb_drumroll.mp3',
         'lb_winner.mp3',

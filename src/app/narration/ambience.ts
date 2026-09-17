@@ -53,13 +53,32 @@ export function pickAmbience(
 // שמשחקים ותיקים אינם מכירים.
 // ---------------------------------------------------------------------------
 
-export const AMB_LOBBY = ['amb_lobby_1', 'amb_lobby_2', 'amb_lobby_3', 'amb_lobby_4', 'amb_lobby_5'] as const;
+export const AMB_LOBBY = [
+  'amb_lobby_1',
+  'amb_lobby_2',
+  'amb_lobby_3',
+  'amb_lobby_4',
+  'amb_lobby_5',
+  'amb_lobby_nearly',
+] as const;
 export const AMB_START = ['amb_start_1', 'amb_start_2', 'amb_start_3'] as const;
 export const AMB_NEXT = ['amb_next_1', 'amb_next_2', 'amb_next_3'] as const;
 export const AMB_VOTING = ['amb_voting_1', 'amb_voting_2', 'amb_voting_3'] as const;
 export const AMB_ALL_CORRECT = ['amb_all_correct_1', 'amb_all_correct_2'] as const;
 export const AMB_NONE_CORRECT = ['amb_none_correct_1', 'amb_none_correct_2'] as const;
 export const AMB_RAFFLE = ['amb_raffle_1', 'amb_raffle_2'] as const;
+/** רוב המשתתפים צדקו — «מהירות מרשימה» הוא ניסוח חלופי לאותו רגע. */
+export const AMB_MOST_CORRECT = ['amb_most_correct', 'amb_fast'] as const;
+/** הפרש זעום בראש הטבלה: אומרים שצמוד, לא כמה. */
+export const AMB_CLOSE_RACE = ['amb_close_race', 'amb_still_open'] as const;
+/** אחרי המקום הראשון. */
+export const AMB_CONGRATS = ['amb_congrats', 'amb_winner_cheer'] as const;
+
+/**
+ * מתי ההפרש בראש הטבלה נחשב «צמוד»: עד חלק אחד מעשרים מניקוד המוביל. מעל
+ * זה אומרים את ההפרש עצמו, שהוא המידע המעניין.
+ */
+export const CLOSE_RACE_RATIO = 20;
 
 /** כל כמה זמן נאמרת קריאת אווירה במסך ההתחברות (ms). */
 export const LOBBY_INTERVAL_MS = 45_000;
