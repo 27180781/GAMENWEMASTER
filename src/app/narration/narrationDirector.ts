@@ -263,6 +263,14 @@ export interface NarrationEvent {
   /** אירוע חד-פעמי למשחק כולו (ולא לביקור). */
   global?: boolean;
   /**
+   * סימון נוסף של "פעם אחת למשחק", בלי לוותר על מפתח קבוע לביקור. נחוץ
+   * כשהניסוח מתחלף אבל האירוע הוא אותו אירוע — קריאת האווירה שלפני מספר
+   * השאלה נאמרת פעם אחת בביקור (`key`), ובתוכה "חצי הדרך" הוא חד-פעמי
+   * למשחק (`once`). בלי ההפרדה הזאת החלפת הניסוח באמצע הביקור הייתה
+   * מחזירה מפתח אחר, ו"ממשיכים הלאה" היה נאמר שוב באמצע השקופית.
+   */
+  once?: string;
+  /**
    * מזהה מצב הסיבוב של הניסוחים (ברירת מחדל: `key`). נדרש כשלכל הופעה יש
    * מפתח משלה — למשל פטפוט הלובי, שבו כל קריאה היא `lobby:n` אחר אבל כולן
    * אותו מצב ולכן מסובבות ביניהן.
@@ -300,7 +308,9 @@ function resolve(
       if (head !== undefined && head !== '') {
         const inner = resolve(part.tail, bank, situation, next);
         next = inner.rotation;
-        urls.push(head, ...inner.urls);
+        // כול-או-כלום לשני הכיוונים: פתיח חסר מפיל את הזנב, וזנב ריק (קטע
+        // מספר שלא נוצר) מפיל את הפתיח — אחרת נשמע "ההפרש הוא" ושקט.
+        if (inner.urls.length > 0) urls.push(head, ...inner.urls);
       }
     } else if (part.url !== null && part.url !== '') {
       urls.push(part.url);
@@ -346,17 +356,28 @@ function correctParts(s: DisplayedState): NarrationEvent['parts'] {
 
 /**
  * תגובת האווירה לחשיפת התשובה הנכונה (ENGINE-narration.md 1.2). שותקת
- * כשהמספרים אינם ידועים, בסקר, בשקופית הימור וכש"הרוב קובע" דולק — שם אין
- * "צדקו" ו"טעו" במובן הרגיל.
+ * כשהמספרים אינם ידועים, בסקר, בשקופית הימור, כש"הרוב קובע" דולק וכששקופית
+ * ההצבעה אינה מסמנת תשובה נכונה כלל — בכל אלה אין "צדקו" ו"טעו" במובן הרגיל.
  */
-function reactionParts(s: DisplayedState): NarrationPart[] | null {
+function reactionEvent(s: DisplayedState): NarrationEvent | null {
   if (s.slideType === 'bet' || s.slideType === 'survey' || s.majorityDecides) return null;
   if (s.correctCount === null || s.votedCount === null || s.votedCount <= 0) return null;
-  if (s.correctCount >= s.votedCount) return [{ variants: AMB_ALL_CORRECT }];
-  if (s.correctCount === 0) return [{ variants: AMB_NONE_CORRECT }];
+  // שקופית הצבעה שלא סומנה בה תשובה נכונה כלל (תשובה-בתמונה שאינה מנוקדת):
+  // המשפט העובדתי שותק, ולכן גם התגובה — אין "טעו" בלי תשובה נכונה לפספס.
+  const hasCorrect = s.answers.some((a) => a.correct) || (s.correctClip ?? '') !== '';
+  if (!hasCorrect) return null;
+  // לכל תוצאה מונה סיבוב משלה, אחרת שתי רשימות בנות שני ניסוחים מקדמות מונה
+  // אחד ומחצית הניסוחים לעולם אינה נשמעת.
+  const reaction = (situation: string, parts: NarrationPart[]): NarrationEvent => ({
+    key: 'reaction',
+    situation,
+    parts,
+  });
+  if (s.correctCount >= s.votedCount) return reaction('reactionAll', [{ variants: AMB_ALL_CORRECT }]);
+  if (s.correctCount === 0) return reaction('reactionNone', [{ variants: AMB_NONE_CORRECT }]);
   const ratio = s.correctCount / s.votedCount;
-  if (ratio > 2 / 3) return ['amb_most_correct'];
-  if (ratio < 1 / 5) return ['amb_few_correct'];
+  if (ratio > 2 / 3) return reaction('reactionMost', ['amb_most_correct']);
+  if (ratio < 1 / 5) return reaction('reactionFew', ['amb_few_correct']);
   return null;
 }
 
@@ -372,8 +393,14 @@ function startPendingOf(s: DisplayedState, memory: NarrationMemory): boolean {
 /** קריאת האווירה שלפני מספר השאלה — חלק מאותו משפט (ENGINE-narration.md 1.2). */
 function questionAmbience(s: DisplayedState, memory: NarrationMemory): NarrationEvent | null {
   if (s.slideType === 'bet' || s.questionOrdinal <= 1) return null;
+  // **מפתח אחד לכל הביקור** (`questionAmbience`): הניסוח נבחר פעם אחת, בצעד
+  // שבו השאלה מוצגת, ושאר צעדי השקופית (חשיפת תשובות) רואים מפתח שכבר נאמר.
+  // כשהמפתח היה הניסוח עצמו, "חצי הדרך" (חד-פעמי למשחק) נרשם ב-global,
+  // הצעד הבא באותה שקופית כבר לא ראה אותו, והקריין זרק "ממשיכים הלאה"
+  // באמצע השקופית — אחרי שהשאלה כבר הוקראה.
+  const key = 'questionAmbience';
   if (s.questionTotal > 1 && s.questionOrdinal >= s.questionTotal) {
-    return { key: 'ambLast', parts: ['amb_last_question'] };
+    return { key, situation: 'ambLast', parts: ['amb_last_question'] };
   }
   // "עברנו את חצי הדרך" — פעם אחת למשחק, בשאלה הראשונה שחוצה את החצי, ורק
   // כשיש בכלל אמצע לחצות (שש שאלות ומעלה).
@@ -382,9 +409,9 @@ function questionAmbience(s: DisplayedState, memory: NarrationMemory): Narration
     s.questionTotal >= 6 &&
     s.questionOrdinal * 2 > s.questionTotal
   ) {
-    return { key: 'ambHalf', parts: ['amb_half'], global: true };
+    return { key, situation: 'ambHalf', parts: ['amb_half'], once: 'ambHalf' };
   }
-  return { key: 'ambNext', parts: [{ variants: AMB_NEXT }] };
+  return { key, situation: 'ambNext', parts: [{ variants: AMB_NEXT }] };
 }
 
 /** דירוג הקבוצות (ENGINE-narration.md 1.2, שורת "מסך הקבוצות"). */
@@ -392,19 +419,24 @@ function groupParts(s: DisplayedState): NarrationPart[] | null {
   const top = s.groups[0];
   if (top === undefined) return null;
   const second = s.groups[1];
-  const rawGap = second === undefined ? 0 : top.points - second.points;
   // הניקוד הקבוצתי הוא *ממוצע* ולכן שבור. מה שנאמר בקול הוא ההפרש המעוגל,
-  // ואם הוא מתעגל לאפס לא אומרים "מובילה באפס נקודות" אלא את הביטוי לבדו.
-  const gap = Math.round(rawGap);
-  // "הקבוצות צמודות" — ההפרש קטן מעשירית מניקוד המובילה (וגם תיקו גמור).
-  if (second !== undefined && rawGap <= top.points / 10) return ['amb_group_close'];
+  // כמו המספרים שעל המסך — ואפס אינו הפרש.
+  const gap = second === undefined ? 0 : Math.round(top.points - second.points);
+  // סדר העדיפויות (שלוש האפשרויות בטבלה ב-ENGINE-narration.md 1.2 אינן
+  // מדורגות): תיקו על המסך → שם הקבוצה המובילה → ההפרש → הביטוי הכללי.
+  // "צמודות" הוא תיקו במספרים המוצגים בדיוק כמו `amb_tie_top` בלוח המובילים,
+  // ולא סף יחסי — אחרת קטע שם הקבוצה, שנוצר ומשולם לכל משחק בנפרד, כמעט
+  // לעולם לא היה מתנגן.
+  if (second !== undefined && gap === 0) return ['amb_group_close'];
   const nameClip = s.groupClips[top.name];
   if (nameClip !== undefined && nameClip !== '') {
     return [{ pre: 'amb_group_lead_pre', tail: [{ url: nameClip }] }];
   }
-  // אין קטע לשם הקבוצה: אומרים את ההפרש, ובלית ברירה את הביטוי לבדו.
+  // אין קטע לשם הקבוצה: אומרים את ההפרש. כשגם אותו אין (קבוצה יחידה) נאמר
+  // הביטוי הכללי השלם — `amb_group_lead_pre` לבדו הוא "הקבוצה המובילה כרגע"
+  // ומשפט קטוע.
   if (gap > 0) return [{ pre: 'amb_group_gap_pre', tail: pointsClipKeys(gap) }];
-  return ['amb_group_lead_pre'];
+  return ['amb_group_close'];
 }
 
 /** כל האירועים שמתאימים למצב הנוכחי, לפי סדר ההשמעה. */
@@ -493,7 +525,7 @@ function candidates(s: DisplayedState, memory: NarrationMemory): NarrationEvent[
       parts.push('amb_lead_change');
     } else if (s.leaders.length >= 2 && gap === 0) {
       parts.push('amb_tie_top');
-    } else if (gap > 0) {
+    } else if (s.leaders.length >= 2 && gap > 0) {
       parts.push({ pre: 'amb_lead_gap_pre', tail: pointsClipKeys(gap) });
     }
     events.push({ key: 'leaders', parts });
@@ -581,8 +613,8 @@ function candidates(s: DisplayedState, memory: NarrationMemory): NarrationEvent[
   if (s.phase === 'results' && s.revealCorrect) {
     const parts = correctParts(s);
     if (parts.length > 0) events.push({ key: 'correct', parts });
-    const reaction = reactionParts(s);
-    if (reaction !== null) events.push({ key: 'reaction', parts: reaction });
+    const reaction = reactionEvent(s);
+    if (reaction !== null) events.push(reaction);
   }
 
   return events;
@@ -652,6 +684,7 @@ export function narrationStep(s: DisplayedState, memory: NarrationMemory): Narra
       const seen = event.global === true ? global : spoken;
       if (seen.has(event.key)) continue;
       seen.add(event.key);
+      if (event.once !== undefined) global.add(event.once);
       // תשובות קודמות שדולגו (חשיפה מלאה בבת אחת) נחשבות כאילו נאמרו, כדי
       // שצעד אחורה וקדימה לא יקריא אותן עכשיו.
       if (event.key.startsWith('answer:')) {

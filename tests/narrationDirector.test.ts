@@ -722,6 +722,31 @@ describe('קריאות אווירה', () => {
       expect(clips[4]![0]).toBe('amb_next_3.mp3'); // ואחריה חוזרים לרגיל
     });
 
+    it('★ בשקופית שחצתה את החצי — קריאת אווירה אחת, ולא "ממשיכים הלאה" באמצע', () => {
+      // "חצי הדרך" הוא חד-פעמי למשחק, אבל קריאת האווירה של השאלה היא
+      // פעם-אחת-לביקור: בלי מפתח קבוע, הצעד הבא באותה שקופית (חשיפת תשובה)
+      // היה מקבל "ממשיכים הלאה" אחרי שהשאלה כבר הוקראה.
+      const half = (over: Partial<DisplayedState> = {}) =>
+        amb({
+          slideId: 4,
+          questionOrdinal: 4,
+          questionTotal: 6,
+          questionShown: true,
+          questionClip: 'q4.mp3',
+          ...over,
+        });
+      const clips = clipsOf([half(), half({ answersShown: 1 }), half({ answersShown: 2 })]);
+      expect(clips[0]).toEqual([
+        'amb_half.mp3',
+        'flow_question_number.mp3',
+        'num_f_4.mp3',
+        'q4.mp3',
+      ]);
+      expect(clips[1]).toEqual(['flow_answer_number.mp3', 'num_f_1.mp3', 'ans1.mp3']);
+      expect(clips[2]).toEqual(['flow_answer_number.mp3', 'num_f_2.mp3', 'ans2.mp3']);
+      expect(clips.flat().filter((c) => c.startsWith('amb_'))).toEqual(['amb_half.mp3']);
+    });
+
     it('במשחק קצר (פחות משש שאלות) אין "חצי הדרך"', () => {
       const clips = clipsOf([q(1, 4), q(2, 4), q(3, 4)]);
       expect(clips.flat()).not.toContain('amb_half.mp3');
@@ -750,18 +775,18 @@ describe('קריאות אווירה', () => {
     const tick = (remaining: number, total: number) =>
       amb({ ...opened, timer: { remaining, total, paused: false } });
 
-    it('★ "תחשבו טוב" אחרי חצי מזמן ההצבעה, ו"מהר!" בסוף', () => {
-      const clips = clipsOf([tick(15, 15), tick(10, 15), tick(7, 15), tick(3, 15)]);
+    it('★ "תחשבו טוב" אחרי חצי מזמן ההצבעה, ו"מהר!" בשתי השניות האחרונות', () => {
+      const clips = clipsOf([tick(15, 15), tick(10, 15), tick(7, 15), tick(3, 15), tick(2, 15)]);
       expect(clips[1]).toEqual([]);
       expect(clips[2]).toEqual(['amb_voting_1.mp3']);
-      expect(clips[3]).toEqual(['amb_hurry.mp3']);
+      expect(clips[3]).toEqual([]); // שלוש שניות — עדיין לא "מהר!"
+      expect(clips[4]).toEqual(['amb_hurry.mp3']);
     });
 
     it('★ "עשר שניות אחרונות" מנצח את "מהר!" כששניהם נופלים יחד', () => {
-      const clips = clipsOf([tick(30, 30), tick(3, 30), tick(2, 30), tick(1, 30)]);
+      const clips = clipsOf([tick(30, 30), tick(2, 30), tick(1, 30)]);
       expect(clips[1]).toEqual(['timer_ten_left.mp3']);
       expect(clips[2]).toEqual([]);
-      expect(clips[3]).toEqual([]);
     });
 
     it('חלון הצבעה חדש מאפס גם את קריאות האווירה', () => {
@@ -794,6 +819,42 @@ describe('קריאות אווירה', () => {
     it('★ פחות מחמישית — ובדיוק חמישית כבר לא', () => {
       expect(reveal(1, 6).at(-1)).toBe('amb_few_correct.mp3');
       expect(reveal(2, 10)).toEqual(['score_correct_is.mp3', 'ans1.mp3']);
+    });
+
+    it('★ שקופית הצבעה בלי תשובה נכונה כלל — גם המשפט העובדתי וגם התגובה שותקים', () => {
+      // תשובה-בתמונה שלא סומנה בה תשובה נכונה היא הגדרה נתמכת (היא פשוט אינה
+      // מנוקדת). אין תשובה נכונה לפספס, ולכן אין "אף אחד לא צדק".
+      expect(
+        reveal(0, 5, {
+          slideType: 'ans_images',
+          answers: [
+            { correct: false, clip: null },
+            { correct: false, clip: null },
+          ],
+        }),
+      ).toEqual([]);
+    });
+
+    it('★ לכל תוצאה מונה ניסוחים משלה — "כולם" ו"אף אחד" אינם חולקים מונה', () => {
+      const at = (slideId: number, correctCount: number) =>
+        amb({
+          slideId,
+          questionShown: true,
+          answersShown: 2,
+          phase: 'results',
+          revealCorrect: true,
+          correctCount,
+          votedCount: 5,
+        });
+      const said = clipsOf([at(1, 5), at(2, 0), at(3, 5), at(4, 0)]).map(
+        (c) => c.filter((x) => x.startsWith('amb_'))[0],
+      );
+      expect(said).toEqual([
+        'amb_all_correct_1.mp3',
+        'amb_none_correct_1.mp3',
+        'amb_all_correct_2.mp3',
+        'amb_none_correct_2.mp3',
+      ]);
     });
 
     it('★ מספרים לא ידועים, סקר, הימור ו"הרוב קובע" — בלי תגובה', () => {
@@ -829,6 +890,27 @@ describe('קריאות אווירה', () => {
       expect(clips[0]).not.toContain('num_f_0.mp3');
     });
 
+    it('★ מוביל יחיד — אין "ההפרש בין הראשון לשני"', () => {
+      // רק מי שצבר ניקוד נמצא ברשימה; בתחילת המשחק זה יכול להיות אחד בלבד,
+      // ואז ההפרש ה"מחושב" הוא כל ניקוד המוביל.
+      const clips = clipsOf([lb(1, [998], ['a'])]);
+      expect(clips[0]!.filter((c) => c.startsWith('amb_'))).toEqual([]);
+      expect(clips[0]![1]).toBe('lb_place_1.mp3');
+    });
+
+    it('★ פתיח שקטעי המספר שאחריו חסרים בבנק — הפתיח לא נאמר לבדו', () => {
+      const numberish = (key: string) =>
+        /^(num_|tens_|hundreds_|thousands_|unit_)/.test(key);
+      const partial = new Proxy(
+        {},
+        { get: (_t, key: string) => (numberish(key) ? undefined : `${key}.mp3`) },
+      ) as Record<string, string>;
+      const clips = clipsOf([
+        base({ bank: partial, overlay: 'leaders', leaders: [100, 60], leaderIds: ['a', 'b'] }),
+      ]);
+      expect(clips[0]).toEqual(['lb_title.mp3', 'lb_place_1.mp3', 'lb_place_2.mp3']);
+    });
+
     it('לוח מובילים ראשון אינו "חילופי הובלה"', () => {
       const clips = clipsOf([lb(1, [100, 60], ['a', 'b'])]);
       expect(clips[0]).not.toContain('amb_lead_change.mp3');
@@ -846,6 +928,13 @@ describe('קריאות אווירה', () => {
       ]);
     });
 
+    it('★ גם הובלה צמודה אומרת את שם הקבוצה — הקטע נוצר לכל משחק בנפרד', () => {
+      expect(gs([{ name: 'הכחולים', points: 100 }, { name: 'הצהובים', points: 95 }], { הכחולים: 'blue.mp3' })).toEqual([
+        'amb_group_lead_pre.mp3',
+        'blue.mp3',
+      ]);
+    });
+
     it('★ קבוצה בלי קטע שם — אומרים את ההפרש במקום', () => {
       expect(gs([{ name: 'הכחולים', points: 100 }, { name: 'הצהובים', points: 40 }])).toEqual([
         'amb_group_gap_pre.mp3',
@@ -854,18 +943,27 @@ describe('קריאות אווירה', () => {
       ]);
     });
 
-    it('★ קבוצה יחידה בלי קטע שם — הביטוי לבדו', () => {
-      expect(gs([{ name: 'הכחולים', points: 100 }])).toEqual(['amb_group_lead_pre.mp3']);
+    it('★ קבוצה יחידה בלי קטע שם — הביטוי השלם, ולא חצי משפט', () => {
+      // `amb_group_lead_pre` הוא "הקבוצה המובילה כרגע" — בלי שם הוא נגמר באוויר.
+      expect(gs([{ name: 'הכחולים', points: 100 }])).toEqual(['amb_group_close.mp3']);
     });
 
-    it('★ הפרש שמתעגל לאפס (ניקוד קבוצתי הוא ממוצע) — אין "אפס נקודות"', () => {
-      expect(gs([{ name: 'א', points: 1.75 }, { name: 'ב', points: 1.4 }])).toEqual([
-        'amb_group_lead_pre.mp3',
+    it('★ הפרש שמתעגל לאפס (ניקוד קבוצתי הוא ממוצע) — "צמודות", בלי "אפס נקודות"', () => {
+      const clips = gs([{ name: 'א', points: 1.75 }, { name: 'ב', points: 1.4 }]);
+      expect(clips).toEqual(['amb_group_close.mp3']);
+      expect(clips).not.toContain('num_f_0.mp3');
+    });
+
+    it('★ בלי קטע שם — ההפרש המעוגל, גם כשהוא קטן', () => {
+      expect(gs([{ name: 'הכחולים', points: 100 }, { name: 'הצהובים', points: 95 }])).toEqual([
+        'amb_group_gap_pre.mp3',
+        'num_f_5.mp3',
+        'unit_points.mp3',
       ]);
     });
 
-    it('★ הפרש קטן מעשירית — "הקבוצות צמודות"', () => {
-      expect(gs([{ name: 'הכחולים', points: 100 }, { name: 'הצהובים', points: 95 }])).toEqual([
+    it('★ בתחילת המשחק, כשכל הקבוצות על אפס — "הקבוצות צמודות"', () => {
+      expect(gs([{ name: 'א', points: 0 }, { name: 'ב', points: 0 }])).toEqual([
         'amb_group_close.mp3',
       ]);
     });

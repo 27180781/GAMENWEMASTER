@@ -67,5 +67,8 @@ export const LOBBY_INTERVAL_MS = 45_000;
 /** כל קריאה שלישית בלובי היא מספר המחוברים ולא ניסוח כללי. */
 export const LOBBY_COUNT_EVERY = 3;
 
-/** "מהר!" — כמה שניות לפני סגירת ההצבעה. */
-export const HURRY_SECONDS = 3;
+/**
+ * "מהר!" — כמה שניות לפני סגירת ההצבעה. **שתיים**, כלשון החוזה
+ * (ENGINE-narration.md 1.2: "בשתי השניות האחרונות amb_hurry").
+ */
+export const HURRY_SECONDS = 2;
