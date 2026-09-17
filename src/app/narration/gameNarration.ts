@@ -38,6 +38,11 @@ export function questionOrdinal(game: GameFile, slideId: number): number {
   return 0;
 }
 
+/** כמה שקופיות שאלה יש במשחק — ל"עברנו את חצי הדרך" ול"השאלה האחרונה". */
+export function questionTotal(game: GameFile): number {
+  return game.questions.filter((slide) => isNarratedQuestionType(slide.type)).length;
+}
+
 /**
  * פעולת שקופית הפונקציה, מנורמלת לארבע המוכרות (ערך לא מוכר נופל ל-'api',
  * בדיוק כמו ה-host עצמו). null בכל שקופית שאינה פונקציה.

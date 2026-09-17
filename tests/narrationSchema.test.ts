@@ -114,6 +114,20 @@ describe('קובץ עם קריינות — כל השדות מגיעים', () => 
     });
   });
 
+  it('★ קטעי שמות הקבוצות (setting.narration.groups) — מפתח = שם הקבוצה המדויק', () => {
+    const raw = gameWithNarration();
+    (raw.setting as Record<string, unknown>).narration = {
+      ...NARRATION_SETTING,
+      groups: { 'הכחולים': 'https://cdn/tts/blue.mp3' },
+    };
+    const parsed = parseGameFile(raw);
+    expect(parsed.setting.narration?.groups).toEqual({ 'הכחולים': 'https://cdn/tts/blue.mp3' });
+  });
+
+  it('בלי groups — מילון ריק, ולא undefined', () => {
+    expect(game.setting.narration?.groups).toEqual({});
+  });
+
   it('קריינות מכובה (enabled: false) — כאילו אינה קיימת', () => {
     const raw = gameWithNarration();
     (raw.setting as Record<string, unknown>).narration = { ...NARRATION_SETTING, enabled: false };

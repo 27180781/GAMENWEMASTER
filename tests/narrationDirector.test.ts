@@ -16,8 +16,18 @@ import {
 } from '../src/app/narration/narrationDirector.ts';
 import { narrationRevealMatches } from '../src/app/narration/gameNarration.ts';
 
-/** בנק "מלא": כל מפתח מחזיר קובץ בשם שלו — כך הבדיקות קריאות. */
+/**
+ * בנק "מלא" — אבל **בלי קבוצת האווירה** (`amb_*`): בדיוק בנק של משחק שנוצר
+ * לפני שהקבוצה נוספה. כל מפתח אחר מחזיר קובץ בשם שלו, כך שהבדיקות קריאות.
+ * הקריאות העובדתיות חייבות להישמע בדיוק כמו קודם גם בקובץ כזה.
+ */
 const BANK = new Proxy(
+  {},
+  { get: (_target, key: string) => (key.startsWith('amb_') ? undefined : `${key}.mp3`) },
+) as Record<string, string>;
+
+/** בנק שכולל גם את קטעי האווירה — לבדיקות של סעיף 1.2. */
+const AMB_BANK = new Proxy(
   {},
   { get: (_target, key: string) => `${key}.mp3` },
 ) as Record<string, string>;
@@ -50,6 +60,16 @@ function base(over: Partial<DisplayedState> = {}): DisplayedState {
     functionDone: false,
     remaining: null,
     announceQuestionNumber: true,
+    lobbyElapsedMs: 0,
+    connectedCount: 0,
+    questionTotal: 1,
+    correctCount: null,
+    votedCount: null,
+    leaderIds: [],
+    groups: [],
+    groupClips: {},
+    bet: null,
+    boardMove: null,
     winnersPreview: false,
     enabled: true,
     bank: BANK,
@@ -598,5 +618,362 @@ describe('מעבר שקופית — הצמד שקופית/חשיפה', () => {
     expect(clips[4]).toEqual([]); // ...ובוטל קומיט אחר כך
     expect(clips[5]).toEqual([]);
     expect(clips[6]).toEqual([]);
+  });
+});
+
+/**
+ * קריאות האווירה (ENGINE-narration.md 1.1 ו-1.2). כל הבדיקות כאן רצות מול
+ * `AMB_BANK` — בנק שכולל את קבוצת `amb_*`. כל שאר הקובץ רץ מול `BANK` שאינו
+ * מכיר אותה, ולכן הוא גם הבדיקה שמשחק ותיק פשוט שקט יותר ולא משתנה.
+ */
+describe('קריאות אווירה', () => {
+  const amb = (over: Partial<DisplayedState> = {}) => base({ bank: AMB_BANK, ...over });
+
+  describe('מסך ההתחברות', () => {
+    const lobby = (lobbyElapsedMs: number, connectedCount = 0) =>
+      amb({ stage: 'opening', lobbyElapsedMs, connectedCount });
+
+    it('★ קריאה כל ~45 שניות, בניסוחים מתחלפים', () => {
+      const clips = clipsOf([lobby(0), lobby(30_000), lobby(45_000), lobby(50_000), lobby(90_000)]);
+      expect(clips[0]).toEqual(['flow_welcome.mp3']);
+      expect(clips[1]).toEqual([]); // עוד לא הגיע הזמן
+      expect(clips[2]).toEqual(['amb_lobby_1.mp3']);
+      expect(clips[3]).toEqual([]); // לא חוזרת לעתים קרובות יותר
+      expect(clips[4]).toEqual(['amb_lobby_2.mp3']);
+    });
+
+    it('★ כל קריאה שלישית היא מספר המחוברים', () => {
+      const clips = clipsOf([
+        lobby(45_000, 12),
+        lobby(90_000, 12),
+        lobby(135_000, 12),
+        lobby(180_000, 12),
+      ]);
+      expect(clips[2]).toEqual(['amb_connected_pre.mp3', 'num_m_12.mp3', 'unit_participants.mp3']);
+      expect(clips[3]).toEqual(['amb_lobby_3.mp3']); // וממשיכים בסיבוב
+    });
+
+    it('כשמספר המחוברים אינו ידוע — ניסוח כללי במקום המספר', () => {
+      const clips = clipsOf([lobby(45_000), lobby(90_000), lobby(135_000)]);
+      expect(clips[2]).toEqual(['amb_lobby_3.mp3']);
+    });
+
+    it('שכבה שאינה מוקראת מעל מסך ההתחברות — שקט', () => {
+      const clips = clipsOf([
+        lobby(0),
+        amb({ stage: 'opening', lobbyElapsedMs: 45_000, overlay: 'other' }),
+      ]);
+      expect(clips[1]).toEqual([]);
+    });
+
+    it('★ הפטפוט נפסק ברגע שהמשחק מתחיל', () => {
+      const clips = clipsOf([
+        lobby(0),
+        amb({ questionShown: true, lobbyElapsedMs: 300_000 }),
+        amb({ questionShown: true, lobbyElapsedMs: 600_000 }),
+      ]);
+      expect(clips.flat().filter((c) => c.startsWith('amb_lobby'))).toEqual([]);
+    });
+  });
+
+  describe('פתיחה, מעבר לשאלה הבאה, חצי הדרך והשאלה האחרונה', () => {
+    it('★ "מתחילים!" ביציאה ממסך הפתיחה — פעם אחת למשחק', () => {
+      const clips = clipsOf([
+        amb({ stage: 'opening' }),
+        amb({ questionShown: true }),
+        amb({ stage: 'opening' }),
+        amb({ slideId: 2, questionShown: true, questionClip: 'q2.mp3' }),
+      ]);
+      expect(clips[1]).toEqual([
+        'amb_start_1.mp3',
+        'flow_question_number.mp3',
+        'num_f_1.mp3',
+        'q1.mp3',
+      ]);
+      expect(clips[3]).not.toContain('amb_start_2.mp3');
+      expect(clips[3]!.filter((c) => c.startsWith('amb_start'))).toEqual([]);
+    });
+
+    const q = (ordinal: number, total: number) =>
+      amb({
+        slideId: ordinal,
+        questionOrdinal: ordinal,
+        questionTotal: total,
+        questionShown: true,
+        questionClip: `q${ordinal}.mp3`,
+      });
+
+    it('★ "השאלה הבאה" לפני מספר השאלה — ובניסוחים מתחלפים', () => {
+      const clips = clipsOf([q(1, 10), q(2, 10), q(3, 10)]);
+      expect(clips[0]).toEqual(['flow_question_number.mp3', 'num_f_1.mp3', 'q1.mp3']);
+      expect(clips[1]).toEqual([
+        'amb_next_1.mp3',
+        'flow_question_number.mp3',
+        'num_f_2.mp3',
+        'q2.mp3',
+      ]);
+      expect(clips[2]![0]).toBe('amb_next_2.mp3');
+    });
+
+    it('★ "עברנו את חצי הדרך" — פעם אחת, בשאלה שחוצה את החצי', () => {
+      const clips = clipsOf([q(1, 10), q(2, 10), q(5, 10), q(6, 10), q(7, 10)]);
+      expect(clips[2]![0]).toBe('amb_next_2.mp3'); // 5 מתוך 10 — עוד לא חצי
+      expect(clips[3]![0]).toBe('amb_half.mp3');
+      expect(clips[4]![0]).toBe('amb_next_3.mp3'); // ואחריה חוזרים לרגיל
+    });
+
+    it('במשחק קצר (פחות משש שאלות) אין "חצי הדרך"', () => {
+      const clips = clipsOf([q(1, 4), q(2, 4), q(3, 4)]);
+      expect(clips.flat()).not.toContain('amb_half.mp3');
+    });
+
+    it('★ "השאלה האחרונה" במקום "השאלה הבאה"', () => {
+      const clips = clipsOf([q(9, 10), q(10, 10)]);
+      expect(clips[1]).toEqual([
+        'amb_last_question.mp3',
+        'flow_question_number.mp3',
+        'num_f_10.mp3',
+        'q10.mp3',
+      ]);
+    });
+
+    it('בנק בלי קבוצת האווירה — בדיוק המשפט העובדתי, בלי חורים', () => {
+      const clips = clipsOf([
+        base({ slideId: 6, questionOrdinal: 6, questionTotal: 10, questionShown: true }),
+      ]);
+      expect(clips[0]).toEqual(['flow_question_number.mp3', 'num_f_6.mp3', 'q1.mp3']);
+    });
+  });
+
+  describe('חלון ההצבעה', () => {
+    const opened = { questionShown: true, answersShown: 2, phase: 'voting' as const };
+    const tick = (remaining: number, total: number) =>
+      amb({ ...opened, timer: { remaining, total, paused: false } });
+
+    it('★ "תחשבו טוב" אחרי חצי מזמן ההצבעה, ו"מהר!" בסוף', () => {
+      const clips = clipsOf([tick(15, 15), tick(10, 15), tick(7, 15), tick(3, 15)]);
+      expect(clips[1]).toEqual([]);
+      expect(clips[2]).toEqual(['amb_voting_1.mp3']);
+      expect(clips[3]).toEqual(['amb_hurry.mp3']);
+    });
+
+    it('★ "עשר שניות אחרונות" מנצח את "מהר!" כששניהם נופלים יחד', () => {
+      const clips = clipsOf([tick(30, 30), tick(3, 30), tick(2, 30), tick(1, 30)]);
+      expect(clips[1]).toEqual(['timer_ten_left.mp3']);
+      expect(clips[2]).toEqual([]);
+      expect(clips[3]).toEqual([]);
+    });
+
+    it('חלון הצבעה חדש מאפס גם את קריאות האווירה', () => {
+      const back = amb({ questionShown: true, answersShown: 2 });
+      const clips = clipsOf([tick(15, 15), tick(7, 15), back, tick(15, 15), tick(7, 15)]);
+      expect(clips[1]).toEqual(['amb_voting_1.mp3']);
+      expect(clips[4]).toEqual(['amb_voting_2.mp3']);
+    });
+  });
+
+  describe('תגובה לתשובה הנכונה', () => {
+    const reveal = (correctCount: number | null, votedCount: number | null, over: Partial<DisplayedState> = {}) => {
+      const shared = { questionShown: true, answersShown: 2, phase: 'results' as const, correctCount, votedCount, ...over };
+      return clipsOf([amb(shared), amb({ ...shared, revealCorrect: true })])[1]!;
+    };
+
+    it('★ כולם צדקו', () => {
+      expect(reveal(10, 10)).toEqual(['score_correct_is.mp3', 'ans1.mp3', 'amb_all_correct_1.mp3']);
+    });
+
+    it('★ אף אחד לא צדק', () => {
+      expect(reveal(0, 10).at(-1)).toBe('amb_none_correct_1.mp3');
+    });
+
+    it('★ יותר משני שלישים — ובדיוק שני שלישים כבר לא', () => {
+      expect(reveal(7, 10).at(-1)).toBe('amb_most_correct.mp3');
+      expect(reveal(6, 9)).toEqual(['score_correct_is.mp3', 'ans1.mp3']);
+    });
+
+    it('★ פחות מחמישית — ובדיוק חמישית כבר לא', () => {
+      expect(reveal(1, 6).at(-1)).toBe('amb_few_correct.mp3');
+      expect(reveal(2, 10)).toEqual(['score_correct_is.mp3', 'ans1.mp3']);
+    });
+
+    it('★ מספרים לא ידועים, סקר, הימור ו"הרוב קובע" — בלי תגובה', () => {
+      expect(reveal(null, null)).toEqual(['score_correct_is.mp3', 'ans1.mp3']);
+      expect(reveal(10, 10, { slideType: 'survey' })).toEqual(['misc_poll_results.mp3']);
+      expect(reveal(10, 10, { slideType: 'bet', questionOrdinal: 0 })).toEqual([]);
+      expect(reveal(10, 10, { majorityDecides: true })).toEqual([
+        'misc_majority.mp3',
+        'ans1.mp3',
+      ]);
+    });
+  });
+
+  describe('לוח המובילים', () => {
+    const lb = (slideId: number, leaders: number[], leaderIds: string[]) =>
+      amb({ slideId, overlay: 'leaders', leaders, leaderIds });
+
+    it('★ הפרש → תיקו → חילופי הובלה', () => {
+      const clips = clipsOf([
+        lb(1, [100, 60], ['a', 'b']),
+        lb(2, [120, 120], ['a', 'b']),
+        lb(3, [130, 120], ['b', 'a']),
+      ]);
+      expect(clips[0]!.slice(-3)).toEqual(['amb_lead_gap_pre.mp3', 'tens_40.mp3', 'unit_points.mp3']);
+      expect(clips[1]!.at(-1)).toBe('amb_tie_top.mp3');
+      expect(clips[2]!.at(-1)).toBe('amb_lead_change.mp3');
+    });
+
+    it('★ הפרש שמתעגל לאפס ("ניקוד יורד") — תיקו, ולא "אפס נקודות"', () => {
+      // על המסך שניהם מראים 10, ולכן זה תיקו גם באוזן.
+      const clips = clipsOf([lb(1, [10.4, 10.1], ['a', 'b'])]);
+      expect(clips[0]!.at(-1)).toBe('amb_tie_top.mp3');
+      expect(clips[0]).not.toContain('num_f_0.mp3');
+    });
+
+    it('לוח מובילים ראשון אינו "חילופי הובלה"', () => {
+      const clips = clipsOf([lb(1, [100, 60], ['a', 'b'])]);
+      expect(clips[0]).not.toContain('amb_lead_change.mp3');
+    });
+  });
+
+  describe('מסך הקבוצות', () => {
+    const gs = (groups: { name: string; points: number }[], groupClips: Record<string, string> = {}) =>
+      clipsOf([amb({ overlay: 'groups', groups, groupClips })])[0]!;
+
+    it('★ קטע שם הקבוצה המובילה', () => {
+      expect(gs([{ name: 'הכחולים', points: 100 }, { name: 'הצהובים', points: 40 }], { הכחולים: 'blue.mp3' })).toEqual([
+        'amb_group_lead_pre.mp3',
+        'blue.mp3',
+      ]);
+    });
+
+    it('★ קבוצה בלי קטע שם — אומרים את ההפרש במקום', () => {
+      expect(gs([{ name: 'הכחולים', points: 100 }, { name: 'הצהובים', points: 40 }])).toEqual([
+        'amb_group_gap_pre.mp3',
+        'tens_60.mp3',
+        'unit_points.mp3',
+      ]);
+    });
+
+    it('★ קבוצה יחידה בלי קטע שם — הביטוי לבדו', () => {
+      expect(gs([{ name: 'הכחולים', points: 100 }])).toEqual(['amb_group_lead_pre.mp3']);
+    });
+
+    it('★ הפרש שמתעגל לאפס (ניקוד קבוצתי הוא ממוצע) — אין "אפס נקודות"', () => {
+      expect(gs([{ name: 'א', points: 1.75 }, { name: 'ב', points: 1.4 }])).toEqual([
+        'amb_group_lead_pre.mp3',
+      ]);
+    });
+
+    it('★ הפרש קטן מעשירית — "הקבוצות צמודות"', () => {
+      expect(gs([{ name: 'הכחולים', points: 100 }, { name: 'הצהובים', points: 95 }])).toEqual([
+        'amb_group_close.mp3',
+      ]);
+    });
+  });
+
+  describe('מנצחים, הימור, הישרדות, הגרלה ולוח', () => {
+    it('★ מסך המנצחים: פתיח, רולאדה לפני כל חשיפה, וברכה אחרי המקום הראשון', () => {
+      const winners = [100, 90, 80];
+      const at = (winnersRevealed: number) => amb({ stage: 'winners', winners, winnersRevealed });
+      const clips = clipsOf([at(0), at(1), at(2), at(3)]);
+      expect(clips[0]).toEqual(['amb_winners_intro.mp3', 'lb_winners.mp3']);
+      expect(clips[1]).toEqual(['amb_drumroll.mp3', 'lb_place_3.mp3', 'tens_80.mp3', 'unit_points.mp3']);
+      expect(clips[3]).toEqual([
+        'amb_drumroll.mp3',
+        'lb_winner.mp3',
+        'lb_place_1.mp3',
+        'hundreds_100.mp3',
+        'unit_points.mp3',
+        'amb_congrats.mp3',
+      ]);
+    });
+
+    it('★ "אמיצים!" כשההצבעה על ההימור נפתחת', () => {
+      const bet = { slideType: 'bet', questionOrdinal: 0, questionShown: true, questionClip: 'bet.mp3' };
+      const clips = clipsOf([amb(bet), amb({ ...bet, phase: 'voting' })]);
+      expect(clips[1]).toEqual(['flow_vote_open.mp3', 'amb_bet_brave.mp3']);
+    });
+
+    it('★ תוצאות ההימור: אין מהמרים / זכייה גדולה / הפסד גדול', () => {
+      const results = (bet: DisplayedState['bet']) => clipsOf([amb({ overlay: 'betResults', bet })])[0]!;
+      expect(results({ anyStake: false, biggestWin: 0, biggestLoss: 0, leaderScore: 100 })).toEqual([
+        'bet_results.mp3',
+        'amb_bet_none.mp3',
+      ]);
+      expect(results({ anyStake: true, biggestWin: 60, biggestLoss: 0, leaderScore: 100 })).toEqual([
+        'bet_results.mp3',
+        'amb_bet_big_win.mp3',
+      ]);
+      expect(results({ anyStake: true, biggestWin: 10, biggestLoss: 70, leaderScore: 100 })).toEqual([
+        'bet_results.mp3',
+        'amb_bet_big_loss.mp3',
+      ]);
+      expect(results({ anyStake: true, biggestWin: 10, biggestLoss: 10, leaderScore: 100 })).toEqual([
+        'bet_results.mp3',
+      ]);
+    });
+
+    it('★ הישרדות: מתח לפני, רווחה אחרי', () => {
+      const survival = (over: Partial<DisplayedState> = {}) =>
+        amb({ slideType: 'function', votable: false, questionOrdinal: 0, functionAction: 'players', ...over });
+      const clips = clipsOf([survival(), survival({ functionDone: true, remaining: 8 })]);
+      expect(clips[0]).toEqual(['amb_surv_tension.mp3', 'surv_round.mp3']);
+      expect(clips[1]).toEqual([
+        'surv_remaining.mp3',
+        'num_m_8.mp3',
+        'unit_participants.mp3',
+        'amb_surv_relief.mp3',
+      ]);
+    });
+
+    it('★ הגרלה — ניסוחים מתחלפים', () => {
+      const clips = clipsOf([
+        amb({ slideId: 1, overlay: 'raffle' }),
+        amb({ slideId: 2, overlay: 'raffle' }),
+      ]);
+      expect(clips[0]).toEqual(['amb_raffle_1.mp3']);
+      expect(clips[1]).toEqual(['amb_raffle_2.mp3']);
+    });
+
+    it('★ לוח הסולמות — לפי כיוון התזוזה', () => {
+      const board = (boardMove: DisplayedState['boardMove']) =>
+        clipsOf([amb({ overlay: 'board', boardMove })])[0]!;
+      expect(board('climb')).toEqual(['amb_board_climb.mp3']);
+      expect(board('fall')).toEqual(['amb_board_fall.mp3']);
+      expect(board(null)).toEqual(['amb_board_move.mp3']);
+    });
+  });
+
+  describe('כללי הזהב חלים גם על האווירה', () => {
+    it('★ משחק בלי קריינות (בנק ריק, בלי קטעים) — שקט מוחלט לאורך כל המהלך', () => {
+      const silent = (over: Partial<DisplayedState> = {}) =>
+        base({ bank: {}, questionClip: null, answers: [], ...over });
+      const clips = clipsOf([
+        silent({ stage: 'opening' }),
+        silent({ stage: 'opening', lobbyElapsedMs: 200_000, connectedCount: 9 }),
+        silent({ questionShown: true, questionOrdinal: 2, questionTotal: 8 }),
+        silent({ questionShown: true, phase: 'voting', timer: { remaining: 3, total: 30, paused: false } }),
+        silent({ questionShown: true, phase: 'results', revealCorrect: true, correctCount: 0, votedCount: 5 }),
+        silent({ overlay: 'leaders', leaders: [10, 1], leaderIds: ['a', 'b'] }),
+        silent({ overlay: 'groups', groups: [{ name: 'x', points: 5 }] }),
+        silent({ overlay: 'raffle' }),
+        silent({ overlay: 'board', boardMove: 'climb' }),
+        silent({ stage: 'winners', winners: [10], winnersRevealed: 1 }),
+        silent({ stage: 'scoreboard' }),
+      ]);
+      expect(clips.flat()).toEqual([]);
+    });
+
+    it('★ קריינות מושתקת — גם האווירה שותקת', () => {
+      const clips = clipsOf([amb({ stage: 'opening', lobbyElapsedMs: 90_000, enabled: false })]);
+      expect(clips[0]).toEqual([]);
+    });
+
+    it('★ מדיה חוסמת — האווירה אינה מתנגנת מעליה', () => {
+      const clips = clipsOf([
+        amb({ slideId: 5, questionOrdinal: 5, questionTotal: 10, questionShown: true, activeMedia: 'open' }),
+      ]);
+      expect(clips[0]).toEqual([]);
+    });
   });
 });

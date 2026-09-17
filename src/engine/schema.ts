@@ -50,6 +50,12 @@ export const narrationSettingSchema = z
     duck: z.boolean().optional().default(false),
     bankVersion: z.number().optional().default(1),
     bank: z.record(z.string()).optional().default({}),
+    /**
+     * קטעי שמות הקבוצות של המשחק הזה (`שם הקבוצה בדיוק כמו במרשם → כתובת`).
+     * שמות קבוצות אינם בבנק כי הם משתנים ממשחק למשחק; שם חסר = הקריין אומר
+     * את הביטוי הכללי בלי השם.
+     */
+    groups: z.record(z.string()).optional().default({}),
   })
   .passthrough();
 

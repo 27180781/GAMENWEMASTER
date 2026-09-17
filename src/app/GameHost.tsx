@@ -69,6 +69,8 @@ import {
   emptyNarrationMemory,
   narrationStep,
   type DisplayedState,
+  type NarrationBetSummary,
+  type NarrationGroupStanding,
   type NarrationOverlay,
 } from './narration/narrationDirector.ts';
 import {
@@ -77,6 +79,7 @@ import {
   narrationFunctionAction,
   narrationRevealMatches,
   questionOrdinal,
+  questionTotal,
   slideNarrationClips,
 } from './narration/gameNarration.ts';
 import { decodeSlideMedia } from './mediaDecode.ts';
@@ -96,7 +99,7 @@ import {
   type RosterData,
 } from './roster.ts';
 import { selectPlayersToRemove } from './functionPlayers.ts';
-import { hasGroupData } from './groupScore.ts';
+import { groupCategories, groupStandings, hasGroupData } from './groupScore.ts';
 import { adjustGroupBonus } from '../engine/scoreAdjust.ts';
 import {
   eligibleCount,
@@ -147,6 +150,8 @@ const NO_REVEAL: RevealState = { questionShown: false, answersShown: 0, revealCo
 
 /** העדפות הקריינות של המפעיל (ESC) — נשמרות בדפדפן, לא בקובץ המשחק. */
 const NARRATION_MUTE_KEY = 'trivia.narration.muted';
+/** כל כמה זמן נדגם שעון הלובי (ms) — תדר נמוך בכוונה, ראו lobbyElapsedMs. */
+const LOBBY_SAMPLE_MS = 5_000;
 const NARRATION_VOLUME_KEY = 'trivia.narration.volume';
 /** כמה מנמיכים את סאונד המשחק בזמן שהקריין מדבר (רק כש-duck דלוק בקובץ). */
 const NARRATION_DUCK = 0.25;
@@ -457,10 +462,18 @@ export function GameHost({
    * ההשתקה והווליום הם העדפת מפעיל — נשמרים ב-localStorage בין משחקים.
    */
   const narrationActive = useMemo(() => hasNarration(game), [game]);
+  /** כמה שקופיות שאלה יש במשחק — קבוע לכל המשחק, ולא מחושב מחדש בכל הצבעה. */
+  const narrationQuestionTotal = useMemo(() => questionTotal(game), [game]);
   const [narrationMuted, setNarrationMuted] = useState(() => readNarrationMuted());
   const [narrationVolume, setNarrationVolume] = useState(() => readNarrationVolume());
   /** הקריין מדבר כרגע — מנמיך את סאונד המשחק (duck) ומעכב מעבר אוטומטי. */
   const [narrationSpeaking, setNarrationSpeaking] = useState(false);
+  /**
+   * כמה זמן מוצג מסך ההתחברות (ms) — הקלט היחיד של פטפוט הלובי. נדגם בתדר
+   * נמוך (כל 5 שניות) **ורק** כל עוד מסך הפתיחה מוצג והקריינות פעילה, כדי
+   * שלא ירוץ שום טיימר חדש במהלך המשחק עצמו.
+   */
+  const [lobbyElapsedMs, setLobbyElapsedMs] = useState(0);
   const syntheticCrowd = settings.crowdEnabled;
   /** מסך מובילים באמצע משחק (פקודת מנחה 1) — שכבה מעל, המשחק ממשיך מתחת. */
   const [leadersOverlay, setLeadersOverlay] = useState(false);
@@ -1885,6 +1898,16 @@ export function GameHost({
 
   useEffect(() => narration.onSpeakingChange(setNarrationSpeaking), [narration]);
 
+  // שעון הלובי — קיים רק במסך הפתיחה ורק כשיש קריינות. נעצר (ומתנקה) ברגע
+  // שהמשחק מתחיל, ולכן אינו מוסיף ולו רינדור אחד למהלך המשחק.
+  useEffect(() => {
+    if (!narrationActive || stage !== 'opening') return;
+    const startedAt = Date.now();
+    setLobbyElapsedMs(0);
+    const id = window.setInterval(() => setLobbyElapsedMs(Date.now() - startedAt), LOBBY_SAMPLE_MS);
+    return () => window.clearInterval(id);
+  }, [narrationActive, stage]);
+
   // ניקוי בעזיבת המשחק — עצירה, הסרת מאזינים וסגירת ה-AudioContext.
   useEffect(() => () => narration.dispose(), [narration]);
 
@@ -2028,19 +2051,22 @@ export function GameHost({
     ? 'betResults'
     : leadersOverlay
       ? 'leaders'
-      : votesOverlay ||
-          groupsOverlay ||
-          boardOverlay ||
-          boardPending !== null ||
-          raffle !== null ||
-          connectCategory !== null ||
-          settingsOpen ||
-          rosterOpen ||
-          captureOn ||
-          lobbyOverlay ||
-          menuOpen
-        ? 'other'
-        : 'none';
+      : groupsOverlay
+        ? 'groups'
+        : raffle !== null
+          ? 'raffle'
+          : boardOverlay
+            ? 'board'
+            : votesOverlay ||
+                boardPending !== null ||
+                connectCategory !== null ||
+                settingsOpen ||
+                rosterOpen ||
+                captureOn ||
+                lobbyOverlay ||
+                menuOpen
+              ? 'other'
+              : 'none';
   const narrationMemoryRef = useRef(emptyNarrationMemory());
 
   useEffect(() => {
@@ -2059,6 +2085,51 @@ export function GameHost({
     // ידבר בדיוק על מה שמוצג — גם אם בינתיים הגיעה הצבעה שדחפה state חדש.
     const s = g.questions.find((q) => q.id === state.currentSlideId) ?? engine.getCurrentSlide();
     const narrationSetting = g.setting.narration;
+    // מספרי "צדקו / הצביעו" — מחושבים רק ברגע חשיפת התשובה הנכונה, כשההצבעה
+    // כבר סגורה; במהלך ההצבעה לא נוגעים ב-votesBySlide.
+    let correctCount: number | null = null;
+    let votedCount: number | null = null;
+    if (state.phase === 'results' && reveal.revealCorrect && isVotableSlide(s) && s.type !== 'bet') {
+      const votes = state.votesBySlide[state.currentSlideId];
+      if (votes !== undefined) {
+        const correctIds = new Set(s.question.answers.filter((a) => a.correct).map((a) => a.id));
+        const picks = Object.values(votes);
+        votedCount = picks.length;
+        correctCount = picks.filter((id) => correctIds.has(id)).length;
+      }
+    }
+    // מחשבים ניקוד רק כשבאמת מציגים מובילים/מנצחים (מיון על כל המשתתפים).
+    const leaderRows = narrationOverlay === 'leaders' ? engine.getWinners(3) : [];
+    // דירוג הקבוצות — רק כשמסך הקבוצות מוצג, ובאותה צורה שהמסך עצמו מציג.
+    let groups: NarrationGroupStanding[] = [];
+    if (narrationOverlay === 'groups') {
+      const cats = groupCategories(roster);
+      const cat = cats.length > 0 ? cats[((groupsCatIndex % cats.length) + cats.length) % cats.length] : undefined;
+      if (cat !== undefined) {
+        groups = groupStandings(roster, cat.id, state.scores, state.answerTimes, groupBonus).map(
+          (row) => ({ name: row.name, points: row.avgScore }),
+        );
+      }
+    }
+    let bet: NarrationBetSummary | null = null;
+    if (narrationOverlay === 'betResults') {
+      const outcomes = state.betOutcomes[state.currentSlideId] ?? {};
+      const summary = betOutcomeSummary(outcomes);
+      bet = {
+        anyStake: Object.values(outcomes).some((o) => o.stake > 0),
+        biggestWin: Math.max(0, summary.biggest?.delta ?? 0),
+        biggestLoss: Math.max(0, ...summary.losers.map((l) => -l.delta)),
+        leaderScore: engine.getWinners(1)[0]?.score ?? 0,
+      };
+    }
+    const boardMove =
+      narrationOverlay === 'board'
+        ? board.lastRound.some((row) => row.jump === 'ladder')
+          ? 'climb'
+          : board.lastRound.some((row) => row.jump === 'snake')
+            ? 'fall'
+            : null
+        : null;
     const display: DisplayedState = {
       stage,
       phase: state.phase,
@@ -2078,8 +2149,7 @@ export function GameHost({
         ? { remaining: timer.remaining, total: timer.total, paused: timer.paused }
         : null,
       overlay: narrationOverlay,
-      // מחשבים ניקוד רק כשבאמת מציגים מובילים/מנצחים (מיון על כל המשתתפים).
-      leaders: narrationOverlay === 'leaders' ? engine.getWinners(3).map((w) => w.score) : [],
+      leaders: leaderRows.map((w) => w.score),
       winners:
         stage === 'winners'
           ? engine
@@ -2094,6 +2164,16 @@ export function GameHost({
       functionDone: functionDetail !== '' && functionDetailSlide === state.currentSlideId,
       remaining: connectedIds.length,
       announceQuestionNumber: narrationSetting?.announceQuestionNumber ?? true,
+      lobbyElapsedMs: stage === 'opening' ? lobbyElapsedMs : 0,
+      connectedCount: connectedIds.length,
+      questionTotal: narrationQuestionTotal,
+      correctCount,
+      votedCount,
+      leaderIds: leaderRows.map((w) => w.voterId),
+      groups,
+      groupClips: narrationSetting?.groups ?? {},
+      bet,
+      boardMove,
       winnersPreview: winnersPreviewRef.current !== null,
       enabled: !narrationMuted,
       bank: narrationSetting?.bank ?? {},
@@ -2121,6 +2201,12 @@ export function GameHost({
     functionDetail,
     functionDetailSlide,
     connectedIds,
+    lobbyElapsedMs,
+    narrationQuestionTotal,
+    roster,
+    groupsCatIndex,
+    groupBonus,
+    board,
   ]);
 
   // הקפאת/הפשרת טיימר ההצבעה בזמן שכבה חוסמת. מכבדים עצירה ידנית (מקש 6): מפשירים
