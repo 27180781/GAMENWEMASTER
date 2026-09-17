@@ -72,5 +72,42 @@ export function mediaFields(game: GameFile): MediaField[] {
       label: SOUND_LABELS[key] ?? `סאונד (${key})`,
     });
   }
+
+  // קטעי הקריינות — אחרונים בתור בכוונה: הם רבים וקטנים, וכל השאר (רקעים,
+  // תמונות שאלה, סאונדים) חשוב יותר. מרגע שהם כאן הם מכוסים אוטומטית גם
+  // בטעינה המוקדמת, גם בבדיקת הקישורים השבורים וגם במיפוי נתיבי האופליין.
+  const narration = s.narration;
+  if (narration) {
+    const bank = narration.bank;
+    for (const key of Object.keys(bank)) {
+      fields.push({
+        get: () => bank[key] ?? '',
+        set: (v) => (bank[key] = v),
+        label: `קריינות · בנק · ${key}`,
+      });
+    }
+  }
+  game.questions.forEach((slide, i) => {
+    const nar = slide.narration;
+    if (!nar) return;
+    const n = `שקופית ${i + 1} · קריינות`;
+    fields.push({
+      get: () => nar.question ?? '',
+      set: (v) => (nar.question = v),
+      label: `${n} · שאלה`,
+    });
+    nar.answers.forEach((_, j) => {
+      fields.push({
+        get: () => nar.answers[j] ?? '',
+        set: (v) => (nar.answers[j] = v),
+        label: `${n} · תשובה ${j + 1}`,
+      });
+    });
+    fields.push({
+      get: () => nar.correct ?? '',
+      set: (v) => (nar.correct = v),
+      label: `${n} · תשובה נכונה`,
+    });
+  });
   return fields;
 }

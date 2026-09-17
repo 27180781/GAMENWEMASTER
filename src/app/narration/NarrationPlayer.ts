@@ -1,0 +1,268 @@
+/**
+ * נגן הקריינות — **שכבה נפרדת לגמרי מ-AudioManager** (ENGINE-narration.md
+ * סעיף 2):
+ * - לא עובר דרך `AudioManager.play`, ולכן אינו עוצר את סאונד המשחק ואינו נעצר
+ *   על ידו. כלל הבלעדיות של מנהל הסאונד נשאר בדיוק כפי שהוא.
+ * - Web Audio: AudioContext אחד (נוצר בעצלתיים), GainNode ראשי קבוע (ווליום
+ *   והשתקה חיים), ומטמון AudioBuffer לפי כתובת — כל קטע נטען ומפוענח פעם אחת.
+ * - `say` משבץ את הקטעים אחד אחרי השני על שעון ה-AudioContext, בלי חורים
+ *   נשמעים בין קטעי מספר מורכב.
+ * - `cancel` עוצר מיד — "הקריינות נגררת אחרי המסך": כל שינוי במה שמוצג מבטל
+ *   את מה שמתנגן.
+ * - קטע שלא נטען (404/רשת) נשמר במטמון כ-null ומדולג בשקט; הוא לעולם לא חוסם
+ *   את שאר המשפט ולא את המשחק.
+ *
+ * כל גישה ל-API של הדפדפן מוגנת (`typeof`), כדי שהמחלקה תהיה בטוחה גם בסביבת
+ * הבדיקות (Node) — שם היא פשוט לא משמיעה דבר.
+ */
+
+import { debugLog } from '../debugLog.ts';
+
+/** קיצור כתובת לתצוגה בלוג (בלי query ארוך). */
+function shortUrl(url: string): string {
+  const clean = url.split('?')[0] ?? url;
+  const parts = clean.split('/');
+  return parts[parts.length - 1] || clean.slice(0, 40);
+}
+
+export interface SayOptions {
+  /**
+   * רווח בין קטעים באותו משפט (ms). ברירת המחדל 0 — הרכבת מספר חייבת להישמע
+   * כמילה אחת רציפה ("עשרים ושלוש"), ולכן אין חורים בתוך רצף.
+   */
+  gapMs?: number;
+}
+
+/** כמה קטעים נטענים במקביל בטעינה מוקדמת (עדיפות נמוכה — לא חונקים את הרשת). */
+const PRELOAD_CHUNK = 4;
+
+export class NarrationPlayer {
+  private context: AudioContext | null = null;
+  private master: GainNode | null = null;
+  /** כתובת → buffer מפוענח, או null כשהטעינה נכשלה (מדלגים עליו מכאן והלאה). */
+  private readonly cache = new Map<string, AudioBuffer | null>();
+  /** טעינות שנמצאות באוויר — כדי לא למשוך את אותו קטע פעמיים. */
+  private readonly inFlight = new Map<string, Promise<AudioBuffer | null>>();
+  private readonly sources = new Set<AudioBufferSourceNode>();
+  private readonly speakingListeners = new Set<(speaking: boolean) => void>();
+  private speaking = false;
+  private volume = 1;
+  private muted = false;
+  /** מזהה הרצה: כל `say`/`cancel` מקדם אותו, וכך תוצאות ישנות נזרקות. */
+  private run = 0;
+  private disposed = false;
+  private listening = false;
+  private readonly unlockFn: () => void;
+
+  constructor() {
+    // פתיחת ה-AudioContext באינטראקציה הראשונה — אותו דפוס כמו ב-AudioManager,
+    // אבל עם מאזינים משלנו (הוא מסיר את שלו אחרי הפתיחה הראשונה).
+    this.unlockFn = () => {
+      const ctx = this.context;
+      if (ctx && ctx.state === 'suspended') void ctx.resume().catch(() => {});
+    };
+    this.armUnlockListeners();
+  }
+
+  private armUnlockListeners(): void {
+    if (this.listening || typeof window === 'undefined') return;
+    this.listening = true;
+    window.addEventListener('pointerdown', this.unlockFn);
+    window.addEventListener('keydown', this.unlockFn);
+  }
+
+  private disarmUnlockListeners(): void {
+    if (!this.listening || typeof window === 'undefined') return;
+    this.listening = false;
+    window.removeEventListener('pointerdown', this.unlockFn);
+    window.removeEventListener('keydown', this.unlockFn);
+  }
+
+  /** ה-AudioContext והמסכם הראשי, או null בסביבה בלי Web Audio. */
+  private ensureContext(): AudioContext | null {
+    if (this.disposed) return null;
+    if (this.context) return this.context;
+    if (typeof AudioContext === 'undefined') return null;
+    try {
+      const ctx = new AudioContext();
+      const master = ctx.createGain();
+      master.gain.value = this.muted ? 0 : this.volume;
+      master.connect(ctx.destination);
+      this.context = ctx;
+      this.master = master;
+      return ctx;
+    } catch {
+      return null; // סביבה בלי אודיו — הקריינות פשוט שותקת
+    }
+  }
+
+  private applyGain(): void {
+    if (this.master) this.master.gain.value = this.muted ? 0 : this.volume;
+  }
+
+  setVolume(volume: number): void {
+    this.volume = Math.min(1, Math.max(0, volume));
+    this.applyGain();
+  }
+
+  setMuted(muted: boolean): void {
+    this.muted = muted;
+    this.applyGain();
+    if (muted) this.cancel();
+  }
+
+  isSpeaking(): boolean {
+    return this.speaking;
+  }
+
+  /** מנוי על שינוי מצב הדיבור (הנמכת סאונד המשחק / המתנה של מעבר אוטומטי). */
+  onSpeakingChange(listener: (speaking: boolean) => void): () => void {
+    this.speakingListeners.add(listener);
+    return () => {
+      this.speakingListeners.delete(listener);
+    };
+  }
+
+  private setSpeaking(speaking: boolean): void {
+    if (this.speaking === speaking) return;
+    this.speaking = speaking;
+    for (const listener of this.speakingListeners) listener(speaking);
+  }
+
+  /** טוען ומפענח קטע בודד; כישלון נשמר כ-null ולא נזרק החוצה לעולם. */
+  private load(url: string): Promise<AudioBuffer | null> {
+    const cached = this.cache.get(url);
+    if (cached !== undefined) return Promise.resolve(cached);
+    const flying = this.inFlight.get(url);
+    if (flying) return flying;
+    const ctx = this.ensureContext();
+    if (ctx === null || typeof fetch === 'undefined') {
+      this.cache.set(url, null);
+      return Promise.resolve(null);
+    }
+    const promise = (async (): Promise<AudioBuffer | null> => {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return null;
+        const bytes = await res.arrayBuffer();
+        return await ctx.decodeAudioData(bytes);
+      } catch {
+        return null;
+      }
+    })()
+      .then((buffer) => {
+        this.cache.set(url, buffer);
+        this.inFlight.delete(url);
+        if (buffer === null) debugLog('narration', `קטע לא נטען — מדלגים (${shortUrl(url)})`);
+        return buffer;
+      })
+      .catch(() => {
+        this.cache.set(url, null);
+        this.inFlight.delete(url);
+        return null;
+      });
+    this.inFlight.set(url, promise);
+    return promise;
+  }
+
+  /**
+   * טעינה מוקדמת ברקע (בנק הביטויים, קטעי השקופית הבאה). לעולם אינה זורקת,
+   * ואינה מחזיקה את הקורא — מחזירה promise שאפשר להתעלם ממנו.
+   */
+  async preload(urls: readonly string[]): Promise<void> {
+    const pending = urls.filter((url) => url !== '' && !this.cache.has(url));
+    for (let i = 0; i < pending.length; i += PRELOAD_CHUNK) {
+      if (this.disposed) return;
+      await Promise.all(pending.slice(i, i + PRELOAD_CHUNK).map((url) => this.load(url)));
+    }
+  }
+
+  /**
+   * אומר רצף קטעים. כל קריאה מבטלת קודם את מה שמתנגן (המסך מוביל), והקטעים
+   * משובצים אחד אחרי השני לפי אורכם. קריאה כשה-AudioContext עדיין נעול נזרקת
+   * *בשקט* ולא נשמרת לתור — קריינות מאחרת גרועה מקריינות חסרה.
+   */
+  say(urls: readonly string[], { gapMs = 0 }: SayOptions = {}): void {
+    this.cancel();
+    if (this.disposed || this.muted) return;
+    const clips = urls.filter((url) => url !== '');
+    if (clips.length === 0) return;
+    const ctx = this.ensureContext();
+    if (ctx === null) return;
+    if (ctx.state === 'suspended') void ctx.resume().catch(() => {});
+
+    const run = this.run;
+    void (async () => {
+      const buffers = await Promise.all(clips.map((url) => this.load(url)));
+      if (this.disposed || this.run !== run) return; // בוטל בזמן הטעינה
+      const ready = buffers.filter((b): b is AudioBuffer => b !== null);
+      if (ready.length === 0) return;
+      if (ctx.state === 'suspended') {
+        debugLog('narration', 'האודיו עדיין נעול — מדלגים על המשפט');
+        return;
+      }
+      const master = this.master;
+      if (master === null) return;
+      // שיבוץ על שעון ה-AudioContext: תחילת כל קטע = סוף הקודם (+ הרווח
+      // המוגדר), כך שאין "מדרגות" בין קטעי מספר מורכב.
+      let at = ctx.currentTime + 0.02;
+      let last: AudioBufferSourceNode | null = null;
+      for (const buffer of ready) {
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(master);
+        source.onended = () => {
+          this.sources.delete(source);
+          if (this.run === run && this.sources.size === 0) this.setSpeaking(false);
+        };
+        this.sources.add(source);
+        source.start(at);
+        at += buffer.duration + gapMs / 1000;
+        last = source;
+      }
+      if (last !== null) this.setSpeaking(true);
+      debugLog('narration', `אומר ${ready.length} קטעים`, {
+        clips: clips.map(shortUrl),
+        skipped: clips.length - ready.length,
+      });
+    })();
+  }
+
+  /** עוצר מיד כל מה שמשובץ (כולל קטעים שעדיין לא התחילו). */
+  cancel(): void {
+    this.run += 1;
+    for (const source of this.sources) {
+      source.onended = null;
+      try {
+        source.stop();
+      } catch {
+        /* עוד לא התחיל / כבר הסתיים */
+      }
+      try {
+        source.disconnect();
+      } catch {
+        /* כבר מנותק */
+      }
+    }
+    this.sources.clear();
+    this.setSpeaking(false);
+  }
+
+  /** ניקוי מלא בעזיבת המשחק — עצירה, הסרת מאזינים וסגירת ה-AudioContext. */
+  dispose(): void {
+    this.cancel();
+    this.disposed = true;
+    this.disarmUnlockListeners();
+    this.speakingListeners.clear();
+    const ctx = this.context;
+    this.context = null;
+    this.master = null;
+    if (ctx) {
+      try {
+        void ctx.close();
+      } catch {
+        /* סביבה בלי close — מתעלמים */
+      }
+    }
+  }
+}

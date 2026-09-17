@@ -15,6 +15,12 @@ interface OperatorMenuProps {
   state: GameState;
   volume: number;
   onVolumeChange: (volume: number) => void;
+  /** למשחק יש קריינות אוטומטית — רק אז מוצגת סקציית «קריינות». */
+  narrationAvailable?: boolean;
+  narrationMuted?: boolean;
+  onNarrationMutedChange?: (muted: boolean) => void;
+  narrationVolume?: number;
+  onNarrationVolumeChange?: (volume: number) => void;
   /** תיאור מקור ההצבעות הפעיל — לתצוגה בלבד. */
   voteSource: string;
   hostVoterId?: string;
@@ -35,6 +41,11 @@ export function OperatorMenu({
   state,
   volume,
   onVolumeChange,
+  narrationAvailable = false,
+  narrationMuted = false,
+  onNarrationMutedChange,
+  narrationVolume = 1,
+  onNarrationVolumeChange,
   voteSource,
   hostVoterId = '',
   onShowReceiver,
@@ -95,6 +106,32 @@ export function OperatorMenu({
               onChange={(e) => onVolumeChange(Number(e.target.value))}
             />
           </label>
+          {/* קריינות אוטומטית — שכבה נפרדת מהסאונד: ההשתקה כאן אינה נוגעת
+              בסאונד המשחק, והווליום שלה נפרד. מוצגת רק כשיש קריינות בקובץ. */}
+          {narrationAvailable && (
+            <>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={!narrationMuted}
+                  onChange={(e) => onNarrationMutedChange?.(!e.target.checked)}
+                />{' '}
+                קריינות
+              </label>
+              <label>
+                ווליום קריינות:{' '}
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={narrationVolume}
+                  disabled={narrationMuted}
+                  onChange={(e) => onNarrationVolumeChange?.(Number(e.target.value))}
+                />
+              </label>
+            </>
+          )}
           <p className="operator-status">
             מקור הצבעות: {voteSource}
             {hostVoterId !== '' && ` · שלט מנחה: ${hostVoterId}`}

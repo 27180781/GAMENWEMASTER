@@ -28,6 +28,7 @@ const CATEGORIES: { cat: DebugCategory; label: string; color: string }[] = [
   { cat: 'auto', label: 'אוטומטי', color: '#38bdf8' },
   { cat: 'socket', label: 'חיבור', color: '#fb7185' },
   { cat: 'audio', label: 'סאונד', color: '#f472b6' },
+  { cat: 'narration', label: 'קריינות', color: '#facc15' },
   { cat: 'media', label: 'מדיה', color: '#c084fc' },
   { cat: 'game', label: 'כללי', color: '#94a3b8' },
 ];
