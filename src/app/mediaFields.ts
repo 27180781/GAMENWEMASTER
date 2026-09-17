@@ -16,6 +16,14 @@ export interface MediaField {
   set: (value: string) => void;
   /** תיאור היכן המדיה משמשת — לדיווחי בדיקה/נכסים חסרים. */
   label: string;
+  /**
+   * `'narration'` = קטע קריינות. לפי ENGINE-narration.md הקטעים **אינם** חלק
+   * ממדיית המשחק: הם לא נספרים ב-`assets`, לא נטענים מראש בטעינה החוסמת ולא
+   * נבדקים בבדיקת הקישורים השבורים — קטע שלא נטען מדולג בשקט (`NarrationPlayer`
+   * טוען אותם בעצמו ברקע). הצרכן היחיד שכן רואה אותם הוא `zipLoader`, שממפה
+   * להם נתיבים יחסיים בחבילה האופליינית.
+   */
+  kind?: 'narration';
 }
 
 export const SOUND_LABELS: Record<string, string> = {
@@ -72,5 +80,46 @@ export function mediaFields(game: GameFile): MediaField[] {
       label: SOUND_LABELS[key] ?? `סאונד (${key})`,
     });
   }
+
+  // קטעי הקריינות — אחרונים ומסומנים ב-kind: 'narration'. הם כאן **רק** כדי
+  // שמיפוי הנתיבים של החבילה האופליינית יכסה אותם; הטעינה המוקדמת החוסמת
+  // ובדיקת הקישורים מדלגות עליהם (ראו MediaField.kind).
+  const narration = s.narration;
+  if (narration) {
+    const bank = narration.bank;
+    for (const key of Object.keys(bank)) {
+      fields.push({
+        get: () => bank[key] ?? '',
+        set: (v) => (bank[key] = v),
+        label: `קריינות · בנק · ${key}`,
+        kind: 'narration',
+      });
+    }
+  }
+  game.questions.forEach((slide, i) => {
+    const nar = slide.narration;
+    if (!nar) return;
+    const n = `שקופית ${i + 1} · קריינות`;
+    fields.push({
+      get: () => nar.question ?? '',
+      set: (v) => (nar.question = v),
+      label: `${n} · שאלה`,
+      kind: 'narration',
+    });
+    nar.answers.forEach((_, j) => {
+      fields.push({
+        get: () => nar.answers[j] ?? '',
+        set: (v) => (nar.answers[j] = v),
+        label: `${n} · תשובה ${j + 1}`,
+        kind: 'narration',
+      });
+    });
+    fields.push({
+      get: () => nar.correct ?? '',
+      set: (v) => (nar.correct = v),
+      label: `${n} · תשובה נכונה`,
+      kind: 'narration',
+    });
+  });
   return fields;
 }

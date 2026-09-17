@@ -21,6 +21,7 @@ import {
   betSlideFor,
   classifyMediaUrl,
   countsOfVotes,
+  hasNarration,
   isVotableSlide,
   questionLabel,
   type GameFile,
@@ -63,6 +64,24 @@ import { themeStyle } from '../render/theme.ts';
 import type { TimerView } from '../render/TimerRing.tsx';
 import { SettingsScreen } from '../render/SettingsScreen.tsx';
 import { AudioManager } from './AudioManager.ts';
+import { NarrationPlayer } from './narration/NarrationPlayer.ts';
+import {
+  emptyNarrationMemory,
+  narrationStep,
+  type DisplayedState,
+  type NarrationBetSummary,
+  type NarrationGroupStanding,
+  type NarrationOverlay,
+} from './narration/narrationDirector.ts';
+import {
+  bankClips,
+  narrationAnswers,
+  narrationFunctionAction,
+  narrationRevealMatches,
+  questionOrdinal,
+  questionTotal,
+  slideNarrationClips,
+} from './narration/gameNarration.ts';
 import { decodeSlideMedia } from './mediaDecode.ts';
 import { extractHostVote } from './hostRemote.ts';
 import { autoSkipDelayMs } from './autoSkip.ts';
@@ -80,7 +99,7 @@ import {
   type RosterData,
 } from './roster.ts';
 import { selectPlayersToRemove } from './functionPlayers.ts';
-import { hasGroupData } from './groupScore.ts';
+import { groupCategories, groupStandings, hasGroupData } from './groupScore.ts';
 import { adjustGroupBonus } from '../engine/scoreAdjust.ts';
 import {
   eligibleCount,
@@ -128,6 +147,32 @@ import { useEngineState } from './useEngineState.ts';
 type HostStage = 'opening' | 'playing' | 'winners' | 'scoreboard';
 
 const NO_REVEAL: RevealState = { questionShown: false, answersShown: 0, revealCorrect: false };
+
+/** העדפות הקריינות של המפעיל (ESC) — נשמרות בדפדפן, לא בקובץ המשחק. */
+const NARRATION_MUTE_KEY = 'trivia.narration.muted';
+/** כל כמה זמן נדגם שעון הלובי (ms) — תדר נמוך בכוונה, ראו lobbyElapsedMs. */
+const LOBBY_SAMPLE_MS = 5_000;
+const NARRATION_VOLUME_KEY = 'trivia.narration.volume';
+/** כמה מנמיכים את סאונד המשחק בזמן שהקריין מדבר (רק כש-duck דלוק בקובץ). */
+const NARRATION_DUCK = 0.25;
+
+function readNarrationMuted(): boolean {
+  try {
+    return window.localStorage.getItem(NARRATION_MUTE_KEY) === '1';
+  } catch {
+    return false; // דפדפן בלי אחסון — ברירת המחדל: הקריינות פועלת
+  }
+}
+
+function readNarrationVolume(): number {
+  try {
+    const raw = window.localStorage.getItem(NARRATION_VOLUME_KEY);
+    const value = raw === null ? NaN : Number(raw);
+    return Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 1;
+  } catch {
+    return 1;
+  }
+}
 
 /**
  * טקסט חיווי חיבור למקור הצבעות (ריסיבר/טלפונים) לפי הסטטוס. בלי subject —
@@ -216,6 +261,12 @@ export function GameHost({
     return new ReplayAdapter();
   }, [isComposite, useClicker, useSocket, voteServerUrl]);
   const audio = useMemo(() => new AudioManager(), []);
+  /**
+   * נגן הקריינות — **שכבה נפרדת** מ-AudioManager (ראו NarrationPlayer):
+   * הוא לא עוצר את סאונד המשחק ולא נעצר על ידו. נוצר תמיד (זול), ופעיל רק
+   * כשקובץ המשחק באמת מביא קריינות.
+   */
+  const narration = useMemo(() => new NarrationPlayer(), []);
   const state = useEngineState(engine);
 
   // מחזור חיי הריסיבר צמוד למצב השלטים: מעבר לדמה/טלפונים (למשל הדלקת "קהל
@@ -405,6 +456,24 @@ export function GameHost({
   const nameOfRef = useRef(nameOf);
   nameOfRef.current = nameOf;
   const [volume, setVolume] = useState(1);
+  /**
+   * קריינות אוטומטית: פעילה רק כשקובץ המשחק מביא אותה (setting.narration
+   * דלוק עם ולו קטע אחד). בלי זה כל השכבה שקטה לגמרי והמשחק מתנהג כמו תמיד.
+   * ההשתקה והווליום הם העדפת מפעיל — נשמרים ב-localStorage בין משחקים.
+   */
+  const narrationActive = useMemo(() => hasNarration(game), [game]);
+  /** כמה שקופיות שאלה יש במשחק — קבוע לכל המשחק, ולא מחושב מחדש בכל הצבעה. */
+  const narrationQuestionTotal = useMemo(() => questionTotal(game), [game]);
+  const [narrationMuted, setNarrationMuted] = useState(() => readNarrationMuted());
+  const [narrationVolume, setNarrationVolume] = useState(() => readNarrationVolume());
+  /** הקריין מדבר כרגע — מנמיך את סאונד המשחק (duck) ומעכב מעבר אוטומטי. */
+  const [narrationSpeaking, setNarrationSpeaking] = useState(false);
+  /**
+   * כמה זמן מוצג מסך ההתחברות (ms) — הקלט היחיד של פטפוט הלובי. נדגם בתדר
+   * נמוך (כל 5 שניות) **ורק** כל עוד מסך הפתיחה מוצג והקריינות פעילה, כדי
+   * שלא ירוץ שום טיימר חדש במהלך המשחק עצמו.
+   */
+  const [lobbyElapsedMs, setLobbyElapsedMs] = useState(0);
   const syntheticCrowd = settings.crowdEnabled;
   /** מסך מובילים באמצע משחק (פקודת מנחה 1) — שכבה מעל, המשחק ממשיך מתחת. */
   const [leadersOverlay, setLeadersOverlay] = useState(false);
@@ -471,10 +540,19 @@ export function GameHost({
   const [timer, setTimer] = useState<TimerView | null>(null);
   /** שלבי החשיפה של השקופית הנוכחית (שאלה / תשובות / תשובה נכונה). */
   const [reveal, setReveal] = useState<RevealState>(NO_REVEAL);
+  /**
+   * לאיזו שקופית שייך `reveal` שלמעלה. איפוס שלבי החשיפה קורה ב-effect, ולכן
+   * בקומיט שבו `state.currentSlideId` כבר התחלף `reveal` עדיין מתאר את
+   * השקופית **הקודמת**. הצמד הזה (נכתב באותה מנה עם `setReveal`) מאפשר לכל
+   * צרכן לזהות את חוסר ההתאמה ולדלג על הקומיט הזה — ראו הבמאי של הקריינות.
+   */
+  const [revealSlide, setRevealSlide] = useState<number | null>(null);
   /** מצב שליחת שקופית "פונקציה" ל-API (לתצוגה על המסך). */
   const [functionStatus, setFunctionStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   /** טקסט נלווה לשקופית פונקציה (למשל "הוסרו 12 שחקנים"). */
   const [functionDetail, setFunctionDetail] = useState<string>('');
+  /** לאיזו שקופית שייך `functionDetail` (אותו טעם כמו `revealSlide`). */
+  const [functionDetailSlide, setFunctionDetailSlide] = useState<number | null>(null);
   /** מזהי המצביעים האחרונים בשקופית הנוכחית (החדש ראשון) — לאווטרים המתעופפים. */
   const [answerers, setAnswerers] = useState<string[]>([]);
   const players = useMemo<RailPlayer[]>(
@@ -881,10 +959,12 @@ export function GameHost({
         setGroupBonus({});
         setFunctionStatus('sent');
         setFunctionDetail('');
+        setFunctionDetailSlide(s.id);
         debugLog('game', 'שקופית פונקציה — איפוס ניקוד כל המשתתפים');
       } else {
         setFunctionStatus('error');
         setFunctionDetail('');
+        setFunctionDetailSlide(s.id);
         debugLog('game', `שקופית פונקציה — פעולת ניקוד לא מוכרת (${String(op)})`);
       }
       return;
@@ -896,6 +976,7 @@ export function GameHost({
       if (!cfg) {
         setFunctionStatus('error');
         setFunctionDetail('');
+        setFunctionDetailSlide(s.id);
         return;
       }
       const scores = engine.getState().scores;
@@ -917,6 +998,7 @@ export function GameHost({
       setCorrectAnswerers((prev) => prev.filter((id) => !removedSet.has(id)));
       setFunctionStatus('sent');
       setFunctionDetail(`${removedCount} שחקנים הוסרו מהמשחק`);
+      setFunctionDetailSlide(s.id);
       debugLog('game', `שקופית פונקציה — עדכון משתתפים (${cfg.mode}/${cfg.selection}) · הוסרו ${removedCount}`);
       return;
     }
@@ -975,6 +1057,9 @@ export function GameHost({
     } else {
       setReveal(NO_REVEAL);
     }
+    // באותה מנת עדכון — כך ש-`reveal` ו-`revealSlide` תמיד מתארים יחד את אותה
+    // שקופית, וצרכן שרץ בקומיט הקודם (עם מזהה חדש וחשיפה ישנה) יזהה ויחכה.
+    setRevealSlide(state.currentSlideId);
     setAnswerers([]);
     setCorrectAnswerers([]);
     lastHostAnswerRef.current = null;
@@ -1788,6 +1873,69 @@ export function GameHost({
   // שאחרת מצטברים על window בכל mount.
   useEffect(() => () => audio.dispose(), [audio]);
 
+  // -------------------------------------------------------------------------
+  // קריינות: ווליום/השתקה (העדפת מפעיל), מצב דיבור, ניקוי, וטעינה מוקדמת.
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    narration.setVolume(narrationVolume);
+    if (!narrationActive) return; // משחק בלי קריינות לא נוגע בכלום, גם לא באחסון
+    try {
+      window.localStorage.setItem(NARRATION_VOLUME_KEY, String(narrationVolume));
+    } catch {
+      /* דפדפן בלי אחסון — ההעדפה פשוט לא נשמרת */
+    }
+  }, [narration, narrationActive, narrationVolume]);
+
+  useEffect(() => {
+    narration.setMuted(narrationMuted);
+    if (!narrationActive) return;
+    try {
+      window.localStorage.setItem(NARRATION_MUTE_KEY, narrationMuted ? '1' : '0');
+    } catch {
+      /* כנ"ל */
+    }
+  }, [narration, narrationActive, narrationMuted]);
+
+  useEffect(() => narration.onSpeakingChange(setNarrationSpeaking), [narration]);
+
+  // שעון הלובי — קיים רק במסך הפתיחה ורק כשיש קריינות. נעצר (ומתנקה) ברגע
+  // שהמשחק מתחיל, ולכן אינו מוסיף ולו רינדור אחד למהלך המשחק.
+  useEffect(() => {
+    if (!narrationActive || stage !== 'opening') return;
+    const startedAt = Date.now();
+    setLobbyElapsedMs(0);
+    const id = window.setInterval(() => setLobbyElapsedMs(Date.now() - startedAt), LOBBY_SAMPLE_MS);
+    return () => window.clearInterval(id);
+  }, [narrationActive, stage]);
+
+  // ניקוי בעזיבת המשחק — עצירה, הסרת מאזינים וסגירת ה-AudioContext.
+  useEffect(() => () => narration.dispose(), [narration]);
+
+  // הנמכת סאונד המשחק בזמן שהקריין מדבר — **רק** כש-duck דלוק בקובץ. ברירת
+  // המחדל היא שהקריינות היא שכבה נפרדת שאינה נוגעת בסאונד הקיים.
+  const narrationDuck = game.setting.narration?.duck === true;
+  useEffect(() => {
+    if (!narrationActive || !narrationDuck) return;
+    audio.setVolume(narrationSpeaking ? volume * NARRATION_DUCK : volume);
+  }, [narrationActive, narrationDuck, narrationSpeaking, volume, audio]);
+
+  // טעינה מוקדמת: בנק הביטויים + קטעי השקופית הראשונה, ברקע ובלי לחסום דבר.
+  useEffect(() => {
+    if (!narrationActive) return;
+    const g = engine.getGame();
+    const first = g.questions[0];
+    void narration.preload([...bankClips(g), ...(first ? slideNarrationClips(first) : [])]);
+  }, [narrationActive, engine, narration]);
+
+  // ...ובכל כניסה לשקופית — הקטעים של השקופית הבאה.
+  useEffect(() => {
+    if (!narrationActive) return;
+    const questions = engine.getGame().questions;
+    const index = questions.findIndex((q) => q.id === state.currentSlideId);
+    const next = index >= 0 ? questions[index + 1] : undefined;
+    if (next) void narration.preload(slideNarrationClips(next));
+  }, [narrationActive, state.currentSlideId, engine, narration]);
+
   // מדיה חוסמת (openMedia/endMedia) מתנגנת עם הקול שלה דרך הנגן — היא בלעדית,
   // ולכן עוצרת כל סאונד-ערוץ שמתנגן (בדיוק כמו שסאונד חדש עוצר את הקודמים).
   // בלי זה, סאונד ערוץ (למשל חשיפת תשובה) יכול להתערבב עם וידאו הסיום.
@@ -1893,6 +2041,174 @@ export function GameHost({
     lobbyOverlay || // מסך התחברות (X) — הטיימר קופא, וממשיכים ברווח
     menuOpen;
 
+  // -------------------------------------------------------------------------
+  // הבמאי של הקריינות (ENGINE-narration.md): אפקט אחד שאוסף את מה שמוצג על
+  // המסך מה-state הקיים, מריץ את narrationStep (טהור) ומזין את הנגן. רץ אחרי
+  // אפקט איפוס-החשיפה של כניסה לשקופית, ולכן לעולם לא מקריא מצב ישן.
+  // -------------------------------------------------------------------------
+  /** איזו שכבה פתוחה מבחינת הקריין: שתיים מוקראות, כל השאר = שקט. */
+  const narrationOverlay: NarrationOverlay = betOverlay
+    ? 'betResults'
+    : leadersOverlay
+      ? 'leaders'
+      : groupsOverlay
+        ? 'groups'
+        : raffle !== null
+          ? 'raffle'
+          : boardOverlay
+            ? 'board'
+            : votesOverlay ||
+                boardPending !== null ||
+                connectCategory !== null ||
+                settingsOpen ||
+                rosterOpen ||
+                captureOn ||
+                lobbyOverlay ||
+                menuOpen
+              ? 'other'
+              : 'none';
+  const narrationMemoryRef = useRef(emptyNarrationMemory());
+
+  useEffect(() => {
+    if (!narrationActive) return;
+    // בקומיט של מעבר שקופית, `state.currentSlideId` כבר חדש אבל `reveal` עדיין
+    // של השקופית הקודמת (האיפוס קורה ב-effect ומגיע קומיט אחד אחריו). לתת
+    // לבמאי את הצמד הלא-מתאים היה מסמן את השאלה והתשובות כ"כבר נאמרו" ומבטל
+    // מיד את המשפט שהתחיל — כלומר שקט מלא מהשקופית השנייה והלאה. מדלגים על
+    // הקומיט הזה ומבטלים את מה שמתנגן; הקומיט הבא כבר מתואם.
+    if (!narrationRevealMatches(revealSlide, state.currentSlideId)) {
+      narration.cancel();
+      return;
+    }
+    const g = engine.getGame();
+    // קוראים את השקופית לפי ה-state שרונדר (ולא getCurrentSlide), כדי שהקריין
+    // ידבר בדיוק על מה שמוצג — גם אם בינתיים הגיעה הצבעה שדחפה state חדש.
+    const s = g.questions.find((q) => q.id === state.currentSlideId) ?? engine.getCurrentSlide();
+    const narrationSetting = g.setting.narration;
+    // מספרי "צדקו / הצביעו" — מחושבים רק ברגע חשיפת התשובה הנכונה, כשההצבעה
+    // כבר סגורה; במהלך ההצבעה לא נוגעים ב-votesBySlide.
+    let correctCount: number | null = null;
+    let votedCount: number | null = null;
+    if (state.phase === 'results' && reveal.revealCorrect && isVotableSlide(s) && s.type !== 'bet') {
+      const votes = state.votesBySlide[state.currentSlideId];
+      if (votes !== undefined) {
+        const correctIds = new Set(s.question.answers.filter((a) => a.correct).map((a) => a.id));
+        const picks = Object.values(votes);
+        votedCount = picks.length;
+        correctCount = picks.filter((id) => correctIds.has(id)).length;
+      }
+    }
+    // מחשבים ניקוד רק כשבאמת מציגים מובילים/מנצחים (מיון על כל המשתתפים).
+    const leaderRows = narrationOverlay === 'leaders' ? engine.getWinners(3) : [];
+    // דירוג הקבוצות — רק כשמסך הקבוצות מוצג, ובאותה צורה שהמסך עצמו מציג.
+    let groups: NarrationGroupStanding[] = [];
+    if (narrationOverlay === 'groups') {
+      const cats = groupCategories(roster);
+      const cat = cats.length > 0 ? cats[((groupsCatIndex % cats.length) + cats.length) % cats.length] : undefined;
+      if (cat !== undefined) {
+        groups = groupStandings(roster, cat.id, state.scores, state.answerTimes, groupBonus).map(
+          (row) => ({ name: row.name, points: row.avgScore }),
+        );
+      }
+    }
+    let bet: NarrationBetSummary | null = null;
+    if (narrationOverlay === 'betResults') {
+      const outcomes = state.betOutcomes[state.currentSlideId] ?? {};
+      const summary = betOutcomeSummary(outcomes);
+      bet = {
+        anyStake: Object.values(outcomes).some((o) => o.stake > 0),
+        biggestWin: Math.max(0, summary.biggest?.delta ?? 0),
+        biggestLoss: Math.max(0, ...summary.losers.map((l) => -l.delta)),
+        leaderScore: engine.getWinners(1)[0]?.score ?? 0,
+      };
+    }
+    const boardMove =
+      narrationOverlay === 'board'
+        ? board.lastRound.some((row) => row.jump === 'ladder')
+          ? 'climb'
+          : board.lastRound.some((row) => row.jump === 'snake')
+            ? 'fall'
+            : null
+        : null;
+    const display: DisplayedState = {
+      stage,
+      phase: state.phase,
+      slideId: state.currentSlideId,
+      slideType: s.type,
+      votable: isVotableSlide(s),
+      questionOrdinal: questionOrdinal(g, s.id),
+      answers: narrationAnswers(s),
+      questionClip: s.narration?.question ?? null,
+      correctClip: s.narration?.correct ?? null,
+      majorityDecides: s.setting.majorityDecides,
+      activeMedia: state.activeMedia,
+      questionShown: reveal.questionShown,
+      answersShown: reveal.answersShown,
+      revealCorrect: reveal.revealCorrect,
+      timer: timer
+        ? { remaining: timer.remaining, total: timer.total, paused: timer.paused }
+        : null,
+      overlay: narrationOverlay,
+      leaders: leaderRows.map((w) => w.score),
+      winners:
+        stage === 'winners'
+          ? engine
+              .getWinners(g.setting.multiWinners)
+              .slice(0, 5)
+              .map((w) => w.score)
+          : [],
+      winnersRevealed,
+      functionAction: narrationFunctionAction(s),
+      // רק תוצאה של *השקופית הזאת* נחשבת "הפעולה בוצעה" — אחרת שקופית הישרדות
+      // שנייה הייתה מכריזה מיד את המספר שנשאר מהשקופית הקודמת.
+      functionDone: functionDetail !== '' && functionDetailSlide === state.currentSlideId,
+      remaining: connectedIds.length,
+      announceQuestionNumber: narrationSetting?.announceQuestionNumber ?? true,
+      lobbyElapsedMs: stage === 'opening' ? lobbyElapsedMs : 0,
+      connectedCount: connectedIds.length,
+      questionTotal: narrationQuestionTotal,
+      correctCount,
+      votedCount,
+      leaderIds: leaderRows.map((w) => w.voterId),
+      groups,
+      groupClips: narrationSetting?.groups ?? {},
+      bet,
+      boardMove,
+      winnersPreview: winnersPreviewRef.current !== null,
+      enabled: !narrationMuted,
+      bank: narrationSetting?.bank ?? {},
+    };
+    const decision = narrationStep(display, narrationMemoryRef.current);
+    narrationMemoryRef.current = decision.memory;
+    if (decision.clips.length > 0) {
+      debugLog('narration', decision.events.join(' · '), { clips: decision.clips.length });
+      narration.say(decision.clips);
+    } else if (decision.cancel) {
+      narration.cancel();
+    }
+  }, [
+    narrationActive,
+    narrationMuted,
+    narration,
+    engine,
+    stage,
+    state,
+    reveal,
+    revealSlide,
+    timer,
+    narrationOverlay,
+    winnersRevealed,
+    functionDetail,
+    functionDetailSlide,
+    connectedIds,
+    lobbyElapsedMs,
+    narrationQuestionTotal,
+    roster,
+    groupsCatIndex,
+    groupBonus,
+    board,
+  ]);
+
   // הקפאת/הפשרת טיימר ההצבעה בזמן שכבה חוסמת. מכבדים עצירה ידנית (מקש 6): מפשירים
   // רק אם *אנחנו* הקפאנו בגלל השכבה, לא אם המנחה עצר בעצמו.
   useEffect(() => {
@@ -1925,6 +2241,10 @@ export function GameHost({
 
   useEffect(() => {
     if (stage !== 'playing' || state.activeMedia !== null || overlayActive) return;
+    // הקריין באמצע משפט — המעבר האוטומטי הבא ממתין לסיומו (חשיפת תשובה,
+    // פתיחת הצבעה, חשיפת התשובה הנכונה). בלי זה מצב אוטומטי היה חותך כל
+    // משפט באמצע. לחיצה ידנית של המנחה עדיין מקדמת מיד.
+    if (narrationActive && narrationSpeaking) return;
     const s = engine.getCurrentSlide();
     const votable = isVotableSlide(s);
     const totalAnswers = s.question.answers.length;
@@ -1994,7 +2314,7 @@ export function GameHost({
       fire();
     }, delayMs);
     return () => window.clearTimeout(timeout);
-  }, [stage, state.phase, state.currentSlideId, state.activeMedia, state.betOutcomes, reveal, autoT, overlayActive, engine, audio, sounds]);
+  }, [stage, state.phase, state.currentSlideId, state.activeMedia, state.betOutcomes, reveal, autoT, overlayActive, engine, audio, sounds, narrationActive, narrationSpeaking]);
 
   // במעבר אוטומטי — מסך תוצאות ההימור נסגר לבד אחרי זמן קריאה (ההשהיה של
   // "השקופית הבאה" ועוד שתי שניות), ואז האפקט שלמעלה ממשיך לשקופית הבאה.
@@ -2301,11 +2621,14 @@ export function GameHost({
     gameEndedRef.current = false;
     reportDownloadedRef.current = false;
     winnersPreviewRef.current = null;
+    // ריצה חדשה = קריינות מתחילה מהתחלה ("ברוכים הבאים" הוא פעם אחת לריצה).
+    narrationMemoryRef.current = emptyNarrationMemory();
+    narration.cancel();
     setSettingsOpen(false);
     debugLog('command', 'התחלת המשחק מחדש (מתוך ההגדרות)', {
       backupRun: wasEnded ? 'ריצה חדשה אחרי סיום — הגיבוי ייפתח מחדש' : 'ריצה חדשה',
     });
-  }, [engine]);
+  }, [engine, narration]);
 
   // תוצאות הימור שממתינות להצגה — לרמז הרווח בפס ההנחיות
   const betOutcomesNow = state.betOutcomes[state.currentSlideId];
@@ -2668,6 +2991,11 @@ export function GameHost({
             state={state}
             volume={volume}
             onVolumeChange={setVolume}
+            narrationAvailable={narrationActive}
+            narrationMuted={narrationMuted}
+            onNarrationMutedChange={setNarrationMuted}
+            narrationVolume={narrationVolume}
+            onNarrationVolumeChange={setNarrationVolume}
             voteSource={voteSourceLabel}
             hostVoterId={hostVoterId}
             {...(canReportToDisk

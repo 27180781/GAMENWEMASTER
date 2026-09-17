@@ -29,6 +29,9 @@ export interface MediaIssue {
 export function collectMediaRefs(game: GameFile): MediaRef[] {
   const refs: MediaRef[] = [];
   for (const field of mediaFields(game)) {
+    // קטעי קריינות מדולגים בשקט כשאינם נטענים — הם אינם "קישור שבור" שמצדיק
+    // אזהרה למפעיל (ENGINE-narration.md סעיף 2).
+    if (field.kind === 'narration') continue;
     const src = field.get().trim();
     if (src !== '') refs.push({ src, context: field.label, kind: classifyMediaUrl(src) });
   }

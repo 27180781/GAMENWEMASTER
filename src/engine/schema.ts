@@ -32,6 +32,43 @@ const mediaRef = z.object({ src: z.string() });
 const soundRef = z.object({ src: z.string().nullable() });
 
 // ---------------------------------------------------------------------------
+// קריינות אוטומטית (ENGINE-narration.md) — שכבה אופציונלית לחלוטין
+// ---------------------------------------------------------------------------
+
+/**
+ * הגדרות הקריין ברמת המשחק. **קובץ בלי `narration` נטען ומתנהג בדיוק כמו
+ * היום** — כל השדות אופציונליים עם ברירת מחדל, ו-`bank` הוא מילון
+ * `bank_key → url` של הביטויים הקבועים של הקול שנבחר (מפתח חסר = המנוע מדלג
+ * על הביטוי בשקט).
+ */
+export const narrationSettingSchema = z
+  .object({
+    enabled: z.boolean().optional().default(true),
+    voice: z.string().optional().default(''),
+    announceQuestionNumber: z.boolean().optional().default(true),
+    /** האם להנמיך את סאונד המשחק בזמן שהקריין מדבר (ברירת מחדל: לא נוגעים בו). */
+    duck: z.boolean().optional().default(false),
+    bankVersion: z.number().optional().default(1),
+    bank: z.record(z.string()).optional().default({}),
+    /**
+     * קטעי שמות הקבוצות של המשחק הזה (`שם הקבוצה בדיוק כמו במרשם → כתובת`).
+     * שמות קבוצות אינם בבנק כי הם משתנים ממשחק למשחק; שם חסר = הקריין אומר
+     * את הביטוי הכללי בלי השם.
+     */
+    groups: z.record(z.string()).optional().default({}),
+  })
+  .passthrough();
+
+/** קטעי הקריינות של שקופית: השאלה, קטע לכל תשובה (באותו סדר), והתשובה הנכונה. */
+export const slideNarrationSchema = z
+  .object({
+    question: z.string().nullable().optional().default(null),
+    answers: z.array(z.string().nullable()).optional().default([]),
+    correct: z.string().nullable().optional().default(null),
+  })
+  .passthrough();
+
+// ---------------------------------------------------------------------------
 // שקופית (SPEC 3.2 + 3.3)
 // ---------------------------------------------------------------------------
 
@@ -320,6 +357,12 @@ export const slideSchema = z
     function: functionConfigSchema.optional(),
     // רק בשקופית "הימור"; מנורמל בהמשך למספר הכרטיסים.
     bet: betConfigSchema.optional(),
+    /**
+     * קטעי הקריינות של השקופית (אופציונלי לגמרי). `catch` מוודא שאובייקט
+     * פגום *לא* מפיל את השקופית ואת המשחק כולו — הוא פשוט נזרק, והשקופית
+     * מתנהגת כאילו אין לה קריינות.
+     */
+    narration: slideNarrationSchema.optional().catch(undefined),
   })
   // כמו ב-question: לא מוחקים שדות שאיננו מכירים.
   .passthrough()
@@ -487,6 +530,11 @@ export const globalSettingsSchema = z.object({
   // מעברים אוטומטיים — ברירת מחדל למשחק (ניתן לדריסה בהגדרות ולשמירה ב-localStorage)
   autoTransition: autoTransitionSchema,
   /**
+   * קריינות אוטומטית — קיימת רק כשמערכת יצירת המשחקים שולחת אותה. `catch`
+   * שומר על הכלל החשוב: אובייקט קריינות פגום נזרק בשקט ואינו פוסל את המשחק.
+   */
+  narration: narrationSettingSchema.optional().catch(undefined),
+  /**
    * סוג המשחק. חסר/לא מוכר = 'classic' — המשחק הרגיל, בדיוק כפי שהיה. סוגים
    * נוספים מוסיפים שכבת חוויה מעל אותו מנוע שאלות (ראו gameTypeSettings).
    */
@@ -578,6 +626,8 @@ export const gameFileSchema = z.object({
 // ---------------------------------------------------------------------------
 
 export type Answer = z.infer<typeof answerSchema>;
+export type NarrationSetting = z.infer<typeof narrationSettingSchema>;
+export type SlideNarration = z.infer<typeof slideNarrationSchema>;
 export type SlideSettings = z.infer<typeof slideSettingsSchema>;
 export type SlideType = z.infer<typeof slideTypeSchema>;
 export type Slide = z.infer<typeof slideSchema>;
@@ -587,4 +637,27 @@ export type GameFile = z.infer<typeof gameFileSchema>;
 
 export function isVotableSlide(slide: Slide): boolean {
   return VOTABLE_TYPES.has(slide.type);
+}
+
+/** האם לשקופית יש ולו קטע קריינות אחד (שאלה / תשובה / תשובה נכונה). */
+export function slideHasNarrationClips(slide: Slide): boolean {
+  const n = slide.narration;
+  if (!n) return false;
+  return (
+    (n.question !== null && n.question !== '') ||
+    (n.correct !== null && n.correct !== '') ||
+    n.answers.some((a) => a !== null && a !== '')
+  );
+}
+
+/**
+ * האם המשחק מגיע עם קריינות פעילה: אובייקט `setting.narration` קיים, דלוק, ויש
+ * לו ולו קטע אחד לנגן (ביטוי מהבנק או קטע של שקופית). כל תשובה אחרת = המנוע
+ * מתנהג בדיוק כמו קובץ בלי קריינות.
+ */
+export function hasNarration(game: GameFile): boolean {
+  const narration = game.setting.narration;
+  if (!narration || !narration.enabled) return false;
+  if (Object.keys(narration.bank).length > 0) return true;
+  return game.questions.some(slideHasNarrationClips);
 }

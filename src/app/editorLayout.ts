@@ -30,8 +30,12 @@ export interface SettingsSection {
  *
  * `limit` הוא הרישיון והמגבלות של המשחק: נתון שהמערכת קובעת, לא המחבר. הוא
  * נשמר בקובץ כרגיל (העורך שומר את האובייקט המלא) — פשוט אין לו פקד.
+ *
+ * `narration` הוא אותו סיפור: מילון כתובות של קטעי שמע שמערכת יצירת המשחקים
+ * מייצרת (ENGINE-narration.md). אין מה לערוך בו ביד, והשתקה/ווליום נמצאים
+ * במקום הנכון — תפריט המפעיל (ESC).
  */
-export const HIDDEN_SETTINGS = ['limit'];
+export const HIDDEN_SETTINGS = ['limit', 'narration'];
 
 /**
  * הקבוצות, בסדר ובשמות של העורך המקוון. `titleThroughoutGame` ו-`logo` יושבים
