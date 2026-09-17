@@ -50,6 +50,19 @@ export function narrationFunctionAction(
   return action === 'screen' || action === 'score' || action === 'players' ? action : 'api';
 }
 
+/**
+ * האם שלבי החשיפה (`reveal`) שייכים לשקופית שמוצגת עכשיו.
+ *
+ * ב-GameHost איפוס שלבי החשיפה קורה ב-effect, ולכן יש קומיט אחד שבו
+ * `state.currentSlideId` כבר התחלף אבל `reveal` עדיין מתאר את השקופית
+ * הקודמת. להאכיל את הבמאי בצמד הזה פירושו לסמן את השאלה ואת כל התשובות
+ * כ"כבר נאמרו" בשקופית החדשה, ולבטל קומיט אחר כך את המשפט שהתחיל — כלומר
+ * שקט מוחלט מהשקופית השנייה והלאה. ה-host מדלג על הקומיט הזה.
+ */
+export function narrationRevealMatches(revealSlide: number | null, slideId: number): boolean {
+  return revealSlide === slideId;
+}
+
 /** התשובות של השקופית בצורה שהבמאי מכיר (דגל נכונה + קטע הקריינות שלה). */
 export function narrationAnswers(slide: Slide): NarrationAnswerView[] {
   if (!isVotableSlide(slide)) return [];

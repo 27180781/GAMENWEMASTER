@@ -19,6 +19,10 @@ export function orderedMediaUrls(game: GameFile): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const field of mediaFields(game)) {
+    // קטעי קריינות אינם חלק ממדיית המשחק (ENGINE-narration.md) — הם אינם
+    // נספרים במסך הטעינה ואינם מעכבים את כפתור ההתחלה; NarrationPlayer מושך
+    // אותם בעצמו ברקע, וקטע שלא נטען מדולג.
+    if (field.kind === 'narration') continue;
     const url = field.get().trim();
     if (url === '' || seen.has(url)) continue;
     // blob:/data: כבר בזיכרון; trivia-media:// נזרם מהדיסק לפי דרישה — אין

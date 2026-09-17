@@ -75,6 +75,7 @@ import {
   bankClips,
   narrationAnswers,
   narrationFunctionAction,
+  narrationRevealMatches,
   questionOrdinal,
   slideNarrationClips,
 } from './narration/gameNarration.ts';
@@ -526,10 +527,19 @@ export function GameHost({
   const [timer, setTimer] = useState<TimerView | null>(null);
   /** שלבי החשיפה של השקופית הנוכחית (שאלה / תשובות / תשובה נכונה). */
   const [reveal, setReveal] = useState<RevealState>(NO_REVEAL);
+  /**
+   * לאיזו שקופית שייך `reveal` שלמעלה. איפוס שלבי החשיפה קורה ב-effect, ולכן
+   * בקומיט שבו `state.currentSlideId` כבר התחלף `reveal` עדיין מתאר את
+   * השקופית **הקודמת**. הצמד הזה (נכתב באותה מנה עם `setReveal`) מאפשר לכל
+   * צרכן לזהות את חוסר ההתאמה ולדלג על הקומיט הזה — ראו הבמאי של הקריינות.
+   */
+  const [revealSlide, setRevealSlide] = useState<number | null>(null);
   /** מצב שליחת שקופית "פונקציה" ל-API (לתצוגה על המסך). */
   const [functionStatus, setFunctionStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   /** טקסט נלווה לשקופית פונקציה (למשל "הוסרו 12 שחקנים"). */
   const [functionDetail, setFunctionDetail] = useState<string>('');
+  /** לאיזו שקופית שייך `functionDetail` (אותו טעם כמו `revealSlide`). */
+  const [functionDetailSlide, setFunctionDetailSlide] = useState<number | null>(null);
   /** מזהי המצביעים האחרונים בשקופית הנוכחית (החדש ראשון) — לאווטרים המתעופפים. */
   const [answerers, setAnswerers] = useState<string[]>([]);
   const players = useMemo<RailPlayer[]>(
@@ -936,10 +946,12 @@ export function GameHost({
         setGroupBonus({});
         setFunctionStatus('sent');
         setFunctionDetail('');
+        setFunctionDetailSlide(s.id);
         debugLog('game', 'שקופית פונקציה — איפוס ניקוד כל המשתתפים');
       } else {
         setFunctionStatus('error');
         setFunctionDetail('');
+        setFunctionDetailSlide(s.id);
         debugLog('game', `שקופית פונקציה — פעולת ניקוד לא מוכרת (${String(op)})`);
       }
       return;
@@ -951,6 +963,7 @@ export function GameHost({
       if (!cfg) {
         setFunctionStatus('error');
         setFunctionDetail('');
+        setFunctionDetailSlide(s.id);
         return;
       }
       const scores = engine.getState().scores;
@@ -972,6 +985,7 @@ export function GameHost({
       setCorrectAnswerers((prev) => prev.filter((id) => !removedSet.has(id)));
       setFunctionStatus('sent');
       setFunctionDetail(`${removedCount} שחקנים הוסרו מהמשחק`);
+      setFunctionDetailSlide(s.id);
       debugLog('game', `שקופית פונקציה — עדכון משתתפים (${cfg.mode}/${cfg.selection}) · הוסרו ${removedCount}`);
       return;
     }
@@ -1030,6 +1044,9 @@ export function GameHost({
     } else {
       setReveal(NO_REVEAL);
     }
+    // באותה מנת עדכון — כך ש-`reveal` ו-`revealSlide` תמיד מתארים יחד את אותה
+    // שקופית, וצרכן שרץ בקומיט הקודם (עם מזהה חדש וחשיפה ישנה) יזהה ויחכה.
+    setRevealSlide(state.currentSlideId);
     setAnswerers([]);
     setCorrectAnswerers([]);
     lastHostAnswerRef.current = null;
@@ -2028,6 +2045,15 @@ export function GameHost({
 
   useEffect(() => {
     if (!narrationActive) return;
+    // בקומיט של מעבר שקופית, `state.currentSlideId` כבר חדש אבל `reveal` עדיין
+    // של השקופית הקודמת (האיפוס קורה ב-effect ומגיע קומיט אחד אחריו). לתת
+    // לבמאי את הצמד הלא-מתאים היה מסמן את השאלה והתשובות כ"כבר נאמרו" ומבטל
+    // מיד את המשפט שהתחיל — כלומר שקט מלא מהשקופית השנייה והלאה. מדלגים על
+    // הקומיט הזה ומבטלים את מה שמתנגן; הקומיט הבא כבר מתואם.
+    if (!narrationRevealMatches(revealSlide, state.currentSlideId)) {
+      narration.cancel();
+      return;
+    }
     const g = engine.getGame();
     // קוראים את השקופית לפי ה-state שרונדר (ולא getCurrentSlide), כדי שהקריין
     // ידבר בדיוק על מה שמוצג — גם אם בינתיים הגיעה הצבעה שדחפה state חדש.
@@ -2063,9 +2089,12 @@ export function GameHost({
           : [],
       winnersRevealed,
       functionAction: narrationFunctionAction(s),
-      functionDone: functionDetail !== '',
+      // רק תוצאה של *השקופית הזאת* נחשבת "הפעולה בוצעה" — אחרת שקופית הישרדות
+      // שנייה הייתה מכריזה מיד את המספר שנשאר מהשקופית הקודמת.
+      functionDone: functionDetail !== '' && functionDetailSlide === state.currentSlideId,
       remaining: connectedIds.length,
       announceQuestionNumber: narrationSetting?.announceQuestionNumber ?? true,
+      winnersPreview: winnersPreviewRef.current !== null,
       enabled: !narrationMuted,
       bank: narrationSetting?.bank ?? {},
     };
@@ -2085,10 +2114,12 @@ export function GameHost({
     stage,
     state,
     reveal,
+    revealSlide,
     timer,
     narrationOverlay,
     winnersRevealed,
     functionDetail,
+    functionDetailSlide,
     connectedIds,
   ]);
 

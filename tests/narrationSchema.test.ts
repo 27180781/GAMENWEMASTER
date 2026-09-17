@@ -51,6 +51,7 @@ function gameWithNarration(): Record<string, unknown> {
     narration: SLIDE_NARRATION,
   };
   const game = rawGame([slide]);
+  (game.setting as Record<string, { src: string }>).logo = { src: 'https://cdn/logo.png' };
   (game.setting as Record<string, unknown>).narration = NARRATION_SETTING;
   return game;
 }
@@ -164,11 +165,24 @@ describe('הקטעים נכנסים לשרשרת המדיה בלי קוד ייע
     );
   });
 
-  it('★ נכנסים לטעינה המוקדמת ולבדיקת הקישורים השבורים', () => {
-    expect(orderedMediaUrls(game)).toContain('https://cdn/tts/q1.mp3');
-    expect(collectMediaRefs(game).map((r) => r.src)).toContain('https://cdn/tts/ab/one.mp3');
-    // קטע null אינו הופך לכתובת ריקה בדרך
-    expect(orderedMediaUrls(game).filter((u) => u === '')).toHaveLength(0);
+  it('★ *אינם* נכנסים לטעינה המוקדמת ולבדיקת הקישורים השבורים', () => {
+    // ENGINE-narration.md: הקטעים אינם ב-assets ואינם משנים את מסך הטעינה של
+    // משחק ותיק — NarrationPlayer מושך אותם בעצמו, וקטע שלא נטען מדולג בשקט.
+    // לכן שני הצרכנים האלה מדלגים עליהם, וה-ZIP (מיפוי נתיבים) עדיין רואה אותם.
+    const preload = orderedMediaUrls(game);
+    expect(preload).not.toContain('https://cdn/tts/q1.mp3');
+    expect(preload).not.toContain('https://cdn/tts/ab/one.mp3');
+    expect(preload).toContain('https://cdn/logo.png'); // שאר המדיה לא נפגעה
+    const refs = collectMediaRefs(game).map((r) => r.src);
+    expect(refs).not.toContain('https://cdn/tts/ab/one.mp3');
+    expect(refs).not.toContain('https://cdn/tts/q1.mp3');
+    // ...וכולם מסומנים ככאלה בהולך המשותף
+    const narrationFields = mediaFields(game).filter((f) => f.kind === 'narration');
+    expect(narrationFields.length).toBeGreaterThan(0);
+    expect(narrationFields.map((f) => f.get())).toContain('https://cdn/tts/q1.mp3');
+    expect(mediaFields(game).filter((f) => f.kind !== 'narration').map((f) => f.get())).not.toContain(
+      'https://cdn/tts/q1.mp3',
+    );
   });
 
   it('★ חבילת אופליין: נתיבי Assets/nar-*.mp3 ממופים כמו כל מדיה אחרת', async () => {

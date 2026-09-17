@@ -70,6 +70,12 @@ export interface DisplayedState {
   /** כמה משתתפים נשארו מחוברים אחרי ההסרה; null/0 = לא ידוע. */
   remaining: number | null;
   announceQuestionNumber: boolean;
+  /**
+   * תצוגה מקדימה של מסך המנצחים (מקש W באמצע המשחק) — אינה סוף המשחק, ולכן
+   * הקריין שותק בה לגמרי: אחרת ההכרזות של הסיום (ובראשן `flow_thanks`, שנאמר
+   * פעם אחת למשחק) היו נצרכות באמצע ומסך הסיום האמיתי היה שותק.
+   */
+  winnersPreview: boolean;
   /** הקריינות פעילה (קיימת בקובץ, דלוקה, ולא הושתקה בתפריט המפעיל). */
   enabled: boolean;
   /** מילון הביטויים הקבועים של הקול (bank_key → url). */
@@ -185,6 +191,13 @@ function correctParts(s: DisplayedState): NarrationEvent['parts'] {
     .map((answer, index) => ({ ...answer, position: index + 1 }))
     .filter((answer) => answer.correct);
   if (winners.length === 0) return s.majorityDecides ? ['misc_majority'] : [];
+  const hasClip = (winner: { clip: string | null }) => winner.clip !== null && winner.clip !== '';
+  // תשובה יחידה בלי קטע (המקרה הרגיל בתשובות-תמונה): `score_correct_number`
+  // הוא כבר המשפט השלם — "התשובה הנכונה היא תשובה מספר" — ולכן הוא מחליף את
+  // הפתיח ואינו מתווסף אליו. אחרת נאמר "התשובה הנכונה היא" פעמיים.
+  if (!s.majorityDecides && winners.length === 1 && !hasClip(winners[0]!)) {
+    return ['score_correct_number', ...numberClipKeys(winners[0]!.position, 'f')];
+  }
   const head = s.majorityDecides
     ? 'misc_majority'
     : winners.length > 1
@@ -192,11 +205,11 @@ function correctParts(s: DisplayedState): NarrationEvent['parts'] {
       : 'score_correct_is';
   const parts: NarrationEvent['parts'] = [head];
   for (const winner of winners) {
-    if (winner.clip !== null && winner.clip !== '') {
-      parts.push({ url: winner.clip });
+    if (hasClip(winner)) {
+      parts.push({ url: winner.clip! });
     } else {
-      // אין קטע לתשובה (למשל תשובות-תמונה) — אומרים את מספרה.
-      parts.push('score_correct_number', ...numberClipKeys(winner.position, 'f'));
+      // אין קטע לתשובה — ממשיכים את הפתיח ב"תשובה מספר N" (בלי לחזור עליו).
+      parts.push('flow_answer_number', ...numberClipKeys(winner.position, 'f'));
     }
   }
   return parts;
@@ -322,6 +335,13 @@ export function narrationStep(s: DisplayedState, memory: NarrationMemory): Narra
   const signature = signatureOf(s);
   const changed = signature !== memory.signature;
   const paused = s.timer?.paused === true;
+
+  // תצוגה מקדימה של המנצחים (W) — הצצה, לא סוף המשחק. שותקים לגמרי **ובלי
+  // לגעת בזיכרון**: כך הסיום האמיתי עדיין יאמר את `flow_thanks` (חד-פעמי
+  // למשחק), והחזרה למשחק אינה נחשבת ביקור חדש ואינה מקריאה את השקופית שוב.
+  if (s.winnersPreview) {
+    return { clips: [], cancel: changed, events: [], memory: { ...memory, signature } };
+  }
 
   // ביקור חדש = זיכרון נקי (אבל ה"פעם אחת למשחק" נשמר).
   const visit = visitOf(s, memory);

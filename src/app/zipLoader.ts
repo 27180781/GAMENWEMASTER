@@ -189,7 +189,8 @@ export function loadGameFromExtracted(src: {
     if (!isRelativeAsset(rel)) continue;
     const url = resolve(rel);
     if (url !== null) field.set(url);
-    else missing.push({ src: rel, context: field.label, reason: 'missing' });
+    // קטע קריינות חסר אינו נכס חסר — הוא פשוט לא יוקרא (ENGINE-narration.md).
+    else if (field.kind !== 'narration') missing.push({ src: rel, context: field.label, reason: 'missing' });
   }
 
   // אין Blob URLs במסלול הזה — אין מה לשחרר.
@@ -269,8 +270,9 @@ export async function loadGameFromZip(
     if (!isRelativeAsset(src)) continue;
     const url = await resolve(src);
     if (url !== null) field.set(url);
-    // אם הנכס חסר ב-ZIP — משאירים את הנתיב היחסי ומדווחים עליו כחסר
-    else missing.push({ src, context: field.label, reason: 'missing' });
+    // אם הנכס חסר ב-ZIP — משאירים את הנתיב היחסי ומדווחים עליו כחסר. קטע
+    // קריינות הוא היוצא מן הכלל: הוא מדולג בשקט ואינו אזהרה למפעיל.
+    else if (field.kind !== 'narration') missing.push({ src, context: field.label, reason: 'missing' });
   }
 
   return {

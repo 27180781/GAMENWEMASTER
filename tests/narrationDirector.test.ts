@@ -14,6 +14,7 @@ import {
   type NarrationDecision,
   type NarrationMemory,
 } from '../src/app/narration/narrationDirector.ts';
+import { narrationRevealMatches } from '../src/app/narration/gameNarration.ts';
 
 /** בנק "מלא": כל מפתח מחזיר קובץ בשם שלו — כך הבדיקות קריאות. */
 const BANK = new Proxy(
@@ -49,6 +50,7 @@ function base(over: Partial<DisplayedState> = {}): DisplayedState {
     functionDone: false,
     remaining: null,
     announceQuestionNumber: true,
+    winnersPreview: false,
     enabled: true,
     bank: BANK,
     ...over,
@@ -218,7 +220,7 @@ describe('חשיפת התשובה הנכונה', () => {
     expect(d!.clips).toEqual(['score_correct_multi.mp3', 'ans1.mp3', 'ans2.mp3']);
   });
 
-  it('★ תשובה נכונה בלי קטע (תשובות-תמונה) → מספרה', () => {
+  it('★ תשובה נכונה בלי קטע (תשובות-תמונה) → מספרה, בלי לומר את הפתיח פעמיים', () => {
     const answers = [
       { correct: false, clip: null },
       { correct: true, clip: null },
@@ -227,7 +229,57 @@ describe('חשיפת התשובה הנכונה', () => {
       results({ answers, slideType: 'ans_images' }),
       results({ revealCorrect: true, answers, slideType: 'ans_images' }),
     ]);
-    expect(d!.clips).toEqual(['score_correct_is.mp3', 'score_correct_number.mp3', 'num_f_2.mp3']);
+    // score_correct_number = "התשובה הנכונה היא תשובה מספר" — משפט שלם בפני
+    // עצמו, ולכן הוא מחליף את score_correct_is ("התשובה הנכונה היא").
+    expect(d!.clips).toEqual(['score_correct_number.mp3', 'num_f_2.mp3']);
+    expect(d!.clips).not.toContain('score_correct_is.mp3');
+  });
+
+  it('★ בחירה מרובה בלי קטעים → פתיח אחד + "תשובה מספר" לכל אחת', () => {
+    const answers = [
+      { correct: true, clip: null },
+      { correct: false, clip: null },
+      { correct: true, clip: null },
+    ];
+    const [, d] = runSteps([
+      results({ answers, slideType: 'ans_images' }),
+      results({ revealCorrect: true, answers, slideType: 'ans_images' }),
+    ]);
+    expect(d!.clips).toEqual([
+      'score_correct_multi.mp3',
+      'flow_answer_number.mp3',
+      'num_f_1.mp3',
+      'flow_answer_number.mp3',
+      'num_f_3.mp3',
+    ]);
+    expect(d!.clips.filter((c) => c.startsWith('score_correct_'))).toHaveLength(1);
+  });
+
+  it('★ מעורב: קטע לאחת, מספר לשנייה — הפתיח נאמר פעם אחת', () => {
+    const answers = [
+      { correct: true, clip: 'ans1.mp3' },
+      { correct: true, clip: null },
+    ];
+    const [, d] = runSteps([results({ answers }), results({ revealCorrect: true, answers })]);
+    expect(d!.clips).toEqual([
+      'score_correct_multi.mp3',
+      'ans1.mp3',
+      'flow_answer_number.mp3',
+      'num_f_2.mp3',
+    ]);
+  });
+
+  it('★ "הרוב קובע" בלי קטע → "הרוב קובע" + "תשובה מספר N" (בלי פתיח כפול)', () => {
+    const answers = [
+      { correct: false, clip: null },
+      { correct: true, clip: null },
+    ];
+    const [, d] = runSteps([
+      results({ answers, majorityDecides: true }),
+      results({ revealCorrect: true, answers, majorityDecides: true }),
+    ]);
+    expect(d!.clips).toEqual(['misc_majority.mp3', 'flow_answer_number.mp3', 'num_f_2.mp3']);
+    expect(d!.clips).not.toContain('score_correct_number.mp3');
   });
 
   it('★ סקר → "תוצאות הסקר" בלבד', () => {
@@ -331,6 +383,50 @@ describe('מסכי הפתיחה, המנצחים והניקוד', () => {
     const [d] = runSteps([base({ stage: 'scoreboard' })]);
     expect(d!.clips).toEqual(['lb_title.mp3', 'flow_thanks.mp3']);
   });
+
+  it('★ תצוגה מקדימה של המנצחים (W) — שקט, והסיום האמיתי עדיין מוכרז', () => {
+    const winners = [100, 90, 80];
+    const preview = (over: Partial<DisplayedState> = {}) =>
+      base({ stage: 'winners', winners, winnersPreview: true, ...over });
+    const clips = clipsOf([
+      base({ questionShown: true }), // באמצע המשחק
+      preview(), // W — הצצה
+      preview({ winnersRevealed: 3 }), // גם חשיפת פודיום בהצצה
+      preview({ stage: 'scoreboard', winnersRevealed: 3 }), // עד לוח הניקוד
+      base({ questionShown: true }), // W שוב — חזרה למשחק
+      base({ stage: 'winners', winners, winnersRevealed: 3 }), // הסיום האמיתי
+      base({ stage: 'scoreboard', winners }),
+    ]);
+    expect(clips[1]).toEqual([]);
+    expect(clips[2]).toEqual([]);
+    expect(clips[3]).toEqual([]);
+    // חזרה לאותה שקופית אינה ביקור חדש — השאלה לא מוקראת שוב
+    expect(clips[4]).toEqual([]);
+    expect(clips[5]).toEqual([
+      'lb_winners.mp3',
+      'lb_place_3.mp3',
+      'tens_80.mp3',
+      'unit_points.mp3',
+      'lb_place_2.mp3',
+      'tens_90.mp3',
+      'unit_points.mp3',
+      'lb_winner.mp3',
+      'lb_place_1.mp3',
+      'hundreds_100.mp3',
+      'unit_points.mp3',
+    ]);
+    // flow_thanks (חד-פעמי למשחק) לא נצרך בהצצה
+    expect(clips[6]).toEqual(['lb_title.mp3', 'flow_thanks.mp3']);
+  });
+
+  it('★ הצצה מבטלת את מה שמתנגן (המסך השתנה) בלי לומר דבר', () => {
+    const [, d] = runSteps([
+      base({ questionShown: true }),
+      base({ stage: 'winners', winners: [100], winnersPreview: true }),
+    ]);
+    expect(d!.clips).toEqual([]);
+    expect(d!.cancel).toBe(true);
+  });
 });
 
 describe('שקופיות פונקציה', () => {
@@ -353,6 +449,32 @@ describe('שקופיות פונקציה', () => {
     const clips = clipsOf([survival(), survival({ functionDone: true, remaining: 12 })]);
     expect(clips[0]).toEqual(['surv_round.mp3']);
     expect(clips[1]).toEqual(['surv_remaining.mp3', 'num_m_12.mp3', 'unit_participants.mp3']);
+  });
+
+  it('★ שקופית הישרדות שנייה — הכניסה שקטה עד שההסרה בוצעה *בה*', () => {
+    const survival = (over: Partial<DisplayedState> = {}) =>
+      base({
+        slideType: 'function',
+        votable: false,
+        questionOrdinal: 0,
+        functionAction: 'players',
+        ...over,
+      });
+    // ה-host מדווח functionDone רק על התוצאה של השקופית המוצגת (ראו GameHost):
+    // בכניסה לשקופית 7 היא עדיין false, גם אחרי שהשקופית 3 הסירה משתתפים.
+    const clips = clipsOf([
+      survival({ slideId: 3, functionDone: true, remaining: 12 }),
+      survival({ slideId: 7, functionDone: false, remaining: 12 }),
+      survival({ slideId: 7, functionDone: true, remaining: 8 }),
+    ]);
+    expect(clips[0]).toEqual([
+      'surv_round.mp3',
+      'surv_remaining.mp3',
+      'num_m_12.mp3',
+      'unit_participants.mp3',
+    ]);
+    expect(clips[1]).toEqual(['surv_round.mp3']);
+    expect(clips[2]).toEqual(['surv_remaining.mp3', 'num_m_8.mp3', 'unit_participants.mp3']);
   });
 
   it('שקופית API — שקט', () => {
@@ -408,5 +530,73 @@ describe('כללי הזהב', () => {
       base({ questionShown: true }),
     ]);
     expect(clips[2]).toEqual(['flow_question_number.mp3', 'num_f_1.mp3', 'q1.mp3']);
+  });
+});
+
+/**
+ * רגרסיה: ב-GameHost איפוס שלבי החשיפה קורה ב-effect, ולכן בקומיט שבו מזהה
+ * השקופית כבר התחלף `reveal` עדיין מתאר את השקופית הקודמת. הצמד הזה סימן
+ * בשקופית החדשה את השאלה ואת כל התשובות כ"כבר נאמרו", ובקומיט שאחריו המשפט
+ * שהתחיל בוטל — כלומר שקט מלא מהשקופית השנייה והלאה.
+ */
+describe('מעבר שקופית — הצמד שקופית/חשיפה', () => {
+  interface Commit {
+    slideId: number;
+    /** לאיזו שקופית שייך ה-reveal של הקומיט הזה. */
+    revealSlide: number;
+    questionShown: boolean;
+    answersShown: number;
+  }
+
+  function runHost(commits: Commit[], guard: boolean): string[][] {
+    let memory: NarrationMemory = emptyNarrationMemory();
+    const out: string[][] = [];
+    for (const c of commits) {
+      if (guard && !narrationRevealMatches(c.revealSlide, c.slideId)) {
+        out.push([]); // ה-host מדלג על הקומיט ומבטל — בלי לגעת בזיכרון
+        continue;
+      }
+      const d = narrationStep(
+        base({
+          slideId: c.slideId,
+          questionOrdinal: c.slideId,
+          questionClip: `q${c.slideId}.mp3`,
+          questionShown: c.questionShown,
+          answersShown: c.answersShown,
+        }),
+        memory,
+      );
+      memory = d.memory;
+      out.push(d.clips);
+    }
+    return out;
+  }
+
+  /** שקופית 1 מוקראת במלואה, ואז מעבר לשקופית 2 בדיוק כפי שה-host מרנדר. */
+  const COMMITS: Commit[] = [
+    { slideId: 1, revealSlide: 1, questionShown: true, answersShown: 0 },
+    { slideId: 1, revealSlide: 1, questionShown: true, answersShown: 1 },
+    { slideId: 1, revealSlide: 1, questionShown: true, answersShown: 2 },
+    // ↓ הקומיט הביניימי: שקופית 2, אבל reveal עדיין של שקופית 1
+    { slideId: 2, revealSlide: 1, questionShown: true, answersShown: 2 },
+    { slideId: 2, revealSlide: 2, questionShown: true, answersShown: 0 },
+    { slideId: 2, revealSlide: 2, questionShown: true, answersShown: 1 },
+    { slideId: 2, revealSlide: 2, questionShown: true, answersShown: 2 },
+  ];
+
+  it('★ עם הדילוג — השקופית השנייה מוקראת במלואה', () => {
+    const clips = runHost(COMMITS, true);
+    expect(clips[3]).toEqual([]); // הקומיט הביניימי — שקט, ובלי לזכור דבר
+    expect(clips[4]).toEqual(['flow_question_number.mp3', 'num_f_2.mp3', 'q2.mp3']);
+    expect(clips[5]).toEqual(['flow_answer_number.mp3', 'num_f_1.mp3', 'ans1.mp3']);
+    expect(clips[6]).toEqual(['flow_answer_number.mp3', 'num_f_2.mp3', 'ans2.mp3']);
+  });
+
+  it('בלי הדילוג — השאלה נקטעת ואף תשובה אינה מוכרזת (הבאג שתוקן)', () => {
+    const clips = runHost(COMMITS, false);
+    expect(clips[3]).not.toEqual([]); // נאמר מיד בכניסה...
+    expect(clips[4]).toEqual([]); // ...ובוטל קומיט אחר כך
+    expect(clips[5]).toEqual([]);
+    expect(clips[6]).toEqual([]);
   });
 });
