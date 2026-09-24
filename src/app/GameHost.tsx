@@ -471,6 +471,12 @@ export function GameHost({
   /** הקריין מדבר כרגע — מנמיך את סאונד המשחק (duck) ומעכב מעבר אוטומטי. */
   const [narrationSpeaking, setNarrationSpeaking] = useState(false);
   /**
+   * האודיו של הקריין נפתח (אינטראקציה ראשונה, או autoplay מותר). עד אז הבמאי
+   * דוחה את משפטי ה"פעם אחת למשחק", והפתיחה עצמה מריצה צעד — כך "ברוכים
+   * הבאים" נאמר ברגע שהמפעיל נוגע בלובי, ולא נשרף על אודיו נעול.
+   */
+  const [narrationUnlocked, setNarrationUnlocked] = useState(() => narration.isUnlocked());
+  /**
    * כמה זמן מוצג מסך ההתחברות (ms) — הקלט היחיד של פטפוט הלובי. נדגם בתדר
    * נמוך (כל 5 שניות) **ורק** כל עוד מסך הפתיחה מוצג והקריינות פעילה, כדי
    * שלא ירוץ שום טיימר חדש במהלך המשחק עצמו.
@@ -1900,6 +1906,13 @@ export function GameHost({
 
   useEffect(() => narration.onSpeakingChange(setNarrationSpeaking), [narration]);
 
+  useEffect(() => {
+    const off = narration.onUnlock(() => setNarrationUnlocked(true));
+    // ייתכן שנפתח בין הרינדור הראשון למנוי (הקשר שרץ מיד בטעינה המוקדמת).
+    if (narration.isUnlocked()) setNarrationUnlocked(true);
+    return off;
+  }, [narration]);
+
   // שעון הלובי — קיים רק במסך הפתיחה ורק כשיש קריינות. נעצר (ומתנקה) ברגע
   // שהמשחק מתחיל, ולכן אינו מוסיף ולו רינדור אחד למהלך המשחק.
   useEffect(() => {
@@ -2184,6 +2197,7 @@ export function GameHost({
       boardMove,
       winnersPreview: winnersPreviewRef.current !== null,
       enabled: !narrationMuted,
+      audioUnlocked: narrationUnlocked,
       bank: narrationSetting?.bank ?? {},
     };
     const decision = narrationStep(display, narrationMemoryRef.current);
@@ -2197,6 +2211,7 @@ export function GameHost({
   }, [
     narrationActive,
     narrationMuted,
+    narrationUnlocked,
     narration,
     engine,
     stage,

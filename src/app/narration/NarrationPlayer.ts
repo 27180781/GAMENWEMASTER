@@ -11,6 +11,9 @@
  *   את מה שמתנגן.
  * - קטע שלא נטען (404/רשת) נשמר במטמון כ-null ומדולג בשקט; הוא לעולם לא חוסם
  *   את שאר המשפט ולא את המשחק.
+ * - נעילת autoplay: עד האינטראקציה הראשונה של המפעיל הדפדפן לא משמיע כלום.
+ *   הנגן מדווח מתי האודיו נפתח (`isUnlocked`/`onUnlock`), והבמאי דוחה עד אז את
+ *   המשפטים של "פעם אחת למשחק" במקום לשרוף אותם על אודיו נעול.
  *
  * כל גישה ל-API של הדפדפן מוגנת (`typeof`), כדי שהמחלקה תהיה בטוחה גם בסביבת
  * הבדיקות (Node) — שם היא פשוט לא משמיעה דבר.
@@ -53,15 +56,47 @@ export class NarrationPlayer {
   private disposed = false;
   private listening = false;
   private readonly unlockFn: () => void;
+  /**
+   * האודיו נפתח: הייתה אינטראקציה של המפעיל (או sticky activation מלפני שהמשחק
+   * עלה), או שההקשר כבר רץ בלעדיה (autoplay מותר — ה-EXE). חד-כיווני.
+   */
+  private unlocked = false;
+  private readonly unlockListeners = new Set<() => void>();
 
   constructor() {
+    // בדיוק כמו AudioManager: אינטראקציה שכבר קרתה במסמך (הקליק שהוביל למשחק)
+    // מתירה ניגון מיד. (navigator.userActivation לא קיים בכל סביבה — נזהרים.)
+    if (typeof navigator !== 'undefined' && navigator.userActivation?.hasBeenActive === true) {
+      this.unlocked = true;
+    }
     // פתיחת ה-AudioContext באינטראקציה הראשונה — אותו דפוס כמו ב-AudioManager,
     // אבל עם מאזינים משלנו (הוא מסיר את שלו אחרי הפתיחה הראשונה).
     this.unlockFn = () => {
+      this.markUnlocked();
       const ctx = this.context;
       if (ctx && ctx.state === 'suspended') void ctx.resume().catch(() => {});
     };
     this.armUnlockListeners();
+  }
+
+  private markUnlocked(): void {
+    if (this.unlocked || this.disposed) return;
+    this.unlocked = true;
+    debugLog('narration', 'האודיו נפתח');
+    for (const listener of this.unlockListeners) listener();
+  }
+
+  /** האם האודיו כבר נפתח (ראו `unlocked`) — קלט לבמאי (DisplayedState.audioUnlocked). */
+  isUnlocked(): boolean {
+    return this.unlocked;
+  }
+
+  /** מנוי על פתיחת האודיו (נקרא פעם אחת, ברגע הפתיחה). */
+  onUnlock(listener: () => void): () => void {
+    this.unlockListeners.add(listener);
+    return () => {
+      this.unlockListeners.delete(listener);
+    };
   }
 
   private armUnlockListeners(): void {
@@ -90,6 +125,12 @@ export class NarrationPlayer {
       master.connect(ctx.destination);
       this.context = ctx;
       this.master = master;
+      // הקשר שרץ בלי אינטראקציה (autoplay מותר) הוא אודיו פתוח; ההקשר עובר
+      // ל-running באופן אסינכרוני, ולכן מאזינים גם לשינוי המצב.
+      ctx.onstatechange = () => {
+        if (ctx.state === 'running') this.markUnlocked();
+      };
+      if (ctx.state === 'running') this.markUnlocked();
       return ctx;
     } catch {
       return null; // סביבה בלי אודיו — הקריינות פשוט שותקת
@@ -188,8 +229,10 @@ export class NarrationPlayer {
 
   /**
    * אומר רצף קטעים. כל קריאה מבטלת קודם את מה שמתנגן (המסך מוביל), והקטעים
-   * משובצים אחד אחרי השני לפי אורכם. קריאה כשה-AudioContext עדיין נעול נזרקת
-   * *בשקט* ולא נשמרת לתור — קריינות מאחרת גרועה מקריינות חסרה.
+   * משובצים אחד אחרי השני לפי אורכם. קריאה לפני שהייתה אינטראקציה כלשהי נזרקת
+   * *בשקט* ולא נשמרת לתור — קריינות מאחרת גרועה מקריינות חסרה (והבמאי אינו
+   * שולח עד אז משפטים של "פעם אחת למשחק"). אחרי האינטראקציה, כשה-resume עוד
+   * בדרך, המשפט ממתין לו — אלא אם בוטל בינתיים.
    */
   say(urls: readonly string[], { gapMs = 0 }: SayOptions = {}): void {
     this.cancel();
@@ -207,9 +250,16 @@ export class NarrationPlayer {
       const ready = buffers.filter((b): b is AudioBuffer => b !== null);
       if (ready.length === 0) return;
       if (ctx.state === 'suspended') {
-        debugLog('narration', 'האודיו עדיין נעול — מדלגים על המשפט');
-        return;
+        if (!this.unlocked) {
+          debugLog('narration', 'האודיו עדיין נעול — מדלגים על המשפט');
+          return;
+        }
+        // המקש שפתח את האודיו הוא בדרך כלל גם זה שהחליף את המסך, והמשפט של
+        // המסך החדש מגיע לכאן לפני שה-resume הסתיים. ממתינים לו במקום לזרוק.
+        await ctx.resume().catch(() => {});
+        if (this.disposed || this.run !== run) return; // המסך השתנה בינתיים
       }
+      if (ctx.state !== 'running') return;
       const master = this.master;
       if (master === null) return;
       // שיבוץ על שעון ה-AudioContext: תחילת כל קטע = סוף הקודם (+ הרווח
@@ -263,6 +313,7 @@ export class NarrationPlayer {
     this.disposed = true;
     this.disarmUnlockListeners();
     this.speakingListeners.clear();
+    this.unlockListeners.clear();
     const ctx = this.context;
     this.context = null;
     this.master = null;

@@ -77,6 +77,7 @@ function base(over: Partial<DisplayedState> = {}): DisplayedState {
     boardMove: null,
     winnersPreview: false,
     enabled: true,
+    audioUnlocked: true,
     bank: BANK,
     ...over,
   };
@@ -555,6 +556,86 @@ describe('כללי הזהב', () => {
       base({ questionShown: true }),
     ]);
     expect(clips[2]).toEqual(['flow_question_number.mp3', 'num_f_1.mp3', 'q1.mp3']);
+  });
+});
+
+/**
+ * נעילת autoplay (דפדפן/טלפונים): עד האינטראקציה הראשונה של המפעיל הנגן זורק
+ * כל משפט. מה שנאמר פעם אחת למשחק אינו נשרף עליו — הוא ממתין לצעד הראשון שבו
+ * האודיו פתוח, כל עוד המסך שלו עדיין מוצג. משפטי השקופית אינם חוזרים באיחור.
+ */
+describe('★ אודיו נעול — מה שנאמר פעם אחת למשחק אינו אובד', () => {
+  const locked = (over: Partial<DisplayedState> = {}) => base({ audioUnlocked: false, ...over });
+  const lockedAmb = (over: Partial<DisplayedState> = {}) => locked({ bank: AMB_BANK, ...over });
+  const amb = (over: Partial<DisplayedState> = {}) => base({ bank: AMB_BANK, ...over });
+
+  it('★ "ברוכים הבאים" ממתין בלובי עד שהאודיו נפתח — ואז נאמר פעם אחת', () => {
+    const clips = clipsOf([
+      locked({ stage: 'opening' }),
+      locked({ stage: 'opening' }),
+      base({ stage: 'opening' }), // המפעיל נגע בלובי
+      base({ stage: 'opening' }),
+    ]);
+    expect(clips).toEqual([[], [], ['flow_welcome.mp3'], []]);
+  });
+
+  it('"ברוכים הבאים" שלא נאמר בלובי אינו נאמר אחרי שהמשחק התחיל', () => {
+    const clips = clipsOf([locked({ stage: 'opening' }), base({ questionShown: true })]);
+    expect(clips[1]).toEqual(['flow_question_number.mp3', 'num_f_1.mp3', 'q1.mp3']);
+  });
+
+  it('★ המקש שפותח את האודיו ומתחיל את המשחק — "מתחילים!" נאמר עם השאלה', () => {
+    const clips = clipsOf([lockedAmb({ stage: 'opening' }), amb({ questionShown: true })]);
+    expect(clips[1]).toEqual(['amb_start_1.mp3', 'flow_question_number.mp3', 'num_f_1.mp3', 'q1.mp3']);
+  });
+
+  it('★ "מתחילים!" שנדחה נאמר בצעד הראשון שבו האודיו פתוח — פעם אחת', () => {
+    const clips = clipsOf([
+      lockedAmb({ stage: 'opening' }),
+      lockedAmb({ questionShown: true }), // המשחק התחיל בלי אינטראקציה
+      amb({ questionShown: true }), // עכשיו האודיו נפתח
+      amb({ questionShown: true, answersShown: 1 }),
+    ]);
+    expect(clips[1]!.filter((c) => c.startsWith('amb_start'))).toEqual([]);
+    expect(clips[2]).toEqual(['amb_start_1.mp3']);
+    expect(clips[3]!.filter((c) => c.startsWith('amb_start'))).toEqual([]);
+  });
+
+  it('★ משפטי השקופית נצרכים כרגיל — אינם חוזרים באיחור כשהאודיו נפתח', () => {
+    const clips = clipsOf([locked({ questionShown: true }), base({ questionShown: true })]);
+    expect(clips[0]).toEqual(['flow_question_number.mp3', 'num_f_1.mp3', 'q1.mp3']); // הנגן זורק
+    expect(clips[1]).toEqual([]);
+  });
+
+  it('★ "חצי הדרך" על אודיו נעול — עובר לשאלה הבאה, ולא אובד', () => {
+    const question = (ordinal: number, over: Partial<DisplayedState> = {}) =>
+      amb({
+        slideId: ordinal,
+        questionOrdinal: ordinal,
+        questionTotal: 8,
+        questionShown: true,
+        questionClip: `q${ordinal}.mp3`,
+        ...over,
+      });
+    const clips = clipsOf([
+      question(5, { audioUnlocked: false }),
+      question(5), // אותה שקופית — קריאת האווירה שלה כבר עברה
+      question(6),
+      question(7),
+    ]);
+    expect(clips[0]!.filter((c) => c.startsWith('amb_'))).toEqual([]);
+    expect(clips[1]).toEqual([]);
+    expect(clips[2]![0]).toBe('amb_half.mp3');
+    expect(clips[3]).not.toContain('amb_half.mp3');
+  });
+
+  it('★ "תודה שהשתתפתם" בלוח הניקוד ממתין לאודיו', () => {
+    const clips = clipsOf([
+      locked({ stage: 'scoreboard' }),
+      base({ stage: 'scoreboard' }),
+      base({ stage: 'scoreboard' }),
+    ]);
+    expect(clips).toEqual([[], ['lb_title.mp3', 'flow_thanks.mp3'], []]);
   });
 });
 

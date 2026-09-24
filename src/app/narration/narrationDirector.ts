@@ -10,6 +10,8 @@
  *      ולכן צעד אחורה וקדימה אינו מקריא שוב. שקופית אחרת = ביקור חדש.
  *   3. **לעולם לא חוסמת** — מפתח בנק חסר או קטע null מדולגים בשקט.
  *
+ * ומה ש"פעם אחת למשחק" אינו נשרף על אודיו שהדפדפן עדיין נועל (audioUnlocked).
+ *
  * הבמאי אידמפוטנטי: אותו מצב פעמיים = אין מה לומר בפעם השנייה.
  */
 
@@ -146,6 +148,14 @@ export interface DisplayedState {
   winnersPreview: boolean;
   /** הקריינות פעילה (קיימת בקובץ, דלוקה, ולא הושתקה בתפריט המפעיל). */
   enabled: boolean;
+  /**
+   * האודיו של הקריין כבר נפתח (NarrationPlayer.isUnlocked): הייתה אינטראקציה
+   * של המפעיל, או שהדפדפן מתיר ניגון בלעדיה. עד אז הנגן זורק כל משפט, ולכן
+   * משפט של "פעם אחת למשחק" (ברוכים הבאים, מתחילים, חצי הדרך, תודה) *אינו
+   * נאמר ואינו נרשם* — הוא ממתין לצעד הראשון שבו האודיו פתוח, כל עוד המסך שלו
+   * עדיין מוצג. משפטים של השקופית נצרכים כרגיל: הם אינם חוזרים באיחור.
+   */
+  audioUnlocked: boolean;
   /** מילון הביטויים הקבועים של הקול (bank_key → url). */
   bank: Record<string, string>;
 }
@@ -691,10 +701,17 @@ export function narrationStep(s: DisplayedState, memory: NarrationMemory): Narra
     events.push(paused ? 'paused' : 'resumed');
   } else {
     for (const event of candidates(s, memory)) {
+      // אודיו נעול: אירוע חד-פעמי למשחק נדחה בלי להירשם (ראו audioUnlocked).
+      if (event.global === true && !s.audioUnlocked) continue;
       const seen = event.global === true ? global : spoken;
       if (seen.has(event.key)) continue;
       seen.add(event.key);
-      if (event.once !== undefined) global.add(event.once);
+      if (event.once !== undefined) {
+        // "חצי הדרך" על אודיו נעול: המקום של קריאת האווירה בשקופית הזאת עובר
+        // בשקט, והסימון החד-פעמי נשאר פתוח לשאלה הבאה.
+        if (!s.audioUnlocked) continue;
+        global.add(event.once);
+      }
       // תשובות קודמות שדולגו (חשיפה מלאה בבת אחת) נחשבות כאילו נאמרו, כדי
       // שצעד אחורה וקדימה לא יקריא אותן עכשיו.
       if (event.key.startsWith('answer:')) {
