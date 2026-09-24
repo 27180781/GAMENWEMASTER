@@ -605,6 +605,22 @@ describe('★ אודיו נעול — מה שנאמר פעם אחת למשחק �
     expect(clips).toEqual([[], [], ['flow_welcome.mp3'], []]);
   });
 
+  it('★ "ברוכים הבאים" אינו נאמר מעל שכבה — הקליק על ⚙ שפתח את האודיו, או תפריט ESC', () => {
+    const clips = clipsOf([
+      locked({ stage: 'opening' }),
+      base({ stage: 'opening', overlay: 'other' }), // ההגדרות נפתחו באותו קליק
+      base({ stage: 'opening', overlay: 'other' }),
+      base({ stage: 'opening' }), // ההגדרות נסגרו — הלובי שוב על המסך
+      base({ stage: 'opening' }),
+    ]);
+    expect(clips).toEqual([[], [], [], ['flow_welcome.mp3'], []]);
+  });
+
+  it('"ברוכים הבאים" אינו תלוי במדיית הפתיחה של השקופית הראשונה (היא עוד לא על המסך)', () => {
+    const clips = clipsOf([base({ stage: 'opening', activeMedia: 'open' })]);
+    expect(clips[0]).toEqual(['flow_welcome.mp3']);
+  });
+
   it('"ברוכים הבאים" שלא נאמר בלובי אינו נאמר אחרי שהמשחק התחיל', () => {
     const clips = clipsOf([locked({ stage: 'opening' }), base({ questionShown: true })]);
     expect(clips[1]).toEqual(['flow_question_number.mp3', 'num_f_1.mp3', 'q1.mp3']);
@@ -625,6 +641,68 @@ describe('★ אודיו נעול — מה שנאמר פעם אחת למשחק �
     expect(clips[1]!.filter((c) => c.startsWith('amb_start'))).toEqual([]);
     expect(clips[2]).toEqual(['amb_start_1.mp3']);
     expect(clips[3]!.filter((c) => c.startsWith('amb_start'))).toEqual([]);
+  });
+
+  /** שקופית שאלה מספר n, מוצגת, עם אודיו נעול או פתוח. */
+  const questionAt = (n: number, over: Partial<DisplayedState> = {}) =>
+    amb({
+      slideId: n,
+      questionOrdinal: n,
+      questionTotal: 10,
+      questionShown: true,
+      questionClip: `q${n}.mp3`,
+      ...over,
+    });
+  const startsOf = (clips: string[][]) => clips.map((c) => c.filter((x) => x.startsWith('amb_start')));
+
+  it('★ "מתחילים!" שנדחה אינו קופץ שקופיות אחר כך — כשהאודיו נפתח רק בשאלה 5', () => {
+    const clips = clipsOf([
+      lockedAmb({ stage: 'opening' }),
+      ...[1, 2, 3, 4, 5].map((n) => questionAt(n, { audioUnlocked: false })), // שלט המנחה, בלי מגע במסך
+      questionAt(5), // המפעיל נוגע במסך הגדול
+      questionAt(5, { phase: 'voting' }),
+      questionAt(6),
+    ]);
+    expect(startsOf(clips).flat()).toEqual([]);
+  });
+
+  it('"מתחילים!" שנדחה יורד גם כשהמקש שפותח את האודיו כבר מעביר לשקופית הבאה', () => {
+    const clips = clipsOf([
+      lockedAmb({ stage: 'opening' }),
+      questionAt(1, { audioUnlocked: false }),
+      questionAt(2),
+    ]);
+    expect(clips[2]).toEqual(['amb_next_1.mp3', 'flow_question_number.mp3', 'num_f_2.mp3', 'q2.mp3']);
+  });
+
+  it('"מתחילים!" שנדחה אינו נאמר לפני לוח המובילים שנפתח מעל השאלה הראשונה', () => {
+    const clips = clipsOf([
+      lockedAmb({ stage: 'opening' }),
+      questionAt(1, { audioUnlocked: false }),
+      questionAt(1, { overlay: 'leaders', leaders: [30, 10] }), // מקש 1 — גם פותח את האודיו
+      questionAt(1),
+    ]);
+    expect(startsOf(clips).flat()).toEqual([]);
+    expect(clips[2]![0]).toBe('lb_title.mp3');
+  });
+
+  it('"מתחילים!" שנדחה ממתין מתחת לתפריט המפעיל, ונאמר כשהשאלה הראשונה חוזרת למסך', () => {
+    const clips = clipsOf([
+      lockedAmb({ stage: 'opening' }),
+      questionAt(1, { audioUnlocked: false }),
+      questionAt(1, { overlay: 'other' }), // קליק בתוך התפריט פתח את האודיו
+      questionAt(1),
+    ]);
+    expect(startsOf(clips)).toEqual([[], [], [], ['amb_start_1.mp3']]);
+  });
+
+  it('מדיה חוסמת בשקופית הראשונה עדיין רק דוחה את "מתחילים!" — גם כשהמנחה מדלג עליה', () => {
+    const clips = clipsOf([
+      amb({ stage: 'opening' }),
+      questionAt(1, { questionShown: false, activeMedia: 'open' }),
+      questionAt(2),
+    ]);
+    expect(clips[2]![0]).toBe('amb_start_1.mp3');
   });
 
   it('★ משפטי השקופית נצרכים כרגיל — אינם חוזרים באיחור כשהאודיו נפתח', () => {
