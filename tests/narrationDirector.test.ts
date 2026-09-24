@@ -14,7 +14,12 @@ import {
   type NarrationDecision,
   type NarrationMemory,
 } from '../src/app/narration/narrationDirector.ts';
-import { narrationRevealMatches } from '../src/app/narration/gameNarration.ts';
+import {
+  narrationRevealMatches,
+  playableGroupClips,
+} from '../src/app/narration/gameNarration.ts';
+import { parseGameFile } from '../src/engine/index.ts';
+import { fourAnswers, rawGame, rawSlide } from './helpers.ts';
 
 /**
  * בנק "מלא" — אבל **בלי קבוצת האווירה** (`amb_*`): בדיוק בנק של משחק שנוצר
@@ -966,6 +971,28 @@ describe('קריאות אווירה', () => {
       expect(gs([{ name: 'א', points: 0 }, { name: 'ב', points: 0 }])).toEqual([
         'amb_group_close.mp3',
       ]);
+    });
+
+    it('★ קטע שם שלא נטען (נתיב אופליין שבור, 404) — ההפרש, ולא "הקבוצה המובילה כרגע…" ושקט', () => {
+      const raw = rawGame([rawSlide({ id: 1, type: 'trivia', answers: fourAnswers(1) })]);
+      (raw.setting as Record<string, unknown>).narration = {
+        bank: {},
+        groups: { הכחולים: 'blue.mp3', הצהובים: 'yellow.mp3' },
+      };
+      const game = parseGameFile(raw);
+      const failed = new Set(['blue.mp3']);
+      const groupClips = playableGroupClips(game, (url) => failed.has(url));
+      expect(groupClips).toEqual({ הצהובים: 'yellow.mp3' });
+      expect(gs([{ name: 'הכחולים', points: 100 }, { name: 'הצהובים', points: 40 }], groupClips)).toEqual([
+        'amb_group_gap_pre.mp3',
+        'tens_60.mp3',
+        'unit_points.mp3',
+      ]);
+      // ...וקטע שעוד לא נוסה (או שנטען) נשאר
+      expect(playableGroupClips(game, () => false)).toEqual({
+        הכחולים: 'blue.mp3',
+        הצהובים: 'yellow.mp3',
+      });
     });
   });
 

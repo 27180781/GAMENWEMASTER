@@ -75,9 +75,11 @@ import {
 } from './narration/narrationDirector.ts';
 import {
   bankClips,
+  groupNameClips,
   narrationAnswers,
   narrationFunctionAction,
   narrationRevealMatches,
+  playableGroupClips,
   questionOrdinal,
   questionTotal,
   slideNarrationClips,
@@ -1919,12 +1921,17 @@ export function GameHost({
     audio.setVolume(narrationSpeaking ? volume * NARRATION_DUCK : volume);
   }, [narrationActive, narrationDuck, narrationSpeaking, volume, audio]);
 
-  // טעינה מוקדמת: בנק הביטויים + קטעי השקופית הראשונה, ברקע ובלי לחסום דבר.
+  // טעינה מוקדמת: בנק הביטויים, שמות הקבוצות וקטעי השקופית הראשונה, ברקע ובלי
+  // לחסום דבר. שם קבוצה שנכשל כאן כבר ידוע כשמסך הקבוצות עולה (playableGroupClips).
   useEffect(() => {
     if (!narrationActive) return;
     const g = engine.getGame();
     const first = g.questions[0];
-    void narration.preload([...bankClips(g), ...(first ? slideNarrationClips(first) : [])]);
+    void narration.preload([
+      ...bankClips(g),
+      ...groupNameClips(g),
+      ...(first ? slideNarrationClips(first) : []),
+    ]);
   }, [narrationActive, engine, narration]);
 
   // ...ובכל כניסה לשקופית — הקטעים של השקופית הבאה.
@@ -2171,7 +2178,8 @@ export function GameHost({
       votedCount,
       leaderIds: leaderRows.map((w) => w.voterId),
       groups,
-      groupClips: narrationSetting?.groups ?? {},
+      // שם קבוצה שהקטע שלו לא נטען — כאילו אין לו קטע (הבמאי אומר את ההפרש).
+      groupClips: playableGroupClips(g, (url) => narration.hasFailed(url)),
       bet,
       boardMove,
       winnersPreview: winnersPreviewRef.current !== null,

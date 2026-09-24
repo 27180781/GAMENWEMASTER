@@ -212,6 +212,15 @@ describe('NarrationPlayer — לעולם לא חוסם', () => {
     expect(ctx().sources).toHaveLength(0);
   });
 
+  it('★ hasFailed מדווח רק על קטע שהטעינה שלו כבר נכשלה', async () => {
+    const player = setup();
+    broken.add('b.mp3');
+    expect(player.hasFailed('b.mp3')).toBe(false); // עוד לא נוסה
+    await player.preload(['a.mp3', 'b.mp3']);
+    expect(player.hasFailed('b.mp3')).toBe(true);
+    expect(player.hasFailed('a.mp3')).toBe(false);
+  });
+
   it('משפט שכל קטעיו נכשלו — פשוט שקט', async () => {
     const player = setup();
     broken.add('a.mp3');
