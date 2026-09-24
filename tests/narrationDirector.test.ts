@@ -362,6 +362,32 @@ describe('שכבות מעל המשחק', () => {
     expect(d!.clips).toEqual(['bet_results.mp3']);
   });
 
+  it('★ "ההימור הגדול של הסבב" + הזכייה שעל המסך — ורק כשיש זוכה', () => {
+    const results = (biggestWin: number, bank = BANK) =>
+      runSteps([
+        base({
+          overlay: 'betResults',
+          bank,
+          bet: { anyStake: true, biggestWin, biggestLoss: 0, leaderScore: 1000 },
+        }),
+      ])[0]!.clips;
+    expect(results(150)).toEqual([
+      'bet_results.mp3',
+      'bet_biggest.mp3',
+      'hundreds_100.mp3',
+      'tens_v_50.mp3',
+      'unit_points.mp3',
+    ]);
+    expect(results(0)).toEqual(['bet_results.mp3']); // אף אחד לא זכה
+    expect(results(0.4)).toEqual(['bet_results.mp3']); // מתעגל לאפס
+    // בנק בלי הפתיח — גם הסכום לא נאמר לבדו
+    const noBiggest = new Proxy(
+      {},
+      { get: (_target, key: string) => (key === 'bet_biggest' ? undefined : `${key}.mp3`) },
+    ) as Record<string, string>;
+    expect(results(150, noBiggest)).toEqual(['bet_results.mp3']);
+  });
+
   it('★ שכבה שאינה מוקראת (תפריט/הגדרות/הגרלה) — שקט, וביטול של מה שמתנגן', () => {
     const [, d] = runSteps([base({ questionShown: true }), base({ questionShown: true, overlay: 'other' })]);
     expect(d!.clips).toEqual([]);
@@ -1109,14 +1135,23 @@ describe('קריאות אווירה', () => {
       ]);
       expect(results({ anyStake: true, biggestWin: 60, biggestLoss: 0, leaderScore: 100 })).toEqual([
         'bet_results.mp3',
+        'bet_biggest.mp3',
+        'tens_60.mp3',
+        'unit_points.mp3',
         'amb_bet_big_win.mp3',
       ]);
       expect(results({ anyStake: true, biggestWin: 10, biggestLoss: 70, leaderScore: 100 })).toEqual([
         'bet_results.mp3',
+        'bet_biggest.mp3',
+        'num_f_10.mp3',
+        'unit_points.mp3',
         'amb_bet_big_loss.mp3',
       ]);
       expect(results({ anyStake: true, biggestWin: 10, biggestLoss: 10, leaderScore: 100 })).toEqual([
         'bet_results.mp3',
+        'bet_biggest.mp3',
+        'num_f_10.mp3',
+        'unit_points.mp3',
       ]);
     });
 

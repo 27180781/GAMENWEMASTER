@@ -393,7 +393,7 @@ interface BackupTarget {
 | עצירה / המשך של המנחה | `timer_paused` / `timer_resumed` |
 | ההצבעה נסגרה | `timer_times_up`; בהימור `bet_closed` |
 | התשובה הנכונה נחשפה | `score_correct_is` (רבות: `score_correct_multi`) + קטעי התשובות; תשובה בלי קטע — `flow_answer_number` + מספרה אחרי הפתיח, ובתשובה יחידה בלי קטע `score_correct_number` + מספרה **במקום** הפתיח (אחרת «התשובה הנכונה היא» נאמר פעמיים); «הרוב קובע»: `misc_majority`; סקר: `misc_poll_results`; הימור: כלום |
-| מסך תוצאות ההימור | `bet_results` |
+| מסך תוצאות ההימור | `bet_results`; כשמישהו זכה — `bet_biggest` + הזכייה הגדולה (המספר שמתחת ל«ההימור הגדול» במסך, בלי השם) + `unit_points` |
 | לוח מובילים (מקש 1) | `lb_title` + לשלושת הראשונים `lb_place_n` + ניקוד |
 | מסך מנצחים | בכניסה `lb_winners`; כל חשיפת מקום 1–3 (מהאחרון לראשון) `lb_place_r` + ניקוד, ובמקום הראשון `lb_winner` לפניו |
 | לוח ניקוד מלא | `lb_title` + `flow_thanks` |

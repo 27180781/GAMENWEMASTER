@@ -519,6 +519,12 @@ function candidates(s: DisplayedState, memory: NarrationMemory): NarrationEvent[
     const parts: NarrationPart[] = ['bet_results'];
     const bet = s.bet;
     if (bet !== null) {
+      // "ההימור הגדול של הסבב" + הסכום — אותו מספר שמסך התוצאות מציג תחת
+      // "ההימור הגדול" (הזכייה הגדולה ביותר). השם שעל המסך אינו נאמר: שמות
+      // משתתפים אינם בבנק. בלי זוכה אין מה להכריז.
+      if (Math.round(bet.biggestWin) > 0) {
+        parts.push({ pre: 'bet_biggest', tail: pointsClipKeys(bet.biggestWin) });
+      }
       const threshold = bet.leaderScore / 2;
       if (!bet.anyStake) parts.push('amb_bet_none');
       else if (bet.leaderScore > 0 && bet.biggestWin >= threshold) parts.push('amb_bet_big_win');
