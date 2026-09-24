@@ -2197,7 +2197,9 @@ export function GameHost({
       boardMove,
       winnersPreview: winnersPreviewRef.current !== null,
       enabled: !narrationMuted,
-      audioUnlocked: narrationUnlocked,
+      // הדגל של הנגן נדלק כבר בתוך הקליק/המקש, לפני ההודעה (שמגיעה אחריו):
+      // המסך שאותו אירוע פותח כבר נחשב פתוח, והשאלה הראשונה אינה נזרקת.
+      audioUnlocked: narrationUnlocked || narration.isUnlocked(),
       bank: narrationSetting?.bank ?? {},
     };
     const decision = narrationStep(display, narrationMemoryRef.current);

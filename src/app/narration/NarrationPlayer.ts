@@ -13,7 +13,9 @@
  *   את שאר המשפט ולא את המשחק.
  * - נעילת autoplay: עד האינטראקציה הראשונה של המפעיל הדפדפן לא משמיע כלום.
  *   הנגן מדווח מתי האודיו נפתח (`isUnlocked`/`onUnlock`), והבמאי דוחה עד אז את
- *   המשפטים של "פעם אחת למשחק" במקום לשרוף אותם על אודיו נעול.
+ *   המשפטים של "פעם אחת למשחק" במקום לשרוף אותם על אודיו נעול. הפתיחה היא קליק
+ *   או מקש שהדפדפן מכיר כאינטראקציה (לא Esc), וההודעה עליה יוצאת רק אחרי
+ *   שהאירוע סיים את דרכו — ראו `unlockFn`.
  *
  * כל גישה ל-API של הדפדפן מוגנת (`typeof`), כדי שהמחלקה תהיה בטוחה גם בסביבת
  * הבדיקות (Node) — שם היא פשוט לא משמיעה דבר.
@@ -69,12 +71,21 @@ export class NarrationPlayer {
     if (typeof navigator !== 'undefined' && navigator.userActivation?.hasBeenActive === true) {
       this.unlocked = true;
     }
-    // פתיחת ה-AudioContext באינטראקציה הראשונה — אותו דפוס כמו ב-AudioManager,
-    // אבל עם מאזינים משלנו (הוא מסיר את שלו אחרי הפתיחה הראשונה).
+    // פתיחת ה-AudioContext באינטראקציה הראשונה — כמו ב-AudioManager, אבל עם
+    // מאזינים משלנו, ובקליק ולא ב-pointerdown: pointerdown מקדים בעשירית שנייה
+    // את הקליק שמחליף את המסך, ו"ברוכים הבאים" היה מתחיל בלובי ונחתך מיד.
+    // המאזינים ב-capture, כדי שהדגל יידלק לפני ה-onClick / מקש המנחה, והמשפט
+    // של המסך שהם פותחים כבר ימתין ל-resume במקום להיזרק.
     this.unlockFn = () => {
-      this.markUnlocked();
       const ctx = this.context;
       if (ctx && ctx.state === 'suspended') void ctx.resume().catch(() => {});
+      // רק אינטראקציה שהדפדפן מכיר: Esc (שפותח את תפריט המפעיל) או מקש שינוי
+      // לבדו אינם כאלה, וה-resume שלהם נתקע עד מגע אמיתי. בלי ה-API (דפדפן
+      // ישן) — כמו קודם, כל קליק או מקש נחשב.
+      if (typeof navigator !== 'undefined' && navigator.userActivation?.hasBeenActive === false) {
+        return;
+      }
+      this.markUnlocked();
     };
     this.armUnlockListeners();
   }
@@ -83,7 +94,13 @@ export class NarrationPlayer {
     if (this.unlocked || this.disposed) return;
     this.unlocked = true;
     debugLog('narration', 'האודיו נפתח');
-    for (const listener of this.unlockListeners) listener();
+    // ההודעה יוצאת רק אחרי שהאירוע שפתח את האודיו סיים את דרכו. הקליק על
+    // "הבא" או על ⚙ כבר החליף את המסך, והצעד שההודעה מריצה רואה את המסך
+    // החדש; הצעד שהקליק עצמו הריץ כבר קרא `isUnlocked` ישירות.
+    setTimeout(() => {
+      if (this.disposed) return;
+      for (const listener of this.unlockListeners) listener();
+    }, 0);
   }
 
   /** האם האודיו כבר נפתח (ראו `unlocked`) — קלט לבמאי (DisplayedState.audioUnlocked). */
@@ -91,7 +108,7 @@ export class NarrationPlayer {
     return this.unlocked;
   }
 
-  /** מנוי על פתיחת האודיו (נקרא פעם אחת, ברגע הפתיחה). */
+  /** מנוי על פתיחת האודיו (נקרא פעם אחת, מיד אחרי האירוע שפתח אותו). */
   onUnlock(listener: () => void): () => void {
     this.unlockListeners.add(listener);
     return () => {
@@ -102,15 +119,15 @@ export class NarrationPlayer {
   private armUnlockListeners(): void {
     if (this.listening || typeof window === 'undefined') return;
     this.listening = true;
-    window.addEventListener('pointerdown', this.unlockFn);
-    window.addEventListener('keydown', this.unlockFn);
+    window.addEventListener('click', this.unlockFn, true);
+    window.addEventListener('keydown', this.unlockFn, true);
   }
 
   private disarmUnlockListeners(): void {
     if (!this.listening || typeof window === 'undefined') return;
     this.listening = false;
-    window.removeEventListener('pointerdown', this.unlockFn);
-    window.removeEventListener('keydown', this.unlockFn);
+    window.removeEventListener('click', this.unlockFn, true);
+    window.removeEventListener('keydown', this.unlockFn, true);
   }
 
   /** ה-AudioContext והמסכם הראשי, או null בסביבה בלי Web Audio. */
