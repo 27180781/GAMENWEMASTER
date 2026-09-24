@@ -2343,14 +2343,17 @@ export function GameHost({
 
   // במעבר אוטומטי — מסך תוצאות ההימור נסגר לבד אחרי זמן קריאה (ההשהיה של
   // "השקופית הבאה" ועוד שתי שניות), ואז האפקט שלמעלה ממשיך לשקופית הבאה.
+  // כמו שם, הזמן נספר רק אחרי שהקריין סיים ("תוצאות ההימור… ההימור הגדול של
+  // הסבב… איזו זכייה!" ארוך מחלון של כמה שניות, והסגירה חתכה את סופו).
   useEffect(() => {
     if (stage !== 'playing' || !betOverlay || !autoT.nextSlide.active) return;
+    if (narrationActive && narrationSpeaking) return;
     const timeout = window.setTimeout(
       () => setBetOverlay(false),
       Math.max(1, autoT.nextSlide.seconds) * 1000 + 2000,
     );
     return () => window.clearTimeout(timeout);
-  }, [stage, betOverlay, autoT]);
+  }, [stage, betOverlay, autoT, narrationActive, narrationSpeaking]);
 
   // מעבר אוטומטי של מדיה חוסמת (openMedia/endMedia + מסכי מדיה עצמאיים):
   //   • תמונה — מעבר אחרי autoT.media.image.seconds (אם image.active דלוק).
