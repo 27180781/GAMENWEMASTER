@@ -5,7 +5,7 @@
  */
 
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { classifyMediaUrl, youtubeEmbedUrl } from '../engine/index.ts';
+import { classifyMediaUrl, isYoutubeUrl, youtubeEmbedUrl, youtubeVideoId } from '../engine/index.ts';
 import { MediaPauseContext } from './mediaPause.ts';
 
 interface MediaPlayerProps {
@@ -16,8 +16,16 @@ interface MediaPlayerProps {
   className?: string;
 }
 
-/** שם קובץ קצר לתצוגה בהודעת כשל (בלי query ונתיב ארוך). */
+/**
+ * שם קצר לתצוגה בהודעת כשל (בלי query ונתיב ארוך).
+ *
+ * בקישור יוטיוב הסגמנט האחרון הוא "watch" — חסר תועלת למי שמנסה להבין איזה
+ * סרטון נפל. מציגים במקומו את מזהה הסרטון, שאותו אפשר לחפש.
+ */
 function shortName(src: string): string {
+  const id = youtubeVideoId(src);
+  if (id !== null) return `סרטון יוטיוב ${id}`;
+  if (isYoutubeUrl(src)) return 'קישור יוטיוב לא תקין';
   const clean = src.split(/[?#]/, 1)[0] ?? src;
   return clean.split('/').pop() || clean.slice(0, 50);
 }
@@ -125,7 +133,7 @@ export function MediaPlayer({ src, onEnded, asBackground = false, className }: M
         <span className="media-buffering-ring" />
       </div>
     ) : null;
-  if (failed && (kind === 'image' || kind === 'video' || kind === 'audio')) {
+  if (failed) {
     if (asBackground) return null;
     return (
       <div className="media-error" role="alert">
@@ -181,40 +189,80 @@ export function MediaPlayer({ src, onEnded, asBackground = false, className }: M
         </div>
       );
     case 'youtube':
-      return <YouTubeEmbed src={src} className={className} {...(onEnded && !asBackground ? { onEnded } : {})} />;
-    default:
       return (
-        <div className={className ?? 'media-unknown'}>
-          <p dir="ltr">{src}</p>
+        <YouTubeEmbed
+          src={src}
+          className={className}
+          onFailed={() => setFailed(true)}
+          {...(onEnded && !asBackground ? { onEnded } : {})}
+        />
+      );
+    default:
+      // סוג שלא זוהה (למשל קישור Drive/Dropbox/Vimeo, או כתובת בלי סיומת).
+      // קודם הוצגה כאן הכתובת החשופה על המסך הגדול — מכוער באמצע אירוע, ובלי
+      // לומר למנחה מה לעשות.
+      if (asBackground) return null;
+      return (
+        <div className="media-error" role="alert">
+          <div className="media-error-icon">⚠️</div>
+          <p>סוג המדיה לא זוהה</p>
+          <p className="media-error-src" dir="ltr">
+            {shortName(src)}
+          </p>
+          <p className="media-error-hint">רווח להמשך</p>
         </div>
       );
   }
 }
 
+/** כמה להמתין לסימן חיים מנגן היוטיוב לפני שמכריזים על כשל. */
+const ALIVE_TIMEOUT_MS = 8000;
+
 /**
  * נגן YouTube דרך iframe עם enablejsapi=1. זיהוי סיום דרך פרוטוקול
  * ה-postMessage של הנגן (playerState === 0), בלי לטעון סקריפט חיצוני.
+ *
+ * אותו ערוץ משמש גם לזיהוי *כשל*: iframe אינו יורה onError כשההטמעה נדחית,
+ * ולכן היעדר תשובה מהנגן הוא הסימן היחיד שמשהו השתבש.
  */
 function YouTubeEmbed({
   src,
   onEnded,
+  onFailed,
   className,
 }: {
   src: string;
   onEnded?: (() => void) | undefined;
+  /** הנגן לא ענה — ראו ALIVE_TIMEOUT_MS. */
+  onFailed?: (() => void) | undefined;
   className?: string | undefined;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const endedRef = useRef(false);
+  /**
+   * הקריאות החוזרות נשמרות ב-ref ואינן ב-deps של האפקט. בלי זה כל רינדור
+   * מחדש (למשל חיווי הטעינה) היה יוצר פונקציה חדשה, האפקט היה רץ שוב, וטיימר
+   * הכשל היה מתאפס — כלומר לא יורה לעולם. נתפס בבדיקה.
+   */
+  const endedCb = useRef(onEnded);
+  endedCb.current = onEnded;
+  const failedCb = useRef(onFailed);
+  failedCb.current = onFailed;
 
   useEffect(() => {
     endedRef.current = false;
     const iframe = iframeRef.current;
     if (!iframe) return;
+    let alive = false;
 
     const handleMessage = (event: MessageEvent) => {
       if (!event.origin.endsWith('youtube.com')) return;
       if (event.source !== iframe.contentWindow) return;
+      // כל הודעה מהנגן מוכיחה שהוא באמת שם. iframe אינו יורה onError כשיוטיוב
+      // מסרב למסגר, כשהסרטון נמחק/פרטי, או כשבעל הערוץ חסם הטמעה — ולכן זו
+      // הדרך היחידה לדעת. בלי זה כל כשל כזה נראה כריבוע אפור בלי שום הסבר.
+      alive = true;
+      window.clearTimeout(aliveTimer);
       try {
         const data: unknown = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
         const info = (data as { event?: string; info?: { playerState?: number } }) ?? {};
@@ -225,7 +273,7 @@ function YouTubeEmbed({
               : info.info?.playerState;
           if (playerState === 0 && !endedRef.current) {
             endedRef.current = true;
-            onEnded?.();
+            endedCb.current?.();
           }
         }
       } catch {
@@ -242,14 +290,20 @@ function YouTubeEmbed({
     };
     iframe.addEventListener('load', listen);
     const timer = window.setTimeout(listen, 1500); // fallback אם load כבר קרה
+    // ארוך בכוונה: רשת איטית באולם עלולה לעכב את ההודעה הראשונה, ועדיף
+    // להמתין מאשר להכריז על כשל כשהסרטון בדרך.
+    const aliveTimer = window.setTimeout(() => {
+      if (!alive) failedCb.current?.();
+    }, ALIVE_TIMEOUT_MS);
 
     window.addEventListener('message', handleMessage);
     return () => {
       window.removeEventListener('message', handleMessage);
       iframe.removeEventListener('load', listen);
       window.clearTimeout(timer);
+      window.clearTimeout(aliveTimer);
     };
-  }, [src, onEnded]);
+  }, [src]);
 
   // ‎youtube.com/watch‎ מסרב להיות ממוסגר (X-Frame-Options), ולכן כל צורה של
   // קישור מומרת ל-‎/embed/<id>‎. בלי זה המסך הראה ריבוע אפור עם סמל עמוד שבור.

@@ -10,7 +10,13 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { classifyMediaUrl, youtubeEmbedUrl, youtubeStartSeconds, youtubeVideoId } from '../src/engine/index.ts';
+import {
+  classifyMediaUrl,
+  isYoutubeUrl,
+  youtubeEmbedUrl,
+  youtubeStartSeconds,
+  youtubeVideoId,
+} from '../src/engine/index.ts';
 
 const ID = 'EEQdTNk3kmM';
 
@@ -120,6 +126,72 @@ describe('הסיווג ממשיך לזהות את אותן כתובות כיוט
       `https://www.youtube.com/embed/${ID}`,
     ]) {
       expect(classifyMediaUrl(url), url).toBe('youtube');
+    }
+  });
+});
+
+/**
+ * ★ הסיבה השורשית לבאג, ולמה הוא חזר: היו **שתי** רשימות של "מה נחשב יוטיוב"
+ * — הביטוי ב-classifyMediaUrl והמנתח ב-youtube.ts — והן נפרדו. קישור shorts
+ * עבר בסיווג כ-'unknown' והוצג כטקסט, אף שהמנתח ידע לקרוא אותו מצוין.
+ *
+ * עכשיו הסיווג קורא למנתח, והבדיקה הזו נועלת את זה: כל צורה שהמנתח מזהה
+ * חייבת להיות מסווגת כיוטיוב, ולהיפך.
+ */
+describe('★ מקור אמת אחד — הסיווג והמנתח לא יכולים להיפרד', () => {
+  const FORMS = [
+    `https://www.youtube.com/watch?v=${ID}`,
+    `https://youtu.be/${ID}`,
+    `https://www.youtube.com/embed/${ID}`,
+    `https://www.youtube.com/shorts/${ID}`,
+    `https://www.youtube.com/live/${ID}`,
+    `https://m.youtube.com/watch?v=${ID}`,
+    `https://music.youtube.com/watch?v=${ID}`,
+    `https://www.youtube-nocookie.com/embed/${ID}`,
+  ];
+
+  it.each(FORMS)('%s → מסווג כיוטיוב וגם מתורגם ל-embed', (url) => {
+    expect(classifyMediaUrl(url)).toBe('youtube');
+    expect(youtubeEmbedUrl(url)).toBe(`https://www.youtube.com/embed/${ID}`);
+  });
+
+  it('★ מה שאינו יוטיוב אינו מסווג ככזה', () => {
+    for (const url of ['https://vimeo.com/123', 'https://cdn.example.com/a.mp4', 'Assets/x.jpg']) {
+      expect(classifyMediaUrl(url), url).not.toBe('youtube');
+    }
+  });
+});
+
+/**
+ * ★ שני הכיוונים חייבים להישאר עקביים: כל מה שהמנתח יודע לקרוא הוא בוודאי
+ * יוטיוב. הכיוון ההפוך *אינו* חייב להתקיים, ובכוונה — קישור יוטיוב עם מזהה
+ * משובש עדיין מסווג כיוטיוב, כדי שלא יישלח להורדה מראש ולא ידווח כמדיה שבורה.
+ */
+describe('★ היחס בין הסיווג הרחב למנתח הצר', () => {
+  it('כל מה שהמנתח קורא — מסווג כיוטיוב', () => {
+    for (const url of [
+      `https://www.youtube.com/watch?v=${ID}`,
+      `https://youtu.be/${ID}`,
+      `https://www.youtube.com/shorts/${ID}`,
+      `https://www.youtube-nocookie.com/embed/${ID}`,
+    ]) {
+      expect(youtubeVideoId(url), url).not.toBeNull();
+      expect(isYoutubeUrl(url), url).toBe(true);
+      expect(classifyMediaUrl(url), url).toBe('youtube');
+    }
+  });
+
+  it('★ מזהה משובש — עדיין יוטיוב לסיווג, אבל בלי כתובת הטמעה', () => {
+    const broken = 'https://youtu.be/abc123';
+    expect(isYoutubeUrl(broken)).toBe(true);
+    expect(classifyMediaUrl(broken)).toBe('youtube'); // לא יימשך מראש, לא ידווח כשבור
+    expect(youtubeVideoId(broken)).toBeNull();
+    expect(youtubeEmbedUrl(broken)).toBeNull(); // הנגן ישאיר את הכתובת, ויודיע על כשל
+  });
+
+  it('מארח אחר אינו יוטיוב בשום אופן', () => {
+    for (const url of ['https://vimeo.com/123', 'https://notyoutube.com/watch?v=x', 'Assets/x.jpg']) {
+      expect(isYoutubeUrl(url), url).toBe(false);
     }
   });
 });

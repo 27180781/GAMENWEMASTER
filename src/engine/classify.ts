@@ -5,6 +5,8 @@
  *   (סרטוני YouTube רשומים שם כ-"image").
  */
 
+import { isYoutubeUrl } from './youtube.ts';
+
 export type SubjectSlideKind = 'dynamic-image' | 'send-data' | 'plain';
 
 export type MediaKind = 'youtube' | 'image' | 'video' | 'audio' | 'unknown';
@@ -62,9 +64,10 @@ export function classifyMediaUrl(src: string): MediaKind {
   const registered = mediaKindRegistry.get(url);
   if (registered !== undefined) return registered;
 
-  if (/(?:youtube\.com\/embed\/|youtube\.com\/watch|youtu\.be\/)/i.test(url)) {
-    return 'youtube';
-  }
+  // מקור אמת אחד למה נחשב יוטיוב (youtube.ts). קודם ישבה כאן רשימה נפרדת
+  // (embed/watch/youtu.be בלבד) שנפרדה מהמנתח, ולכן קישור ‎shorts/‎ סווג
+  // כ'unknown' והוצג כטקסט — אף שהמנתח יודע לקרוא אותו מצוין.
+  if (isYoutubeUrl(url)) return 'youtube';
 
   // סיומת הקובץ — בלי query string ו-hash
   const path = url.split(/[?#]/, 1)[0] ?? url;
