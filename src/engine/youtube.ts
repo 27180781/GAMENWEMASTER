@@ -39,6 +39,24 @@ export function youtubeStartSeconds(raw: string | null): number | null {
 }
 
 /**
+ * האם זו בכלל כתובת של יוטיוב — לפי המארח בלבד, בלי לדרוש מזהה תקין.
+ *
+ * מכוון **רחב** בכוונה, ובנפרד מ-youtubeVideoId שמכוון צר: הסיווג קובע גם מה
+ * *לא* לעשות — לא למשוך מראש לזיכרון ולא לבדוק אם הקישור שבור. קישור יוטיוב
+ * עם מזהה משובש שהיה מסווג כ"לא מוכר" היה נשלח להורדה מלאה של עמוד יוטיוב,
+ * ועוד היה מדווח למנחה כ"מדיה שבורה". עדיף לזהות אותו כיוטיוב, ואם ההטמעה
+ * תיכשל — הנגן כבר יודע לומר את זה (ראו ALIVE_TIMEOUT_MS).
+ */
+export function isYoutubeUrl(src: string): boolean {
+  try {
+    const host = new URL(src.trim()).hostname;
+    return YOUTUBE_HOST.test(host) || SHORT_HOST.test(host);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * מזהה הסרטון מתוך כל צורה מוכרת של קישור יוטיוב, או null.
  *
  * הצורות: ‎watch?v=‎ · ‎youtu.be/‎ · ‎embed/‎ · ‎shorts/‎ · ‎live/‎ · ‎v/‎.
