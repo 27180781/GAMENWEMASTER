@@ -5,7 +5,7 @@
  */
 
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { classifyMediaUrl } from '../engine/index.ts';
+import { classifyMediaUrl, youtubeEmbedUrl } from '../engine/index.ts';
 import { MediaPauseContext } from './mediaPause.ts';
 
 interface MediaPlayerProps {
@@ -251,7 +251,10 @@ function YouTubeEmbed({
     };
   }, [src, onEnded]);
 
-  const separator = src.includes('?') ? '&' : '?';
+  // ‎youtube.com/watch‎ מסרב להיות ממוסגר (X-Frame-Options), ולכן כל צורה של
+  // קישור מומרת ל-‎/embed/<id>‎. בלי זה המסך הראה ריבוע אפור עם סמל עמוד שבור.
+  const embed = youtubeEmbedUrl(src) ?? src;
+  const separator = embed.includes('?') ? '&' : '?';
   // ניגון אוטומטי בלבד, בלי שום פקד אינטראקטיבי:
   // controls=0 (בלי פס בקרה), disablekb=1 (בלי מקלדת), fs=0 (בלי מסך מלא),
   // modestbranding=1, iv_load_policy=3 (בלי הערות), rel=0, playsinline=1.
@@ -266,7 +269,7 @@ function YouTubeEmbed({
     'rel=0',
     'playsinline=1',
   ].join('&');
-  const url = `${src}${separator}${params}`;
+  const url = `${embed}${separator}${params}`;
 
   return (
     // עטיפה עם שכבת חסימה שקופה מעל ה-iframe — בולעת כל קליק כדי שלא ניתן
