@@ -1,6 +1,7 @@
 export * from './schema.ts';
 export * from './loader.ts';
 export * from './classify.ts';
+export * from './youtube.ts';
 export * from './questionMode.ts';
 export * from './scoreAdjust.ts';
 export * from './scoring.ts';
