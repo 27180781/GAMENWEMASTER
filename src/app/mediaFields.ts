@@ -81,9 +81,9 @@ export function mediaFields(game: GameFile): MediaField[] {
     });
   }
 
-  // קטעי הקריינות — אחרונים ומסומנים ב-kind: 'narration'. הם כאן **רק** כדי
-  // שמיפוי הנתיבים של החבילה האופליינית יכסה אותם; הטעינה המוקדמת החוסמת
-  // ובדיקת הקישורים מדלגות עליהם (ראו MediaField.kind).
+  // קטעי הקריינות (בנק, שמות קבוצות, שקופיות) — אחרונים ומסומנים ב-kind:
+  // 'narration'. הם כאן **רק** כדי שמיפוי הנתיבים של החבילה האופליינית יכסה
+  // אותם; הטעינה המוקדמת החוסמת ובדיקת הקישורים מדלגות עליהם (ראו MediaField.kind).
   const narration = s.narration;
   if (narration) {
     const bank = narration.bank;
@@ -92,6 +92,18 @@ export function mediaFields(game: GameFile): MediaField[] {
         get: () => bank[key] ?? '',
         set: (v) => (bank[key] = v),
         label: `קריינות · בנק · ${key}`,
+        kind: 'narration',
+      });
+    }
+    // קטעי שמות הקבוצות — אותה צורה כמו הבנק (שם → כתובת). בלי המיפוי הזה
+    // הנתיב נשאר יחסי בחבילה האופליינית, הטעינה נכשלת, והקהל שומע "הקבוצה
+    // המובילה כרגע…" ושקט.
+    const groups = narration.groups;
+    for (const name of Object.keys(groups)) {
+      fields.push({
+        get: () => groups[name] ?? '',
+        set: (v) => (groups[name] = v),
+        label: `קריינות · קבוצה · ${name}`,
         kind: 'narration',
       });
     }

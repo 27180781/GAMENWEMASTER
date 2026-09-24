@@ -9,6 +9,7 @@
 
 const { app, BrowserWindow, dialog, globalShortcut, ipcMain, shell, protocol, net } = require('electron');
 const { nextZoomFactor, zoomActionFor } = require('./zoom.cjs');
+const { MEDIA_SCHEME_PRIVILEGES, withCors } = require('./mediaScheme.cjs');
 const path = require('node:path');
 const fs = require('node:fs');
 const crypto = require('node:crypto');
@@ -68,10 +69,11 @@ app.setPath('userData', path.join(app.getPath('appData'), 'trivia-engine'));
 
 // סכימת מדיה מהדיסק (trivia-media://) — חייבת להירשם כ"מיוחסת" לפני app.ready
 // כדי ש-<video>/<img> יוכלו לטעון ממנה, ותמיכת fetch/זרימה (Range) תעבוד.
+// ההרשאות (כולל CORS לקטעי הקריינות) — ראו mediaScheme.cjs.
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'trivia-media',
-    privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true },
+    privileges: MEDIA_SCHEME_PRIVILEGES,
   },
 ]);
 
@@ -1801,7 +1803,9 @@ app.whenReady().then(() => {
   // פרוטוקול trivia-media:// — מגיש קבצי מדיה מהמטמון בדיסק בזרימה (net.fetch
   // על file:// תומך ב-Range, כך שחיפוש/דילוג בווידאו עובד) — רק המדיה המתנגנת
   // כרגע נטענת, לא הכול לזיכרון. עם הגנת traversal (safeRelPath + בדיקת prefix).
-  protocol.handle('trivia-media', async (request) => {
+  // כל תשובה (גם שגיאה) יוצאת עם Access-Control-Allow-Origin — נגן הקריינות
+  // מושך את הקטעים ב-fetch() מדף ‎file://‎ (ראו mediaScheme.cjs).
+  const serveMedia = async (request) => {
     try {
       const url = new URL(request.url);
       const key = safeCacheKey(decodeURIComponent(url.hostname));
@@ -1856,7 +1860,8 @@ app.whenReady().then(() => {
       console.error('[media] הגשת מדיה נכשלה:', /** @type {Error} */ (err).message);
       return new Response('error', { status: 500 });
     }
-  });
+  };
+  protocol.handle('trivia-media', async (request) => withCors(await serveMedia(request)));
   // חילוץ מדיית ה-ZIP לדיסק (מצב זרימה) — מחזיר { cacheKey } או null.
   ipcMain.handle('media:extract', async (_e, bytes) => {
     try {

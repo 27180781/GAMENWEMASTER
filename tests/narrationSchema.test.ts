@@ -13,7 +13,7 @@ import { hasNarration, parseGameFile } from '../src/engine/index.ts';
 import { mediaFields } from '../src/app/mediaFields.ts';
 import { collectMediaRefs } from '../src/app/mediaCheck.ts';
 import { orderedMediaUrls } from '../src/app/mediaLoader.ts';
-import { loadGameFromZip } from '../src/app/zipLoader.ts';
+import { loadGameFromExtracted, loadGameFromZip } from '../src/app/zipLoader.ts';
 import { fourAnswers, rawGame, rawSlide } from './helpers.ts';
 
 /** בדיוק המבנה שבמסמך החוזה. */
@@ -229,5 +229,61 @@ describe('הקטעים נכנסים לשרשרת המדיה בלי קוד ייע
     expect(offline.questions[0]!.narration?.question).toMatch(/^blob:nar-/);
     expect(offline.questions[0]!.narration?.answers[0]).toMatch(/^blob:nar-/);
     expect(offline.questions[0]!.narration?.answers[1]).toBeNull(); // null נשאר null
+  });
+
+  /**
+   * רגרסיה: `setting.narration.groups` לא היה בהולך המשותף, ולכן באופליין נשאר
+   * נתיב יחסי, הטעינה נכשלה, והקריין אמר "הקבוצה המובילה כרגע…" ושתק.
+   */
+  describe('★ קטעי שמות הקבוצות ממופים באופליין כמו הבנק', () => {
+    const offlineRaw = () => {
+      const raw = gameWithNarration();
+      (raw.setting as Record<string, unknown>).narration = {
+        ...NARRATION_SETTING,
+        bank: { num_f_1: 'Assets/nar-bank-num-f-1.mp3' },
+        groups: { 'הכחולים': 'Assets/nar-group-blue.mp3', 'האדומים': 'Assets/nar-group-red.mp3' },
+      };
+      for (const key of ['id', 'assets', 'createdAt', 'baseUrl']) delete raw[key];
+      return raw;
+    };
+
+    it('כל שם קבוצה הוא שדה קריינות עם תווית מזהה', () => {
+      const game = parseGameFile(offlineRaw());
+      const fields = mediaFields(game).filter((f) => f.label === 'קריינות · קבוצה · הכחולים');
+      expect(fields).toHaveLength(1);
+      expect(fields[0]!.kind).toBe('narration');
+      expect(fields[0]!.get()).toBe('Assets/nar-group-blue.mp3');
+    });
+
+    it('ZIP בדפדפן — הנתיבים הופכים ל-Blob, ושם שחסר בחבילה אינו אזהרה', async () => {
+      const zip = new JSZip();
+      zip.file('data.json', JSON.stringify(offlineRaw()));
+      // רק הכחולים ארוזים — האדומים חסרים בחבילה
+      for (const name of ['nar-bank-num-f-1.mp3', 'nar-group-blue.mp3']) {
+        zip.file(`Assets/${name}`, new Uint8Array([1, 2, 3]));
+      }
+      let created = 0;
+      globalThis.URL.createObjectURL = () => `blob:grp-${++created}`;
+      globalThis.URL.revokeObjectURL = () => {};
+
+      const { game: offline, missing } = await loadGameFromZip(
+        await zip.generateAsync({ type: 'uint8array' }),
+      );
+      expect(offline.setting.narration?.groups['הכחולים']).toMatch(/^blob:grp-/);
+      expect(offline.setting.narration?.groups['האדומים']).toBe('Assets/nar-group-red.mp3');
+      expect(missing).toEqual([]);
+    });
+
+    it('EXE (מדיה שחולצה לדיסק) — הנתיבים הופכים ל-trivia-media://', () => {
+      const { game: offline } = loadGameFromExtracted({
+        cacheKey: 'k1',
+        dataPath: 'data.json',
+        dataJson: JSON.stringify(offlineRaw()),
+        names: ['data.json', 'Assets/nar-bank-num-f-1.mp3', 'Assets/nar-group-blue.mp3'],
+      });
+      expect(offline.setting.narration?.groups['הכחולים']).toBe(
+        'trivia-media://k1/Assets/nar-group-blue.mp3',
+      );
+    });
   });
 });

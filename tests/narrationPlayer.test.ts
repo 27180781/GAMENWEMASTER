@@ -44,7 +44,15 @@ class FakeContext {
   static instances: FakeContext[] = [];
   /** האם resume() באמת פותח את ההקשר (בדפדפן חסום הוא נשאר suspended). */
   static resumeWorks = true;
-  state: 'running' | 'suspended' = 'running';
+  /** מצב ההקשר ביצירה: running = autoplay מותר; suspended = נעול עד אינטראקציה. */
+  static initialState: 'running' | 'suspended' = 'running';
+  /**
+   * resume "איטי" כמו בדפדפן אמיתי: כשזה מערך, כל resume() נפתח רק כשהבדיקה
+   * קוראת לאחת הפונקציות שנאספו בו.
+   */
+  static pendingResumes: (() => void)[] | null = null;
+  state: 'running' | 'suspended' = FakeContext.initialState;
+  onstatechange: (() => void) | null = null;
   currentTime = 10;
   destination = {};
   sources: FakeSource[] = [];
@@ -68,7 +76,16 @@ class FakeContext {
     return Promise.resolve({ duration: durations[url] ?? 1 });
   }
   resume(): Promise<void> {
-    if (FakeContext.resumeWorks) this.state = 'running';
+    const open = () => {
+      if (!FakeContext.resumeWorks || this.state === 'running') return;
+      this.state = 'running';
+      this.onstatechange?.();
+    };
+    if (FakeContext.pendingResumes !== null) {
+      const pending = FakeContext.pendingResumes;
+      return new Promise((resolve) => pending.push(() => (open(), resolve())));
+    }
+    open();
     return Promise.resolve();
   }
   close(): Promise<void> {
@@ -78,16 +95,24 @@ class FakeContext {
 }
 
 let winListeners: Record<string, () => void> = {};
+/** האם המאזין נרשם בשלב ה-capture (לפני המאזינים של האפליקציה עצמה). */
+let winCapture: Record<string, boolean> = {};
 
 function setup(): NarrationPlayer {
   durations = { 'a.mp3': 1, 'b.mp3': 2, 'c.mp3': 0.5 };
   broken = new Set();
   fetched = [];
   winListeners = {};
+  winCapture = {};
   FakeContext.instances = [];
   FakeContext.resumeWorks = true;
+  FakeContext.initialState = 'running';
+  FakeContext.pendingResumes = null;
   vi.stubGlobal('window', {
-    addEventListener: (type: string, cb: () => void) => (winListeners[type] = cb),
+    addEventListener: (type: string, cb: () => void, capture?: boolean) => {
+      winListeners[type] = cb;
+      winCapture[type] = capture === true;
+    },
     removeEventListener: (type: string) => delete winListeners[type],
   });
   vi.stubGlobal('AudioContext', FakeContext as unknown as typeof AudioContext);
@@ -212,6 +237,15 @@ describe('NarrationPlayer — לעולם לא חוסם', () => {
     expect(ctx().sources).toHaveLength(0);
   });
 
+  it('★ hasFailed מדווח רק על קטע שהטעינה שלו כבר נכשלה', async () => {
+    const player = setup();
+    broken.add('b.mp3');
+    expect(player.hasFailed('b.mp3')).toBe(false); // עוד לא נוסה
+    await player.preload(['a.mp3', 'b.mp3']);
+    expect(player.hasFailed('b.mp3')).toBe(true);
+    expect(player.hasFailed('a.mp3')).toBe(false);
+  });
+
   it('משפט שכל קטעיו נכשלו — פשוט שקט', async () => {
     const player = setup();
     broken.add('a.mp3');
@@ -260,6 +294,120 @@ describe('NarrationPlayer — נעילת autoplay', () => {
     expect(ctx().sources).toHaveLength(0);
   });
 
+  /** נגן שההקשר שלו נוצר נעול (דפדפן בלי אינטראקציה), אחרי טעינה מוקדמת. */
+  const lockedPlayer = async () => {
+    const player = setup();
+    FakeContext.initialState = 'suspended';
+    await player.preload(['a.mp3', 'b.mp3']); // יוצר את ההקשר — נעול
+    return player;
+  };
+
+  it('★ הקשר נעול נפתח רק באינטראקציה — ומודיע על כך פעם אחת', async () => {
+    const player = await lockedPlayer();
+    const opened: number[] = [];
+    player.onUnlock(() => opened.push(1));
+    expect(player.isUnlocked()).toBe(false);
+    winListeners.keydown?.();
+    expect(player.isUnlocked()).toBe(true);
+    winListeners.click?.();
+    await flush();
+    expect(opened).toEqual([1]);
+  });
+
+  it('★ נפתח בקליק ובמקש, בשלב ה-capture — ולא ב-pointerdown שמקדים את הקליק', () => {
+    setup();
+    expect(Object.keys(winListeners).sort()).toEqual(['click', 'keydown']);
+    expect(winCapture).toEqual({ click: true, keydown: true });
+  });
+
+  it('★ הפתיחה מסומנת מיד, אבל ההודעה יוצאת רק אחרי שהאירוע סיים את דרכו', async () => {
+    const player = await lockedPlayer();
+    const opened: boolean[] = [];
+    player.onUnlock(() => opened.push(player.isUnlocked()));
+    winListeners.click?.(); // הקליק על "הבא" — ה-onClick של הכפתור רץ אחרי המאזין שלנו
+    // מה שהקליק עצמו מחליף כבר רואה אודיו פתוח (ה-host קורא את isUnlocked בצעד)...
+    expect(player.isUnlocked()).toBe(true);
+    // ...והצעד שההודעה מריצה מגיע רק אחריו, על המסך החדש — ולא בלובי שנעלם.
+    expect(opened).toEqual([]);
+    await flush();
+    expect(opened).toEqual([true]);
+  });
+
+  it('★ מקש שאינו אינטראקציה בעיני הדפדפן (Esc, מקש שינוי) — אינו פותח', async () => {
+    const activation = { hasBeenActive: false, isActive: false };
+    vi.stubGlobal('navigator', { userActivation: activation });
+    const player = await lockedPlayer();
+    FakeContext.resumeWorks = false; // ה-resume של Esc נתקע עד מגע אמיתי
+    winListeners.keydown?.();
+    await flush();
+    expect(player.isUnlocked()).toBe(false);
+    player.say(['a.mp3']);
+    await flush();
+    expect(ctx().sources).toHaveLength(0); // נזרק — לא ממתין ל-resume שלא יגיע
+    // קליק אמיתי בתוך התפריט
+    activation.hasBeenActive = true;
+    activation.isActive = true;
+    FakeContext.resumeWorks = true;
+    winListeners.click?.();
+    expect(player.isUnlocked()).toBe(true);
+  });
+
+  it('★ הקשר שרץ בלי אינטראקציה (autoplay מותר, כמו ב-EXE) — פתוח מיד', async () => {
+    const player = setup();
+    const opened: number[] = [];
+    player.onUnlock(() => opened.push(1));
+    await player.preload(['a.mp3']);
+    expect(player.isUnlocked()).toBe(true);
+    await flush();
+    expect(opened).toEqual([1]);
+  });
+
+  it('★ הקשר שנפתח מעצמו מאוחר יותר (statechange) — גם הוא פתיחה', async () => {
+    const player = await lockedPlayer();
+    FakeContext.pendingResumes = [];
+    player.say(['a.mp3']); // מבקש resume — שעוד לא הסתיים
+    await flush();
+    expect(player.isUnlocked()).toBe(false);
+    FakeContext.pendingResumes.forEach((open) => open());
+    expect(player.isUnlocked()).toBe(true);
+  });
+
+  it('★ לפני כל אינטראקציה — המשפט נזרק, ולא מתנגן גם אחרי הפתיחה', async () => {
+    const player = await lockedPlayer();
+    FakeContext.resumeWorks = false;
+    player.say(['a.mp3']);
+    await flush();
+    FakeContext.resumeWorks = true;
+    winListeners.keydown?.();
+    await flush();
+    expect(ctx().sources).toHaveLength(0);
+  });
+
+  it('★ אחרי האינטראקציה, משפט שמקדים את סוף ה-resume ממתין לו ומתנגן', async () => {
+    const player = await lockedPlayer();
+    FakeContext.pendingResumes = [];
+    winListeners.keydown?.(); // המקש שפותח את האודיו (וגם מחליף מסך)
+    player.say(['a.mp3', 'b.mp3']); // המשפט של המסך החדש — ה-resume עוד בדרך
+    await flush();
+    expect(ctx().sources).toHaveLength(0);
+    FakeContext.pendingResumes.forEach((open) => open());
+    await flush();
+    expect(ctx().sources).toHaveLength(2);
+    expect(player.isSpeaking()).toBe(true);
+  });
+
+  it('★ משפט שממתין ל-resume ובוטל בינתיים (המסך השתנה) — לא מתנגן', async () => {
+    const player = await lockedPlayer();
+    FakeContext.pendingResumes = [];
+    winListeners.keydown?.();
+    player.say(['a.mp3']);
+    await flush();
+    player.cancel();
+    FakeContext.pendingResumes.forEach((open) => open());
+    await flush();
+    expect(ctx().sources).toHaveLength(0);
+  });
+
   it('dispose מסיר את המאזינים וסוגר את ההקשר', async () => {
     const player = setup();
     player.say(['a.mp3']);
@@ -267,6 +415,7 @@ describe('NarrationPlayer — נעילת autoplay', () => {
     player.dispose();
     expect(ctx().closed).toBe(true);
     expect(winListeners.keydown).toBeUndefined();
+    expect(winListeners.click).toBeUndefined();
     expect(ctx().sources.every((s) => s.stopped)).toBe(true);
   });
 });

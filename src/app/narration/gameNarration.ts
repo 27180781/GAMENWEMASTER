@@ -25,6 +25,27 @@ export function bankClips(game: GameFile): string[] {
   return Object.values(bank).filter((url) => url !== '');
 }
 
+/** כל כתובות קטעי שמות הקבוצות של המשחק (`setting.narration.groups`). */
+export function groupNameClips(game: GameFile): string[] {
+  const groups = game.setting.narration?.groups;
+  if (!groups) return [];
+  return Object.values(groups).filter((url) => url !== '');
+}
+
+/**
+ * קטעי שמות הקבוצות שעוד אפשר לנגן. קטע שהטעינה שלו כבר נכשלה (נתיב שלא
+ * נמצא בחבילה האופליינית, 404, פענוח) יוצא מהמילון, והבמאי אומר את הניסוח
+ * בלי השם — במקום "הקבוצה המובילה כרגע…" ושקט. הקטעים נטענים מראש יחד עם
+ * הבנק, ולכן עד שמסך הקבוצות עולה הכישלון כבר ידוע.
+ */
+export function playableGroupClips(
+  game: GameFile,
+  failed: (url: string) => boolean,
+): Record<string, string> {
+  const groups = game.setting.narration?.groups ?? {};
+  return Object.fromEntries(Object.entries(groups).filter(([, url]) => url !== '' && !failed(url)));
+}
+
 /**
  * מספר השאלה להכרזה: המקום של השקופית בין שקופיות השאלה (טריוויה/סקר/תמונות).
  * הימור, טקסט, מדיה ופונקציה אינם שאלות ואינם מזיזים את הספירה. 0 = לא שאלה.

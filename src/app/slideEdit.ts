@@ -38,7 +38,10 @@ export function removeSlide(game: GameFile, index: number): GameFile {
   return { ...game, questions: game.questions.filter((_, i) => i !== index) };
 }
 
-/** שכפול שקופית (עם מזהה חדש) מיד אחרי המקור. */
+/**
+ * שכפול שקופית (עם מזהה חדש) מיד אחרי המקור. הקריינות משוכפלת איתה — אותו
+ * נוסח בדיוק, ולכן אותם קטעים; עריכה של העותק תוריד אותם (updateSlide).
+ */
 export function duplicateSlide(game: GameFile, index: number): GameFile {
   const slide = game.questions[index];
   if (!slide) return game;
@@ -71,6 +74,9 @@ export function addSlide(game: GameFile, index: number): GameFile {
     openMedia: { src: '' },
     endMedia: { src: '' },
   };
+  // שקופית חדשה אינה יורשת את הקריינות של שקופית הבסיס — אחרת "שאלה חדשה"
+  // הייתה מוקראת בקול של השאלה שעליה היא נבנתה.
+  delete blank.narration;
   const questions = [...game.questions];
   questions.splice(index + 1, 0, blank);
   return { ...game, questions };
@@ -281,18 +287,77 @@ export function normalizeFunctionSlide(game: GameFile, index: number): GameFile 
   return updateSlide(game, index, (s) => ({ ...s, function: next }));
 }
 
-/** החלת שינוי על שקופית לפי מיקום (updater מקבל עותק ומחזיר שקופית חדשה). */
+/**
+ * החלת שינוי על שקופית לפי מיקום (updater מקבל עותק ומחזיר שקופית חדשה).
+ * כל עריכה של שקופית קיימת עוברת כאן, ולכן כאן גם נשמרת הקריינות אמיתית
+ * (keepNarrationTruthful) — גם לעריכות שנכתבות ישירות בטופס.
+ */
 export function updateSlide(game: GameFile, index: number, updater: (s: Slide) => Slide): GameFile {
   if (index < 0 || index >= game.questions.length) return game;
-  const questions = game.questions.map((q, i) => (i === index ? updater(clone(q)) : q));
+  const questions = game.questions.map((q, i) =>
+    i === index ? keepNarrationTruthful(q, updater(clone(q))) : q,
+  );
   return { ...game, questions };
+}
+
+/** הטקסט כפי שהקריין הקליט אותו: רווחים מקופלים וקצוות חתוכים, כמו ביצוא. */
+function spokenText(text: string): string {
+  return text.replace(/\s+/gu, ' ').trim();
+}
+
+/**
+ * מה שקטע "התשובה הנכונה" המוכן מכריז — נוסח התשובות הנכונות לפי הסדר — או
+ * null כשהשקופית אינה מכריזה תשובה נכונה מוכנה (סקר, הימור, "הרוב קובע").
+ */
+function correctAnnouncement(slide: Slide): string | null {
+  if (slide.type === 'survey' || slide.type === 'bet' || slide.setting.majorityDecides) return null;
+  return slide.question.answers
+    .filter((a) => a.correct)
+    .map((a) => spokenText(a.ans))
+    .join('\n');
+}
+
+/**
+ * הקריינות של שקופית אחרי עריכה — **רק מה שעדיין נכון**. כל קטע הוא הקלטה של
+ * טקסט מסוים, והמנוע לעולם אינו מייצר שמע; לכן קטע שהטקסט שלו השתנה יורד.
+ * שקט עדיף על קטע שמוקרא ליד התשובה הלא נכונה.
+ *   • השאלה — נשארת רק כשנוסח השאלה לא השתנה.
+ *   • התשובות — כל קטע צמוד לנוסח שהוקלט: תשובה שזזה לוקחת אותו איתה, תשובה
+ *     שנמחקה מוציאה אותו, ותשובה חדשה או שנערכה נשארת בלי קטע. בלי זה מחיקת
+ *     תשובה הזיזה כל קטע שאחריה מקום אחד, והקטע הלא נכון הוקרא ליד כל תשובה.
+ *   • התשובה הנכונה — נשארת רק כשאותן תשובות, באותו נוסח, עדיין מסומנות
+ *     נכונות, ורק בשקופית שמכריזה תשובה נכונה מוכנה.
+ * `before` הוא השקופית לפני העריכה (הקטעים שלה תואמים את הטקסטים שלה).
+ */
+export function keepNarrationTruthful(before: Slide, after: Slide): Slide {
+  const source = before.narration;
+  const nar = after.narration;
+  if (source === undefined || nar === undefined) return after;
+  const byText = new Map<string, string>();
+  before.question.answers.forEach((answer, i) => {
+    const clip = source.answers[i];
+    const text = spokenText(answer.ans);
+    if (clip && text !== '' && !byText.has(text)) byText.set(text, clip);
+  });
+  const announced = correctAnnouncement(before);
+  return {
+    ...after,
+    narration: {
+      ...nar,
+      question:
+        spokenText(before.question.que) === spokenText(after.question.que) ? source.question : null,
+      answers: after.question.answers.map((answer) => byText.get(spokenText(answer.ans)) ?? null),
+      correct: announced !== null && announced === correctAnnouncement(after) ? source.correct : null,
+    },
+  };
 }
 
 /** הוספת תשובה לשקופית (עד שמירה על מבנה תקין). id לפי המיקום (1..N). */
 export function addAnswer(slide: Slide): Slide {
   const answers = [...slide.question.answers];
   answers.push({ ans: `תשובה ${answers.length + 1}`, correct: false, id: answers.length + 1 });
-  return syncBetOptions({ ...slide, question: { ...slide.question, answers } });
+  const next = syncBetOptions({ ...slide, question: { ...slide.question, answers } });
+  return keepNarrationTruthful(slide, next);
 }
 
 /** הסרת תשובה לפי מיקום — לא יורדים מתחת ל-2 תשובות בשקופית מצביעה. */
@@ -307,13 +372,15 @@ export function removeAnswer(slide: Slide, ansIndex: number): Slide {
   const bet = slide.type === 'bet' && slide.bet !== undefined
     ? { ...slide.bet, options: slide.bet.options.filter((_, i) => i !== ansIndex) }
     : slide.bet;
-  return syncBetOptions({ ...slide, question: { ...slide.question, answers }, ...(bet !== undefined ? { bet } : {}) });
+  const next = syncBetOptions({ ...slide, question: { ...slide.question, answers }, ...(bet !== undefined ? { bet } : {}) });
+  // הקטע של התשובה שנמחקה יוצא איתה, ושאר הקטעים נשארים צמודים לתשובות שלהם.
+  return keepNarrationTruthful(slide, next);
 }
 
 /** קביעת התשובה הנכונה (טריוויה) לפי מיקום — בדיוק אחת נכונה. */
 export function setCorrect(slide: Slide, ansIndex: number): Slide {
   const answers = slide.question.answers.map((a, i) => ({ ...a, correct: i === ansIndex }));
-  return { ...slide, question: { ...slide.question, answers } };
+  return keepNarrationTruthful(slide, { ...slide, question: { ...slide.question, answers } });
 }
 
 /**

@@ -14,7 +14,12 @@ import {
   type NarrationDecision,
   type NarrationMemory,
 } from '../src/app/narration/narrationDirector.ts';
-import { narrationRevealMatches } from '../src/app/narration/gameNarration.ts';
+import {
+  narrationRevealMatches,
+  playableGroupClips,
+} from '../src/app/narration/gameNarration.ts';
+import { parseGameFile } from '../src/engine/index.ts';
+import { fourAnswers, rawGame, rawSlide } from './helpers.ts';
 
 /**
  * בנק "מלא" — אבל **בלי קבוצת האווירה** (`amb_*`): בדיוק בנק של משחק שנוצר
@@ -72,6 +77,7 @@ function base(over: Partial<DisplayedState> = {}): DisplayedState {
     boardMove: null,
     winnersPreview: false,
     enabled: true,
+    audioUnlocked: true,
     bank: BANK,
     ...over,
   };
@@ -356,6 +362,32 @@ describe('שכבות מעל המשחק', () => {
     expect(d!.clips).toEqual(['bet_results.mp3']);
   });
 
+  it('★ "ההימור הגדול של הסבב" + הזכייה שעל המסך — ורק כשיש זוכה', () => {
+    const results = (biggestWin: number, bank = BANK) =>
+      runSteps([
+        base({
+          overlay: 'betResults',
+          bank,
+          bet: { anyStake: true, biggestWin, biggestLoss: 0, leaderScore: 1000 },
+        }),
+      ])[0]!.clips;
+    expect(results(150)).toEqual([
+      'bet_results.mp3',
+      'bet_biggest.mp3',
+      'hundreds_100.mp3',
+      'tens_v_50.mp3',
+      'unit_points.mp3',
+    ]);
+    expect(results(0)).toEqual(['bet_results.mp3']); // אף אחד לא זכה
+    expect(results(0.4)).toEqual(['bet_results.mp3']); // מתעגל לאפס
+    // בנק בלי הפתיח — גם הסכום לא נאמר לבדו
+    const noBiggest = new Proxy(
+      {},
+      { get: (_target, key: string) => (key === 'bet_biggest' ? undefined : `${key}.mp3`) },
+    ) as Record<string, string>;
+    expect(results(150, noBiggest)).toEqual(['bet_results.mp3']);
+  });
+
   it('★ שכבה שאינה מוקראת (תפריט/הגדרות/הגרלה) — שקט, וביטול של מה שמתנגן', () => {
     const [, d] = runSteps([base({ questionShown: true }), base({ questionShown: true, overlay: 'other' })]);
     expect(d!.clips).toEqual([]);
@@ -550,6 +582,164 @@ describe('כללי הזהב', () => {
       base({ questionShown: true }),
     ]);
     expect(clips[2]).toEqual(['flow_question_number.mp3', 'num_f_1.mp3', 'q1.mp3']);
+  });
+});
+
+/**
+ * נעילת autoplay (דפדפן/טלפונים): עד האינטראקציה הראשונה של המפעיל הנגן זורק
+ * כל משפט. מה שנאמר פעם אחת למשחק אינו נשרף עליו — הוא ממתין לצעד הראשון שבו
+ * האודיו פתוח, כל עוד המסך שלו עדיין מוצג. משפטי השקופית אינם חוזרים באיחור.
+ */
+describe('★ אודיו נעול — מה שנאמר פעם אחת למשחק אינו אובד', () => {
+  const locked = (over: Partial<DisplayedState> = {}) => base({ audioUnlocked: false, ...over });
+  const lockedAmb = (over: Partial<DisplayedState> = {}) => locked({ bank: AMB_BANK, ...over });
+  const amb = (over: Partial<DisplayedState> = {}) => base({ bank: AMB_BANK, ...over });
+
+  it('★ "ברוכים הבאים" ממתין בלובי עד שהאודיו נפתח — ואז נאמר פעם אחת', () => {
+    const clips = clipsOf([
+      locked({ stage: 'opening' }),
+      locked({ stage: 'opening' }),
+      base({ stage: 'opening' }), // המפעיל נגע בלובי
+      base({ stage: 'opening' }),
+    ]);
+    expect(clips).toEqual([[], [], ['flow_welcome.mp3'], []]);
+  });
+
+  it('★ "ברוכים הבאים" אינו נאמר מעל שכבה — הקליק על ⚙ שפתח את האודיו, או תפריט ESC', () => {
+    const clips = clipsOf([
+      locked({ stage: 'opening' }),
+      base({ stage: 'opening', overlay: 'other' }), // ההגדרות נפתחו באותו קליק
+      base({ stage: 'opening', overlay: 'other' }),
+      base({ stage: 'opening' }), // ההגדרות נסגרו — הלובי שוב על המסך
+      base({ stage: 'opening' }),
+    ]);
+    expect(clips).toEqual([[], [], [], ['flow_welcome.mp3'], []]);
+  });
+
+  it('"ברוכים הבאים" אינו תלוי במדיית הפתיחה של השקופית הראשונה (היא עוד לא על המסך)', () => {
+    const clips = clipsOf([base({ stage: 'opening', activeMedia: 'open' })]);
+    expect(clips[0]).toEqual(['flow_welcome.mp3']);
+  });
+
+  it('"ברוכים הבאים" שלא נאמר בלובי אינו נאמר אחרי שהמשחק התחיל', () => {
+    const clips = clipsOf([locked({ stage: 'opening' }), base({ questionShown: true })]);
+    expect(clips[1]).toEqual(['flow_question_number.mp3', 'num_f_1.mp3', 'q1.mp3']);
+  });
+
+  it('★ המקש שפותח את האודיו ומתחיל את המשחק — "מתחילים!" נאמר עם השאלה', () => {
+    const clips = clipsOf([lockedAmb({ stage: 'opening' }), amb({ questionShown: true })]);
+    expect(clips[1]).toEqual(['amb_start_1.mp3', 'flow_question_number.mp3', 'num_f_1.mp3', 'q1.mp3']);
+  });
+
+  it('★ "מתחילים!" שנדחה נאמר בצעד הראשון שבו האודיו פתוח — פעם אחת', () => {
+    const clips = clipsOf([
+      lockedAmb({ stage: 'opening' }),
+      lockedAmb({ questionShown: true }), // המשחק התחיל בלי אינטראקציה
+      amb({ questionShown: true }), // עכשיו האודיו נפתח
+      amb({ questionShown: true, answersShown: 1 }),
+    ]);
+    expect(clips[1]!.filter((c) => c.startsWith('amb_start'))).toEqual([]);
+    expect(clips[2]).toEqual(['amb_start_1.mp3']);
+    expect(clips[3]!.filter((c) => c.startsWith('amb_start'))).toEqual([]);
+  });
+
+  /** שקופית שאלה מספר n, מוצגת, עם אודיו נעול או פתוח. */
+  const questionAt = (n: number, over: Partial<DisplayedState> = {}) =>
+    amb({
+      slideId: n,
+      questionOrdinal: n,
+      questionTotal: 10,
+      questionShown: true,
+      questionClip: `q${n}.mp3`,
+      ...over,
+    });
+  const startsOf = (clips: string[][]) => clips.map((c) => c.filter((x) => x.startsWith('amb_start')));
+
+  it('★ "מתחילים!" שנדחה אינו קופץ שקופיות אחר כך — כשהאודיו נפתח רק בשאלה 5', () => {
+    const clips = clipsOf([
+      lockedAmb({ stage: 'opening' }),
+      ...[1, 2, 3, 4, 5].map((n) => questionAt(n, { audioUnlocked: false })), // שלט המנחה, בלי מגע במסך
+      questionAt(5), // המפעיל נוגע במסך הגדול
+      questionAt(5, { phase: 'voting' }),
+      questionAt(6),
+    ]);
+    expect(startsOf(clips).flat()).toEqual([]);
+  });
+
+  it('"מתחילים!" שנדחה יורד גם כשהמקש שפותח את האודיו כבר מעביר לשקופית הבאה', () => {
+    const clips = clipsOf([
+      lockedAmb({ stage: 'opening' }),
+      questionAt(1, { audioUnlocked: false }),
+      questionAt(2),
+    ]);
+    expect(clips[2]).toEqual(['amb_next_1.mp3', 'flow_question_number.mp3', 'num_f_2.mp3', 'q2.mp3']);
+  });
+
+  it('"מתחילים!" שנדחה אינו נאמר לפני לוח המובילים שנפתח מעל השאלה הראשונה', () => {
+    const clips = clipsOf([
+      lockedAmb({ stage: 'opening' }),
+      questionAt(1, { audioUnlocked: false }),
+      questionAt(1, { overlay: 'leaders', leaders: [30, 10] }), // מקש 1 — גם פותח את האודיו
+      questionAt(1),
+    ]);
+    expect(startsOf(clips).flat()).toEqual([]);
+    expect(clips[2]![0]).toBe('lb_title.mp3');
+  });
+
+  it('"מתחילים!" שנדחה ממתין מתחת לתפריט המפעיל, ונאמר כשהשאלה הראשונה חוזרת למסך', () => {
+    const clips = clipsOf([
+      lockedAmb({ stage: 'opening' }),
+      questionAt(1, { audioUnlocked: false }),
+      questionAt(1, { overlay: 'other' }), // קליק בתוך התפריט פתח את האודיו
+      questionAt(1),
+    ]);
+    expect(startsOf(clips)).toEqual([[], [], [], ['amb_start_1.mp3']]);
+  });
+
+  it('מדיה חוסמת בשקופית הראשונה עדיין רק דוחה את "מתחילים!" — גם כשהמנחה מדלג עליה', () => {
+    const clips = clipsOf([
+      amb({ stage: 'opening' }),
+      questionAt(1, { questionShown: false, activeMedia: 'open' }),
+      questionAt(2),
+    ]);
+    expect(clips[2]![0]).toBe('amb_start_1.mp3');
+  });
+
+  it('★ משפטי השקופית נצרכים כרגיל — אינם חוזרים באיחור כשהאודיו נפתח', () => {
+    const clips = clipsOf([locked({ questionShown: true }), base({ questionShown: true })]);
+    expect(clips[0]).toEqual(['flow_question_number.mp3', 'num_f_1.mp3', 'q1.mp3']); // הנגן זורק
+    expect(clips[1]).toEqual([]);
+  });
+
+  it('★ "חצי הדרך" על אודיו נעול — עובר לשאלה הבאה, ולא אובד', () => {
+    const question = (ordinal: number, over: Partial<DisplayedState> = {}) =>
+      amb({
+        slideId: ordinal,
+        questionOrdinal: ordinal,
+        questionTotal: 8,
+        questionShown: true,
+        questionClip: `q${ordinal}.mp3`,
+        ...over,
+      });
+    const clips = clipsOf([
+      question(5, { audioUnlocked: false }),
+      question(5), // אותה שקופית — קריאת האווירה שלה כבר עברה
+      question(6),
+      question(7),
+    ]);
+    expect(clips[0]!.filter((c) => c.startsWith('amb_'))).toEqual([]);
+    expect(clips[1]).toEqual([]);
+    expect(clips[2]![0]).toBe('amb_half.mp3');
+    expect(clips[3]).not.toContain('amb_half.mp3');
+  });
+
+  it('★ "תודה שהשתתפתם" בלוח הניקוד ממתין לאודיו', () => {
+    const clips = clipsOf([
+      locked({ stage: 'scoreboard' }),
+      base({ stage: 'scoreboard' }),
+      base({ stage: 'scoreboard' }),
+    ]);
+    expect(clips).toEqual([[], ['lb_title.mp3', 'flow_thanks.mp3'], []]);
   });
 });
 
@@ -967,6 +1157,28 @@ describe('קריאות אווירה', () => {
         'amb_group_close.mp3',
       ]);
     });
+
+    it('★ קטע שם שלא נטען (נתיב אופליין שבור, 404) — ההפרש, ולא "הקבוצה המובילה כרגע…" ושקט', () => {
+      const raw = rawGame([rawSlide({ id: 1, type: 'trivia', answers: fourAnswers(1) })]);
+      (raw.setting as Record<string, unknown>).narration = {
+        bank: {},
+        groups: { הכחולים: 'blue.mp3', הצהובים: 'yellow.mp3' },
+      };
+      const game = parseGameFile(raw);
+      const failed = new Set(['blue.mp3']);
+      const groupClips = playableGroupClips(game, (url) => failed.has(url));
+      expect(groupClips).toEqual({ הצהובים: 'yellow.mp3' });
+      expect(gs([{ name: 'הכחולים', points: 100 }, { name: 'הצהובים', points: 40 }], groupClips)).toEqual([
+        'amb_group_gap_pre.mp3',
+        'tens_60.mp3',
+        'unit_points.mp3',
+      ]);
+      // ...וקטע שעוד לא נוסה (או שנטען) נשאר
+      expect(playableGroupClips(game, () => false)).toEqual({
+        הכחולים: 'blue.mp3',
+        הצהובים: 'yellow.mp3',
+      });
+    });
   });
 
   describe('מנצחים, הימור, הישרדות, הגרלה ולוח', () => {
@@ -1001,14 +1213,23 @@ describe('קריאות אווירה', () => {
       ]);
       expect(results({ anyStake: true, biggestWin: 60, biggestLoss: 0, leaderScore: 100 })).toEqual([
         'bet_results.mp3',
+        'bet_biggest.mp3',
+        'tens_60.mp3',
+        'unit_points.mp3',
         'amb_bet_big_win.mp3',
       ]);
       expect(results({ anyStake: true, biggestWin: 10, biggestLoss: 70, leaderScore: 100 })).toEqual([
         'bet_results.mp3',
+        'bet_biggest.mp3',
+        'num_f_10.mp3',
+        'unit_points.mp3',
         'amb_bet_big_loss.mp3',
       ]);
       expect(results({ anyStake: true, biggestWin: 10, biggestLoss: 10, leaderScore: 100 })).toEqual([
         'bet_results.mp3',
+        'bet_biggest.mp3',
+        'num_f_10.mp3',
+        'unit_points.mp3',
       ]);
     });
 

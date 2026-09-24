@@ -10,6 +10,8 @@
  *      ולכן צעד אחורה וקדימה אינו מקריא שוב. שקופית אחרת = ביקור חדש.
  *   3. **לעולם לא חוסמת** — מפתח בנק חסר או קטע null מדולגים בשקט.
  *
+ * ומה ש"פעם אחת למשחק" אינו נשרף על אודיו שהדפדפן עדיין נועל (audioUnlocked).
+ *
  * הבמאי אידמפוטנטי: אותו מצב פעמיים = אין מה לומר בפעם השנייה.
  */
 
@@ -146,6 +148,14 @@ export interface DisplayedState {
   winnersPreview: boolean;
   /** הקריינות פעילה (קיימת בקובץ, דלוקה, ולא הושתקה בתפריט המפעיל). */
   enabled: boolean;
+  /**
+   * האודיו של הקריין כבר נפתח (NarrationPlayer.isUnlocked): הייתה אינטראקציה
+   * של המפעיל, או שהדפדפן מתיר ניגון בלעדיה. עד אז הנגן זורק כל משפט, ולכן
+   * משפט של "פעם אחת למשחק" (ברוכים הבאים, מתחילים, חצי הדרך, תודה) *אינו
+   * נאמר ואינו נרשם* — הוא ממתין לצעד הראשון שבו האודיו פתוח, כל עוד המסך שלו
+   * עדיין מוצג. משפטים של השקופית נצרכים כרגיל: הם אינם חוזרים באיחור.
+   */
+  audioUnlocked: boolean;
   /** מילון הביטויים הקבועים של הקול (bank_key → url). */
   bank: Record<string, string>;
 }
@@ -171,6 +181,11 @@ export interface NarrationMemory {
   lastStage: NarrationStage | null;
   /** המעבר למשחק זוהה ו"מתחילים!" עדיין לא נאמר (למשל בגלל מדיה חוסמת). */
   startPending: boolean;
+  /**
+   * הביקור שבו "מתחילים!" נדחה בגלל אודיו נעול (null = לא נדחה כך). הדחייה
+   * הזאת תקפה רק למסך שבו המשחק התחיל — ראו narrationStep.
+   */
+  startLockedVisit: string | null;
   /** מזהה המוביל כפי שהוכרז בפעם הקודמת בלוח המובילים. */
   topId: string | null;
   /** קריאות חלון ההצבעה הנוכחי — מתאפסות עם כל פתיחת הצבעה. */
@@ -201,6 +216,7 @@ export function emptyNarrationMemory(): NarrationMemory {
     lobbyLines: 0,
     lastStage: null,
     startPending: false,
+    startLockedVisit: null,
     topId: null,
     ambVoting: false,
     ambHurry: false,
@@ -448,11 +464,16 @@ function candidates(s: DisplayedState, memory: NarrationMemory): NarrationEvent[
   const events: NarrationEvent[] = [];
 
   if (s.stage === 'opening') {
+    // מעל שכבה (תפריט המפעיל, הגדרות, מרשם) — שקט, וגם "ברוכים הבאים" ממתין
+    // ללובי עצמו. כשהאודיו נפתח בקליק על ⚙ הוא נאמר כשההגדרות נסגרות, ולא
+    // מתחיל מתחת להן ונחתך. (מדיה חוסמת אינה תנאי כאן: `activeMedia` בלובי היא
+    // מדיית הפתיחה של השקופית הראשונה, שעוד לא על המסך.)
+    if (s.overlay !== 'none') return events;
     events.push({ key: 'welcome', parts: ['flow_welcome'], global: true });
     // פטפוט הלובי: כל ~45 שניות, ובכל פעם שלישית מספר המחוברים במקום ניסוח
-    // כללי. לא מתנגן מעל שכבה שאינה מוקראת או מדיה חוסמת, ונפסק ברגע
-    // שהמשחק מתחיל (השלב כבר אינו 'opening').
-    if (s.overlay === 'none' && s.activeMedia === null) {
+    // כללי. לא מתנגן מעל מדיה חוסמת, ונפסק ברגע שהמשחק מתחיל (השלב כבר אינו
+    // 'opening').
+    if (s.activeMedia === null) {
       const nth = memory.lobbyLines + 1;
       if (s.lobbyElapsedMs >= nth * LOBBY_INTERVAL_MS) {
         const counted = nth % LOBBY_COUNT_EVERY === 0 && s.connectedCount > 0;
@@ -509,6 +530,12 @@ function candidates(s: DisplayedState, memory: NarrationMemory): NarrationEvent[
     const parts: NarrationPart[] = ['bet_results'];
     const bet = s.bet;
     if (bet !== null) {
+      // "ההימור הגדול של הסבב" + הסכום — אותו מספר שמסך התוצאות מציג תחת
+      // "ההימור הגדול" (הזכייה הגדולה ביותר). השם שעל המסך אינו נאמר: שמות
+      // משתתפים אינם בבנק. בלי זוכה אין מה להכריז.
+      if (Math.round(bet.biggestWin) > 0) {
+        parts.push({ pre: 'bet_biggest', tail: pointsClipKeys(bet.biggestWin) });
+      }
       const threshold = bet.leaderScore / 2;
       if (!bet.anyStake) parts.push('amb_bet_none');
       else if (bet.leaderScore > 0 && bet.biggestWin >= threshold) parts.push('amb_bet_big_win');
@@ -667,6 +694,7 @@ export function narrationStep(s: DisplayedState, memory: NarrationMemory): Narra
     lastStage: s.stage,
     // המעבר ממסך הפתיחה למשחק — נזכר עד ש"מתחילים!" באמת נאמר (פעם אחת למשחק).
     startPending: startPendingOf(s, memory),
+    startLockedVisit: memory.startLockedVisit,
     topId: memory.topId,
     ambVoting: newWindow ? false : memory.ambVoting,
     ambHurry: newWindow ? false : memory.ambHurry,
@@ -675,6 +703,21 @@ export function narrationStep(s: DisplayedState, memory: NarrationMemory): Narra
   // קריינות כבויה/מושתקת — שקט מוחלט, בלי לזכור דבר.
   if (!s.enabled) {
     return { clips: [], cancel: changed, events: [], memory: next };
+  }
+
+  // "מתחילים!" שנדחה בגלל אודיו נעול שייך למסך שבו המשחק התחיל. כשהמסך הזה
+  // כבר מאחורינו — שקופית אחרת, או שכבה מוקראת (מובילים, הימור...) שנפתחה
+  // מעליו — הוא יורד בשקט ונרשם כנאמר, ולא קופץ באמצע שאלה 5 ברגע שמישהו נגע
+  // במסך. שכבה שאינה מוקראת (תפריט המפעיל) רק משהה אותו: מתחתיה עדיין אותו מסך.
+  // דחייה בגלל מדיה חוסמת אינה עוברת כאן — היא נשארת עד שהקריאה נאמרת.
+  if (
+    next.startPending &&
+    memory.startLockedVisit !== null &&
+    (visit !== memory.startLockedVisit || (s.overlay !== 'none' && s.overlay !== 'other'))
+  ) {
+    global.add('ambStart');
+    next.startPending = false;
+    next.startLockedVisit = null;
   }
 
   const clips: string[] = [];
@@ -693,8 +736,18 @@ export function narrationStep(s: DisplayedState, memory: NarrationMemory): Narra
     for (const event of candidates(s, memory)) {
       const seen = event.global === true ? global : spoken;
       if (seen.has(event.key)) continue;
+      // אודיו נעול: אירוע חד-פעמי למשחק נדחה בלי להירשם (ראו audioUnlocked).
+      if (event.global === true && !s.audioUnlocked) {
+        if (event.key === 'ambStart') next.startLockedVisit = visit;
+        continue;
+      }
       seen.add(event.key);
-      if (event.once !== undefined) global.add(event.once);
+      if (event.once !== undefined) {
+        // "חצי הדרך" על אודיו נעול: המקום של קריאת האווירה בשקופית הזאת עובר
+        // בשקט, והסימון החד-פעמי נשאר פתוח לשאלה הבאה.
+        if (!s.audioUnlocked) continue;
+        global.add(event.once);
+      }
       // תשובות קודמות שדולגו (חשיפה מלאה בבת אחת) נחשבות כאילו נאמרו, כדי
       // שצעד אחורה וקדימה לא יקריא אותן עכשיו.
       if (event.key.startsWith('answer:')) {
@@ -704,7 +757,10 @@ export function narrationStep(s: DisplayedState, memory: NarrationMemory): Narra
       // פטפוט הלובי מתקדם בכל פעם שהגיע תורו — גם כשאין לו קטע בבנק, אחרת
       // אותה קריאה הייתה נתקעת ולא הייתה מגיעה אף פעם לקריאה הבאה.
       if (event.key.startsWith('lobby:')) next.lobbyLines = memory.lobbyLines + 1;
-      if (event.key === 'ambStart') next.startPending = false;
+      if (event.key === 'ambStart') {
+        next.startPending = false;
+        next.startLockedVisit = null;
+      }
       if (event.key === 'leaders') next.topId = s.leaderIds[0] ?? next.topId;
       const resolved = resolve(event.parts, s.bank, event.situation ?? event.key, next.rotation);
       next.rotation = resolved.rotation;

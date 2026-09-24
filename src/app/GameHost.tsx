@@ -75,9 +75,11 @@ import {
 } from './narration/narrationDirector.ts';
 import {
   bankClips,
+  groupNameClips,
   narrationAnswers,
   narrationFunctionAction,
   narrationRevealMatches,
+  playableGroupClips,
   questionOrdinal,
   questionTotal,
   slideNarrationClips,
@@ -468,6 +470,12 @@ export function GameHost({
   const [narrationVolume, setNarrationVolume] = useState(() => readNarrationVolume());
   /** הקריין מדבר כרגע — מנמיך את סאונד המשחק (duck) ומעכב מעבר אוטומטי. */
   const [narrationSpeaking, setNarrationSpeaking] = useState(false);
+  /**
+   * האודיו של הקריין נפתח (אינטראקציה ראשונה, או autoplay מותר). עד אז הבמאי
+   * דוחה את משפטי ה"פעם אחת למשחק", והפתיחה עצמה מריצה צעד — כך "ברוכים
+   * הבאים" נאמר ברגע שהמפעיל נוגע בלובי, ולא נשרף על אודיו נעול.
+   */
+  const [narrationUnlocked, setNarrationUnlocked] = useState(() => narration.isUnlocked());
   /**
    * כמה זמן מוצג מסך ההתחברות (ms) — הקלט היחיד של פטפוט הלובי. נדגם בתדר
    * נמוך (כל 5 שניות) **ורק** כל עוד מסך הפתיחה מוצג והקריינות פעילה, כדי
@@ -1898,6 +1906,13 @@ export function GameHost({
 
   useEffect(() => narration.onSpeakingChange(setNarrationSpeaking), [narration]);
 
+  useEffect(() => {
+    const off = narration.onUnlock(() => setNarrationUnlocked(true));
+    // ייתכן שנפתח בין הרינדור הראשון למנוי (הקשר שרץ מיד בטעינה המוקדמת).
+    if (narration.isUnlocked()) setNarrationUnlocked(true);
+    return off;
+  }, [narration]);
+
   // שעון הלובי — קיים רק במסך הפתיחה ורק כשיש קריינות. נעצר (ומתנקה) ברגע
   // שהמשחק מתחיל, ולכן אינו מוסיף ולו רינדור אחד למהלך המשחק.
   useEffect(() => {
@@ -1919,12 +1934,17 @@ export function GameHost({
     audio.setVolume(narrationSpeaking ? volume * NARRATION_DUCK : volume);
   }, [narrationActive, narrationDuck, narrationSpeaking, volume, audio]);
 
-  // טעינה מוקדמת: בנק הביטויים + קטעי השקופית הראשונה, ברקע ובלי לחסום דבר.
+  // טעינה מוקדמת: בנק הביטויים, שמות הקבוצות וקטעי השקופית הראשונה, ברקע ובלי
+  // לחסום דבר. שם קבוצה שנכשל כאן כבר ידוע כשמסך הקבוצות עולה (playableGroupClips).
   useEffect(() => {
     if (!narrationActive) return;
     const g = engine.getGame();
     const first = g.questions[0];
-    void narration.preload([...bankClips(g), ...(first ? slideNarrationClips(first) : [])]);
+    void narration.preload([
+      ...bankClips(g),
+      ...groupNameClips(g),
+      ...(first ? slideNarrationClips(first) : []),
+    ]);
   }, [narrationActive, engine, narration]);
 
   // ...ובכל כניסה לשקופית — הקטעים של השקופית הבאה.
@@ -2171,11 +2191,15 @@ export function GameHost({
       votedCount,
       leaderIds: leaderRows.map((w) => w.voterId),
       groups,
-      groupClips: narrationSetting?.groups ?? {},
+      // שם קבוצה שהקטע שלו לא נטען — כאילו אין לו קטע (הבמאי אומר את ההפרש).
+      groupClips: playableGroupClips(g, (url) => narration.hasFailed(url)),
       bet,
       boardMove,
       winnersPreview: winnersPreviewRef.current !== null,
       enabled: !narrationMuted,
+      // הדגל של הנגן נדלק כבר בתוך הקליק/המקש, לפני ההודעה (שמגיעה אחריו):
+      // המסך שאותו אירוע פותח כבר נחשב פתוח, והשאלה הראשונה אינה נזרקת.
+      audioUnlocked: narrationUnlocked || narration.isUnlocked(),
       bank: narrationSetting?.bank ?? {},
     };
     const decision = narrationStep(display, narrationMemoryRef.current);
@@ -2189,6 +2213,7 @@ export function GameHost({
   }, [
     narrationActive,
     narrationMuted,
+    narrationUnlocked,
     narration,
     engine,
     stage,
@@ -2318,14 +2343,17 @@ export function GameHost({
 
   // במעבר אוטומטי — מסך תוצאות ההימור נסגר לבד אחרי זמן קריאה (ההשהיה של
   // "השקופית הבאה" ועוד שתי שניות), ואז האפקט שלמעלה ממשיך לשקופית הבאה.
+  // כמו שם, הזמן נספר רק אחרי שהקריין סיים ("תוצאות ההימור… ההימור הגדול של
+  // הסבב… איזו זכייה!" ארוך מחלון של כמה שניות, והסגירה חתכה את סופו).
   useEffect(() => {
     if (stage !== 'playing' || !betOverlay || !autoT.nextSlide.active) return;
+    if (narrationActive && narrationSpeaking) return;
     const timeout = window.setTimeout(
       () => setBetOverlay(false),
       Math.max(1, autoT.nextSlide.seconds) * 1000 + 2000,
     );
     return () => window.clearTimeout(timeout);
-  }, [stage, betOverlay, autoT]);
+  }, [stage, betOverlay, autoT, narrationActive, narrationSpeaking]);
 
   // מעבר אוטומטי של מדיה חוסמת (openMedia/endMedia + מסכי מדיה עצמאיים):
   //   • תמונה — מעבר אחרי autoT.media.image.seconds (אם image.active דלוק).
