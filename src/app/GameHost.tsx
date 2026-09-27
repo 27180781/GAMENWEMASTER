@@ -145,7 +145,7 @@ import { QrCode } from '../render/QrCode.tsx';
 import { DebugOverlay } from '../render/DebugOverlay.tsx';
 import { debugLog } from './debugLog.ts';
 import { useEngineState } from './useEngineState.ts';
-import { betResultsCloseDelayMs } from './betOverlayTiming.ts';
+import { betResultsCloseDelayMs, narrationSafeDelayMs } from './narrationWait.ts';
 
 type HostStage = 'opening' | 'playing' | 'winners' | 'scoreboard';
 
@@ -2269,8 +2269,8 @@ export function GameHost({
     if (stage !== 'playing' || state.activeMedia !== null || overlayActive) return;
     // הקריין באמצע משפט — המעבר האוטומטי הבא ממתין לסיומו (חשיפת תשובה,
     // פתיחת הצבעה, חשיפת התשובה הנכונה). בלי זה מצב אוטומטי היה חותך כל
-    // משפט באמצע. לחיצה ידנית של המנחה עדיין מקדמת מיד.
-    if (narrationActive && narrationSpeaking) return;
+    // משפט באמצע. לחיצה ידנית של המנחה עדיין מקדמת מיד. קטע שלא מדווח שנגמר
+    // אינו עוצר את המשחק לנצח — יש תקרה (ראו narrationWait.ts).
     const s = engine.getCurrentSlide();
     const votable = isVotableSlide(s);
     const totalAnswers = s.question.answers.length;
@@ -2333,6 +2333,7 @@ export function GameHost({
     }
 
     if (action === null) return;
+    delayMs = narrationSafeDelayMs(delayMs, narrationActive && narrationSpeaking);
     const fire = action;
     const desc = label;
     const timeout = window.setTimeout(() => {
@@ -2348,7 +2349,7 @@ export function GameHost({
   // הסבב… איזו זכייה!" ארוך מחלון של כמה שניות, והסגירה חתכה את סופו).
   useEffect(() => {
     if (stage !== 'playing' || !betOverlay || !autoT.nextSlide.active) return;
-    // קטע שלא מדווח שנגמר לא משאיר את המסך לנצח — ראו betOverlayTiming.ts.
+    // קטע שלא מדווח שנגמר לא משאיר את המסך לנצח — ראו narrationWait.ts.
     const timeout = window.setTimeout(
       () => setBetOverlay(false),
       betResultsCloseDelayMs(autoT.nextSlide.seconds, narrationActive && narrationSpeaking),
