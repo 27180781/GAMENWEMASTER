@@ -329,4 +329,12 @@ describe('★ קריינות אחרי עריכה חיה — רק מה שעדיי
     const after = edit((s) => ({ ...s, question: { ...s.question, timeForQue: 40, src: 'x.png' } }));
     expect(after.narration).toEqual(first(narrated()).narration);
   });
+
+  it('שקופית מוקראת בלי setting (JSON ישן/חלקי) — עריכה חיה אינה זורקת', () => {
+    const base = first(narrated());
+    const bare = { ...base, setting: undefined } as unknown as Slide;
+    const after = removeAnswer(bare, 0);
+    expect(after.narration?.answers).toEqual(['paris.mp3', 'rome.mp3', 'berlin.mp3']);
+    expect(after.narration?.correct).toBe('correct-paris.mp3');
+  });
 });

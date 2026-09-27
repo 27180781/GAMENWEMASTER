@@ -119,7 +119,7 @@ export function slideSubtitle(slide: Slide): string {
   }
   // בסקר אין תשובה נכונה. הדגל `correct` עדיין יכול להיות שם — הוא נשמר בכוונה
   // בהחלפת סוג — ולכן חייבים לסנן לפי הסוג, אחרת הכרטיס היה מסמן ✓ בסקר.
-  if (slide.type !== 'survey' && !slide.setting.majorityDecides) {
+  if (slide.type !== 'survey' && !slide.setting?.majorityDecides) {
     const text = slide.question.answers.find((a) => a.correct)?.ans.trim();
     if (text !== undefined && text !== '') return `✓ ${text}`;
   }
@@ -208,7 +208,7 @@ export function changeSlideType(game: GameFile, index: number, type: SlideType):
         answers.push({ ans: `תשובה ${answers.length + 1}`, correct: false, id: answers.length + 1 });
       }
       // trivia — חייבת תשובה נכונה אחת לפחות (אלא אם "הרוב קובע")
-      if (type === 'trivia' && !slide.setting.majorityDecides && !answers.some((a) => a.correct)) {
+      if (type === 'trivia' && !slide.setting?.majorityDecides && !answers.some((a) => a.correct)) {
         answers[0] = { ...answers[0]!, correct: true };
       }
       next.question = { ...next.question, answers };
@@ -310,7 +310,7 @@ function spokenText(text: string): string {
  * null כשהשקופית אינה מכריזה תשובה נכונה מוכנה (סקר, הימור, "הרוב קובע").
  */
 function correctAnnouncement(slide: Slide): string | null {
-  if (slide.type === 'survey' || slide.type === 'bet' || slide.setting.majorityDecides) return null;
+  if (slide.type === 'survey' || slide.type === 'bet' || slide.setting?.majorityDecides) return null;
   return slide.question.answers
     .filter((a) => a.correct)
     .map((a) => spokenText(a.ans))
@@ -366,7 +366,7 @@ export function removeAnswer(slide: Slide, ansIndex: number): Slide {
   let answers = slide.question.answers.filter((_, i) => i !== ansIndex);
   // מזהים לפי מיקום; ולדאות שנשארת תשובה נכונה אחת בטריוויה.
   answers = answers.map((a, i) => ({ ...a, id: i + 1 }));
-  if (slide.type === 'trivia' && !slide.setting.majorityDecides && !answers.some((a) => a.correct) && answers[0]) {
+  if (slide.type === 'trivia' && !slide.setting?.majorityDecides && !answers.some((a) => a.correct) && answers[0]) {
     answers[0] = { ...answers[0], correct: true };
   }
   const bet = slide.type === 'bet' && slide.bet !== undefined
