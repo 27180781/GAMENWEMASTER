@@ -145,6 +145,7 @@ import { QrCode } from '../render/QrCode.tsx';
 import { DebugOverlay } from '../render/DebugOverlay.tsx';
 import { debugLog } from './debugLog.ts';
 import { useEngineState } from './useEngineState.ts';
+import { betResultsCloseDelayMs } from './betOverlayTiming.ts';
 
 type HostStage = 'opening' | 'playing' | 'winners' | 'scoreboard';
 
@@ -2347,10 +2348,10 @@ export function GameHost({
   // הסבב… איזו זכייה!" ארוך מחלון של כמה שניות, והסגירה חתכה את סופו).
   useEffect(() => {
     if (stage !== 'playing' || !betOverlay || !autoT.nextSlide.active) return;
-    if (narrationActive && narrationSpeaking) return;
+    // קטע שלא מדווח שנגמר לא משאיר את המסך לנצח — ראו betOverlayTiming.ts.
     const timeout = window.setTimeout(
       () => setBetOverlay(false),
-      Math.max(1, autoT.nextSlide.seconds) * 1000 + 2000,
+      betResultsCloseDelayMs(autoT.nextSlide.seconds, narrationActive && narrationSpeaking),
     );
     return () => window.clearTimeout(timeout);
   }, [stage, betOverlay, autoT, narrationActive, narrationSpeaking]);

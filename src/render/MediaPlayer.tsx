@@ -7,6 +7,7 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { classifyMediaUrl, isYoutubeUrl, youtubeEmbedUrl, youtubeVideoId } from '../engine/index.ts';
 import { MediaPauseContext } from './mediaPause.ts';
+import { startYoutubeHandshake } from './youtubeHandshake.ts';
 
 interface MediaPlayerProps {
   src: string;
@@ -193,7 +194,8 @@ export function MediaPlayer({ src, onEnded, asBackground = false, className }: M
         <YouTubeEmbed
           src={src}
           className={className}
-          onFailed={() => setFailed(true)}
+          // ברקע לא מסירים את הסרטון על שתיקת הנגן — ראו youtubeHandshake.ts.
+          {...(asBackground ? {} : { onFailed: () => setFailed(true) })}
           {...(onEnded && !asBackground ? { onEnded } : {})}
         />
       );
@@ -215,9 +217,6 @@ export function MediaPlayer({ src, onEnded, asBackground = false, className }: M
   }
 }
 
-/** כמה להמתין לסימן חיים מנגן היוטיוב לפני שמכריזים על כשל. */
-const ALIVE_TIMEOUT_MS = 8000;
-
 /**
  * נגן YouTube דרך iframe עם enablejsapi=1. זיהוי סיום דרך פרוטוקול
  * ה-postMessage של הנגן (playerState === 0), בלי לטעון סקריפט חיצוני.
@@ -233,7 +232,7 @@ function YouTubeEmbed({
 }: {
   src: string;
   onEnded?: (() => void) | undefined;
-  /** הנגן לא ענה — ראו ALIVE_TIMEOUT_MS. */
+  /** הנגן לא ענה — ראו ALIVE_TIMEOUT_MS ב-youtubeHandshake.ts. */
   onFailed?: (() => void) | undefined;
   className?: string | undefined;
 }) {
@@ -253,7 +252,18 @@ function YouTubeEmbed({
     endedRef.current = false;
     const iframe = iframeRef.current;
     if (!iframe) return;
-    let alive = false;
+
+    const handshake = startYoutubeHandshake({
+      send: () => {
+        iframe.contentWindow?.postMessage(
+          JSON.stringify({ event: 'listening', id: 'trivia-engine' }),
+          '*',
+        );
+      },
+      // ברקע אין למי להציג שגיאה, ולהסיר סרטון שאולי מתנגן בפועל רק כי הנגן
+      // לא ענה — גרוע מלהשאיר אותו. הכשל מדווח רק בחזית, שם המנחה צריך לדעת.
+      onTimeout: () => failedCb.current?.(),
+    });
 
     const handleMessage = (event: MessageEvent) => {
       if (!event.origin.endsWith('youtube.com')) return;
@@ -261,8 +271,7 @@ function YouTubeEmbed({
       // כל הודעה מהנגן מוכיחה שהוא באמת שם. iframe אינו יורה onError כשיוטיוב
       // מסרב למסגר, כשהסרטון נמחק/פרטי, או כשבעל הערוץ חסם הטמעה — ולכן זו
       // הדרך היחידה לדעת. בלי זה כל כשל כזה נראה כריבוע אפור בלי שום הסבר.
-      alive = true;
-      window.clearTimeout(aliveTimer);
+      handshake.markAlive();
       try {
         const data: unknown = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
         const info = (data as { event?: string; info?: { playerState?: number } }) ?? {};
@@ -281,27 +290,15 @@ function YouTubeEmbed({
       }
     };
 
-    // בקשת האזנה לאירועי הנגן
-    const listen = () => {
-      iframe.contentWindow?.postMessage(
-        JSON.stringify({ event: 'listening', id: 'trivia-engine' }),
-        '*',
-      );
-    };
-    iframe.addEventListener('load', listen);
-    const timer = window.setTimeout(listen, 1500); // fallback אם load כבר קרה
-    // ארוך בכוונה: רשת איטית באולם עלולה לעכב את ההודעה הראשונה, ועדיף
-    // להמתין מאשר להכריז על כשל כשהסרטון בדרך.
-    const aliveTimer = window.setTimeout(() => {
-      if (!alive) failedCb.current?.();
-    }, ALIVE_TIMEOUT_MS);
-
+    // בקשת האזנה לאירועי הנגן: מיד ב-load, ובנוסף שוב ושוב עד התשובה הראשונה
+    // (ראו youtubeHandshake.ts). הטיימר של הכשל ארוך בכוונה — רשת איטית באולם
+    // עלולה לעכב את ההודעה הראשונה.
+    iframe.addEventListener('load', handshake.sendNow);
     window.addEventListener('message', handleMessage);
     return () => {
       window.removeEventListener('message', handleMessage);
-      iframe.removeEventListener('load', listen);
-      window.clearTimeout(timer);
-      window.clearTimeout(aliveTimer);
+      iframe.removeEventListener('load', handshake.sendNow);
+      handshake.dispose();
     };
   }, [src]);
 
