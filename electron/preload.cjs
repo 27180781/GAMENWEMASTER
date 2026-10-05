@@ -107,7 +107,7 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
   forgetGame() {
     void ipcRenderer.invoke('game:forget');
   },
-  /** המשחקים שכבר הורדו — [{ code, name, savedAt, size }], החדש קודם. */
+  /** המשחקים שכבר הורדו או נבנו במחשב — [{ code, name, savedAt, size, local }], החדש קודם. */
   gameLibrary() {
     return ipcRenderer.invoke('game:library');
   },
@@ -241,6 +241,10 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
   /** שמירת משחק ערוך לתוך חבילת ה-ZIP שעל הדיסק. */
   saveEditedGame(/** @type {string} */ dataJson) {
     return ipcRenderer.invoke('game:saveEdited', dataJson);
+  },
+  /** בניית משחק חדש מאפס — נשמר בספרייה ונבחר כמשחק הנוכחי. */
+  createGame(/** @type {string} */ name, /** @type {string} */ dataJson) {
+    return ipcRenderer.invoke('game:create', name, dataJson);
   },
   /** הורדת משחק מהשרת לפי קוד; נשמר כ"משחק אחרון" ונטען משם. */
   downloadGameByCode(/** @type {string} */ code) {

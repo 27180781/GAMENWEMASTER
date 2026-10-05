@@ -31,6 +31,8 @@ import {
 import { saveEditedGame } from '../app/clickerBridge.ts';
 import { insertImportedQuestions, type ImportedQuestion } from '../app/questionImport.ts';
 import { ImportExcelDialog } from './ImportExcelDialog.tsx';
+import { LicenseFields } from './NewGameDialog.tsx';
+import { applyLicense, licenseFromGame, licenseProblem } from '../app/gameLicense.ts';
 
 /** עץ השדות נגזר פעם אחת — הסכימה קבועה לאורך חיי התוכנה. */
 const SETTING_FIELDS = describeObject(globalSettingsSchema);
@@ -46,6 +48,11 @@ interface GameEditorProps {
   /** שמירת הגרסה הערוכה גם בזיכרון (כדי שהמשחק שירוץ יהיה המעודכן). */
   onApply: (game: GameFile) => void;
   onClose: () => void;
+  /**
+   * משחק שנבנה במחשב: הרישיון שלו (קליקרים/טלפונים, משתתפים, קוד חדר) נערך
+   * כאן. במשחק שהורד הרישיון מגיע מהמערכת, ולכן הקבוצה מוסתרת.
+   */
+  licenseEditable?: boolean;
 }
 
 type SaveState =
@@ -147,7 +154,7 @@ function Section({
   );
 }
 
-export function GameEditor({ game, onApply, onClose }: GameEditorProps) {
+export function GameEditor({ game, onApply, onClose, licenseEditable = false }: GameEditorProps) {
   const [draft, setDraft] = useState<GameFile>(game);
   const [dirty, setDirty] = useState(false);
   const [save, setSave] = useState<SaveState>({ kind: 'idle' });
@@ -188,7 +195,14 @@ export function GameEditor({ game, onApply, onClose }: GameEditorProps) {
     setSave({ kind: 'idle' });
   };
 
+  const license = licenseEditable ? licenseFromGame(draft) : null;
+  const licenseError = license === null ? null : licenseProblem(license);
+
   const doSave = async () => {
+    if (licenseError !== null) {
+      setSave({ kind: 'error', message: `רישיון: ${licenseError}` });
+      return;
+    }
     setSave({ kind: 'saving' });
     const res = await saveEditedGame(JSON.stringify(draft));
     if (!res.ok) {
@@ -289,6 +303,17 @@ export function GameEditor({ game, onApply, onClose }: GameEditorProps) {
                 />
               </Section>
             ))}
+
+            {license !== null && (
+              <Section title="רישיון" icon="🔑">
+                <LicenseFields
+                  key={`license-${game.id}`}
+                  value={license}
+                  onChange={(next) => edit(applyLicense(draft, next))}
+                />
+                {licenseError !== null && <p className="editor-error">{licenseError}</p>}
+              </Section>
+            )}
 
             <Section title="כלים" icon="🔧">
               <GameTools game={draft} onChange={edit} />

@@ -85,6 +85,8 @@ function libraryList(userData) {
         name: String(meta?.name ?? ''),
         savedAt: Number(meta?.savedAt) || 0,
         size,
+        // משחק שנבנה במחשב (localGame.cjs) — אין לו עותק בשרת.
+        local: meta?.local === true,
       });
     }
     out.sort((a, b) => b.savedAt - a.savedAt || a.code.localeCompare(b.code));
@@ -112,18 +114,59 @@ function librarySelect(userData, code) {
   }
 }
 
-/** רישום חבילה שהורדה (הקובץ כבר במקומו) וסימונה כנוכחית. */
-function libraryStore(userData, code, name) {
+/**
+ * רישום חבילה שהורדה (הקובץ כבר במקומו) וסימונה כנוכחית.
+ * `extra.local` — משחק שנבנה במחשב ולא הורד (ראו localGame.cjs).
+ */
+function libraryStore(userData, code, name, extra = {}) {
   if (!isSafeCode(code)) return false;
   try {
     fs.writeFileSync(
       libraryMetaPath(userData, code),
-      JSON.stringify({ code, name: String(name ?? ''), savedAt: Date.now() }),
+      JSON.stringify({
+        code,
+        name: String(name ?? ''),
+        savedAt: Date.now(),
+        ...(extra.local === true ? { local: true } : {}),
+      }),
     );
   } catch {
     return false;
   }
   return librarySelect(userData, code);
+}
+
+/** קוד המשחק הנוכחי בספרייה, או null (משחק מקובץ ZIP / אין משחק). */
+function currentCode(userData) {
+  const code = readJson(lastGameMetaPath(userData))?.code;
+  return isSafeCode(code) && fs.existsSync(libraryZipPath(userData, code)) ? code : null;
+}
+
+/** האם המשחק הנוכחי נבנה במחשב (ולא הורד מהשרת). */
+function currentIsLocal(userData) {
+  const code = currentCode(userData);
+  return code !== null && readJson(libraryMetaPath(userData, code))?.local === true;
+}
+
+/**
+ * עדכון השם של המשחק הנוכחי ברשימה אחרי שמירה בעורך, כדי שהרשימה תציג את
+ * השם ששמור בקובץ. רק למשחק שנבנה במחשב: למשחק שהורד השם ברשימה הוא השם
+ * מהשרת, והוא מתעדכן בהורדה מחדש.
+ */
+function renameCurrentLocal(userData, name) {
+  const clean = String(name ?? '').trim();
+  const code = currentCode(userData);
+  if (clean === '' || code === null) return false;
+  const meta = readJson(libraryMetaPath(userData, code));
+  if (meta?.local !== true || meta.name === clean) return false;
+  try {
+    fs.writeFileSync(libraryMetaPath(userData, code), JSON.stringify({ ...meta, name: clean }));
+    const last = readJson(lastGameMetaPath(userData));
+    if (last !== null) fs.writeFileSync(lastGameMetaPath(userData), JSON.stringify({ ...last, name: clean }));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** ביטול בחירת המשחק הנוכחי ("טען משחק אחר"). הספרייה **אינה** נמחקת. */
@@ -166,4 +209,7 @@ module.exports = {
   libraryStore,
   libraryDelete,
   forgetCurrent,
+  currentCode,
+  currentIsLocal,
+  renameCurrentLocal,
 };
