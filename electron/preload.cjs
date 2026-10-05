@@ -155,6 +155,13 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
   openReports() {
     void ipcRenderer.invoke('report:open');
   },
+  /**
+   * "שמירה בשם" (דיאלוג של Windows). מחזיר { ok, path }, { ok: false, canceled }
+   * או { ok: false, error }.
+   */
+  saveFileAs(/** @type {string} */ name, /** @type {Uint8Array} */ bytes) {
+    return ipcRenderer.invoke('file:saveAs', name, bytes);
+  },
   /** יציאה מהמשחק (סגירת ה-EXE) — אחרי אישור המשתמש. */
   quit() {
     void ipcRenderer.invoke('app:quit');

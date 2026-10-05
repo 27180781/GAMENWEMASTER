@@ -2827,6 +2827,154 @@ body {
 }
 .sa-done:hover { filter: brightness(1.06); }
 
+/* ---- "יבוא מאקסל" — הכפתור מעל רשימת השקופיות והחלון שהוא פותח ---- */
+/* בירוק של הכפתור במערכת יצירת המשחקים, כדי שיהיה קל לזהות אותו. */
+.ge-import {
+  flex: 0 0 auto;
+  padding: 9px 12px;
+  border: 2px solid #18aa6b;
+  border-radius: 12px;
+  background: rgba(24, 170, 107, 0.14);
+  color: var(--ge-ink, #4b3f6b);
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ge-import:hover { background: rgba(24, 170, 107, 0.24); }
+
+.xi-modal { width: min(620px, 100%); }
+.xi-sub { margin: -6px 0 0; text-align: center; font-size: 13.5px; color: var(--ge-soft, #8a80a8); }
+.xi-step { display: flex; flex-direction: column; gap: 8px; }
+.xi-step-head { display: flex; align-items: center; gap: 8px; font-size: 14.5px; font-weight: 700; }
+.xi-step-num {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--ge-primary, #6c5ce7);
+  color: #fff;
+  font-size: 12.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.xi-template {
+  padding: 10px 12px;
+  border: 1px solid var(--ge-line, #e6e2f0);
+  border-radius: 11px;
+  background: #fff;
+  color: var(--ge-ink, #4b3f6b);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.xi-template:hover { border-color: var(--ge-primary, #6c5ce7); color: var(--ge-primary, #6c5ce7); }
+.xi-drop {
+  border: 2px dashed var(--ge-line, #e6e2f0);
+  border-radius: 12px;
+  padding: 18px 16px;
+  text-align: center;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.xi-drop:hover,
+.xi-drop:focus-visible,
+.xi-drop--over {
+  outline: none;
+  border-color: var(--ge-primary, #6c5ce7);
+  background: rgba(108, 92, 231, 0.05);
+}
+.xi-drop-icon { font-size: 26px; }
+.xi-drop-main { margin: 4px 0 0; font-size: 14px; }
+.xi-drop-sub { margin: 4px 0 0; font-size: 12px; color: var(--ge-soft, #8a80a8); }
+.xi-file { margin: 6px 0 0; font-size: 13.5px; font-weight: 700; overflow-wrap: anywhere; }
+.xi-msg {
+  margin: 0;
+  padding: 9px 11px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.xi-msg--error { background: #fdeef0; color: #b0213a; }
+.xi-msg--warning { background: #fff8e1; color: #7a5200; border: 1px solid #ffe08a; }
+.xi-msg--info { background: #eef4ff; color: #1f4fa8; border: 1px solid #cddcff; }
+.xi-msg--ok { background: #e9f8f0; color: #1a7f4b; }
+.xi-notices { display: flex; flex-direction: column; gap: 6px; }
+.xi-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.xi-chip { padding: 4px 9px; border-radius: 8px; font-size: 12.5px; font-weight: 700; }
+.xi-chip--ok { background: #dcf5e8; color: #1a7f4b; }
+.xi-chip--skip { background: #fdeef0; color: #b0213a; }
+.xi-chip--warn { background: #fff1c7; color: #7a5200; }
+.xi-list-title { font-size: 13.5px; font-weight: 700; }
+.xi-list-title--ok { color: #1a7f4b; }
+.xi-list {
+  list-style: none;
+  margin: 0;
+  max-height: 190px;
+  overflow-y: auto;
+  border: 1px solid var(--ge-line, #e6e2f0);
+  border-radius: 10px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.xi-issue { padding: 6px 8px; border-radius: 7px; font-size: 12.5px; line-height: 1.45; }
+.xi-issue--error { background: #fdeef0; color: #a61d34; }
+.xi-issue--warning { background: #fff8e1; color: #6b4a00; }
+.xi-issue-row { font-weight: 800; margin-inline-end: 6px; }
+.xi-issue-preview {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  opacity: 0.75;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.xi-q { display: flex; align-items: center; gap: 8px; padding: 3px 4px; font-size: 13.5px; }
+.xi-q-num { flex: 0 0 auto; color: var(--ge-soft, #8a80a8); }
+.xi-q-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.xi-q-ans { flex: 0 0 auto; font-size: 12px; color: var(--ge-soft, #8a80a8); white-space: nowrap; }
+.xi-q-type { flex: 0 0 auto; padding: 2px 7px; border-radius: 6px; font-size: 11.5px; }
+.xi-q-type--trivia { background: #e6eeff; color: #2a55b8; }
+.xi-q-type--survey { background: #dcf5e8; color: #1a7f4b; }
+.xi-place {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--ge-line, #e6e2f0);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13.5px;
+}
+.xi-place legend { padding: 0 4px; font-weight: 700; }
+.xi-place label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.xi-actions { flex: 0 0 auto; display: flex; gap: 10px; }
+.xi-actions > button { flex: 1 1 0; }
+.xi-cancel {
+  padding: 11px;
+  border: 1px solid var(--ge-line, #e6e2f0);
+  border-radius: 11px;
+  background: #fff;
+  color: var(--ge-ink, #4b3f6b);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.xi-cancel:hover { background: #f6f4fb; }
+.xi-go:disabled { opacity: 0.45; cursor: default; filter: none; }
+
 /*
  * העורך אינו יושב על הבמה (ראו Shell fullWindow), ולכן רוחב החלון הוא באמת
  * רוחב העורך — ושאילתות המדיה כאן משמעותיות. שתי העמודות הקבועות מקבלות

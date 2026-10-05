@@ -1746,6 +1746,34 @@ app.whenReady().then(() => {
   });
 
   /**
+   * "שמירה בשם" לקובץ שהתוכנה מייצרת (תבנית האקסל של יבוא השאלות). הדיאלוג
+   * מודאלי לחלון ששאל: חלון המשחק במסך מלא, ודיאלוג בלי חלון-אב עלול להיפתח
+   * מאחוריו. ברירת המחדל היא שולחן העבודה, כמו בחתימת EXE.
+   */
+  ipcMain.handle('file:saveAs', async (e, suggested, bytes) => {
+    try {
+      const name = String(suggested || 'קובץ').replace(/[\\/:*?"<>|]/g, '_').slice(0, 80);
+      const ext = path.extname(name).slice(1).toLowerCase();
+      const opts = {
+        title: 'שמירת קובץ',
+        defaultPath: path.join(app.getPath('desktop'), name),
+        filters: ext === 'xlsx' ? [{ name: 'Excel', extensions: ['xlsx'] }] : [],
+      };
+      const win = BrowserWindow.fromWebContents(e.sender);
+      const picked =
+        win !== null ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts);
+      if (picked.canceled || !picked.filePath) return { ok: false, canceled: true };
+      fs.writeFileSync(picked.filePath, Buffer.from(bytes));
+      console.log('[file] נשמר:', picked.filePath);
+      return { ok: true, path: picked.filePath };
+    } catch (err) {
+      const msg = /** @type {Error} */ (err).message;
+      console.error('[file] שמירה נכשלה:', msg);
+      return { ok: false, error: msg };
+    }
+  });
+
+  /**
    * חתימת משחק ל-EXE חדש — "חתום EXE" מתוך התוכנה עצמה, בלי שורת פקודה.
    *
    * בסיס החתימה: קודם כול מנסים את **הגרסה העדכנית** של המנוע מהמהדורה היציבה
