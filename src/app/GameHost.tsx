@@ -60,7 +60,7 @@ import { ClickerDiagnostic } from '../render/ClickerDiagnostic.tsx';
 import { useClickerLink } from '../render/useClickerLink.ts';
 import { WindowControls } from '../render/WindowControls.tsx';
 import { Stage } from '../render/Stage.tsx';
-import { themeStyle } from '../render/theme.ts';
+import { themeRootProps } from '../render/theme.ts';
 import type { TimerView } from '../render/TimerRing.tsx';
 import { SettingsScreen } from '../render/SettingsScreen.tsx';
 import { AudioManager } from './AudioManager.ts';
@@ -2674,7 +2674,7 @@ export function GameHost({
     <div
       className={`game-root${showJoinBanner && stage !== 'opening' ? ' has-banner' : ''}`}
       dir="rtl"
-      style={themeStyle(setting)}
+      {...themeRootProps(setting)}
     >
       {/* שכבה חוסמת פתוחה = המשחק עצור, וזה כולל את המדיה: וידאו/סאונד נעצרים
           וממשיכים מאותה נקודה כשהיא נסגרת (הטיימר כבר קפא כך ממילא). */}

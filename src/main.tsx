@@ -4,6 +4,7 @@ import { App } from './app/App.tsx';
 import { HostConsole } from './render/HostConsole.tsx';
 import { registerMediaServiceWorker } from './app/mediaSW.ts';
 import './render/styles.css';
+import './render/themes.css';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('אלמנט root לא נמצא');

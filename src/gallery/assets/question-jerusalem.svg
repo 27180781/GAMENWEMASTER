@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6b26b"/><stop offset="0.55" stop-color="#ffd8a8"/><stop offset="1" stop-color="#fff1d6"/></linearGradient>
+    <linearGradient id="stone" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e9d3a6"/><stop offset="1" stop-color="#c9a76b"/></linearGradient>
+    <radialGradient id="gold" cx="0.4" cy="0.35" r="0.7"><stop offset="0" stop-color="#fff3b0"/><stop offset="0.5" stop-color="#e8b84a"/><stop offset="1" stop-color="#9c6b12"/></radialGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#sky)"/>
+  <circle cx="930" cy="170" r="70" fill="#fff6d8" opacity="0.9"/>
+  <path d="M0 520 Q200 440 420 500 T860 480 T1200 500 V800 H0Z" fill="#b99363" opacity="0.55"/>
+  <rect x="0" y="560" width="1200" height="240" fill="url(#stone)"/>
+  <g fill="#b48a4f" opacity="0.6">
+    <rect x="0" y="600" width="1200" height="4"/><rect x="0" y="650" width="1200" height="4"/><rect x="0" y="700" width="1200" height="4"/><rect x="0" y="750" width="1200" height="4"/>
+  </g>
+  <g>
+    <rect x="430" y="420" width="340" height="150" fill="#3f6fb5"/>
+    <polygon points="430,420 600,370 770,420" fill="#2f5a99"/>
+    <rect x="520" y="330" width="160" height="90" fill="#335f9f"/>
+    <path d="M500 335 Q600 170 700 335 Z" fill="url(#gold)"/>
+    <rect x="596" y="200" width="8" height="40" fill="#9c6b12"/>
+  </g>
+  <g fill="#d8bb85">
+    <rect x="120" y="440" width="120" height="130"/><rect x="160" y="380" width="40" height="70"/>
+    <rect x="900" y="430" width="160" height="140"/><rect x="960" y="360" width="40" height="80"/>
+  </g>
+  <g fill="#2d5b2d"><ellipse cx="320" cy="530" rx="40" ry="60"/><ellipse cx="860" cy="530" rx="36" ry="56"/><ellipse cx="80" cy="540" rx="30" ry="46"/></g>
+</svg>

@@ -1,0 +1,441 @@
+/*
+ * ערכות נושא חזותיות (setting.visualTheme) — ראו src/engine/visualThemes.ts.
+ *
+ * כללי הברזל, לכל ערכה ולכל כלל בקובץ הזה:
+ * 1. מראה בלבד. אין כאן width/height/padding/margin/gap/font-size/top/left ואין
+ *    border-width חדש: מסגרת נוספת מצוירת ב-box-shadow inset או ב-outline עם
+ *    offset שלילי. כך תקציבי הגובה של FitText, הגריד של שמונה תשובות ומיקומי
+ *    השמות על הפודיום (PODIUM_POS) נשארים נכונים בכל ערכה.
+ * 2. הצבעים של המשחק נשארים שלו: מילוי התיבות הוא mainColor (‎--pill /
+ *    ‎--main-color / ‎--main-rgb), הטקסט הוא secondaryColor, והתשובה הנכונה
+ *    מחליפה ביניהם (styles.css). ערכה מוסיפה מעל זה ברק, מרקם, מסגרת וצל.
+ * 3. הרקע האחורי מגיע ממדיית המשחק. רקעי הבמה כאן (‎.slide-screen,
+ *    ‎.leaders-overlay, ‎.sl-overlay) הם רק הגיבוי כשאין מדיה.
+ * 4. מסך חדש: אם הוא משתמש באותן מחלקות משטח (תיבה בצבע המשחק / לוח כהה /
+ *    שורה בטבלה) — הוא כבר מעוצב. אחרת להוסיף את המחלקות שלו לרשימות בכל ערכה,
+ *    ולהריץ ‎npm run shots‎ (tools/theme-shots.mjs) על כל הערכות.
+ *
+ * 'classic' לא מופיע כאן בכלל: themeRootProps לא שם תכונה עבורו.
+ */
+
+/* ---- גופנים (OFL, Google Fonts; ארוזים בבנייה — עובד גם באופליין וב-EXE) ---- */
+@font-face {
+  font-family: 'VT Suez One';
+  src: url('./fonts/suez-one-hebrew.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+  ascent-override: 92%;
+  descent-override: 26%;
+  line-gap-override: 0%;
+  unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F;
+}
+@font-face {
+  font-family: 'VT Suez One';
+  src: url('./fonts/suez-one-latin.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+  ascent-override: 92%;
+  descent-override: 26%;
+  line-gap-override: 0%;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'VT Assistant';
+  src: url('./fonts/assistant-hebrew.woff2') format('woff2');
+  font-weight: 200 800;
+  font-display: swap;
+  ascent-override: 92%;
+  descent-override: 26%;
+  line-gap-override: 0%;
+  unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F;
+}
+@font-face {
+  font-family: 'VT Assistant';
+  src: url('./fonts/assistant-latin.woff2') format('woff2');
+  font-weight: 200 800;
+  font-display: swap;
+  ascent-override: 92%;
+  descent-override: 26%;
+  line-gap-override: 0%;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'VT Frank Ruhl Libre';
+  src: url('./fonts/frank-ruhl-libre-hebrew.woff2') format('woff2');
+  font-weight: 300 900;
+  font-display: swap;
+  ascent-override: 92%;
+  descent-override: 26%;
+  line-gap-override: 0%;
+  unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F;
+}
+@font-face {
+  font-family: 'VT Frank Ruhl Libre';
+  src: url('./fonts/frank-ruhl-libre-latin.woff2') format('woff2');
+  font-weight: 300 900;
+  font-display: swap;
+  ascent-override: 92%;
+  descent-override: 26%;
+  line-gap-override: 0%;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@keyframes vt-twinkle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+@keyframes vt-glow-pulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.12); }
+}
+@keyframes vt-sweep {
+  0%, 100% { background-position: 0% 0%, 100% 0%, 0 0, 0 0; }
+  50% { background-position: 18% 0%, 82% 0%, 0 0, 0 0; }
+}
+@keyframes vt-drift {
+  0%, 100% { background-position: 0% 0%, 100% 100%, 60% 0%, 0 0; }
+  50% { background-position: 30% 40%, 70% 60%, 40% 30%, 0 0; }
+}
+
+/* =========================================================================
+   אולפן טלוויזיה — במת שעשועון: מסגרות זהב, נורות מרקיזה, זרקורים.
+   ========================================================================= */
+
+.game-root[data-visual-theme='studio'] :is(
+  .screen, .q-screen, .leaders-overlay, .raffle-overlay, .votes-overlay, .gs-overlay,
+  .bet-overlay, .sl-overlay, .join-banner, .gconn-screen
+) {
+  font-family: 'VT Suez One', 'Kanuba', 'Heebo', sans-serif;
+  font-synthesis: none;
+}
+
+/* תיבות בצבע המשחק: ברק עליון, מסגרת זהב פנימית, הילה כהה ומסגרת זהב חיצונית */
+.game-root[data-visual-theme='studio'] :is(
+  .q-question, .q-title-pill, .subject-text, .function-card, .lobby-join-dial,
+  .q-score-drop, .q-survey-legend-item, .q-board-name, .bet-summary-chip
+) {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0) 48%, rgba(0, 0, 0, 0.16));
+  border-radius: 24px;
+  box-shadow:
+    inset 0 0 0 3px #e8b84a,
+    inset 0 2px 0 3px rgba(255, 236, 170, 0.55),
+    0 0 0 5px rgba(12, 8, 48, 0.88),
+    0 0 0 7px rgba(232, 184, 74, 0.5),
+    0 16px 40px rgba(0, 0, 0, 0.5),
+    0 0 34px rgba(255, 200, 80, 0.22);
+}
+.game-root[data-visual-theme='studio'] .q-question { position: relative; border-radius: 28px; }
+/* שורת נורות מרקיזה סביב השאלה — מהבהבת לאט */
+.game-root[data-visual-theme='studio'] .q-question::after {
+  content: '';
+  position: absolute;
+  inset: 9px;
+  border-radius: 20px;
+  border: 5px dotted #ffd977;
+  filter: drop-shadow(0 0 4px rgba(255, 217, 119, 0.9));
+  opacity: 0.9;
+  animation: vt-twinkle 1.6s ease-in-out infinite;
+  pointer-events: none;
+}
+.game-root[data-visual-theme='studio'] :is(.lobby-join-code, .q-count-num, .q-count-track) {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 50%, rgba(0, 0, 0, 0.18));
+  border-color: #e8b84a;
+  box-shadow: 0 0 0 4px rgba(12, 8, 48, 0.85), 0 0 0 6px rgba(232, 184, 74, 0.45), 0 14px 34px rgba(0, 0, 0, 0.5);
+}
+.game-root[data-visual-theme='studio'] .q-count-fill {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0) 60%);
+}
+
+/* תשובות: לוחות שעשועון עם שולי זהב */
+.game-root[data-visual-theme='studio'] .q-card {
+  border-radius: 20px;
+  border-color: #e8b84a;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 46%, rgba(0, 0, 0, 0.2));
+  box-shadow: 0 0 0 4px rgba(12, 8, 48, 0.85), 0 0 0 6px rgba(232, 184, 74, 0.35), 0 14px 32px rgba(0, 0, 0, 0.45);
+}
+.game-root[data-visual-theme='studio'] .q-coin {
+  border-color: #ffd977;
+  box-shadow: 0 0 0 3px rgba(12, 8, 48, 0.7), 0 6px 14px rgba(0, 0, 0, 0.45);
+}
+.game-root[data-visual-theme='studio'] .q-card--correct {
+  border-color: #ffd977;
+  box-shadow: 0 0 0 5px #ffd977, 0 0 46px rgba(255, 217, 119, 0.8), 0 14px 32px rgba(0, 0, 0, 0.45);
+  animation: vt-glow-pulse 1.4s ease-in-out infinite;
+}
+
+/* לוחות כהים ושורות בטבלאות: כחול לילה עם שוליים מוזהבים */
+.game-root[data-visual-theme='studio'] :is(
+  .votes-panel, .gs-panel, .bet-panel, .raffle-box, .sl-side
+) {
+  background: linear-gradient(180deg, rgba(27, 20, 80, 0.96), rgba(9, 6, 34, 0.96));
+  border-color: #e8b84a;
+  box-shadow: 0 0 0 6px rgba(9, 6, 34, 0.9), 0 0 0 8px rgba(232, 184, 74, 0.4), 0 30px 90px rgba(0, 0, 0, 0.6);
+}
+.game-root[data-visual-theme='studio'] :is(
+  .leader-card:not(.leader-card--top), .score-cell, .group-list li, .gs-card:not(.gs-card--lead),
+  .votes-col:not(.votes-col--correct), .bet-row, .sl-result, .lobby-count, .q-answered-pill, .q-live
+) {
+  background: linear-gradient(180deg, rgba(30, 22, 88, 0.82), rgba(10, 7, 38, 0.82));
+  border-color: rgba(232, 184, 74, 0.55);
+}
+.game-root[data-visual-theme='studio'] :is(.leader-card, .score-cell, .gs-card, .votes-col, .bet-col) {
+  border-color: rgba(232, 184, 74, 0.6);
+}
+.game-root[data-visual-theme='studio'] :is(.raffle-title, .bet-title) { color: #ffd977; }
+
+/* כותרות חופשיות: הילת זהב בנוסף לצל הכהה */
+.game-root[data-visual-theme='studio'] :is(.podium-name, .podium-score, .raffle-name) {
+  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.75), 0 0 26px rgba(255, 200, 80, 0.45);
+}
+
+/* רקעי גיבוי (כשאין מדיה): במה כהה עם שני זרקורים נעים */
+.game-root[data-visual-theme='studio'] :is(.slide-screen, .leaders-overlay, .sl-overlay) {
+  background:
+    conic-gradient(from 196deg at 12% -12%, transparent 0deg 7deg, rgba(255, 244, 210, 0.13) 10deg 17deg, transparent 20deg 360deg),
+    conic-gradient(from 146deg at 88% -12%, transparent 0deg 3deg, rgba(255, 244, 210, 0.13) 6deg 13deg, transparent 16deg 360deg),
+    radial-gradient(ellipse at 50% 118%, color-mix(in srgb, rgb(var(--main-rgb, 34, 43, 69)) 42%, #2a1a7a) 0%, transparent 62%),
+    linear-gradient(180deg, #0a0626, #05031a);
+  background-size: 160% 100%, 160% 100%, 100% 100%, 100% 100%;
+  animation: vt-sweep 14s ease-in-out infinite;
+}
+.game-root[data-visual-theme='studio'] .sl-board {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(255, 217, 119, 0.12), transparent 60%),
+    linear-gradient(160deg, #1d1658, #0a0728);
+  border-color: #e8b84a;
+}
+.game-root[data-visual-theme='studio'] .sl-cell:not(.sl-cell--ladder, .sl-cell--snake, .sl-cell--end) { border-color: rgba(232, 184, 74, 0.35); }
+
+/* =========================================================================
+   זכוכית — תיבות שקופות-מטושטשות בצבע המשחק, קצוות לבנים דקים, כתמי אור.
+   ========================================================================= */
+
+.game-root[data-visual-theme='glass'] :is(
+  .screen, .q-screen, .leaders-overlay, .raffle-overlay, .votes-overlay, .gs-overlay,
+  .bet-overlay, .sl-overlay, .join-banner, .gconn-screen
+) {
+  font-family: 'VT Assistant', 'Kanuba', 'Heebo', sans-serif;
+}
+
+/* התיבה עצמה: צבע המשחק ב-74% אטימות מעל טשטוש — הטקסט נשאר קריא מעל כל רקע */
+.game-root[data-visual-theme='glass'] :is(
+  .q-question, .q-card, .q-title-pill, .subject-text, .function-card, .lobby-join-dial,
+  .lobby-join-code, .q-count-num, .q-count-track, .q-score-drop, .q-survey-legend-item,
+  .q-board-name, .bet-summary-chip
+) {
+  background-color: color-mix(in srgb, rgb(var(--main-rgb, 34, 43, 69)) 74%, transparent);
+  background-image: linear-gradient(160deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.04) 42%, rgba(255, 255, 255, 0) 60%);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  box-shadow:
+    inset 0 0 0 1.5px rgba(255, 255, 255, 0.5),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.75),
+    0 18px 44px rgba(0, 0, 0, 0.28);
+}
+.game-root[data-visual-theme='glass'] :is(.q-question, .subject-text, .function-card) { border-radius: 36px; }
+.game-root[data-visual-theme='glass'] :is(.q-card, .lobby-join-dial, .lobby-join-code, .q-title-pill) { border-radius: 26px; }
+.game-root[data-visual-theme='glass'] :is(.q-card, .q-count-num, .q-count-track, .q-score-drop, .lobby-join-code) {
+  border-color: rgba(255, 255, 255, 0.55);
+}
+.game-root[data-visual-theme='glass'] .q-coin {
+  border-color: rgba(255, 255, 255, 0.9);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+/* הנכונה: אטומה בצבע הטקסט (כמו בקלאסי) עם הילה לבנה */
+.game-root[data-visual-theme='glass'] .q-card--correct {
+  background-color: var(--text);
+  border-color: #fff;
+  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.8), 0 0 0 4px rgba(255, 255, 255, 0.55), 0 0 44px rgba(255, 255, 255, 0.55);
+}
+.game-root[data-visual-theme='glass'] .q-card--dim { opacity: 0.7; }
+.game-root[data-visual-theme='glass'] .q-answers--images .q-card { background-color: transparent; }
+
+.game-root[data-visual-theme='glass'] :is(
+  .votes-panel, .gs-panel, .bet-panel, .raffle-box, .sl-side
+) {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.05)), rgba(13, 11, 31, 0.62);
+  backdrop-filter: blur(22px) saturate(1.3);
+  -webkit-backdrop-filter: blur(22px) saturate(1.3);
+  border-color: rgba(255, 255, 255, 0.4);
+  border-radius: 34px;
+  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.5), 0 30px 90px rgba(0, 0, 0, 0.45);
+}
+.game-root[data-visual-theme='glass'] :is(
+  .leader-card:not(.leader-card--top), .score-cell, .group-list li, .gs-card:not(.gs-card--lead),
+  .votes-col:not(.votes-col--correct), .bet-row, .sl-result, .lobby-count, .q-answered-pill, .q-live
+) {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04)), rgba(13, 11, 31, 0.4);
+  border-color: rgba(255, 255, 255, 0.32);
+}
+.game-root[data-visual-theme='glass'] :is(.leader-card, .score-cell, .gs-card, .votes-col, .bet-col, .sl-result) {
+  border-radius: 24px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 10px 30px rgba(0, 0, 0, 0.25);
+}
+
+.game-root[data-visual-theme='glass'] :is(.slide-screen, .leaders-overlay, .sl-overlay) {
+  background:
+    radial-gradient(circle at 20% 25%, color-mix(in srgb, rgb(var(--main-rgb, 34, 43, 69)) 70%, #4f46e5) 0, transparent 34%),
+    radial-gradient(circle at 80% 75%, rgba(34, 211, 238, 0.55) 0, transparent 36%),
+    radial-gradient(circle at 70% 15%, rgba(217, 70, 239, 0.45) 0, transparent 30%),
+    linear-gradient(160deg, #141036, #0d0b1f);
+  background-size: 160% 160%, 160% 160%, 160% 160%, 100% 100%;
+  animation: vt-drift 26s ease-in-out infinite;
+}
+.game-root[data-visual-theme='glass'] .sl-board {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04)), rgba(13, 11, 31, 0.5);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-color: rgba(255, 255, 255, 0.4);
+  border-radius: 34px;
+}
+.game-root[data-visual-theme='glass'] .sl-cell {
+  border-radius: 20px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+/* צבעי הסולם/הנחש/הסיום נשארים */
+.game-root[data-visual-theme='glass'] .sl-cell:not(.sl-cell--ladder, .sl-cell--snake, .sl-cell--end) {
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+/* =========================================================================
+   מגילה — קלף, מסגרת כפולה חומה-זהובה, עיטורים וגופן מסורתי.
+   ========================================================================= */
+
+.game-root[data-visual-theme='scroll'] :is(
+  .screen, .q-screen, .leaders-overlay, .raffle-overlay, .votes-overlay, .gs-overlay,
+  .bet-overlay, .sl-overlay, .join-banner, .gconn-screen
+) {
+  font-family: 'VT Frank Ruhl Libre', 'Kanuba', 'David', serif;
+}
+
+/* תיבות בצבע המשחק: פינות מעוגלות מעט, מסגרת חומה וקו זהב פנימי, מרקם נייר עדין */
+.game-root[data-visual-theme='scroll'] :is(
+  .q-question, .q-card, .q-title-pill, .subject-text, .function-card, .lobby-join-dial,
+  .lobby-join-code, .q-score-drop, .q-survey-legend-item, .q-board-name, .bet-summary-chip
+) {
+  background-image:
+    radial-gradient(ellipse at 50% 0%, rgba(255, 248, 225, 0.22), transparent 70%),
+    repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.035) 0 2px, transparent 2px 7px);
+  outline: 2px solid #e8c25c;
+  outline-offset: -9px;
+  box-shadow:
+    inset 0 0 0 3px #8a5a24,
+    inset 0 0 18px rgba(60, 30, 8, 0.28),
+    0 10px 26px rgba(60, 30, 8, 0.35);
+}
+.game-root[data-visual-theme='scroll'] :is(.q-question, .subject-text, .function-card) { border-radius: 18px; }
+.game-root[data-visual-theme='scroll'] :is(.q-card, .q-title-pill, .lobby-join-dial, .lobby-join-code, .q-score-drop, .bet-summary-chip) {
+  border-radius: 14px;
+}
+.game-root[data-visual-theme='scroll'] :is(.q-card, .lobby-join-code) { border-color: #8a5a24; }
+.game-root[data-visual-theme='scroll'] .q-card { outline-offset: -8px; }
+/* עיטור ❦ משני צדי השאלה — בתוך הריפוד הקיים, בלי להזיז את הטקסט */
+.game-root[data-visual-theme='scroll'] .q-question { position: relative; }
+.game-root[data-visual-theme='scroll'] .q-question::before,
+.game-root[data-visual-theme='scroll'] .q-question::after {
+  content: '❦';
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 30px;
+  line-height: 1;
+  color: #e8c25c;
+  text-shadow: 0 1px 0 rgba(60, 30, 8, 0.5);
+  pointer-events: none;
+}
+.game-root[data-visual-theme='scroll'] .q-question::before { inset-inline-start: 16px; }
+.game-root[data-visual-theme='scroll'] .q-question::after { inset-inline-end: 16px; transform: translateY(-50%) scaleX(-1); }
+.game-root[data-visual-theme='scroll'] :is(.q-count-num, .q-count-track) {
+  border-color: #8a5a24;
+  box-shadow: inset 0 0 0 2px rgba(232, 194, 92, 0.8), 0 10px 26px rgba(60, 30, 8, 0.4);
+}
+.game-root[data-visual-theme='scroll'] .q-coin {
+  border-color: #e8c25c;
+  box-shadow: 0 0 0 2px #8a5a24, 0 4px 10px rgba(60, 30, 8, 0.4);
+}
+.game-root[data-visual-theme='scroll'] .q-card--correct {
+  border-color: #3b2412;
+  box-shadow: inset 0 0 0 3px #3b2412, 0 0 0 4px #e8c25c, 0 0 32px rgba(232, 194, 92, 0.75);
+}
+
+.game-root[data-visual-theme='scroll'] :is(
+  .votes-panel, .gs-panel, .bet-panel, .raffle-box, .sl-side
+) {
+  background: linear-gradient(180deg, rgba(66, 38, 16, 0.97), rgba(38, 21, 8, 0.97));
+  border-color: #e8c25c;
+  border-radius: 18px;
+  outline: 2px solid rgba(232, 194, 92, 0.55);
+  outline-offset: -12px;
+  box-shadow: 0 30px 90px rgba(20, 10, 2, 0.6);
+}
+.game-root[data-visual-theme='scroll'] :is(
+  .leader-card:not(.leader-card--top), .score-cell, .group-list li, .gs-card:not(.gs-card--lead),
+  .votes-col:not(.votes-col--correct), .bet-row, .sl-result, .lobby-count, .q-answered-pill, .q-live
+) {
+  background: linear-gradient(180deg, rgba(74, 44, 18, 0.86), rgba(43, 24, 10, 0.86));
+  border-color: rgba(232, 194, 92, 0.6);
+}
+.game-root[data-visual-theme='scroll'] :is(.leader-card, .score-cell, .gs-card, .votes-col, .bet-col, .sl-result) {
+  border-radius: 12px;
+  border-color: rgba(232, 194, 92, 0.7);
+}
+.game-root[data-visual-theme='scroll'] :is(.raffle-title, .bet-title) { color: #e8c25c; }
+
+/* טקסט חופשי שעומד ישירות על הרקע: קלף בהיר במקום לילה כהה, לכן הילה כהה
+   חזקה סביב האותיות — קריא גם על קלף וגם על כל רקע אחר שהבעלים העלה */
+.game-root[data-visual-theme='scroll'] :is(
+  .opening-hint, .lobby-join-label, .podium-name, .podium-score,
+  .q-flyer:not(.q-flyer--bubble) .q-flyer-nm, .slide-counter, .leaders-empty, .winners-empty, .lobby-empty
+) {
+  text-shadow: 0 0 2px #2b180a, 0 0 6px #2b180a, 0 2px 12px rgba(43, 24, 10, 0.9);
+}
+
+.game-root[data-visual-theme='scroll'] :is(.slide-screen, .leaders-overlay, .sl-overlay) {
+  background:
+    radial-gradient(ellipse at center, rgba(246, 231, 196, 0) 45%, rgba(92, 56, 20, 0.55) 100%),
+    repeating-linear-gradient(115deg, rgba(120, 80, 30, 0.035) 0 2px, transparent 2px 9px),
+    radial-gradient(ellipse at 50% 40%, #f3e2bb, #d9bb82 80%);
+  box-shadow: inset 0 0 0 14px rgba(92, 56, 20, 0.35), inset 0 0 0 18px rgba(232, 194, 92, 0.45);
+}
+.game-root[data-visual-theme='scroll'] .sl-board {
+  background:
+    repeating-linear-gradient(115deg, rgba(120, 80, 30, 0.05) 0 2px, transparent 2px 9px),
+    linear-gradient(160deg, #f1ddb0, #d6b77a);
+  border-color: #8a5a24;
+  border-radius: 18px;
+  outline: 2px solid #e8c25c;
+  outline-offset: -12px;
+}
+.game-root[data-visual-theme='scroll'] .sl-cell { border-radius: 10px; }
+.game-root[data-visual-theme='scroll'] .sl-cell:not(.sl-cell--ladder, .sl-cell--snake, .sl-cell--end) {
+  background-color: rgba(255, 250, 235, 0.5);
+  border-color: rgba(138, 90, 36, 0.6);
+}
+
+
+/* =========================================================================
+   משותף לכל הערכות (לא לקלאסי)
+   ========================================================================= */
+
+/* טקסט בצבע המשני שעומד ישירות על הרקע או על לוח כהה (כותרות, ניקוד): הילה
+   בצבע הראשי סביב האותיות — אותו זוג צבעים כמו בתיבות, ולכן קריא בכל רקע של
+   ערכה. בלי זה ברירת המחדל (טקסט כחול כהה) נבלעת ברקעים הכהים של אולפן וזכוכית. */
+.game-root[data-visual-theme] :is(
+  .opening-title, .lobby-title, .winners-title, .winners-col-title, .gconn-title, .startup-countdown,
+  .leader-score, .score-pts, .votes-question, .votes-col-count, .gs-title, .gs-score-num,
+  .gs-leader-score, .sl-title, .sl-dice-who, .sl-win-title, .sl-result-pct
+) {
+  text-shadow:
+    0 0 2px rgb(var(--main-rgb, 34, 43, 69)),
+    0 0 6px rgb(var(--main-rgb, 34, 43, 69)),
+    0 0 14px color-mix(in srgb, rgb(var(--main-rgb, 34, 43, 69)) 70%, transparent),
+    0 4px 18px rgba(0, 0, 0, 0.45);
+}
+
+/* ---- תנועה מופחתת: עוצרים את התנועה הסביבתית של הערכות ---- */
+@media (prefers-reduced-motion: reduce) {
+  .game-root[data-visual-theme] :is(.slide-screen, .leaders-overlay, .sl-overlay, .q-card--correct),
+  .game-root[data-visual-theme] .q-question::after {
+    animation: none;
+  }
+}

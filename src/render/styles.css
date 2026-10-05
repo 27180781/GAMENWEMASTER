@@ -6053,7 +6053,10 @@ body {
      מידה בפיקסלים כאן דטרמיניסטית — כמו שאר המידות במסך המשחק. */
   width: 1000px;
   max-width: 100%;
-  max-height: 42vh;
+  /* פיקסלים ולא vh: ‏vh נמדד על החלון ולא על הבמה, ו-42vh (453px ב-1080p, יותר
+     בחלון גבוה) דחף את שורת התשובות התחתונה אל מתחת לפס הצדקו/טעו. 320px
+     משאיר מקום לכותרת, לספירה, לשתי שורות תשובות ולפס התחתון. */
+  max-height: 320px;
   min-width: 0;
   border-radius: 18px;
   object-fit: contain;
@@ -6064,11 +6067,12 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2vh 2vw;
+  /* מידות הבמה (1920×1080) ולא vh/vw של החלון — כמו 400px של תמונת השאלה */
+  padding: 22px 38px;
 }
 .subject-image {
   max-width: 100%;
-  max-height: 92vh;
+  max-height: 994px;
   object-fit: contain;
   border-radius: 20px;
 }

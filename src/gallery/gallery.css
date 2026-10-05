@@ -1,0 +1,16 @@
+/* האינדקס של הגלריה בלבד — המסכים עצמם משתמשים ב-styles.css/themes.css כמו המשחק. */
+.gallery-index {
+  position: fixed;
+  inset: 0;
+  overflow: auto;
+  padding: 24px 32px;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: system-ui, sans-serif;
+  user-select: text;
+}
+.gallery-index h1 { font-size: 28px; margin-bottom: 8px; }
+.gallery-index p { margin-bottom: 16px; }
+.gallery-index table { border-collapse: collapse; }
+.gallery-index td { padding: 4px 10px; border-bottom: 1px solid #e2e8f0; }
+.gallery-index a { color: #4338ca; }

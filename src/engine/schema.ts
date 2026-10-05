@@ -10,6 +10,7 @@
  *   לפי URL ב-classify.ts, והסכמה לא מגבילה את הערך.
  */
 
+import { normalizeVisualTheme, VISUAL_THEME_LABELS } from './visualThemes.ts';
 import { z } from 'zod';
 
 // ---------------------------------------------------------------------------
@@ -489,6 +490,17 @@ export const globalSettingsSchema = z.object({
         plain: 'טקסט על הרקע',
         bubble: 'בתוך בועת דיבור',
       })}`,
+    ),
+  /**
+   * ערכת הנושא החזותית של המשחק (src/render/visualThemes.ts): משנה מראה בלבד —
+   * צורה, מסגרת, גופן ותנועה — לא פריסה ולא צבעים. חסר/לא מוכר = 'classic', כך
+   * שקבצים ישנים (וערכות שמנוע ישן עוד לא מכיר) נראים בדיוק כמו קודם.
+   */
+  visualTheme: z
+    .unknown()
+    .transform((v) => normalizeVisualTheme(v))
+    .describe(
+      `choice:${JSON.stringify(VISUAL_THEME_LABELS)}`,
     ),
   // שינוי הצבעה בזמן הטיימר לכל המשחק (ההצבעה האחרונה קובעת) — הגדרה גלובלית
   // שחלה על *כל* השקופיות. חסר/false = כבוי גלובלית, וכל שקופית נקבעת לפי
