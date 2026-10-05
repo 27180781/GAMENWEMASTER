@@ -46,7 +46,8 @@ export function FitText({ children, className, dir, min, deps }: FitTextProps) {
   }, [children, min, deps]);
 
   return (
-    <span ref={ref} className={className} {...(dir !== undefined ? { dir } : {})}>
+    // data-fit-text: סימון לבדיקת הגלישה האוטומטית (tools/theme-shots.mjs) — אינו משפיע על התצוגה.
+    <span ref={ref} className={className} data-fit-text="" {...(dir !== undefined ? { dir } : {})}>
       {children}
     </span>
   );

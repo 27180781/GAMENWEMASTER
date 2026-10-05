@@ -14,3 +14,6 @@ coverage
 # (01-…06-) כן נשמרים בגיט. בלי זה כל בדיקה בדפדפן משאירה וידאו שנכנס גם
 # ל-dist וגם ל-EXE שהלקוח מוריד.
 /public/guide/check-*.webm
+
+# צילומי המטריצה של ערכות הנושא (npm run shots — tools/theme-shots.mjs)
+/theme-shots/

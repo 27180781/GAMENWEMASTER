@@ -14,7 +14,7 @@ import { parseGameFileLenient, type DroppedSlide, type GameFile } from '../engin
 import { DebugApp } from '../debug/DebugApp.tsx';
 import { SettingsScreen } from '../render/SettingsScreen.tsx';
 import { Stage } from '../render/Stage.tsx';
-import { themeStyle } from '../render/theme.ts';
+import { themeRootProps } from '../render/theme.ts';
 import { GameHost } from './GameHost.tsx';
 import { prefetchBackup, resolveBackupConfig } from './backup.ts';
 import { useMediaPreload } from './useMediaPreload.ts';
@@ -132,12 +132,13 @@ function useHash(): string {
 /** מעטפת במה 16:9 למסכים שמחוץ למשחק עצמו (בחירה, הגדרות, טעינה). */
 function Shell({
   children,
-  style,
+  root,
   bare = false,
   fullWindow = false,
 }: {
   children: ReactNode;
-  style?: Record<string, string>;
+  /** משתני הצבע וערכת הנושא של המשחק (themeRootProps). */
+  root?: ReturnType<typeof themeRootProps>;
   /** בלי חיווי הריסיבר — למסכים שאינם משחק (כלי "חתום EXE"), שם הוא רק רעש. */
   bare?: boolean;
   /**
@@ -148,7 +149,7 @@ function Shell({
   fullWindow?: boolean;
 }) {
   return (
-    <div className={`game-root${fullWindow ? ' game-root--full' : ''}`} dir="rtl" style={style}>
+    <div className={`game-root${fullWindow ? ' game-root--full' : ''}`} dir="rtl" {...root}>
       {fullWindow ? children : <Stage>{children}</Stage>}
       {!bare && <ClickerDiagnostic />}
       {/* מסכים שאינם המשחק (הגדרות/פתיחה/עורך) — גם מהם צריך לצאת ממסך מלא
@@ -973,7 +974,7 @@ export function App() {
     // חסימת התחלה עד סיום טעינה: מסך פתיחה עם התקדמות/ניסיונות-חוזרים וספירה.
     if (starting) {
       return (
-        <Shell style={themeStyle(pendingGame.setting)}>
+        <Shell root={themeRootProps(pendingGame.setting)}>
           <StartupOverlay
             logo={pendingGame.setting.logo.src}
             preload={mediaPreload}
@@ -989,7 +990,7 @@ export function App() {
     // מדריך הווידאו — על כל החלון, מעל מסך ההגדרות שממנו נפתח.
     if (guideOpen) {
       return (
-        <Shell bare fullWindow style={themeStyle(pendingGame.setting)}>
+        <Shell bare fullWindow root={themeRootProps(pendingGame.setting)}>
           <GuideScreen onClose={() => setGuideOpen(false)} />
         </Shell>
       );
@@ -997,7 +998,7 @@ export function App() {
     // עורך המשחק המקומי — על כל החלון, מעל מסך ההגדרות שממנו נפתח.
     if (editorOpen) {
       return (
-        <Shell bare fullWindow style={themeStyle(pendingGame.setting)}>
+        <Shell bare fullWindow root={themeRootProps(pendingGame.setting)}>
           <GameEditor
             game={pendingGame}
             onApply={(edited) => setPendingGame(edited)}
@@ -1007,7 +1008,7 @@ export function App() {
       );
     }
     return (
-      <Shell style={themeStyle(pendingGame.setting)}>
+      <Shell root={themeRootProps(pendingGame.setting)}>
         <SettingsScreen
           game={pendingGame}
           initial={settings}
@@ -1060,7 +1061,7 @@ export function App() {
   if (loadNotice !== null) {
     const { game: noticeGame, dropped } = loadNotice;
     return (
-      <Shell style={themeStyle(noticeGame.setting)}>
+      <Shell root={themeRootProps(noticeGame.setting)}>
         <ErrorScreen
           variant="warning"
           title={`נמצאו ${dropped.length} שקופיות בעייתיות`}

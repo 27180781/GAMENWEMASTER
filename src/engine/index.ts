@@ -8,6 +8,7 @@ export * from './scoring.ts';
 export * from './imageReveal.ts';
 export * from './bet.ts';
 export * from './majority.ts';
+export * from './visualThemes.ts';
 export * from './gameEngine.ts';
 export * from './replayAdapter.ts';
 export type {

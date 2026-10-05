@@ -4,7 +4,7 @@
  * ב-#RRGGBBAA ישירות, אך אנחנו מפרקים גם ל-RGB כדי לאפשר וריאציות שקיפות.
  */
 
-import type { GlobalSettings } from '../engine/index.ts';
+import { normalizeVisualTheme, type GlobalSettings } from '../engine/index.ts';
 
 export interface ThemeColors {
   /** הצבע כפי שהוא (כולל אלפא אם יש) — תקין כערך CSS. */
@@ -43,4 +43,19 @@ export function themeStyle(setting: GlobalSettings): Record<string, string> {
     '--main-rgb': colors.mainRgb,
     '--secondary-rgb': colors.secondaryRgb,
   };
+}
+
+/**
+ * המאפיינים של שורש המסך: משתני הצבע + ערכת הנושא (data-visual-theme), שעליה
+ * נתלים כללי src/render/themes.css. 'classic' לא מקבל תכונה בכלל — כך שהוא
+ * זהה לחלוטין למראה שהיה לפני שהיו ערכות.
+ */
+export function themeRootProps(setting: GlobalSettings): {
+  style: Record<string, string>;
+  'data-visual-theme'?: string;
+} {
+  const theme = normalizeVisualTheme(setting.visualTheme);
+  return theme === 'classic'
+    ? { style: themeStyle(setting) }
+    : { style: themeStyle(setting), 'data-visual-theme': theme };
 }
