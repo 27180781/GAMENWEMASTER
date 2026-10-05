@@ -38,6 +38,13 @@ interface SettingsScreenProps {
   onPickAnother?: () => void;
   /** EXE בלבד — פתיחת עורך המשחק המקומי (לא זמין במשחק סגור). */
   onEditGame?: () => void;
+  /** EXE בלבד — בניית משחק חדש מאפס (לא זמין במשחק סגור). */
+  onNewGame?: () => void;
+  /**
+   * מקורות ההצבעה שהרישיון מתיר — רק למשחק שנבנה במחשב, שהרישיון שלו נקבע
+   * בתוכנה. חסר = כמו היום (הכול לפי הקוד והחותמת).
+   */
+  sources?: { clickers: boolean; phones: boolean };
   /** פתיחת מדריך הווידאו (אופליין בלבד — הסרטונים מצורפים לתוכנה). */
   onOpenGuide?: () => void;
   /** משחק מוטבע ("סגור") ב-EXE — מגביל את מקורות ההצבעה שמותר לבחור. */
@@ -55,8 +62,10 @@ export function SettingsScreen({
   offline = false,
   onPickAnother,
   onEditGame,
+  onNewGame,
   onOpenGuide,
   sealConfig,
+  sources,
 }: SettingsScreenProps) {
   // אונליין-דמו (‎?demo=1‎, לא אופליין): הקהל המדומה תמיד פעיל. אופליין: תלוי
   // בהקשר — ב-EXE עם קליקרים (RF317) הקהל כבוי (מקור ההצבעות הוא הקליקרים);
@@ -71,8 +80,10 @@ export function SettingsScreen({
   // מסך בחירת מקור ההצבעה מוצג ב-EXE (אופליין) לפני התחלת המשחק.
   const clickerCapable = offline && isDesktopClicker();
   // אילו כרטיסים להציג — במשחק מוטבע ("סגור") מוגבל לפי כלי החותמת.
-  const canPickClickers = sealConfig?.allowClickers ?? true;
-  const canPickPhones = (game.room ?? '') !== '' && (sealConfig?.allowPhones ?? true);
+  // ובמשחק שנבנה במחשב — לפי הרישיון שנקבע לו.
+  const canPickClickers = (sealConfig?.allowClickers ?? true) && (sources?.clickers ?? true);
+  const canPickPhones =
+    (game.room ?? '') !== '' && (sealConfig?.allowPhones ?? true) && (sources?.phones ?? true);
   const [voterCount, setVoterCount] = useState(initial.voterCount);
   const [intervalMs, setIntervalMs] = useState(initial.intervalMs);
   const [hostVoterId, setHostVoterId] = useState(initial.hostVoterId);
@@ -503,11 +514,16 @@ export function SettingsScreen({
 
   // "טען משחק אחר" (EXE) — מוצג רק במסך הפתיחה, כשיש אפשרות לשכוח את המשחק השמור.
   const pickAnotherLink =
-    mode === 'start' && (onPickAnother || onEditGame || onOpenGuide) ? (
+    mode === 'start' && (onPickAnother || onEditGame || onNewGame || onOpenGuide) ? (
       <div className="settings-secondary">
         {onPickAnother && (
           <button className="settings-pick-another" onClick={onPickAnother}>
             📂 טען משחק אחר
+          </button>
+        )}
+        {onNewGame && (
+          <button className="settings-pick-another" onClick={onNewGame}>
+            ✨ משחק חדש
           </button>
         )}
         {onEditGame && (
