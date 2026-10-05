@@ -14,7 +14,7 @@ import { createPortal } from 'react-dom';
  * position: fixed בתוך אב עם transform מתנהג כמו absolute — כלומר החלון היה
  * נכלא בתוך הבמה ומוקטן איתה, במקום למלא את החלון.
  */
-function Overlay({ children, onClose }: { children: ReactNode; onClose?: () => void }) {
+export function Overlay({ children, onClose }: { children: ReactNode; onClose?: () => void }) {
   return createPortal(
     <div className="gate-backdrop" role="presentation" {...(onClose ? { onClick: onClose } : {})}>
       {children}
@@ -58,7 +58,7 @@ export function GateSetup({ onDone }: { onDone: (code: string | null) => void })
       <div className="gate-box" role="dialog" aria-modal="true" aria-label="קוד גישה">
         <h2 className="gate-title">🔒 קוד גישה</h2>
         <p className="gate-lead">
-          קוד שחוסם <b>החלפה ועריכה</b> של קובץ המשחק, כדי שלא ישנו אותו בטעות
+          קוד שחוסם <b>החלפה, עריכה ובנייה</b> של משחקים, כדי שלא ישנו אותם בטעות
           במחשב שבאולם. <b>לשחק אפשר תמיד בלי קוד</b> — גם אם שכחתם אותו.
         </p>
         <label className="gate-field">

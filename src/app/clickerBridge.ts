@@ -58,6 +58,8 @@ export interface SavedGamePayload {
   name?: string;
   /** הגדרות משחק מוטבע — רק כשמקור הטעינה הוא 'sealed'. */
   config?: SealConfig;
+  /** המשחק נבנה במחשב ולא הורד מהשרת — הרישיון שלו נערך בעורך. */
+  local?: boolean;
 }
 
 /** מצב חלון המשחק ב-EXE. בדפדפן אין כזה — ושם משתמשים ב-Fullscreen API. */
@@ -150,6 +152,8 @@ interface TriviaDesktop {
   onSealProgress?: (cb: (p: SealProgress) => void) => () => void;
   /** שמירת משחק ערוך לתוך חבילת ה-ZIP שעל הדיסק. */
   saveEditedGame?: (dataJson: string) => Promise<SaveEditResult>;
+  /** בניית משחק חדש מאפס — נשמר בספרייה ונבחר כמשחק הנוכחי. */
+  createGame?: (name: string, dataJson: string) => Promise<CreateGameResult>;
   /** הורדת משחק מהשרת לפי קוד (נשמר כ"משחק אחרון"). */
   downloadGameByCode?: (code: string) => Promise<RemoteDownloadResult>;
   /** מנוי להתקדמות ההורדה מהשרת. מחזיר פונקציית ביטול-מנוי. */
@@ -214,6 +218,13 @@ export interface SaveFileResult {
 }
 
 /** תוצאת שמירת עריכה. addedMedia = כמה קובצי מדיה הוטמעו בחבילה. */
+export interface CreateGameResult {
+  ok: boolean;
+  /** קוד המשחק בספרייה (local-…). */
+  code?: string;
+  error?: string;
+}
+
 export interface SaveEditResult {
   ok: boolean;
   addedMedia?: number;
@@ -363,6 +374,8 @@ export interface LibraryGame {
   savedAt: number;
   /** גודל החבילה בבתים. */
   size: number;
+  /** נבנה במחשב ולא הורד — אין לו עותק בשרת (גרסה ישנה: חסר). */
+  local?: boolean;
 }
 
 /** האם ה-EXE מנהל ספריית משחקים שהורדו. */
@@ -744,6 +757,22 @@ export async function saveEditedGame(dataJson: string): Promise<SaveEditResult> 
   if (typeof fn !== 'function') return { ok: false, error: 'שמירה אינה זמינה בגרסה הזו' };
   try {
     return await fn(dataJson);
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+/** האם התוכנה יודעת לבנות משחק חדש מאפס (EXE בלבד). */
+export function canCreateGame(): boolean {
+  return typeof desktop()?.createGame === 'function';
+}
+
+/** בניית משחק חדש: נשמר בספרייה ונבחר כנוכחי; הטעינה במסלול הרגיל. */
+export async function desktopCreateGame(name: string, dataJson: string): Promise<CreateGameResult> {
+  const fn = desktop()?.createGame;
+  if (typeof fn !== 'function') return { ok: false, error: 'לא זמין בגרסה הזו' };
+  try {
+    return await fn(name, dataJson);
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }

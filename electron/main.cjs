@@ -1191,6 +1191,7 @@ function stopReceiver() {
 // ולכן ניתן לבדיקה מול תיקייה זמנית). כאן רק חיבור ל-userData של Electron.
 const lib = require('./gameLibrary.cjs');
 const gate = require('./gameGate.cjs');
+const localGame = require('./localGame.cjs');
 const userData = () => app.getPath('userData');
 
 const lastGameZipPath = () => lib.lastGameZipPath(userData());
@@ -1669,10 +1670,32 @@ app.whenReady().then(() => {
     if (sealedGame !== null) return { ok: false, error: 'משחק סגור אינו ניתן לעריכה' };
     if (isSealerBuild()) return { ok: false, error: 'לא זמין בכלי החתימה' };
     try {
-      return await saveEditedGame(dataJson);
+      const res = await saveEditedGame(dataJson);
+      // משחק שנבנה במחשב: הרשימה במסך הפתיחה מציגה את השם ששמור בקובץ.
+      if (res.ok) {
+        try {
+          lib.renameCurrentLocal(userData(), JSON.parse(String(dataJson)).name);
+        } catch {
+          /* השם ברשימה אינו קריטי */
+        }
+      }
+      return res;
     } catch (err) {
       const msg = /** @type {Error} */ (err).message;
       console.error('[edit] שמירת המשחק נכשלה:', msg);
+      return { ok: false, error: msg };
+    }
+  });
+  // בניית משחק חדש מאפס (localGame.cjs): נשמר בספרייה ונבחר כמשחק הנוכחי, ומשם
+  // נטען במסלול הרגיל (game:loadSaved). חסום במשחק סגור ובכלי החתימה, כמו עריכה.
+  ipcMain.handle('game:create', async (_e, name, dataJson) => {
+    if (sealedGame !== null) return { ok: false, error: 'לא זמין במשחק סגור' };
+    if (isSealerBuild()) return { ok: false, error: 'לא זמין בכלי החתימה' };
+    try {
+      return await localGame.createLocalGame(userData(), String(name ?? ''), String(dataJson ?? ''));
+    } catch (err) {
+      const msg = /** @type {Error} */ (err).message;
+      console.error('[create] יצירת משחק נכשלה:', msg);
       return { ok: false, error: msg };
     }
   });
@@ -1925,7 +1948,9 @@ app.whenReady().then(() => {
       } catch {
         /* אין מטא — שם ריק */
       }
-      return config !== null ? { ...res, config, name } : { ...res, name };
+      if (config !== null) return { ...res, config, name };
+      // משחק שנבנה במחשב — העורך מציג לו גם את הגדרת הרישיון.
+      return lib.currentIsLocal(userData()) ? { ...res, name, local: true } : { ...res, name };
     } catch (err) {
       console.error('[game] טעינת משחק שמור נכשלה:', /** @type {Error} */ (err).message);
       return null;

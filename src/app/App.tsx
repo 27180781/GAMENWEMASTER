@@ -27,6 +27,9 @@ import { SealScreen } from '../render/SealScreen.tsx';
 import { GameEditor } from '../render/GameEditor.tsx';
 import { GuideScreen } from '../render/GuideScreen.tsx';
 import { GateChange, GateSetup, GateUnlock } from '../render/GateDialog.tsx';
+import { NewGameDialog } from '../render/NewGameDialog.tsx';
+import { licenseSources, type GameLicense } from './gameLicense.ts';
+import { newGameFile } from './newGame.ts';
 import {
   isDesktopClicker,
   isDesktopApp,
@@ -38,6 +41,8 @@ import {
   onUpdateStatus,
   getAppVersion,
   canSaveEdits,
+  canCreateGame,
+  desktopCreateGame,
   canDownloadByCode,
   canBrowseLibrary,
   canGate,
@@ -370,6 +375,13 @@ export function App() {
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   /** עורך המשחק המקומי פתוח (EXE, משחק שאינו סגור). */
   const [editorOpen, setEditorOpen] = useState(false);
+  /** חלון "משחק חדש" פתוח (בנייה מאפס, EXE). */
+  const [newGameOpen, setNewGameOpen] = useState(false);
+  /**
+   * המשחק הנוכחי נבנה במחשב ולא הורד מהשרת: הרישיון שלו נערך בעורך, והוא
+   * קובע אילו מקורות הצבעה מוצעים במסך "איך משחקים?".
+   */
+  const [currentLocal, setCurrentLocal] = useState(false);
   /** מדריך הווידאו — אופליין בלבד, הסרטונים מצורפים לתוכנה. */
   const [guideOpen, setGuideOpen] = useState(false);
   /** קוד המשחק שהוקלד, והתקדמות ההורדה מהשרת (null = לא מוריד כרגע). */
@@ -588,6 +600,7 @@ export function App() {
           setSealConfig(saved.config);
           applySeal(res.game, saved.config);
         }
+        setCurrentLocal(saved.local === true);
         applyLoadedZip(res);
         return true;
       } catch (e) {
@@ -729,6 +742,7 @@ export function App() {
     loadGameFromZip(buffer, { stream: desktopApp })
       .then((res) => {
         applySeal(res.game, seal);
+        setCurrentLocal(false); // קובץ ZIP מהדיסק — הרישיון שלו מהמערכת
         applyLoadedZip(res);
       })
       .catch((e: unknown) => setError(`טעינת ה-ZIP נכשלה:\n${(e as Error).message}`));
@@ -749,17 +763,21 @@ export function App() {
    * ישר לדיסק (חבילה עם וידאו שוקלת מאות MB), ומשם נטענת במסלול המהיר הרגיל
    * של "המשחק האחרון" — בלי להעביר בייטים דרך ה-renderer.
    */
-  /** טעינת המשחק שנבחר כ"נוכחי" (אחרי הורדה או בחירה מהספרייה). */
-  const openCurrentGame = async (failMessage: string) => {
+  /** טעינת המשחק שנבחר כ"נוכחי" (אחרי הורדה או בחירה מהספרייה). true אם נטען. */
+  const openCurrentGame = async (failMessage: string): Promise<boolean> => {
     const saved = await desktopLoadSavedGame('last');
     if (saved === null || saved.dataJson === '') {
       setCodeError(failMessage);
-      return;
+      return false;
     }
     try {
-      applyLoadedZip(loadGameFromExtracted(saved));
+      const res = loadGameFromExtracted(saved);
+      setCurrentLocal(saved.local === true);
+      applyLoadedZip(res);
+      return true;
     } catch (e) {
       setCodeError(`טעינת המשחק נכשלה: ${(e as Error).message}`);
+      return false;
     }
   };
 
@@ -775,9 +793,12 @@ export function App() {
     await openCurrentGame('העותק השמור אינו תקין — נסו להוריד מחדש');
   };
 
-  const removeFromLibrary = async (code: string) => {
-    if (!window.confirm(`למחוק את המשחק ${code} מהמחשב? אפשר יהיה להוריד אותו שוב עם הקוד.`)) return;
-    await gameLibraryDelete(code);
+  const removeFromLibrary = async (g: LibraryGame) => {
+    const question = g.local
+      ? `למחוק את המשחק "${g.name || 'ללא שם'}"? הוא נבנה במחשב הזה ואין לו עותק באתר, ולכן אי אפשר יהיה לשחזר אותו.`
+      : `למחוק את המשחק ${g.code} מהמחשב? אפשר יהיה להוריד אותו שוב עם הקוד.`;
+    if (!window.confirm(question)) return;
+    await gameLibraryDelete(g.code);
     refreshLibrary();
   };
 
@@ -802,18 +823,54 @@ export function App() {
     await openCurrentGame('החבילה שהתקבלה מהשרת אינה תקינה');
   };
 
-  // "טען משחק אחר" (EXE) — שכחת המשחק השמור וחזרה לבורר קובץ ה-ZIP.
-  const pickAnotherGame = () => {
-    forgetGame();
+  /** סגירת המשחק שעל המסך וחזרה למסך הפתיחה (בלי לגעת בבחירה שעל הדיסק). */
+  const closeLoadedGame = () => {
     refreshLibrary(); // חוזרים למסך הפתיחה — שהרשימה תהיה מעודכנת
     zipRevokeRef.current?.();
     zipRevokeRef.current = null;
     setOffline(false);
+    setCurrentLocal(false);
     setGame(null);
     setPendingGame(null);
     setLoadNotice(null);
     setError(null);
   };
+
+  // "טען משחק אחר" (EXE) — שכחת המשחק השמור וחזרה לבורר קובץ ה-ZIP.
+  const pickAnotherGame = () => {
+    forgetGame();
+    closeLoadedGame();
+  };
+
+  /**
+   * בניית משחק חדש מאפס: הקובץ נשמר בספרייה ונבחר כנוכחי (ב-main), נטען
+   * במסלול הרגיל של "המשחק הנוכחי", והעורך נפתח עליו מיד. מחזיר הודעת שגיאה
+   * לחלון, או null בהצלחה.
+   */
+  const createNewGame = async (name: string, license: GameLicense): Promise<string | null> => {
+    const file = newGameFile({ name, license });
+    const res = await desktopCreateGame(name, JSON.stringify(file));
+    if (!res.ok) return res.error ?? 'יצירת המשחק נכשלה';
+    setNewGameOpen(false);
+    setCodeError(null);
+    setLoadNotice(null);
+    refreshLibrary();
+    if (await openCurrentGame('המשחק נוצר ונשמר, אבל לא נפתח. נסו לפתוח אותו מהרשימה.')) {
+      setEditorOpen(true);
+    } else {
+      // המשחק החדש כבר "הנוכחי" על הדיסק. אסור שיישאר על המסך המשחק הקודם —
+      // שמירה בעורך שלו הייתה נכתבת לקובץ של החדש. חוזרים למסך הפתיחה, שם
+      // מוצגת השגיאה והמשחק החדש ברשימה.
+      closeLoadedGame();
+    }
+    return null;
+  };
+
+  /** החלון נשתל ליד חלונות קוד הגישה — במסך הפתיחה ובמסך ההגדרות. */
+  const newGameLayer = newGameOpen ? (
+    <NewGameDialog onCreate={createNewGame} onClose={() => setNewGameOpen(false)} />
+  ) : null;
+  const openNewGame = () => guard('בניית משחק חדש', () => setNewGameOpen(true));
 
   /** החלת קובץ משחק מעודכן: רענון חם באמצע משחק, או עדכון התצוגה לפני התחלה. */
   const applyGame = useCallback((loaded: GameFile) => {
@@ -1003,6 +1060,7 @@ export function App() {
             game={pendingGame}
             onApply={(edited) => setPendingGame(edited)}
             onClose={() => setEditorOpen(false)}
+            licenseEditable={currentLocal}
           />
         </Shell>
       );
@@ -1018,6 +1076,8 @@ export function App() {
           qrAvailable={!offline && (pendingGame.room ?? '') !== ''}
           {...(sealConfig !== null ? { sealConfig } : {})}
           {...(desktopApp && sealConfig === null ? { onPickAnother: () => guard('החלפת המשחק', pickAnotherGame) } : {})}
+          {...(desktopApp && sealConfig === null && canCreateGame() ? { onNewGame: openNewGame } : {})}
+          {...(currentLocal && sealConfig === null ? { sources: licenseSources(pendingGame) } : {})}
           {...(offline && sealConfig === null && canSaveEdits()
             ? { onEditGame: () => guard('עריכת המשחק', () => setEditorOpen(true)) }
             : {})}
@@ -1033,6 +1093,7 @@ export function App() {
         {updateStatus !== null && <UpdateBadge status={updateStatus} />}
         <VersionLine status={updateStatus} />
         {gateLayer}
+        {newGameLayer}
         {mediaIssues.length > 0 && !mediaAlertDismissed && (
           <MediaIssuesAlert issues={mediaIssues} onClose={() => setMediaAlertDismissed(true)} />
         )}
@@ -1147,6 +1208,7 @@ export function App() {
                 {canDownloadByCode()
                   ? 'בחרו קובץ משחק (ZIP), או הקלידו את קוד המשחק כדי למשוך אותו מהשרת'
                   : 'בחרו את קובץ המשחק (ZIP) כדי להתחיל'}
+                {canCreateGame() && <><br />או בנו כאן משחק חדש מאפס</>}
               </p>
               <label className="picker-button offline-open-load" onClick={onPickZip}>
                 📦 טעינת משחק (ZIP)
@@ -1181,42 +1243,67 @@ export function App() {
                   </button>
                 </form>
               )}
+              {/* בנייה מאפס, בלי מערכת יצירת המשחקים — מאחורי קוד הגישה. */}
+              {canCreateGame() && (
+                <button
+                  type="button"
+                  className="offline-open-new"
+                  disabled={downloading !== null}
+                  onClick={openNewGame}
+                >
+                  ✨ בניית משחק חדש
+                </button>
+              )}
               {downloading !== null && <DownloadBar progress={downloading} />}
               {codeError !== null && <p className="offline-open-error">{codeError}</p>}
 
               {/* משחקים שכבר הורדו — פתיחה מיידית בלי רשת ובלי הורדה מחדש. */}
               {library.length > 0 && downloading === null && (
                 <section className="lib">
-                  <h2 className="lib-title">משחקים שהורדו למחשב</h2>
+                  <h2 className="lib-title">
+                    {library.some((g) => g.local) ? 'המשחקים במחשב' : 'משחקים שהורדו למחשב'}
+                  </h2>
                   <ul className="lib-list">
                     {library.map((g) => (
                       <li key={g.code} className="lib-item">
                         <button
                           type="button"
                           className="lib-open"
-                          title={`פתיחת ${g.name || g.code} — בלי הורדה מחדש`}
+                          title={g.local ? `פתיחת ${g.name || 'המשחק'}` : `פתיחת ${g.name || g.code} — בלי הורדה מחדש`}
                           onClick={() => guard('החלפת המשחק', () => void openFromLibrary(g.code))}
                         >
                           <span className="lib-name">{g.name || `משחק ${g.code}`}</span>
                           <span className="lib-meta">
-                            קוד {g.code}
-                            {g.savedAt > 0 && ` · הורד ${new Date(g.savedAt).toLocaleDateString('he-IL')}`}
-                            {g.size > 0 && ` · ${(g.size / 1048576).toFixed(0)}MB`}
+                            {g.local ? (
+                              // נבנה במחשב: אין קוד בשרת להציג, ואין "הורדה מחדש".
+                              <>
+                                ✨ נבנה במחשב
+                                {g.savedAt > 0 && ` · ${new Date(g.savedAt).toLocaleDateString('he-IL')}`}
+                              </>
+                            ) : (
+                              <>
+                                קוד {g.code}
+                                {g.savedAt > 0 && ` · הורד ${new Date(g.savedAt).toLocaleDateString('he-IL')}`}
+                                {g.size > 0 && ` · ${(g.size / 1048576).toFixed(0)}MB`}
+                              </>
+                            )}
                           </span>
                         </button>
-                        <button
-                          type="button"
-                          className="lib-refresh"
-                          title="הורדה מחדש מהשרת (אם המשחק עודכן)"
-                          onClick={() => guard('הורדת המשחק מחדש', () => void loadFromCode(g.code, true))}
-                        >
-                          ⟳
-                        </button>
+                        {!g.local && (
+                          <button
+                            type="button"
+                            className="lib-refresh"
+                            title="הורדה מחדש מהשרת (אם המשחק עודכן)"
+                            onClick={() => guard('הורדת המשחק מחדש', () => void loadFromCode(g.code, true))}
+                          >
+                            ⟳
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="lib-del"
                           title="מחיקה מהמחשב"
-                          onClick={() => guard('מחיקת משחק', () => void removeFromLibrary(g.code))}
+                          onClick={() => guard('מחיקת משחק', () => void removeFromLibrary(g))}
                         >
                           🗑
                         </button>
@@ -1224,8 +1311,9 @@ export function App() {
                     ))}
                   </ul>
                   <p className="lib-hint">
-                    פתיחה מכאן היא מיידית ואינה דורשת אינטרנט. אם ערכתם את המשחק
-                    באתר מאז ההורדה — לחצו ⟳ כדי למשוך את הגרסה המעודכנת.
+                    פתיחה מכאן היא מיידית ואינה דורשת אינטרנט.
+                    {library.some((g) => !g.local) &&
+                      ' אם ערכתם את המשחק באתר מאז ההורדה — לחצו ⟳ כדי למשוך את הגרסה המעודכנת.'}
                   </p>
                 </section>
               )}
@@ -1248,6 +1336,7 @@ export function App() {
               {updateStatus !== null && <UpdateBadge status={updateStatus} />}
         <VersionLine status={updateStatus} />
               {gateLayer}
+              {newGameLayer}
               {sealCapable && (
                 <button
                   type="button"
