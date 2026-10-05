@@ -58,20 +58,48 @@
       .note { margin-top: 28px; font-size: 15px; opacity: 0.6; line-height: 1.7; text-align: right; }
       .note strong { opacity: 0.9; }
       code { background: rgba(255, 255, 255, 0.1); padding: 2px 6px; border-radius: 5px; }
+      .version { margin: -18px 0 28px; font-size: 16px; opacity: 0.85; }
+      .version b { color: #facc15; }
+      .btn .file { display: block; font-size: 13px; font-weight: 500; opacity: 0.6; margin-top: 2px; direction: ltr; }
+      .news { margin-top: 36px; text-align: right; }
+      .news h2 { font-size: 22px; margin-bottom: 14px; }
+      .news ol { list-style: none; display: flex; flex-direction: column; gap: 14px; }
+      .news li.release {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 12px 16px;
+      }
+      .news .head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; margin-bottom: 6px; }
+      .news .num { font-weight: 800; }
+      .news .date { font-size: 14px; opacity: 0.6; }
+      .news .latest { font-size: 12px; font-weight: 700; color: #111; background: #facc15; border-radius: 999px; padding: 1px 8px; }
+      .news ul { padding-right: 18px; font-size: 15px; line-height: 1.6; opacity: 0.85; }
+      .news .quiet { font-size: 15px; opacity: 0.55; }
+      .news details { margin-top: 14px; }
+      .news summary { cursor: pointer; opacity: 0.75; font-size: 15px; margin-bottom: 12px; }
+      @media (max-width: 520px) {
+        .card { padding: 32px 18px; }
+        h1 { font-size: 30px; }
+        .btn { min-width: 0; width: 100%; padding: 16px 18px; }
+      }
     </style>
   </head>
   <body>
     <div class="card">
       <h1>🎯 חוויה בקליק</h1>
       <p class="sub">גרסת שולחן עבודה — אופליין לגמרי, בלי התקנה</p>
+      <p class="version" id="version" hidden></p>
 
       <div class="btns">
         <a
           class="btn"
+          id="setup-link"
           href="/desktop/TriviaEngine-Setup.exe"
         >
           ⬇ הורדה והתקנה
           <span class="small">מתקין + קיצור דרך · מתעדכן לבד, בלי להתקין שוב</span>
+          <span class="file" id="setup-file" hidden></span>
         </a>
         <a
           class="btn secondary"
@@ -88,6 +116,15 @@
           <span class="small">כלי שסוגר קובץ ZIP של משחק לקובץ EXE בודד</span>
         </a>
       </div>
+
+      <section class="news" id="news" hidden>
+        <h2>מה חדש</h2>
+        <ol id="news-recent"></ol>
+        <details id="news-more" hidden>
+          <summary>גרסאות קודמות</summary>
+          <ol id="news-older"></ol>
+        </details>
+      </section>
 
       <div class="note">
         <p><strong>הפעלה:</strong> המתקין יוצר קיצור דרך; הגרסה הניידת רצה בלחיצה כפולה. שניהם אופליין, במסך מלא.</p>
@@ -115,10 +152,78 @@
           ולא לטעון משחק. (גם בנגן הרגיל יש כפתור «חתום EXE» במסך הפתיחה.)
         </p>
         <p style="margin-top: 14px; opacity: 0.8">
-          מדיה מרוחקת (יוטיוב/וידאו בענן) עדיין דורשת אינטרנט. תמיכה במשחק ארוז
-          מקומית (ZIP) תיווסף ב-Milestone 5.
+          מדיה מרוחקת (יוטיוב/וידאו בענן) עדיין דורשת אינטרנט.
         </p>
       </div>
     </div>
+    <script>
+      // הגרסה העדכנית, שם המתקין בהורדה (עם מספר הגרסה) ו«מה חדש» — מתוך
+      // מה שהשרת מגיש ב-/desktop/ (tools/fetch-desktop-assets.mjs). בלי הקבצים
+      // האלה העמוד נשאר כמו שהוא, עם הקישורים בשמות הקבועים.
+      (async () => {
+        const get = async (url) => {
+          try {
+            const res = await fetch(url, { cache: 'no-store' });
+            return res.ok ? await res.json() : null;
+          } catch {
+            return null;
+          }
+        };
+        const [index, notes] = await Promise.all([get('/desktop/index.json'), get('/desktop/changelog.json')]);
+        const versions = Array.isArray(notes?.versions) ? notes.versions : [];
+        const latest = typeof index?.version === 'string' ? index.version : versions[0]?.version ?? null;
+        const dateOf = (iso) => {
+          const d = iso ? new Date(iso) : null;
+          return d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString('he-IL', { timeZone: 'Asia/Jerusalem' }) : '';
+        };
+        const el = (tag, cls, text) => {
+          const node = document.createElement(tag);
+          if (cls) node.className = cls;
+          if (text) node.textContent = text;
+          return node;
+        };
+
+        if (latest !== null) {
+          const line = document.getElementById('version');
+          const date = dateOf(versions.find((v) => v.version === latest)?.date);
+          line.append('הגרסה העדכנית: ', el('b', '', latest));
+          if (date) line.append(` · יצאה ב-${date}`);
+          line.hidden = false;
+        }
+
+        // הקובץ נשמר בשמו המלא, כדי שיהיה ברור איזו גרסה ירדה. הקישור עצמו נשאר
+        // השם הקבוע: הקובץ הממוספר נמחק מהשרת כשיוצאת גרסה, וקישור ששותף אליו
+        // היה מחזיר 404.
+        const installer = typeof index?.installer === 'string' ? index.installer : '';
+        if (/^HavayaBeClick-Setup-[\d.]+\.exe$/.test(installer)) {
+          document.getElementById('setup-link').download = installer;
+          const file = document.getElementById('setup-file');
+          file.textContent = installer;
+          file.hidden = false;
+        }
+
+        if (versions.length === 0) return;
+        versions.forEach((v, i) => {
+          const item = el('li', 'release');
+          const head = el('div', 'head');
+          head.append(el('span', 'num', `גרסה ${v.version}`));
+          const date = dateOf(v.date);
+          if (date) head.append(el('span', 'date', date));
+          if (v.version === latest) head.append(el('span', 'latest', 'העדכנית'));
+          item.append(head);
+          const changes = Array.isArray(v.changes) ? v.changes.filter((c) => typeof c === 'string') : [];
+          if (changes.length === 0) {
+            item.append(el('p', 'quiet', 'שיפורים פנימיים'));
+          } else {
+            const list = el('ul');
+            for (const c of changes) list.append(el('li', '', c));
+            item.append(list);
+          }
+          document.getElementById(i < 5 ? 'news-recent' : 'news-older').append(item);
+        });
+        document.getElementById('news-more').hidden = versions.length <= 5;
+        document.getElementById('news').hidden = false;
+      })();
+    </script>
   </body>
 </html>
