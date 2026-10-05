@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error — כלי בנייה ב-JS, בלי הצהרות טיפוסים
-import { needsRefresh, servedVersion } from '../tools/refresh-desktop-assets.mjs';
+import { needsRefresh, refreshIntervalMs, servedVersion } from '../tools/refresh-desktop-assets.mjs';
 // @ts-expect-error — כלי בנייה ב-JS, בלי הצהרות טיפוסים
 import { parseFeed } from '../tools/fetch-desktop-assets.mjs';
 
@@ -64,6 +64,30 @@ describe('מתי מרעננים', () => {
   it('לא הצלחנו לקרוא את המהדורה → לא נוגעים במה שקיים', () => {
     expect(needsRefresh('0.1.164', null)).toBe(false);
     expect(needsRefresh(null, null)).toBe(false);
+  });
+});
+
+describe('כל כמה זמן בודקים', () => {
+  const MIN = 60 * 1000;
+
+  it('★ ברירת המחדל עשר דקות — גרסה חדשה מגיעה לשרת תוך דקות ולא אחרי שש שעות', () => {
+    expect(refreshIntervalMs({})).toBe(10 * MIN);
+  });
+
+  it('DESKTOP_REFRESH_MINUTES קובע', () => {
+    expect(refreshIntervalMs({ DESKTOP_REFRESH_MINUTES: '3' })).toBe(3 * MIN);
+    expect(refreshIntervalMs({ DESKTOP_REFRESH_MINUTES: '3', DESKTOP_REFRESH_HOURS: '6' })).toBe(3 * MIN);
+  });
+
+  it('השם הישן בשעות עדיין נתמך כשהוגדר במפורש', () => {
+    expect(refreshIntervalMs({ DESKTOP_REFRESH_HOURS: '2' })).toBe(120 * MIN);
+  });
+
+  it('ערך ריק, אפס, שלילי או לא מספר → ברירת המחדל', () => {
+    for (const bad of ['', '0', '-5', 'abc']) {
+      expect(refreshIntervalMs({ DESKTOP_REFRESH_MINUTES: bad }), bad).toBe(10 * MIN);
+      expect(refreshIntervalMs({ DESKTOP_REFRESH_HOURS: bad }), bad).toBe(10 * MIN);
+    }
   });
 });
 
