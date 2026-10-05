@@ -10,10 +10,12 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error — כלי בנייה ב-JS, בלי הצהרות טיפוסים
-import { APP_PATHS, WHATS_NEW, buildChangelog, changeText } from '../tools/desktop-changelog.mjs';
+import * as changelog from '../tools/desktop-changelog.mjs';
 
 // js-yaml מגיע דרך electron-builder, בלי הצהרות טיפוסים (כמו ב-electronBuilderConfig.test.ts).
 const { load } = createRequire(import.meta.url)('js-yaml') as { load: (text: string) => unknown };
+
+const { APP_PATHS, WHATS_NEW, buildChangelog, changeText, publishedRuns } = changelog;
 
 type Entry = { version: string; date: string | null; changes: string[] };
 
@@ -81,6 +83,35 @@ describe('buildChangelog', () => {
     expect(entries[0]).toEqual({ version: '0.1.4', date: null, changes: [] });
     expect(buildChangelog(runs, log, 1).map((e: Entry) => e.version)).toEqual(['0.1.4']);
     expect(buildChangelog([{ number: 1, headSha: 'a' }], log)).toEqual([]);
+  });
+});
+
+describe('publishedRuns', () => {
+  const runs = [
+    { number: 177, headSha: 'a' },
+    { number: 178, headSha: 'b' }, // פרסמה ואז נפלה בצעד מאוחר
+    { number: 180, headSha: 'c' }, // נפלה לפני הפרסום
+    { number: 182, headSha: 'd' },
+  ];
+  const assets = [
+    'HavayaBeClick-Setup-0.1.177.exe',
+    'HavayaBeClick-Setup-0.1.178.exe',
+    'HavayaBeClick-Setup-0.1.178.exe.blockmap',
+    'HavayaBeClick-Setup-0.1.182.exe',
+    'TriviaEngine-Setup.exe',
+    'latest.yml',
+  ];
+
+  it('★ "פורסמה" = המתקין במהדורה, לא "הריצה הצליחה"', () => {
+    expect(publishedRuns(runs, assets).map((r: { number: number }) => r.number)).toEqual([
+      177, 178, 182,
+    ]);
+  });
+
+  it('רשימה שאי אפשר לסמוך עליה — זורק, כדי שהמהדורה תשמור את הרשימה הקודמת', () => {
+    // הגרסה האחרונה שפורסמה חסרה ברשימת הריצות (תשובה חלקית מ-gh)
+    expect(() => publishedRuns(runs.slice(0, 3), assets)).toThrow(/0\.1\.182/);
+    expect(() => publishedRuns(runs, ['latest.yml'])).toThrow(/אין מתקינים/);
   });
 });
 

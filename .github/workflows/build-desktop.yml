@@ -30,7 +30,7 @@ on:
 
 permissions:
   contents: write
-  actions: read # «מה חדש» נבנה מרשימת הריצות שהצליחו
+  actions: read # «מה חדש» נבנה מרשימת הריצות
 
 concurrency:
   group: desktop
@@ -77,9 +77,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh run list --workflow build-desktop.yml --branch main --status success --limit 40 \
-            --json number,headSha,createdAt > runs.json
-          node tools/desktop-changelog.mjs runs.json "${{ github.run_number }}" "${{ github.sha }}" release/changelog.json
+          set -euo pipefail
+          gh run list --workflow build-desktop.yml --limit 60 --json number,headSha,createdAt > runs.json
+          gh release view desktop-latest --json assets --jq '.assets[].name' > assets.txt
+          node tools/desktop-changelog.mjs runs.json assets.txt "${{ github.run_number }}" "${{ github.sha }}" release/changelog.json
       # אם latest.yml לא נוצר, העדכון האוטומטי פשוט לא יעבוד — ובשקט. עדיף
       # שהבנייה תיפול כאן ונדע מיד, מאשר לגלות את זה אצל משתמש בשטח.
       - name: Verify update metadata exists

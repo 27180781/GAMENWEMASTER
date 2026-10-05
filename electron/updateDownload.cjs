@@ -267,9 +267,16 @@ function parseBlockMap(buf) {
   }
 }
 
-/** כמה בתים המפה מתארת — בדיוק גודל המתקין שממנו נבנתה. @param {BlockMap} map */
+/**
+ * כמה בתים המפה מתארת — בדיוק גודל המתקין שממנו נבנתה. מפה פגומה (בלי sizes /
+ * offset מספריים) נותנת NaN, שאינו שווה לאף גודל — ולכן נפסלת ולא מפילה את העדכון.
+ * @param {BlockMap} map
+ */
 function blockMapSize(map) {
-  return map.files.reduce((max, f) => Math.max(max, f.offset + f.sizes.reduce((s, n) => s + n, 0)), 0);
+  return map.files.reduce((max, f) => {
+    const sizes = Array.isArray(f?.sizes) ? f.sizes.reduce((s, n) => s + Number(n), 0) : NaN;
+    return Math.max(max, Number(f?.offset) + sizes);
+  }, 0);
 }
 
 /**

@@ -1,19 +1,21 @@
 /**
  * «מה חדש» לעמוד ההורדה (public/download/): לכל גרסה שפורסמה — מה נכנס אליה.
  *
- * נבנה מחדש, כולו, בכל בניית EXE (build-desktop.yml) מתוך ריצות הבנייה שהצליחו:
- * הגרסה היא 0.1.<מספר הריצה>, והשינויים שלה הם הקומיטים שבין הריצה המוצלחת
- * הקודמת לזו — רק כאלה שנוגעים בתוכנה (אותם paths שמפעילים את הבנייה). ריצה
- * שנכשלה או בוטלה מגלגלת את השינויים שלה לגרסה הבאה שהצליחה, כמו שקרה באמת.
- * בלי מצב שמור: אין קובץ שיכול לצאת מסנכרון עם המהדורה.
+ * נבנה מחדש, כולו, בכל בניית EXE (build-desktop.yml): הגרסה היא 0.1.<מספר הריצה>,
+ * והשינויים שלה הם הקומיטים שבין הגרסה הקודמת שפורסמה לזו — רק כאלה שנוגעים
+ * בתוכנה (אותם paths שמפעילים את הבנייה). "פורסמה" = המתקין שלה נמצא במהדורה,
+ * ולא "הריצה הצליחה": ריצה יכולה לפרסם ואז ליפול בצעד מאוחר (כך 0.1.178). ריצה
+ * שלא פרסמה מגלגלת את השינויים שלה לגרסה הבאה, כמו שקרה באמת. בלי מצב שמור.
  *
  * הטקסט הוא כותרת הקומיט (= כותרת ה-PR) בלי "(#NNN)". כותרת טכנית או באנגלית
  * מנוסחת מחדש ב-WHATS_NEW לפי מספר ה-PR, ו-null מסתיר שינוי פנימי. ניסוח שנוסף
  * כאן נכנס לתוקף בבניית ה-EXE הבאה (שינוי ב-tools/ לבדו אינו בונה EXE).
  *
  * שימוש (ב-workflow):
- *   node tools/desktop-changelog.mjs <runs.json> <מספר-הריצה> <sha> <קובץ-פלט>
- * runs.json = gh run list --workflow build-desktop.yml --status success --json number,headSha,createdAt
+ *   node tools/desktop-changelog.mjs <runs.json> <assets.txt> <מספר-הריצה> <sha> <קובץ-פלט>
+ * runs.json  = gh run list --workflow build-desktop.yml --json number,headSha,createdAt
+ * assets.txt = שמות הקבצים במהדורה desktop-latest, לפני שהריצה הזו מפרסמת
+ * רשימה חלקית (נצפתה פעם תשובה כזו מ-gh) — הקובץ לא נכתב, והמהדורה שומרת את הקודם.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -79,10 +81,31 @@ export function changeText(subject) {
 }
 
 /**
+ * הריצות שפרסמו גרסה: המתקין שלהן במהדורה. זורק כשאי אפשר לסמוך על הרשימות —
+ * אין מתקינים בכלל, או שהגרסה האחרונה שפורסמה חסרה ברשימת הריצות.
+ * @param {Run[]} runs @param {string[]} assets
+ * @returns {Run[]}
+ */
+export function publishedRuns(runs, assets) {
+  const published = new Set();
+  for (const name of assets) {
+    const m = /^HavayaBeClick-Setup-0\.1\.(\d+)\.exe$/.exec(name.trim());
+    if (m !== null) published.add(Number(m[1]));
+  }
+  if (published.size === 0) throw new Error('אין מתקינים במהדורה — אי אפשר לדעת מה פורסם');
+  const newest = Math.max(...published);
+  const kept = runs.filter((r) => published.has(r.number));
+  if (!kept.some((r) => r.number === newest)) {
+    throw new Error(`הגרסה האחרונה במהדורה (0.1.${newest}) חסרה ברשימת הריצות — הרשימה חלקית`);
+  }
+  return kept;
+}
+
+/**
  * @typedef {{ number: number, headSha: string, createdAt?: string }} Run
  * @typedef {{ version: string, date: string | null, changes: string[] }} Entry
  *
- * @param {Run[]} runs ריצות שהצליחו (כל סדר; כפילויות נזרקות)
+ * @param {Run[]} runs ריצות שפרסמו (כל סדר; כפילויות נזרקות)
  * @param {(from: string, to: string) => string[]} subjectsBetween כותרות הקומיטים בטווח, מהחדש לישן
  * @param {number} [keep]
  * @returns {Entry[]} מהחדשה לישנה
@@ -115,9 +138,13 @@ export function buildChangelog(runs, subjectsBetween, keep = KEEP) {
 /** @param {string} from @param {string} to */
 function gitSubjects(from, to) {
   try {
-    const out = execFileSync('git', ['log', '--format=%s', `${from}..${to}`, '--', ...APP_PATHS], {
-      encoding: 'utf8',
-    });
+    const out = execFileSync(
+      'git',
+      ['log', '--no-merges', '--format=%s', `${from}..${to}`, '--', ...APP_PATHS],
+      {
+        encoding: 'utf8',
+      },
+    );
     return out.split('\n').filter((l) => l.trim() !== '');
   } catch {
     return []; // קומיט שאינו בהיסטוריה (force-push ישן) — הגרסה מופיעה בלי פירוט
@@ -125,15 +152,23 @@ function gitSubjects(from, to) {
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const [runsFile, number, sha, outFile] = process.argv.slice(2);
-  if (!runsFile || !number || !sha || !outFile) {
+  const [runsFile, assetsFile, number, sha, outFile] = process.argv.slice(2);
+  if (!runsFile || !assetsFile || !number || !sha || !outFile) {
     console.error(
-      'שימוש: node tools/desktop-changelog.mjs <runs.json> <מספר-הריצה> <sha> <קובץ-פלט>',
+      'שימוש: node tools/desktop-changelog.mjs <runs.json> <assets.txt> <מספר-הריצה> <sha> <קובץ-פלט>',
     );
     process.exit(1);
   }
   /** @type {Run[]} */
-  const runs = JSON.parse(readFileSync(runsFile, 'utf8'));
+  const all = JSON.parse(readFileSync(runsFile, 'utf8'));
+  // הריצה הנוכחית נוספת בנפרד — גם בהרצה חוזרת שכבר פרסמה את אותו מספר.
+  const current = `HavayaBeClick-Setup-0.1.${number}.exe`;
+  const runs = publishedRuns(
+    all.filter((r) => r.number !== Number(number)),
+    readFileSync(assetsFile, 'utf8')
+      .split('\n')
+      .filter((name) => name.trim() !== current),
+  );
   runs.push({ number: Number(number), headSha: sha, createdAt: new Date().toISOString() });
   const versions = buildChangelog(runs, gitSubjects);
   writeFileSync(

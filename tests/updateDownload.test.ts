@@ -306,5 +306,9 @@ describe('downloadUpdate', () => {
     // המטמון מתאר קובץ אחר — הורדה מלאה מיד, בלי הפרש שייפסל
     expect(mod.pickOldBlockMap([null, other], oldFile.length)).toBeNull();
     expect(mod.pickOldBlockMap([installed], 0)).toBeNull();
+    // מפה פגומה (תשובה זרה מהשרת) — נפסלת בלי לזרוק, והמטמון התקין עדיין נבחר
+    const broken = { version: '2', files: [{ name: 'file', offset: 0, checksums: ['x'] }] } as unknown as BlockMap;
+    expect(Number.isNaN(mod.blockMapSize(broken))).toBe(true);
+    expect(mod.pickOldBlockMap([broken, installed], oldFile.length)).toBe(installed);
   });
 });

@@ -157,7 +157,7 @@
       </div>
     </div>
     <script>
-      // הגרסה העדכנית, קישור למתקין בשמו המלא (עם מספר הגרסה) ו«מה חדש» — מתוך
+      // הגרסה העדכנית, שם המתקין בהורדה (עם מספר הגרסה) ו«מה חדש» — מתוך
       // מה שהשרת מגיש ב-/desktop/ (tools/fetch-desktop-assets.mjs). בלי הקבצים
       // האלה העמוד נשאר כמו שהוא, עם הקישורים בשמות הקבועים.
       (async () => {
@@ -191,10 +191,12 @@
           line.hidden = false;
         }
 
-        // הקובץ בשמו המלא, כדי שיהיה ברור איזו גרסה ירדה.
+        // הקובץ נשמר בשמו המלא, כדי שיהיה ברור איזו גרסה ירדה. הקישור עצמו נשאר
+        // השם הקבוע: הקובץ הממוספר נמחק מהשרת כשיוצאת גרסה, וקישור ששותף אליו
+        // היה מחזיר 404.
         const installer = typeof index?.installer === 'string' ? index.installer : '';
         if (/^HavayaBeClick-Setup-[\d.]+\.exe$/.test(installer)) {
-          document.getElementById('setup-link').href = `/desktop/${installer}`;
+          document.getElementById('setup-link').download = installer;
           const file = document.getElementById('setup-file');
           file.textContent = installer;
           file.hidden = false;
