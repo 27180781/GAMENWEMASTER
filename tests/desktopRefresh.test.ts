@@ -228,6 +228,32 @@ describe('משיכה בסבבים — חלון ההחלפה של המהדורה'
     ]);
   });
 
+  it('«מה חדש» (changelog.json) מוגש כשהוא תקין, ונעדר בלי להפיל את המשיכה כשהוא חסר או פגום', async () => {
+    const exe = Buffer.from('INSTALLER');
+    const notes = JSON.stringify({ versions: [{ version: '0.1.180', date: null, changes: ['שינוי'] }] });
+    for (const [body, expected] of [
+      [notes, 'changelog.json'],
+      ['<!doctype html>', null],
+      [null, null],
+    ] as const) {
+      dir = mkdtempSync(join(tmpdir(), 'desktop-'));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string) => {
+          if (url.endsWith('/latest.yml')) return ok(feedFor('0.1.180', exe));
+          if (url.endsWith('.blockmap')) return ok(BLOCKMAP);
+          if (url.endsWith('/changelog.json')) return body === null ? fail(404) : ok(body);
+          return ok(exe);
+        }),
+      );
+      expect(await fetchDesktopAssets(dir, { ...QUICK, attempts: 1, previousBlockmaps: 0 })).toBe('0.1.180');
+      expect(JSON.parse(readFileSync(join(dir, 'index.json'), 'utf8')).changelog).toBe(expected);
+      expect(existsSync(join(dir, 'changelog.json'))).toBe(expected !== null);
+      if (expected !== null) expect(readFileSync(join(dir, 'changelog.json'), 'utf8')).toBe(notes);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('previousBlockmapNames — אחורה עד count, לא מתחת למספר בנייה 1, ורק לגרסאות בפורמט הבנייה', () => {
     expect(previousBlockmapNames('0.1.180', 3)).toEqual([
       'HavayaBeClick-Setup-0.1.179.exe.blockmap',

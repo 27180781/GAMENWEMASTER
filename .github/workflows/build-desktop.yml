@@ -30,6 +30,7 @@ on:
 
 permissions:
   contents: write
+  actions: read # «מה חדש» נבנה מרשימת הריצות שהצליחו
 
 concurrency:
   group: desktop
@@ -40,6 +41,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # ההיסטוריה המלאה — «מה חדש» לכל גרסה נבנה מהקומיטים
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -65,6 +68,18 @@ jobs:
           copy release\HavayaBeClick-${{ env.APP_VERSION }}.exe release\TriviaEngine-Portable.exe
           copy release\HavayaBeClick-Setup-${{ env.APP_VERSION }}.exe release\TriviaEngine-Setup.exe
           copy release\HavayaBeClick-${{ env.APP_VERSION }}.exe release\SealEXE.exe
+      # «מה חדש» בעמוד ההורדה: לכל גרסה שפורסמה — מה נכנס אליה (ראו
+      # tools/desktop-changelog.mjs). נבנה מחדש, כולו, בכל בנייה. כישלון כאן לא
+      # עוצר את המהדורה: העמוד פשוט מציג את הגרסה בלי הרשימה.
+      - name: Build the what's-new list
+        shell: bash
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run list --workflow build-desktop.yml --branch main --status success --limit 40 \
+            --json number,headSha,createdAt > runs.json
+          node tools/desktop-changelog.mjs runs.json "${{ github.run_number }}" "${{ github.sha }}" release/changelog.json
       # אם latest.yml לא נוצר, העדכון האוטומטי פשוט לא יעבוד — ובשקט. עדיף
       # שהבנייה תיפול כאן ונדע מיד, מאשר לגלות את זה אצל משתמש בשטח.
       - name: Verify update metadata exists
@@ -103,6 +118,7 @@ jobs:
             release/TriviaEngine-Portable.exe
             release/SealEXE.exe
             release/latest.yml
+            release/changelog.json
           prerelease: false
 
       # עדכון הפרשי צריך גם את מפת הבלוקים של הגרסה *המותקנת* אצל הלקוח
@@ -132,16 +148,6 @@ jobs:
             gh release upload desktop-latest "backfill/${setup}.blockmap" --clobber
             rm -f "backfill/${setup}"
           done
-      # ⚠ המהדורה שפורסמה כאן **אינה מגיעה ללקוחות מיד.**
-      #
-      # האתר נבנה ב-CapRover, שמחובר ישירות ל-GitHub ובונה בכל דחיפה ל-main —
-      # כלומר דקות *לפני* שהשלב שמעל סיים לפרסם את ה-EXE של אותו קומיט. תמונת
-      # ה-Docker מושכת את קובצי ההתקנה בזמן הבנייה (ראו Dockerfile), ולכן היא
-      # תמיד מושכת את latest.yml של המהדורה הקודמת.
-      #
-      # התוצאה: השרת מגיש בקביעות גרסה אחת אחורה, והתוכנה המותקנת מדווחת
-      # "מעודכן" — כי זו באמת הגרסה האחרונה שהשרת מציע לה.
-      #
-      # התיקון האמיתי הוא להפסיק לצרוב את קובצי ההתקנה לתוך התמונה ולמשוך
-      # אותם בעליית המכולה (ואז גם לרענן מדי כמה שעות), כך שהאתר לא יהיה תלוי
-      # כלל בתזמון הבנייה. עד שזה ייעשה — הפיגור נשאר.
+      # המהדורה מגיעה ללקוחות דרך האתר, לא מכאן: tools/refresh-desktop-assets.mjs
+      # במכולה של האתר בודק כל 10 דקות אם יצאה גרסה חדשה ומושך אותה (יחד עם
+      # מפות הבלוקים ו-changelog.json). כלומר עד ‎~15 דקות מהמיזוג ללקוחות.

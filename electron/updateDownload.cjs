@@ -267,6 +267,25 @@ function parseBlockMap(buf) {
   }
 }
 
+/** כמה בתים המפה מתארת — בדיוק גודל המתקין שממנו נבנתה. @param {BlockMap} map */
+function blockMapSize(map) {
+  return map.files.reduce((max, f) => Math.max(max, f.offset + f.sizes.reduce((s, n) => s + n, 0)), 0);
+}
+
+/**
+ * המפה ה"ישנה" להפרש: הראשונה מהמועמדות שמתארת קובץ בגודל המתקין שבמטמון.
+ * מפה של קובץ אחר מייצרת תוכנית שמעתיקה בלוקים לא נכונים — הקובץ שנבנה נפסל
+ * ב-sha512, והעדכון כולו יורד מחדש (110MB במקום 1.5MB). עדיף לגלות את זה לפני
+ * שמורידים משהו: בלי מפה תואמת — הורדה מלאה מיד.
+ * @param {(BlockMap | null)[]} candidates לפי סדר עדיפות
+ * @param {number} oldSize גודל המתקין שבמטמון (0 = אין)
+ * @returns {BlockMap | null}
+ */
+function pickOldBlockMap(candidates, oldSize) {
+  if (!(oldSize > 0)) return null;
+  return candidates.find((m) => m !== null && blockMapSize(m) === oldSize) ?? null;
+}
+
 /**
  * כתובת המפה של הגרסה המותקנת — כמו ב-electron-updater: שם המתקין החדש עם
  * מספר הגרסה הישן במקום החדש, ו-.blockmap בסוף.
@@ -276,4 +295,4 @@ function oldBlockMapUrl(newUrl, newVersion, oldVersion) {
   return `${newUrl.split(newVersion).join(oldVersion)}.blockmap`;
 }
 
-module.exports = { downloadUpdate, buildPlan, planHash, parseBlockMap, hashFile, oldBlockMapUrl, CHECKPOINT_BYTES };
+module.exports = { downloadUpdate, buildPlan, planHash, parseBlockMap, hashFile, oldBlockMapUrl, blockMapSize, pickOldBlockMap, CHECKPOINT_BYTES };
