@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error — כלי בנייה ב-JS, בלי הצהרות טיפוסים
-import { needsRefresh, refreshIntervalMs, servedVersion } from '../tools/refresh-desktop-assets.mjs';
+import { installInto, installOrder, needsRefresh, refreshIntervalMs, servedVersion } from '../tools/refresh-desktop-assets.mjs';
 // @ts-expect-error — כלי בנייה ב-JS, בלי הצהרות טיפוסים
 import { parseFeed } from '../tools/fetch-desktop-assets.mjs';
 
@@ -92,11 +92,54 @@ describe('כל כמה זמן בודקים', () => {
 });
 
 /**
+ * העברת הגרסה החדשה לתיקייה המוגשת. עד 5.10.2026 הרענון החליף את התיקייה כולה
+ * (rename), ובמכולה זה נכשל תמיד: התיקייה באה משכבת התמונה, וב-overlayfs שינוי
+ * שם של תיקייה משכבה תחתונה מחזיר EXDEV. השרת התעדכן רק בפריסה. (שוחזר על
+ * overlayfs אמיתי; כאן נבדק שהתיקייה עצמה לעולם אינה מוחלפת.)
+ */
+describe('העברת הגרסה החדשה לתיקייה המוגשת', () => {
+  it('★ הקבצים עוברים לתוך אותה תיקייה, מה שלא הגיע נמחק, והתיקייה הזמנית נעלמת', () => {
+    const root = mkdtempSync(join(tmpdir(), 'install-'));
+    const dir = join(root, 'desktop');
+    const next = join(root, 'desktop.new');
+    mkdirSync(dir);
+    mkdirSync(next);
+    writeFileSync(join(dir, 'latest.yml'), 'version: 0.1.191\n');
+    writeFileSync(join(dir, 'HavayaBeClick-Setup-0.1.191.exe'), 'OLD');
+    writeFileSync(join(dir, 'TriviaEngine-Setup.exe'), 'OLD');
+    writeFileSync(join(next, 'latest.yml'), 'version: 0.1.192\n');
+    writeFileSync(join(next, 'HavayaBeClick-Setup-0.1.192.exe'), 'NEW');
+    writeFileSync(join(next, 'TriviaEngine-Setup.exe'), 'NEW');
+    writeFileSync(join(next, 'index.json'), '{"version":"0.1.192"}');
+    const inode = statSync(dir).ino;
+
+    installInto(next, dir);
+
+    expect(statSync(dir).ino).toBe(inode); // אותה תיקייה — לא rename שלה
+    expect(readdirSync(dir).sort()).toEqual(['HavayaBeClick-Setup-0.1.192.exe', 'TriviaEngine-Setup.exe', 'index.json', 'latest.yml']);
+    expect(readFileSync(join(dir, 'latest.yml'), 'utf8')).toBe('version: 0.1.192\n');
+    expect(readFileSync(join(dir, 'TriviaEngine-Setup.exe'), 'utf8')).toBe('NEW');
+    expect(existsSync(next)).toBe(false);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('latest.yml ו-index.json עוברים אחרונים — הפיד לא מצביע על מתקין שעוד לא הגיע', () => {
+    expect(installOrder(['index.json', 'latest.yml', 'HavayaBeClick-Setup-0.1.192.exe', 'changelog.json'])).toEqual([
+      'HavayaBeClick-Setup-0.1.192.exe',
+      'changelog.json',
+      'latest.yml',
+      'index.json',
+    ]);
+    expect(installOrder(['a.exe'])).toEqual(['a.exe']);
+  });
+});
+
+/**
  * המשיכה בסבבים (fetchDesktopAssets): הפריסה ב-CapRover נכשלה כשהבנייה תפסה
  * את חלון ההחלפה של המהדורה — 504 מ-GitHub, ואחר כך פיד חדש עם מתקין ישן.
  * הבדיקות מדמות fetch: סבב ראשון בתוך החלון, סבב שני אחרי שהמהדורה יציבה.
  */
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';

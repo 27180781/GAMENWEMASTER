@@ -19,7 +19,8 @@
  *   DESKTOP_SOURCE_URL      — מקור המהדורה (כמו בסקריפט המשיכה)
  */
 
-import { existsSync, readFileSync, renameSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { fetchDesktopAssets, fetchWithRetry, parseFeed, SOURCE } from './fetch-desktop-assets.mjs';
 
 const dir = process.argv[2] ?? '/usr/share/nginx/html/desktop';
@@ -63,6 +64,36 @@ export function needsRefresh(served, latest) {
   return latest !== null && served !== latest;
 }
 
+/**
+ * סדר ההעברה לתיקייה המוגשת: קודם המתקינים והמפות, אחר כך latest.yml —
+ * electron-updater קורא אותו ראשון, ואסור שיצביע על מתקין שעוד לא הגיע — ובסוף
+ * index.json, שממנו עמוד ההורדה מציג את הגרסה.
+ */
+export function installOrder(names) {
+  const last = ['latest.yml', 'index.json'];
+  return [...names.filter((f) => !last.includes(f)), ...last.filter((f) => names.includes(f))];
+}
+
+/**
+ * מעביר את הקבצים שנמשכו (next) לתוך התיקייה המוגשת (dir), קובץ אחרי קובץ,
+ * ומוחק ממנה את מה שלא הגיע (הגרסה הקודמת).
+ *
+ * למה לא החלפת התיקייה כולה, כמו עד 5.10.2026: dir מגיע משכבת התמונה, וב-
+ * overlayfs של Docker שינוי שם של תיקייה משכבה תחתונה נכשל (EXDEV). הרענון
+ * הוריד ‎~220MB בכל סבב, נכשל בהחלפה, ניקה ונשאר עם מה שנצרב בתמונה — כך השרת
+ * התעדכן רק כשהאתר נפרס מחדש. העברת *קבצים* לתוך התיקייה עובדת שם.
+ */
+export function installInto(next, dir) {
+  mkdirSync(dir, { recursive: true });
+  const incoming = readdirSync(next);
+  for (const f of installOrder(incoming)) renameSync(join(next, f), join(dir, f));
+  const keep = new Set(incoming);
+  for (const f of readdirSync(dir)) {
+    if (!keep.has(f)) rmSync(join(dir, f), { recursive: true, force: true });
+  }
+  rmSync(next, { recursive: true, force: true });
+}
+
 function currentVersion() {
   const file = `${dir}/index.json`;
   return existsSync(file) ? servedVersion(readFileSync(file, 'utf8')) : null;
@@ -78,18 +109,14 @@ async function refreshOnce() {
   }
   log(`נמצאה ${latest} (מוגש ${served ?? '—'}) — מושך`);
 
-  // מושכים לתיקייה זמנית ורק אז מחליפים. משיכה *לתוך* התיקייה המשמשת הייתה
+  // מושכים לתיקייה זמנית ורק אז מעבירים. משיכה *לתוך* התיקייה המשמשת הייתה
   // מותירה את עמוד ההורדה עם קבצים חסרים למשך דקות ארוכות.
   const next = `${dir}.new`;
-  const old = `${dir}.old`;
   rmSync(next, { recursive: true, force: true });
   // ברקע לא ממתינים דקות: שני סבבים, והסבב הבא ממילא בעוד כמה דקות.
   await fetchDesktopAssets(next, { attempts: 2, waitMs: 30_000 });
 
-  rmSync(old, { recursive: true, force: true });
-  if (existsSync(dir)) renameSync(dir, old);
-  renameSync(next, dir);
-  rmSync(old, { recursive: true, force: true });
+  installInto(next, dir);
   log(`✓ השרת מגיש עכשיו ${latest}`);
 }
 
