@@ -29,6 +29,8 @@ import {
   VOTABLE_TYPES,
 } from '../app/slideEdit.ts';
 import { saveEditedGame } from '../app/clickerBridge.ts';
+import { insertImportedQuestions, type ImportedQuestion } from '../app/questionImport.ts';
+import { ImportExcelDialog } from './ImportExcelDialog.tsx';
 
 /** עץ השדות נגזר פעם אחת — הסכימה קבועה לאורך חיי התוכנה. */
 const SETTING_FIELDS = describeObject(globalSettingsSchema);
@@ -50,7 +52,10 @@ type SaveState =
   | { kind: 'idle' }
   | { kind: 'saving' }
   | { kind: 'saved'; media: number }
-  | { kind: 'error'; message: string };
+  | { kind: 'error'; message: string }
+  // יבוא מאקסל נכנס לטיוטה בלבד — בניגוד לבונה, שם הוא נכתב מיד — ולכן
+  // ההודעה אומרת במפורש שעוד צריך לשמור.
+  | { kind: 'imported'; count: number };
 
 /**
  * "כלים" — פעולות מיידיות על כל השקופיות יחד, כמו בעורך המקוון. שתיהן משנות
@@ -154,6 +159,10 @@ export function GameEditor({ game, onApply, onClose }: GameEditorProps) {
   const appliedRef = useRef<GameFile | null>(null);
   const [selected, setSelected] = useState(0);
   const [search, setSearch] = useState('');
+  const [importOpen, setImportOpen] = useState(false);
+  const cardsRef = useRef<HTMLDivElement>(null);
+  /** עולה בכל יבוא — כדי לגלול את הרשימה לשאלה הראשונה שנוספה. */
+  const [importTick, setImportTick] = useState(0);
 
   // המשחק התחלף *מבחוץ* (נטען משחק אחר) — מתחילים ממנו מחדש.
   useEffect(() => {
@@ -167,6 +176,11 @@ export function GameEditor({ game, onApply, onClose }: GameEditorProps) {
   useEffect(() => {
     setSelected((s) => Math.min(s, Math.max(0, draft.questions.length - 1)));
   }, [draft.questions.length]);
+
+  useEffect(() => {
+    if (importTick === 0) return;
+    cardsRef.current?.querySelector('.se-item--sel')?.scrollIntoView({ block: 'center' });
+  }, [importTick]);
 
   const edit = (next: GameFile) => {
     setDraft(next);
@@ -190,6 +204,17 @@ export function GameEditor({ game, onApply, onClose }: GameEditorProps) {
   const close = () => {
     if (dirty && !window.confirm('יש שינויים שלא נשמרו. לצאת בלי לשמור?')) return;
     onClose();
+  };
+
+  /** השאלות מהאקסל נכנסות לטיוטה, והשאלה הראשונה שנוספה נבחרת. */
+  const importQuestions = (questions: ImportedQuestion[], after: number | null) => {
+    const res = insertImportedQuestions(draft, questions, after);
+    edit(res.game);
+    setSave({ kind: 'imported', count: res.count });
+    setSelected(res.firstIndex);
+    setSearch(''); // שחיפוש פתוח לא יסתיר את מה שנוסף
+    setImportOpen(false);
+    setImportTick((t) => t + 1);
   };
 
   /** הוספת שקופית מסוג נבחר מיד אחרי הנוכחית, ומעבר אליה. */
@@ -219,6 +244,11 @@ export function GameEditor({ game, onApply, onClose }: GameEditorProps) {
             </span>
           )}
           {save.kind === 'error' && <span className="editor-error">{save.message}</span>}
+          {save.kind === 'imported' && (
+            <span className="editor-saved">
+              ✅ {save.count} שאלות יובאו בהצלחה · עוד לא נשמרו בקובץ המשחק
+            </span>
+          )}
           {save.kind === 'idle' && dirty && <span className="ge-dirty">● שינויים לא שמורים</span>}
         </span>
         <span className="ge-spacer" />
@@ -280,6 +310,9 @@ export function GameEditor({ game, onApply, onClose }: GameEditorProps) {
         </aside>
 
         <section className="ge-slides">
+          <button type="button" className="ge-import" onClick={() => setImportOpen(true)}>
+            📊 יבוא מאקסל
+          </button>
           <div className="ge-search">
             <span className="ge-count">
               <b>{draft.questions.length}</b>
@@ -293,7 +326,7 @@ export function GameEditor({ game, onApply, onClose }: GameEditorProps) {
             />
             <span className="ge-search-icon">🔍</span>
           </div>
-          <div className="ge-cards">
+          <div className="ge-cards" ref={cardsRef}>
             <SlideList
               game={draft}
               selected={selected}
@@ -335,6 +368,15 @@ export function GameEditor({ game, onApply, onClose }: GameEditorProps) {
           </div>
         </section>
       </div>
+
+      {importOpen && (
+        <ImportExcelDialog
+          game={draft}
+          selected={selected}
+          onImport={importQuestions}
+          onClose={() => setImportOpen(false)}
+        />
+      )}
     </div>
   );
 }

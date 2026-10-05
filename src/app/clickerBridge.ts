@@ -108,6 +108,8 @@ interface TriviaDesktop {
   saveReport?: (name: string, bytes: Uint8Array) => Promise<string | null>;
   /** פתיחת תיקיית התוצאות בסייר הקבצים. */
   openReports?: () => void;
+  /** "שמירה בשם" — דיאלוג שמירה של Windows וכתיבת הבייטים לקובץ שנבחר. */
+  saveFileAs?: (name: string, bytes: Uint8Array) => Promise<SaveFileResult>;
   /** יציאה מהמשחק (סגירת ה-EXE). */
   quit?: () => void;
   /** חילוץ מדיית ה-ZIP לדיסק (מצב זרימה) — מחזיר { cacheKey } או null. */
@@ -201,6 +203,14 @@ export interface UpdateStatus {
 export interface SealMode {
   capable: boolean;
   tool: boolean;
+}
+
+/** תוצאת "שמירה בשם": הנתיב שנשמר, ביטול של המשתמש, או שגיאה. */
+export interface SaveFileResult {
+  ok: boolean;
+  path?: string;
+  canceled?: boolean;
+  error?: string;
 }
 
 /** תוצאת שמירת עריכה. addedMedia = כמה קובצי מדיה הוטמעו בחבילה. */
@@ -513,6 +523,23 @@ export async function desktopSaveReport(name: string, bytes: Uint8Array): Promis
 /** פתיחת תיקיית התוצאות בסייר הקבצים (EXE). */
 export function desktopOpenReports(): void {
   desktop()?.openReports?.();
+}
+
+/**
+ * "שמירה בשם" דרך דיאלוג השמירה של Windows (EXE). null = אין גשר — דפדפן, או
+ * תוכנה ישנה בלי הערוץ — והקורא מוריד את הקובץ כמו בדפדפן.
+ */
+export async function desktopSaveFileAs(
+  name: string,
+  bytes: Uint8Array,
+): Promise<SaveFileResult | null> {
+  const fn = desktop()?.saveFileAs;
+  if (typeof fn !== 'function') return null;
+  try {
+    return await fn(name, bytes);
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
 }
 
 /** האם ניתן לצאת מהמשחק (EXE — סגירת התוכנה). */

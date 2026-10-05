@@ -5,6 +5,7 @@
  *
  * שימוש: buildXlsxBlob([{ name: 'משתתפים', rows: [[...], ...] }, ...]).
  * שורת הכותרת (הראשונה) מודגשת אוטומטית. תאים: מחרוזת / מספר / null (ריק).
+ * ‎cols‎ (לא חובה) — רוחב כל עמודה בתווים, כמו ‎wch‎ של SheetJS.
  */
 
 import JSZip from 'jszip';
@@ -13,6 +14,8 @@ export type Cell = string | number | null | undefined;
 export interface SheetData {
   name: string;
   rows: Cell[][];
+  /** רוחב העמודות בתווים, לפי הסדר (A, B, …). */
+  cols?: number[];
 }
 
 /** אינדקס עמודה (0-based) → אות עמודה של אקסל (A, B, …, Z, AA, …). */
@@ -61,7 +64,22 @@ function cellXml(ref: string, value: Cell, bold: boolean): string {
   return `<c r="${ref}"${s} t="inlineStr"><is><t xml:space="preserve">${text}</t></is></c>`;
 }
 
-function sheetXml(rows: Cell[][]): string {
+/**
+ * רוחב עמודה בתווים → יחידות הרוחב של אקסל: תווים ועוד ריפוד של 5 פיקסלים,
+ * ביחס לרוחב ספרה (7 פיקסלים בגופן ברירת המחדל), בשלמויות של 1/256.
+ */
+function colsXml(cols: number[] | undefined): string {
+  if (cols === undefined || cols.length === 0) return '';
+  const items = cols
+    .map((chars, i) => {
+      const width = Math.floor(((chars * 7 + 5) / 7) * 256) / 256;
+      return `<col min="${i + 1}" max="${i + 1}" width="${width}" customWidth="1"/>`;
+    })
+    .join('');
+  return `<cols>${items}</cols>`;
+}
+
+function sheetXml(rows: Cell[][], cols?: number[]): string {
   const body = rows
     .map((row, r) => {
       const cells = row
@@ -74,6 +92,7 @@ function sheetXml(rows: Cell[][]): string {
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
     '<sheetViews><sheetView rightToLeft="1" workbookViewId="0"/></sheetViews>' +
+    colsXml(cols) +
     `<sheetData>${body}</sheetData>` +
     '</worksheet>'
   );
@@ -147,7 +166,7 @@ export async function buildXlsxBlob(sheets: SheetData[]): Promise<Blob> {
   zip.file('xl/workbook.xml', workbook);
   zip.file('xl/_rels/workbook.xml.rels', workbookRels);
   zip.file('xl/styles.xml', STYLES_XML);
-  named.forEach((s, i) => zip.file(`xl/worksheets/sheet${i + 1}.xml`, sheetXml(s.rows)));
+  named.forEach((s, i) => zip.file(`xl/worksheets/sheet${i + 1}.xml`, sheetXml(s.rows, s.cols)));
 
   return zip.generateAsync({
     type: 'blob',
