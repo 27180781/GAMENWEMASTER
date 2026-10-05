@@ -140,8 +140,9 @@ async function fetchOptional(url, baseMs) {
 }
 
 /**
- * מפות הבלוקים של הגרסאות הקודמות — לעדכון ההפרשי *הראשון* של לקוח: המפה של
- * הגרסה המותקנת אצלו נמשכת מהשרת (אחר כך היא כבר שמורה אצלו במטמון). מה שיש
+ * מפות הבלוקים של הגרסאות הקודמות — לעדכון ההפרשי של לקוח: המפה של הגרסה
+ * המותקנת אצלו נמשכת מהשרת בכל עדכון (המטמון שלו רק גיבוי, כי הוא יכול לתאר
+ * גרסה שהורדה ולא הותקנה — ראו downloadUpdateResumable ב-electron/main.cjs). מה שיש
  * במהדורה נשמר; מה שחסר (נבנה לפני שהמפות התחילו להתפרסם, או מספר בנייה
  * שדולג) פשוט נעדר.
  */
@@ -164,6 +165,19 @@ async function fetchPreviousBlockmaps(outDir, version, count, baseMs) {
       : '  · אין מפות בלוקים לגרסאות קודמות במהדורה',
   );
   return found;
+}
+
+/**
+ * «מה חדש» (changelog.json, נבנה ב-build-desktop) — לעמוד ההורדה בלבד, ולכן
+ * best-effort: קובץ חסר או פגום פשוט לא מוגש, והעמוד מציג את הגרסה בלי הרשימה.
+ */
+export function parseChangelog(buf) {
+  try {
+    const parsed = JSON.parse(buf.toString('utf8'));
+    return Array.isArray(parsed?.versions) ? parsed : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -240,6 +254,12 @@ async function fetchOnce(
   // (1ג) המפות של הגרסאות הקודמות — best-effort.
   const previous = await fetchPreviousBlockmaps(outDir, version, previousBlockmaps, retryBaseMs);
 
+  // (1ד) «מה חדש» לעמוד ההורדה — best-effort.
+  const notes = await fetchOptional(`${SOURCE}/changelog.json`, retryBaseMs);
+  const changelog = notes !== null && parseChangelog(notes) !== null ? 'changelog.json' : null;
+  if (changelog !== null) writeFileSync(join(outDir, changelog), notes);
+  console.log(changelog !== null ? '  ✓ changelog.json' : '  · אין changelog.json במהדורה');
+
   // (2) הקובץ הנייד — להורדה ישירה, וגם הבסיס שכלי החתימה מוריד.
   const portable = `HavayaBeClick-${version}.exe`;
   console.log(`מוריד ${portable} …`);
@@ -266,7 +286,7 @@ async function fetchOnce(
   writeFileSync(
     join(outDir, 'index.json'),
     `${JSON.stringify(
-      { version, installer, blockmap, previousBlockmaps: previous, portable, source: SOURCE, builtAt: new Date().toISOString() },
+      { version, installer, blockmap, previousBlockmaps: previous, portable, changelog, source: SOURCE, builtAt: new Date().toISOString() },
       null,
       2,
     )}\n`,
@@ -276,6 +296,7 @@ async function fetchOnce(
   const seen = new Set();
   let total = 0;
   const files = ['latest.yml', installer, blockmap, ...previous, portable, 'TriviaEngine-Setup.exe', 'TriviaEngine-Portable.exe', 'SealEXE.exe', 'index.json'];
+  if (changelog !== null) files.push(changelog);
   for (const f of files) {
     const st = statSync(join(outDir, f));
     if (seen.has(st.ino)) continue;

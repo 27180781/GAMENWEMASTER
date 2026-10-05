@@ -25,7 +25,7 @@ const { remoteErrorMessage } = require('./remoteErrors.cjs');
 const { hasZipEndRecord, tailLength } = require('./zipIntegrity.cjs');
 const { downloadGameDirect } = require('./remoteGame.cjs');
 const { downloadToFile, downloadRange } = require('./netDownload.cjs');
-const { downloadUpdate, parseBlockMap, oldBlockMapUrl } = require('./updateDownload.cjs');
+const { downloadUpdate, parseBlockMap, oldBlockMapUrl, pickOldBlockMap } = require('./updateDownload.cjs');
 const {
   writeEncryptedMedia,
   readEncryptedMediaRange,
@@ -294,6 +294,15 @@ function readFileOrNull(file) {
   }
 }
 
+/** @param {string} file */
+function fileSizeOrZero(file) {
+  try {
+    return fs.statSync(file).size;
+  } catch {
+    return 0;
+  }
+}
+
 function scheduleUpdateRetry() {
   if (updateRetryTimer !== null) return;
   updateRetryTimer = setTimeout(() => {
@@ -324,12 +333,20 @@ async function downloadUpdateResumable(info) {
     const fileInfo = files.find((f) => String(f.url).toLowerCase().endsWith('.exe')) ?? files[0] ?? null;
     const fileName = path.basename(String(fileInfo?.url ?? info.path ?? ''));
     const newUrl = `${DESKTOP_BASE_URL}/${fileName}`;
-    // המטמון של electron-updater: pending/ לקובץ המוכן, installer.exe ו-current.blockmap של הגרסה המותקנת
+    // המטמון של electron-updater: pending/ לקובץ המוכן, ו-installer.exe — המתקין של הגרסה המותקנת
+    // (NSIS מעתיק את עצמו לשם בכל התקנה, גם בהתקנה נקייה).
     const helper = await /** @type {any} */ (u).getOrCreateDownloadHelper();
     const pendingDir = String(helper.cacheDirForPendingUpdate);
     const cacheDir = String(helper.cacheDir);
-    let oldBlockMap = parseBlockMap(readFileOrNull(path.join(cacheDir, 'current.blockmap')));
-    if (oldBlockMap === null) oldBlockMap = parseBlockMap(await fetchSmall(oldBlockMapUrl(newUrl, version, app.getVersion())));
+    const oldFile = path.join(cacheDir, 'installer.exe');
+    // המפה של installer.exe. קודם זו שבשרת לגרסה המותקנת; current.blockmap שבמטמון רק כגיבוי
+    // (גרסה ישנה מ-12 בניות), כי הוא מתאר את מה ש*הורד* אחרון ולא בהכרח את מה שהותקן:
+    // electron-updater מעתיק אותו בסיום הורדה, והסרת התוכנה אינה מוחקת את המטמון. כך
+    // התקנה נקייה של 189 מעל מטמון שהשאירה 151 הורידה את 190 במלואו (5.10.2026).
+    const serverOldMap = parseBlockMap(await fetchSmall(oldBlockMapUrl(newUrl, version, app.getVersion())));
+    const cachedOldMap = parseBlockMap(readFileOrNull(path.join(cacheDir, 'current.blockmap')));
+    const oldBlockMap = pickOldBlockMap([serverOldMap, cachedOldMap], fileSizeOrZero(oldFile));
+    if (oldBlockMap === null) console.log('[update] אין מפת בלוקים שתואמת למתקין שבמטמון — הורדה מלאה');
     const newBlockMap = parseBlockMap(await fetchSmall(`${newUrl}.blockmap`));
     const res = await downloadUpdate({
       pendingDir,
@@ -337,7 +354,7 @@ async function downloadUpdateResumable(info) {
       sha512: String(fileInfo?.sha512 ?? info.sha512 ?? ''),
       size: Number(fileInfo?.size) || 0,
       newUrl,
-      oldFile: path.join(cacheDir, 'installer.exe'),
+      oldFile,
       oldBlockMap,
       newBlockMap,
       fetchRange: (url, start, end, sink) => downloadRange(net, url, start, end, sink),

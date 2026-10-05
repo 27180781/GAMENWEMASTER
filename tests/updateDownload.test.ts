@@ -36,6 +36,8 @@ const mod = require('../electron/updateDownload.cjs') as {
   buildPlan: (a: { oldBlockMap: BlockMap | null; newBlockMap: BlockMap | null; oldFile: string | null; size: number; log: (m: string) => void }) => { ops: { kind: number; start: number; end: number }[]; differential: boolean };
   oldBlockMapUrl: (newUrl: string, newVersion: string, oldVersion: string) => string;
   parseBlockMap: (buf: Buffer | null) => BlockMap | null;
+  blockMapSize: (map: BlockMap) => number;
+  pickOldBlockMap: (candidates: (BlockMap | null)[], oldSize: number) => BlockMap | null;
 };
 
 const BLOCK = 64 * 1024;
@@ -246,5 +248,67 @@ describe('downloadUpdate', () => {
     );
     expect(mod.parseBlockMap(Buffer.from('<html>'))).toBeNull();
     expect(mod.parseBlockMap(null)).toBeNull();
+  });
+
+  it('★ מפה ישנה במטמון (הורדה שלא הותקנה / שארית מהתקנה קודמת): נבחרת המפה שתואמת למתקין, וההפרש מצליח', async () => {
+    // המטמון מחזיק מפה של גרסה שהורדה ולא הותקנה — אותו גודל, תוכן אחר.
+    const stale = mapOf([A, B, X]);
+    const installed = mapOf(oldBlocks);
+
+    // כך היה עד 5.10.2026: המפה מהמטמון קודמת — ההפרש נבנה מבלוקים לא נכונים ונפסל.
+    const before = setup();
+    const broken = await mod.downloadUpdate({
+      pendingDir: before.pendingDir,
+      fileName: 'Setup-2.exe',
+      sha512: sha512(newFile),
+      size: newFile.length,
+      newUrl: 'https://host/desktop/Setup-2.exe',
+      oldFile: before.oldFile,
+      oldBlockMap: stale,
+      newBlockMap: mapOf(newBlocks),
+      fetchRange: server(newFile).fetchRange,
+    });
+    expect(broken.ok).toBe(false);
+    rmSync(dir, { recursive: true, force: true });
+
+    // עכשיו: המפה מהשרת לגרסה המותקנת קודמת, והמטמון רק כגיבוי.
+    const { pendingDir, oldFile: old } = setup();
+    const chosen = mod.pickOldBlockMap([installed, stale], oldFile.length);
+    expect(chosen).toBe(installed);
+    const net = server(newFile);
+    const res = await mod.downloadUpdate({
+      pendingDir,
+      fileName: 'Setup-2.exe',
+      sha512: sha512(newFile),
+      size: newFile.length,
+      newUrl: 'https://host/desktop/Setup-2.exe',
+      oldFile: old,
+      oldBlockMap: chosen,
+      newBlockMap: mapOf(newBlocks),
+      fetchRange: net.fetchRange,
+    });
+    expect(res.ok).toBe(true);
+    expect(res.differential).toBe(true);
+    expect(net.served()).toBe(X.length + Y.length);
+  });
+
+  it('pickOldBlockMap: רק מפה בגודל המתקין שבמטמון, לפי סדר העדיפות', () => {
+    const installed = mapOf(oldBlocks);
+    const other = mapOf(newBlocks); // גרסה אחרת, גודל אחר
+    expect(mod.blockMapSize(installed)).toBe(oldFile.length);
+    expect(mod.blockMapSize(other)).toBe(newFile.length);
+    expect(
+      mod.blockMapSize({ version: '2', files: [{ name: 'a', offset: 0, checksums: ['x'], sizes: [10] }, { name: 'b', offset: 10, checksums: ['y'], sizes: [5, 7] }] }),
+    ).toBe(22);
+    expect(mod.pickOldBlockMap([installed, other], oldFile.length)).toBe(installed);
+    // אין מפה בשרת (גרסה ישנה מ-12 בניות) — המטמון, אם הוא תואם
+    expect(mod.pickOldBlockMap([null, installed], oldFile.length)).toBe(installed);
+    // המטמון מתאר קובץ אחר — הורדה מלאה מיד, בלי הפרש שייפסל
+    expect(mod.pickOldBlockMap([null, other], oldFile.length)).toBeNull();
+    expect(mod.pickOldBlockMap([installed], 0)).toBeNull();
+    // מפה פגומה (תשובה זרה מהשרת) — נפסלת בלי לזרוק, והמטמון התקין עדיין נבחר
+    const broken = { version: '2', files: [{ name: 'file', offset: 0, checksums: ['x'] }] } as unknown as BlockMap;
+    expect(Number.isNaN(mod.blockMapSize(broken))).toBe(true);
+    expect(mod.pickOldBlockMap([broken, installed], oldFile.length)).toBe(installed);
   });
 });
