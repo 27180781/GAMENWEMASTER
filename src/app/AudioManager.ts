@@ -30,6 +30,14 @@ interface PendingPlay {
   loop: boolean;
 }
 
+/** מה שהמנהל התבקש לנגן — לשיקוף במסך הצפייה (src/live/soundTrack.ts). */
+export type AudioEvent =
+  | { type: 'play'; channel: SoundChannel; src: string | null; loop: boolean }
+  | { type: 'stop'; channel: SoundChannel }
+  | { type: 'stopAll' }
+  | { type: 'applause' }
+  | { type: 'cue'; kind: 'climb' | 'fall' | 'fanfare' };
+
 // הערה: טעינת הסאונד מראש מטופלת מרוכז ב-mediaLoader (useMediaPreload) יחד עם
 // שאר המדיה — כאן רק ניגון בפועל.
 
@@ -45,6 +53,7 @@ export class AudioManager {
   private applauseSource: AudioBufferSourceNode | null = null;
   /** מאזין הפתיחה (unlock) — נשמר כדי שאפשר יהיה להסירו ב-dispose. */
   private readonly unlockFn: () => void;
+  private observer: ((event: AudioEvent) => void) | null = null;
 
   constructor() {
     // אם ל-document כבר הייתה אינטראקציה (sticky activation) — למשל הקליק על
@@ -84,6 +93,22 @@ export class AudioManager {
     window.removeEventListener('keydown', this.unlockFn);
   }
 
+  /**
+   * מקבל כל בקשת ניגון/עצירה — כך מסך הצפייה שומע מה שהמסך הראשי מנגן. כשל
+   * של המאזין לעולם לא פוגע בסאונד של המשחק עצמו.
+   */
+  setObserver(observer: ((event: AudioEvent) => void) | null): void {
+    this.observer = observer;
+  }
+
+  private emit(event: AudioEvent): void {
+    try {
+      this.observer?.(event);
+    } catch {
+      /* מסך הצפייה הוא תוספת — לא עוצרים בגללו את הסאונד */
+    }
+  }
+
   /** ניקוי מלא בעזיבת המשחק: עצירת כל הסאונדים והסרת מאזיני ה-unlock מ-window. */
   dispose(): void {
     this.stopAll();
@@ -97,6 +122,7 @@ export class AudioManager {
 
   /** מנגן src בערוץ נתון; קודם עוצר כל סאונד אחר שמתנגן. src ריק/null עוצר בלבד. */
   play(channel: SoundChannel, src: string | null, { loop = false } = {}): void {
+    this.emit({ type: 'play', channel, src, loop });
     // סאונד חדש עוצר את כל הקודמים (כל הערוצים + מחיאות כפיים) — בלי ערבוב
     this.stopActiveSounds();
     this.pending.clear();
@@ -139,6 +165,7 @@ export class AudioManager {
   }
 
   stop(channel: SoundChannel): void {
+    this.emit({ type: 'stop', channel });
     this.pending.delete(channel);
     const audio = this.active.get(channel);
     if (audio) {
@@ -166,6 +193,7 @@ export class AudioManager {
   }
 
   stopAll(): void {
+    this.emit({ type: 'stopAll' });
     this.stopActiveSounds();
     this.pending.clear();
   }
@@ -175,6 +203,7 @@ export class AudioManager {
    * מאות "כפיים" של רעש לבן קצר עם מעטפת דעיכה, בפיזור אקראי שמתדלדל לקראת הסוף.
    */
   playApplause(): void {
+    this.emit({ type: 'applause' });
     try {
       this.context ??= new AudioContext();
       const ctx = this.context;
@@ -209,6 +238,7 @@ export class AudioManager {
    * ולעיתים שני אפקטים קורים יחד (קבוצה מטפסת בזמן שאחרת נופלת).
    */
   playCue(kind: 'climb' | 'fall' | 'fanfare'): void {
+    this.emit({ type: 'cue', kind });
     try {
       this.context ??= new AudioContext();
       const ctx = this.context;

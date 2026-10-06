@@ -18,7 +18,8 @@ interface VotesBreakdownProps {
   nameOf: (voterId: string) => string;
   /** תגי מספר (1,2,3…) או אותיות (A,B,C…) — לפי ansIsNumber שבקובץ. */
   ansIsNumber: boolean;
-  onClose: () => void;
+  /** בלי סגירה (מסך הצפייה) — אין כפתור ואין סגירה בלחיצה. */
+  onClose?: (() => void) | undefined;
 }
 
 /** מקסימום שמות שמוצגים לכל תשובה לפני "ועוד N" — כדי לא לגלוש מהמסך. */
@@ -56,9 +57,11 @@ export function VotesBreakdown({ slide, votes, nameOf, ansIsNumber, onClose }: V
             )}
           </h2>
           <span className="votes-total">{total} הצבעות</span>
-          <button className="votes-close" title="סגירה (5)" onClick={onClose}>
-            ✕
-          </button>
+          {onClose !== undefined && (
+            <button className="votes-close" title="סגירה (5)" onClick={onClose}>
+              ✕
+            </button>
+          )}
         </div>
 
         <div className={`votes-cols${isImages ? ' votes-cols--images' : ''}`}>

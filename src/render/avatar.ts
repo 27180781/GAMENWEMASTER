@@ -30,5 +30,18 @@ export function railInitial(name: string): string {
 
 /** הצבע הקבוע של השחקן לפי מזההו. */
 export function avatarColor(id: string): string {
+  const override = colorOverrides?.get(id);
+  if (override !== undefined) return override;
   return RAIL_COLORS[hashId(id) % RAIL_COLORS.length]!;
+}
+
+/**
+ * מסך הצפייה (src/live) מקבל כינויים במקום מזהים, ואיתם את הצבע שהמסך הראשי
+ * נתן לכל אחד — כך שאותו שחקן נראה באותו צבע בשני המסכים. במסך הראשי אין
+ * כאן כלום.
+ */
+let colorOverrides: ReadonlyMap<string, string> | null = null;
+
+export function setAvatarColorOverrides(colors: ReadonlyMap<string, string> | null): void {
+  colorOverrides = colors;
 }

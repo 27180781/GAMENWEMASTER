@@ -14,7 +14,7 @@
  * ומייצגים את כפתורי השלט — אינם מושפעים מהערכה.
  */
 
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useContext, useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
   descendingScoreAt,
   descendingScoreOf,
@@ -29,6 +29,7 @@ import {
 } from '../engine/index.ts';
 import { slideGroupRestriction } from '../app/groupRestriction.ts';
 import { FitText } from './FitText.tsx';
+import { LiveMirrorContext } from './mediaPause.ts';
 import { displayText } from './multiline.ts';
 import type { TimerView } from './TimerRing.tsx';
 
@@ -84,6 +85,11 @@ interface QuestionSlideProps {
   gameType?: string;
   /** הימור פעיל שהשאלה הזאת מכריעה (ראו bet.ts) — לפס בכותרת; null = אין. */
   betPill?: { bettors: number; total: number } | null;
+  /**
+   * כמה ענו נכון — מגיע מבחוץ במסך הצפייה, שבו סימון התשובה הנכונה מוסתר עד
+   * החשיפה (src/live/snapshot.ts) ולכן אי אפשר לחשב אותו כאן. null = מחשבים.
+   */
+  liveCorrectCount?: number | null;
 }
 
 /** סגנון השם המתעופף (setting.voterNameStyle). */
@@ -105,8 +111,19 @@ export function Flyers({ players, style = 'plain' }: { players: RailPlayer[]; st
   const [flyers, setFlyers] = useState<Flyer[]>([]);
   const seenRef = useRef<Set<string>>(new Set());
   const keyRef = useRef(0);
+  // מסך הצפייה: מי שכבר הצביע כשהמסך עלה לא "עף" — אחרת צופה שנכנס באמצע
+  // רואה את כל המצביעים עפים בבת אחת.
+  const mirror = useContext(LiveMirrorContext);
+  const primedRef = useRef(false);
 
   useEffect(() => {
+    if (!primedRef.current) {
+      primedRef.current = true;
+      if (mirror) {
+        players.forEach((p) => seenRef.current.add(p.id));
+        return;
+      }
+    }
     if (players.length === 0) {
       seenRef.current = new Set(); // מעבר שקופית — איפוס
       return;
@@ -124,7 +141,7 @@ export function Flyers({ players, style = 'plain' }: { players: RailPlayer[]; st
       variant: Math.floor(Math.random() * 3),
     }));
     setFlyers((prev) => [...prev, ...additions]);
-  }, [players]);
+  }, [players, mirror]);
 
   const remove = (key: number) => setFlyers((prev) => prev.filter((f) => f.key !== key));
 
@@ -343,6 +360,7 @@ export function QuestionSlide({
   logo,
   gameType = 'classic',
   betPill = null,
+  liveCorrectCount = null,
 }: QuestionSlideProps) {
   const isVoting = state.phase === 'voting';
   // מונה הצבעות חי (setting.liveVoteCounts) — כמה בחרו בכל תשובה, בזמן ההצבעה.
@@ -401,9 +419,9 @@ export function QuestionSlide({
   const reveal = imageRevealOf(slide);
 
   // אחוז שענו נכון (מתוך מי שענה) — לפס הירוק/אדום החי בתחתית, בזמן ההצבעה.
-  const correctCount = answers
-    .filter((a) => a.correct)
-    .reduce((sum, a) => sum + (counts[String(a.id)] ?? 0), 0);
+  const correctCount =
+    liveCorrectCount ??
+    answers.filter((a) => a.correct).reduce((sum, a) => sum + (counts[String(a.id)] ?? 0), 0);
   const correctPct = total > 0 ? Math.round((correctCount / total) * 100) : 0;
 
   return (

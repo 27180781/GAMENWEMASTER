@@ -11,8 +11,9 @@ interface GroupConnectScreenProps {
   /** groupId → כמה הצטרפו. */
   counts: Record<string, number>;
   total: number;
-  onReset: () => void;
-  onClose: () => void;
+  /** בלי פעולות (מסך הצפייה) — אין כפתורי סגירה ואיפוס. */
+  onReset?: (() => void) | undefined;
+  onClose?: (() => void) | undefined;
 }
 
 /** צבעי מספרי הקבוצות — תואמים למטבעות התשובות (ירוק/אדום/לבן/זהב/כחול/כתום…). */
@@ -39,9 +40,11 @@ export function GroupConnectScreen({
   return (
     <div className="screen gconn-screen" dir="rtl">
       <div className="screen-content gconn-content">
-        <button className="gconn-close" onClick={onClose} title="סגירה">
-          ✕
-        </button>
+        {onClose !== undefined && (
+          <button className="gconn-close" onClick={onClose} title="סגירה">
+            ✕
+          </button>
+        )}
         <h1 className="gconn-title">התחברות לקבוצות · {categoryName}</h1>
         <p className="gconn-sub">הקישו את מספר הקבוצה שלכם כדי להצטרף · אפשר לתקן בכל רגע (הקשה אחרונה קובעת)</p>
 
@@ -64,9 +67,11 @@ export function GroupConnectScreen({
 
         <div className="gconn-footer">
           <span className="gconn-total">סה״כ מחוברים: <b>{total}</b></span>
-          <button className="gconn-reset" onClick={onReset}>
-            ♻ איפוס המחוברים לקטגוריה
-          </button>
+          {onReset !== undefined && (
+            <button className="gconn-reset" onClick={onReset}>
+              ♻ איפוס המחוברים לקטגוריה
+            </button>
+          )}
         </div>
       </div>
     </div>

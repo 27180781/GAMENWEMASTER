@@ -125,6 +125,7 @@ import {
   type HostStateSnapshot,
 } from './controlChannel.ts';
 import { GroupConnectScreen } from '../render/GroupConnectScreen.tsx';
+import { useLivePublisher } from '../live/useLivePublisher.ts';
 import {
   endGame,
   getBackup,
@@ -2660,6 +2661,59 @@ export function GameHost({
     });
   }, [engine, narration]);
 
+  // מסך הצפייה (‎?view=‎, src/live): במשחק אונליין המסך הזה משודר בלייב למי
+  // שפתח את קישור הצפייה — מה שמוצג כאן, בלי מה שמיועד למנחה בלבד.
+  const connectCat =
+    connectCategory === null ? undefined : roster.categories.find((c) => c.id === connectCategory);
+  const live = useLivePublisher({
+    enabled: useSocket,
+    gameId: game.id,
+    roomId,
+    audio,
+    frame: {
+      stage,
+      game: engine.getGame(),
+      state,
+      reveal,
+      timer,
+      players,
+      leaders,
+      lobby: connectedPlayers,
+      nameOf,
+      roster,
+      groupBonus,
+      join: { show: showJoinBanner, code: roomId, qrUrl: showQrCode ? qrUrl : null },
+      overlays: {
+        leaders: leadersOverlay,
+        votes: votesOverlay,
+        lobby: lobbyOverlay,
+        bet: betOverlay,
+        groups: groupsOverlay ? { categoryIndex: groupsCatIndex } : null,
+        board: boardOverlay
+          ? {
+              board,
+              groups: roster.categories.find((c) => c.id === boardCategoryId(roster))?.groups ?? [],
+              progression: setting.gameTypeSettings.snakesLadders.progression,
+            }
+          : null,
+        connect:
+          connectCat === undefined || connectCategory === null
+            ? null
+            : {
+                categoryName: connectCat.name || 'קטגוריה',
+                groups: connectCat.groups,
+                counts: groupCounts(roster, connectCategory),
+                total: categoryMemberTotal(roster, connectCategory),
+              },
+        raffle,
+      },
+      winnersRevealed,
+      functionStatus,
+      functionDetail,
+      paused: overlayActive,
+    },
+  });
+
   // תוצאות הימור שממתינות להצגה — לרמז הרווח בפס ההנחיות
   const betOutcomesNow = state.betOutcomes[state.currentSlideId];
   const betPending =
@@ -2669,7 +2723,9 @@ export function GameHost({
     Object.keys(betOutcomesNow).length > 0 &&
     betShownForRef.current !== state.currentSlideId;
 
-  // קליק עכבר אינו מקדם שלבים — קידום רק ברווח/0 (בקשת המנחה)
+  // קליק עכבר אינו מקדם שלבים — קידום רק ברווח/0 (בקשת המנחה).
+  // מה שהקהל רואה כאן משוכפל במסך הצפייה (src/live/LiveViewer.tsx) — שינוי
+  // במסכים או בשכבות שמוצגים לקהל צריך להשתקף גם שם.
   return (
     <div
       className={`game-root${showJoinBanner && stage !== 'opening' ? ' has-banner' : ''}`}
@@ -2806,7 +2862,12 @@ export function GameHost({
           <WinnersScreen engine={engine} nameOf={nameOf} revealed={winnersRevealed} />
         )}
         {stage === 'scoreboard' && (
-          <AllScoresScreen engine={engine} nameOf={nameOf} pageBump={scoresPageBump} />
+          <AllScoresScreen
+            engine={engine}
+            nameOf={nameOf}
+            pageBump={scoresPageBump}
+            onPageChange={live.onScoresPage}
+          />
         )}
 
         {/* טבלת הניקוד באמצע משחק (פקודת מנחה 1) — מסך נפרד מלא מעל כל התצוגה */}

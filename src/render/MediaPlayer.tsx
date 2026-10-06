@@ -6,7 +6,7 @@
 
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { classifyMediaUrl, isYoutubeUrl, youtubeEmbedUrl, youtubeVideoId } from '../engine/index.ts';
-import { MediaPauseContext } from './mediaPause.ts';
+import { MediaClockContext, MediaMutedContext, MediaPauseContext } from './mediaPause.ts';
 import { startYoutubeHandshake } from './youtubeHandshake.ts';
 
 interface MediaPlayerProps {
@@ -65,6 +65,8 @@ export function MediaPlayer({ src, onEnded, asBackground = false, className }: M
   // ---- עצירה בזמן שכבה חוסמת + חיווי טעינה ----
   const elRef = useRef<HTMLMediaElement | null>(null);
   const pausedByOverlay = useContext(MediaPauseContext);
+  const forceMuted = useContext(MediaMutedContext);
+  const startedAt = useContext(MediaClockContext);
   /** האם *אנחנו* עצרנו — כדי לא להפעיל מחדש וידאו שנגמר או שהמנחה עצר. */
   const overlayPausedRef = useRef(false);
   /**
@@ -83,10 +85,36 @@ export function MediaPlayer({ src, onEnded, asBackground = false, className }: M
       // רקע = מושתק. התכונה muted ב-JSX אינה אמינה ל-autoplay (React מגדיר אותה
       // כ-attribute ולא כ-property בזמן, אז הדפדפן עלול להתחיל לנגן *עם* קול);
       // לכן מגדירים muted ישירות על ה-DOM ברגע שהמרכיב נוצר.
-      if (node && node instanceof HTMLVideoElement) node.muted = asBackground;
+      if (node && node instanceof HTMLVideoElement) node.muted = asBackground || forceMuted;
+      else if (node && node instanceof HTMLAudioElement && forceMuted) node.muted = true;
     },
-    [asBackground],
+    [asBackground, forceMuted],
   );
+
+  // מסך הצפייה: הצופה הפעיל/כיבה צליל באמצע — מעדכנים את הנגן הקיים במקום
+  // להחליף אותו (החלפה הייתה מתחילה את הסרטון מההתחלה).
+  useEffect(() => {
+    const el = elRef.current;
+    if (!el) return;
+    if (el instanceof HTMLVideoElement) el.muted = asBackground || forceMuted;
+    else if (el instanceof HTMLAudioElement) el.muted = forceMuted;
+  }, [forceMuted, asBackground, loadSrc]);
+
+  // מסך הצפייה: מי שנכנס באמצע סרטון קופץ לנקודה שבה המסך הראשי נמצא.
+  useEffect(() => {
+    const el = elRef.current;
+    if (!el || asBackground || startedAt === null) return undefined;
+    const seek = () => {
+      const offset = (Date.now() - startedAt) / 1000;
+      if (offset > 1.5 && Number.isFinite(el.duration) && offset < el.duration - 0.5) el.currentTime = offset;
+    };
+    if (el.readyState >= 1) {
+      seek();
+      return undefined;
+    }
+    el.addEventListener('loadedmetadata', seek, { once: true });
+    return () => el.removeEventListener('loadedmetadata', seek);
+  }, [loadSrc, startedAt, asBackground]);
 
   // מנוי לאירועי הבאפר של הנגן — מקור אמת ישיר, בלי ניחושים לפי זמן.
   useEffect(() => {
@@ -238,6 +266,19 @@ function YouTubeEmbed({
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const endedRef = useRef(false);
+  // מסך הצפייה: מושתק עד שהצופה מפעיל צליל. הפרמטר נקבע פעם אחת (שינוי שלו
+  // היה טוען את הסרטון מחדש); שינוי אחר כך עובר כפקודה לנגן.
+  const forceMuted = useContext(MediaMutedContext);
+  const [mutedAtLoad] = useState(forceMuted);
+  const lastMutedRef = useRef(forceMuted);
+  useEffect(() => {
+    if (lastMutedRef.current === forceMuted) return;
+    lastMutedRef.current = forceMuted;
+    iframeRef.current?.contentWindow?.postMessage(
+      JSON.stringify({ event: 'command', func: forceMuted ? 'mute' : 'unMute', args: [] }),
+      '*',
+    );
+  }, [forceMuted]);
   /**
    * הקריאות החוזרות נשמרות ב-ref ואינן ב-deps של האפקט. בלי זה כל רינדור
    * מחדש (למשל חיווי הטעינה) היה יוצר פונקציה חדשה, האפקט היה רץ שוב, וטיימר
@@ -319,6 +360,7 @@ function YouTubeEmbed({
     'iv_load_policy=3',
     'rel=0',
     'playsinline=1',
+    ...(mutedAtLoad ? ['mute=1'] : []),
   ].join('&');
   const url = `${embed}${separator}${params}`;
 
