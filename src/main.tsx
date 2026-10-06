@@ -4,6 +4,8 @@ import { App } from './app/App.tsx';
 import { HostConsole } from './render/HostConsole.tsx';
 import { LiveViewer } from './live/LiveViewer.tsx';
 import { registerMediaServiceWorker } from './app/mediaSW.ts';
+import { VOTE_SERVER_URL } from './app/socketAdapter.ts';
+import { parseAppParams } from './app/urlParams.ts';
 import './render/styles.css';
 import './render/themes.css';
 
@@ -16,13 +18,17 @@ const isHost =
   window.location.hash === '#host' || new URLSearchParams(window.location.search).get('host') === '1';
 
 // ‎?view=<קוד>‎ — מסך הצפייה של משחק אונליין: המסך הראשי בשידור חי, בלי שום
-// שליטה (src/live). לא טוען משחק ולא מתחבר לשרת ההצבעות.
+// שליטה (src/live). לא טוען משחק; מי שכותב את שמו עונה ממנו דרך שרת ההצבעות,
+// כמו מהטלפון (‎?voteServer=‎ דורס את השרת, כמו במסך הראשי).
 const viewToken = new URLSearchParams(window.location.search).get('view');
 
 createRoot(rootElement).render(
   <StrictMode>
     {viewToken !== null ? (
-      <LiveViewer token={viewToken.trim().toLowerCase()} />
+      <LiveViewer
+        token={viewToken.trim().toLowerCase()}
+        voteServerUrl={parseAppParams(window.location.search).voteServer ?? VOTE_SERVER_URL}
+      />
     ) : isHost ? (
       <HostConsole />
     ) : (

@@ -1,13 +1,14 @@
 /**
- * מסך הצפייה (‎?view=<קוד>‎) — המסך הראשי של משחק אונליין, בשידור חי, לצפייה
- * בלבד: בלי מקלדת, בלי כפתורי משחק ובלי שום דרך להשפיע על המשחק.
+ * מסך הצפייה (‎?view=<קוד>‎) — המסך הראשי של משחק אונליין, בשידור חי: בלי
+ * מקלדת, בלי כפתורי משחק ובלי שום דרך להשפיע על המסך עצמו.
  *
  * הוא מרנדר את אותם רכיבים כמו GameHost, באותו סדר שכבות, מתוך מצב המסך
  * שהמסך הראשי משדר (subscriber.ts → mirrorEngine.ts). **שינוי במה שהמסך
  * הראשי מציג (GameHost.tsx, החלק שאחרי `return (`) צריך להשתקף גם כאן.**
  *
  * מה שיש לצופה בלבד: הפעלת צליל (דפדפנים לא מנגנים קול בלי נגיעה של
- * המשתמש — עד אז סרטונים מתנגנים מושתקים) ומסך מלא. שניהם מקומיים לגמרי.
+ * המשתמש — עד אז סרטונים מתנגנים מושתקים), מסך מלא, ולמי שכותב את שמו —
+ * שלט הצבעה ליד המסך (VotePad.tsx), שעונה דרך שרת ההצבעות בדיוק כמו טלפון.
  */
 
 import {
@@ -48,6 +49,8 @@ import { themeRootProps } from '../render/theme.ts';
 import type { TimerView } from '../render/TimerRing.tsx';
 import { VotesBreakdown } from '../render/VotesBreakdown.tsx';
 import { mirrorEngine } from './mirrorEngine.ts';
+import { JoinCard, VotePad } from './VotePad.tsx';
+import { joinFields, padRoom, postToVoteServer, savePlayerName } from './votePad.ts';
 import { mirrorSoundActions } from './soundTrack.ts';
 import { LiveSubscriber, type ViewerConnection, type ViewerUpdate } from './subscriber.ts';
 import { isViewToken, liveRelayBase } from './token.ts';
@@ -164,7 +167,7 @@ class RenderGuard extends Component<RenderGuardProps, { failed: boolean; key: un
   }
 }
 
-export function LiveViewer({ token }: { token: string }) {
+export function LiveViewer({ token, voteServerUrl }: { token: string; voteServerUrl: string }) {
   if (!isViewToken(token)) {
     return (
       <div className="live-viewer">
@@ -178,10 +181,17 @@ export function LiveViewer({ token }: { token: string }) {
       </div>
     );
   }
-  return <ValidLiveViewer token={token} />;
+  return <ValidLiveViewer token={token} voteServerUrl={voteServerUrl} />;
 }
 
-function ValidLiveViewer({ token }: { token: string }) {
+/**
+ * ‏ask — חלונית השם פתוחה (בכניסה, או כשביקשו להחליף שם / לחזור להצבעה);
+ * watch — רק צופים; play — עם שלט הצבעה, בשם הזה.
+ */
+type PlayerMode =
+  { phase: 'ask'; name: string | null } | { phase: 'watch' } | { phase: 'play'; name: string };
+
+function ValidLiveViewer({ token, voteServerUrl }: { token: string; voteServerUrl: string }) {
   const [update, setUpdate] = useState<ViewerUpdate>({
     snapshot: null,
     connection: 'connecting',
@@ -203,6 +213,59 @@ function ValidLiveViewer({ token }: { token: string }) {
   }, []);
 
   const snap = update.snapshot;
+  // השלט צריך את קוד החדר — הוא מגיע עם המסך הראשון מהמסך הראשי.
+  const room = snap === null ? null : padRoom(snap);
+  const [player, setPlayer] = useState<PlayerMode>({ phase: 'ask', name: null });
+
+  // הצטרפות (‎/game/join‎): המשתתף מופיע בלובי של המסך הראשי. גם כשקוד החדר
+  // או השם מתחלפים.
+  const playName = player.phase === 'play' ? player.name : null;
+  useEffect(() => {
+    if (playName === null || room === null) return;
+    void postToVoteServer(voteServerUrl, '/game/join', joinFields(room, playName));
+  }, [playName, room, voteServerUrl]);
+
+  const join = (name: string) => {
+    savePlayerName(name);
+    setPlayer({ phase: 'play', name });
+  };
+  const previousName = player.phase === 'ask' ? player.name : null;
+  const cancelAsk = () =>
+    setPlayer(previousName !== null ? { phase: 'play', name: previousName } : { phase: 'watch' });
+
+  const pad =
+    snap !== null && room !== null && player.phase === 'play' ? (
+      <RenderGuard resetKey={snap} fallback={<aside className="live-pad" />}>
+        <VotePad
+          snap={snap}
+          name={player.name}
+          voteServerUrl={voteServerUrl}
+          onChangeName={() => setPlayer({ phase: 'ask', name: player.name })}
+          onClose={() => setPlayer({ phase: 'watch' })}
+        />
+      </RenderGuard>
+    ) : null;
+  const overlay =
+    snap !== null && room !== null && player.phase === 'ask' ? (
+      <JoinCard
+        initialName={player.name}
+        gameName={snap.game.name}
+        changing={player.name !== null}
+        onJoin={join}
+        onWatch={cancelAsk}
+      />
+    ) : null;
+  const extraControl =
+    room !== null && player.phase === 'watch' ? (
+      <button
+        type="button"
+        className="live-btn live-btn--play"
+        onClick={() => setPlayer({ phase: 'ask', name: null })}
+        title="שלט הצבעה"
+      >
+        🙋 להצבעה
+      </button>
+    ) : null;
 
   return (
     <RenderGuard
@@ -218,6 +281,9 @@ function ValidLiveViewer({ token }: { token: string }) {
         hasSnapshot={snap !== null}
         soundSource={snap}
         toLocal={update.toLocal}
+        pad={pad}
+        overlay={overlay}
+        extraControl={extraControl}
       >
         {(soundOn) =>
           snap === null ? (
@@ -235,19 +301,26 @@ function ValidLiveViewer({ token }: { token: string }) {
 
 /**
  * מה שמסביב למסך: הפעלת צליל, מסך מלא והודעת חיבור. הכפתורים נעלמים אחרי
- * כמה שניות בלי תנועה, וחוזרים בנגיעה — כדי שלא יסתירו את המשחק.
+ * כמה שניות בלי תנועה, וחוזרים בנגיעה — כדי שלא יסתירו את המשחק. עם שלט
+ * הצבעה (`pad`) המסך מתכווץ ומפנה לו מקום: בצד, או מתחת בטלפון לאורך.
  */
 function ViewerChrome({
   connection,
   hasSnapshot,
   soundSource,
   toLocal,
+  pad = null,
+  overlay = null,
+  extraControl = null,
   children,
 }: {
   connection: ViewerConnection;
   hasSnapshot: boolean;
   soundSource: LiveSnapshot | null;
   toLocal: (hostTime: number) => number;
+  pad?: ReactNode;
+  overlay?: ReactNode;
+  extraControl?: ReactNode;
   children: (soundOn: boolean) => ReactNode;
 }) {
   const [soundOn, setSoundOn] = useState(false);
@@ -335,37 +408,57 @@ function ViewerChrome({
   };
 
   const notice = connectionNotice(connection, hasSnapshot);
-  return (
-    <div className="live-viewer">
-      {children(soundOn)}
-      {notice !== null && (
-        <div className="live-notice" role="status" dir="rtl">
-          {notice}
-        </div>
-      )}
-      <div className={`live-controls${controlsShown || !soundOn ? ' is-shown' : ''}`} dir="rtl">
+  const hasPad = pad !== null;
+  // עם שלט הכפתורים יושבים מתחתיו, תמיד גלויים — ולא על המסך, שקטן אז.
+  const controls = (
+    <div
+      className={`live-controls${hasPad ? ' live-controls--docked' : ''}${controlsShown || !soundOn || hasPad ? ' is-shown' : ''}`}
+      dir="rtl"
+    >
+      <button
+        type="button"
+        className={`live-btn${soundOn ? '' : ' live-btn--call'}`}
+        onClick={toggleSound}
+        title={soundOn ? 'השתקה' : 'הפעלת צליל'}
+      >
+        {soundOn ? '🔊' : '🔇 הפעלת צליל'}
+      </button>
+      {canFullscreen && (
         <button
           type="button"
-          className={`live-btn${soundOn ? '' : ' live-btn--call'}`}
-          onClick={toggleSound}
-          title={soundOn ? 'השתקה' : 'הפעלת צליל'}
+          className="live-btn"
+          onClick={toggleFullscreen}
+          title={fullscreen ? 'יציאה ממסך מלא' : 'מסך מלא'}
         >
-          {soundOn ? '🔊' : '🔇 הפעלת צליל'}
+          {fullscreen ? '🗗' : '⛶'}
         </button>
-        {canFullscreen && (
-          <button
-            type="button"
-            className="live-btn"
-            onClick={toggleFullscreen}
-            title={fullscreen ? 'יציאה ממסך מלא' : 'מסך מלא'}
-          >
-            {fullscreen ? '🗗' : '⛶'}
-          </button>
+      )}
+      {extraControl}
+    </div>
+  );
+  return (
+    <div className={`live-viewer${hasPad ? ' has-pad' : ''}`}>
+      <div className="live-screen-area">
+        {children(soundOn)}
+        {notice !== null && (
+          <div className="live-notice" role="status" dir="rtl">
+            {notice}
+          </div>
+        )}
+        {!hasPad && controls}
+        {!hasPad && (
+          <div className="live-rotate-hint" dir="rtl">
+            סובבו את הטלפון לרוחב למסך גדול יותר
+          </div>
         )}
       </div>
-      <div className="live-rotate-hint" dir="rtl">
-        סובבו את הטלפון לרוחב למסך גדול יותר
-      </div>
+      {hasPad && (
+        <div className="live-side">
+          {pad}
+          {controls}
+        </div>
+      )}
+      {overlay}
     </div>
   );
 }
@@ -426,7 +519,7 @@ function LiveScreen({
         <MediaPauseContext.Provider value={snap.paused}>
           <MediaMutedContext.Provider value={!soundOn}>
             <MediaClockContext.Provider value={mediaStartedAt}>
-              <Stage>
+              <Stage fit="parent">
                 {join.show && stage !== 'opening' && (
                   <div className="join-banner">
                     📞 להצטרפות למשחק חייגו <b>{JOIN_DIAL_DISPLAY}</b> והקישו את קוד המשחק:{' '}
