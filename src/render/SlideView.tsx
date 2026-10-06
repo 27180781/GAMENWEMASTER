@@ -8,10 +8,10 @@ import {
   betSlideFor,
   betSummary,
   scoredLikeTrivia,
-  type GameEngine,
   type GameState,
   type Slide,
 } from '../engine/index.ts';
+import type { EngineView } from './engineView.ts';
 import { BetSlide } from './BetSlide.tsx';
 import { MediaPlayer } from './MediaPlayer.tsx';
 import { QuestionSlide, type RailPlayer, type RevealState } from './QuestionSlide.tsx';
@@ -21,7 +21,7 @@ import type { RosterData } from '../app/roster.ts';
 import type { TimerView } from './TimerRing.tsx';
 
 interface SlideViewProps {
-  engine: GameEngine;
+  engine: EngineView;
   state: GameState;
   timer: TimerView | null;
   reveal: RevealState;
@@ -39,6 +39,8 @@ interface SlideViewProps {
   roster?: RosterData;
   /** סיום מדיה חוסמת (סרטון/יוטיוב) — למעבר אוטומטי אם מוגדר playToEnd. */
   onBlockingMediaEnded?: () => void;
+  /** מסך הצפייה: כמה ענו נכון, כשסימון התשובה הנכונה עוד מוסתר ממנו (ראו QuestionSlide). */
+  liveCorrectCount?: number | null;
 }
 
 /** מסך שקופית "פונקציה" — פעולת מערכת (API / ניקוד / משתתפים) עם חיווי מצב. */
@@ -115,6 +117,7 @@ export function SlideView({
   nameOf,
   roster,
   onBlockingMediaEnded,
+  liveCorrectCount = null,
 }: SlideViewProps) {
   const slide = engine.getCurrentSlide();
   const game = engine.getGame();
@@ -203,6 +206,7 @@ export function SlideView({
             logo={engine.getGame().setting.logo.src}
             gameType={engine.getGame().setting.gameType}
             betPill={betPill}
+            liveCorrectCount={liveCorrectCount}
           />
         )}
       </div>

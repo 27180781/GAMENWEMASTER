@@ -13,7 +13,8 @@ interface BetResultsOverlayProps {
   nameOf: (voterId: string) => string;
   /** נוסח ההימור (הנחיית שקופית ההימור) — לכותרת. */
   title?: string;
-  onClose: () => void;
+  /** בלי סגירה (מסך הצפייה) — אין כפתור ואין סגירה בלחיצה. */
+  onClose?: (() => void) | undefined;
 }
 
 /** כמה שמות מוצגים בכל עמודה; השאר מסוכמים בשורה אחת. */
@@ -60,9 +61,11 @@ export function BetResultsOverlay({ outcomes, nameOf, title = '', onClose }: Bet
             <span className="bet-counts-sep">·</span>
             <span className="bet-counts-lose">{s.lost} הפסידו</span>
           </span>
-          <button className="bet-close" title="סגירה (רווח)" onClick={onClose}>
-            ✕
-          </button>
+          {onClose !== undefined && (
+            <button className="bet-close" title="סגירה (רווח)" onClick={onClose}>
+              ✕
+            </button>
+          )}
         </div>
         {title.trim() !== '' && <p className="bet-subtitle">{title}</p>}
 

@@ -11,4 +11,9 @@ set -e
 
 node /app/tools/refresh-desktop-assets.mjs /usr/share/nginx/html/desktop &
 
+# ממסר מסך הצפייה (‎/live/‎ ב-nginx.conf). רץ בלולאה: אם הוא נופל הוא עולה שוב
+# אחרי שנייה, והמסכים הראשיים שולחים לו מצב מלא בשידור הבא. נפילה שלו לא
+# נוגעת באתר ובעדכוני ה-EXE.
+( while true; do node /app/server/live-relay.mjs || true; sleep 1; done ) &
+
 exec nginx -g 'daemon off;'

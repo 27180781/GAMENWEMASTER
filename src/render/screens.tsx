@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import type { GameEngine } from '../engine/index.ts';
+import type { EngineView } from './engineView.ts';
 import { avatarColor, railInitial } from './avatar.ts';
 import { FitText } from './FitText.tsx';
 import { MediaPlayer } from './MediaPlayer.tsx';
@@ -67,7 +67,7 @@ export function LobbyScreen({
   qrUrl,
   joinInfo,
 }: {
-  engine: GameEngine;
+  engine: EngineView;
   players: RailPlayer[];
   /** כשמוגדר — מציג קוד QR גדול בצד הלובי להתחברות מהטלפון. */
   qrUrl?: string;
@@ -137,7 +137,7 @@ export function WinnersScreen({
   nameOf = identityName,
   revealed,
 }: {
-  engine: GameEngine;
+  engine: EngineView;
   nameOf?: NameResolver;
   revealed?: number;
 }) {
@@ -182,7 +182,7 @@ export function WinnersListScreen({
   nameOf = identityName,
   roster,
 }: {
-  engine: GameEngine;
+  engine: EngineView;
   nameOf?: NameResolver;
   /** מרשם הקבוצות — כשמסופק ויש שיוכים, מוצג גם דירוג קבוצתי לצד הדירוג האישי. */
   roster?: RosterData;
@@ -273,11 +273,20 @@ export function AllScoresScreen({
   engine,
   nameOf = identityName,
   pageBump = 0,
+  page: controlledPage,
+  onPageChange,
 }: {
-  engine: GameEngine;
+  engine: EngineView;
   nameOf?: NameResolver;
   /** מונה חיצוני: כל עלייה שלו מדפדפת עמוד מיד (רווח/0 של המנחה). */
   pageBump?: number;
+  /**
+   * עמוד קבוע מבחוץ — מסך הצפייה מציג את העמוד שהמסך הראשי מציג, בלי לולאה
+   * משלו (שהייתה מתחילה בזמן אחר ומדפדפת לא בסנכרון).
+   */
+  page?: number;
+  /** מדווח על העמוד המוצג — כדי שמסך הצפייה יוכל לעקוב. */
+  onPageChange?: (page: number) => void;
 }) {
   const setting = engine.getGame().setting;
   // כל המשתתפים — כולל מי שהצביע אך לא צבר נקודות (מוצג עם 0), כדי שבאמת
@@ -294,14 +303,15 @@ export function AllScoresScreen({
     ...[...zeroIds].sort((a, b) => a.localeCompare(b)).map((voterId) => ({ voterId, score: 0 })),
   ];
   const pages = Math.max(1, Math.ceil(all.length / SCORES_PER_PAGE));
-  const [page, setPage] = useState(0);
+  const [ownPage, setPage] = useState(0);
+  const controlled = controlledPage !== undefined;
   // לולאה אוטומטית בין העמודים (רק כשיש יותר מעמוד אחד)
   useEffect(() => {
     setPage(0);
-    if (pages <= 1) return undefined;
+    if (pages <= 1 || controlled) return undefined;
     const timer = window.setInterval(() => setPage((p) => (p + 1) % pages), SCORES_PAGE_MS);
     return () => window.clearInterval(timer);
-  }, [pages]);
+  }, [pages, controlled]);
   // דפדוף ידני של המנחה (רווח/0) — עמוד הבא מיד, בלי להמתין ללולאה.
   // מגיבים רק לעלייה שקרתה אחרי ה-mount (לא לערך שהצטבר בכניסה קודמת למסך).
   const lastBumpRef = useRef(pageBump);
@@ -310,7 +320,13 @@ export function AllScoresScreen({
     lastBumpRef.current = pageBump;
     setPage((p) => (p + 1) % pages);
   }, [pageBump, pages]);
-  const safePage = page % pages;
+  const page = controlled ? controlledPage : ownPage;
+  const safePage = ((page % pages) + pages) % pages;
+  const onPageChangeRef = useRef(onPageChange);
+  onPageChangeRef.current = onPageChange;
+  useEffect(() => {
+    onPageChangeRef.current?.(safePage);
+  }, [safePage]);
   const start = safePage * SCORES_PER_PAGE;
   const slice = all.slice(start, start + SCORES_PER_PAGE);
   return (

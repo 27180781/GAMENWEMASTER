@@ -27,8 +27,19 @@ FROM nginx:1.27-alpine
 # בתזמון הבנייה — ומהדורה חדשה מגיעה ללקוחות בלי פריסה בכלל.
 RUN apk add --no-cache nodejs
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+# כל צופה במסך הצפייה (‎/live/‎) מחזיק חיבור פתוח — ושניים כאן, מהדפדפן ואל
+# הממסר. ברירת המחדל של התמונה (1024 חיבורים לכל worker) נגמרת בכמה מאות
+# צופים, ואז גם האתר ועדכוני ה-EXE לא עונים. הממסר מגביל את הצופים כך שיישאר
+# מקום (maxConnections ב-server/live-relay.mjs). nginx -t עוצר בנייה שבורה.
+RUN sed -i 's/worker_connections[[:space:]]*[0-9]*;/worker_connections 16384;/' /etc/nginx/nginx.conf \
+ && sed -i 's/^worker_processes[^;]*;/& worker_rlimit_nofile 40000;/' /etc/nginx/nginx.conf \
+ && grep -q 'worker_connections 16384;' /etc/nginx/nginx.conf \
+ && grep -q 'worker_rlimit_nofile 40000;' /etc/nginx/nginx.conf \
+ && nginx -t
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY tools/fetch-desktop-assets.mjs tools/refresh-desktop-assets.mjs /app/tools/
+# ממסר מסך הצפייה (?view=) — Node בלי תלויות, מאחורי nginx ב-/live/
+COPY server/live-relay.mjs /app/server/
 # שם שונה מ-/docker-entrypoint.sh של תמונת nginx: ה-ENTRYPOINT שלה ממשיך לרוץ
 # כרגיל (ומריץ את סקריפטי ה-init שלה), ואז מפעיל את ה-CMD הזה במקום nginx.
 COPY docker-entrypoint.sh /entrypoint.sh

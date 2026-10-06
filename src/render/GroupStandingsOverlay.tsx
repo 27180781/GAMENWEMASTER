@@ -26,7 +26,8 @@ interface GroupStandingsOverlayProps {
   categoryIndex: number;
   /** בונוסים ידניים לקבוצות (ראו scoreAdjust.ts). */
   groupBonus?: Record<string, number>;
-  onClose: () => void;
+  /** בלי סגירה (מסך הצפייה) — אין כפתור ואין סגירה בלחיצה. */
+  onClose?: (() => void) | undefined;
 }
 
 /** מדליות למקומות הראשונים; מעבר לכך — מספר המקום. */
@@ -60,9 +61,11 @@ export function GroupStandingsOverlay({
             {cat.name}
             {multi && <span className="gs-cat-idx"> ({idx + 1}/{cats.length})</span>}
           </span>
-          <button className="gs-close" title="סגירה (4)" onClick={onClose}>
-            ✕
-          </button>
+          {onClose !== undefined && (
+            <button className="gs-close" title="סגירה (4)" onClick={onClose}>
+              ✕
+            </button>
+          )}
         </div>
 
         <div className="gs-grid">

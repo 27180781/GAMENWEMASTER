@@ -11,3 +11,22 @@
 import { createContext } from 'react';
 
 export const MediaPauseContext = createContext(false);
+
+/**
+ * מסך הצפייה (?view=): הצופה עוד לא הפעיל צליל. דפדפנים חוסמים ניגון אוטומטי
+ * עם קול בלי נגיעה של המשתמש, וסרטון שנחסם לא היה מתחיל בכלל — לכן עד שהצופה
+ * מפעיל צליל, סרטונים מתנגנים מושתקים. במסך הראשי תמיד false.
+ */
+export const MediaMutedContext = createContext(false);
+
+/**
+ * מסך הצפייה: מתי (בשעון של הצופה) התחילה המדיה החוסמת במסך הראשי. צופה
+ * שנכנס באמצע סרטון קופץ לאותה נקודה במקום להתחיל מההתחלה. במסך הראשי null.
+ */
+export const MediaClockContext = createContext<number | null>(null);
+
+/**
+ * מסך הצפייה: true. רכיבים שמנפישים "מה חדש מאז שעלו" (שמות המצביעים
+ * העפים) לא מנפישים את מה שכבר היה כשהצופה נכנס. במסך הראשי false.
+ */
+export const LiveMirrorContext = createContext(false);

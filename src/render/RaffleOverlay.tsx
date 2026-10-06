@@ -12,6 +12,12 @@ import { useEffect, useRef, useState } from 'react';
 export interface RaffleEntry {
   id: string;
   name: string;
+  /**
+   * מה להציג מתחת לשם במקום המזהה. מסך הצפייה מקבל כינוי במקום המזהה (ראו
+   * src/live/aliases.ts), ולכן הוא מקבל כאן את הטקסט המוסתר — או '' כשהמסך
+   * הראשי לא מציג מזהה. חסר = המזהה עצמו, כמו תמיד.
+   */
+  idLabel?: string;
 }
 
 /** משך ה"גלגל" ומספר ההחלפות — נבחרו כך שההאטה נראית טבעית על מסך גדול. */
@@ -35,7 +41,8 @@ export function RaffleOverlay({
 }: {
   entries: RaffleEntry[];
   winner: RaffleEntry;
-  onClose: () => void;
+  /** בלי סגירה (מסך הצפייה) — אין סגירה בלחיצה ואין הנחיות מקשים. */
+  onClose?: (() => void) | undefined;
 }) {
   const [current, setCurrent] = useState<RaffleEntry>(entries[0] ?? winner);
   const [done, setDone] = useState(false);
@@ -76,7 +83,8 @@ export function RaffleOverlay({
     };
   }, [entries, winner]);
 
-  const showId = current.id !== '' && current.id !== current.name;
+  const shownId = current.idLabel ?? current.id;
+  const showId = shownId !== '' && shownId !== current.name;
   return (
     <div className="raffle-overlay" onClick={onClose}>
       <div className={`raffle-box${done ? ' raffle-box--done' : ''}`}>
@@ -84,12 +92,14 @@ export function RaffleOverlay({
         <div className={`raffle-name${done ? ' raffle-name--done' : ''}`}>{current.name}</div>
         {showId && (
           <div className="raffle-id" dir="ltr">
-            {current.id}
+            {shownId}
           </div>
         )}
-        <div className="raffle-hint">
-          {done ? 'R / רווח — חזרה למשחק · R שוב — הגרלה נוספת' : 'מגריל…'}
-        </div>
+        {(onClose !== undefined || !done) && (
+          <div className="raffle-hint">
+            {done ? 'R / רווח — חזרה למשחק · R שוב — הגרלה נוספת' : 'מגריל…'}
+          </div>
+        )}
       </div>
     </div>
   );

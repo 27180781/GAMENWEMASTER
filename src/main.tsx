@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './app/App.tsx';
 import { HostConsole } from './render/HostConsole.tsx';
+import { LiveViewer } from './live/LiveViewer.tsx';
 import { registerMediaServiceWorker } from './app/mediaSW.ts';
 import './render/styles.css';
 import './render/themes.css';
@@ -14,8 +15,20 @@ if (!rootElement) throw new Error('אלמנט root לא נמצא');
 const isHost =
   window.location.hash === '#host' || new URLSearchParams(window.location.search).get('host') === '1';
 
+// ‎?view=<קוד>‎ — מסך הצפייה של משחק אונליין: המסך הראשי בשידור חי, בלי שום
+// שליטה (src/live). לא טוען משחק ולא מתחבר לשרת ההצבעות.
+const viewToken = new URLSearchParams(window.location.search).get('view');
+
 createRoot(rootElement).render(
-  <StrictMode>{isHost ? <HostConsole /> : <App />}</StrictMode>,
+  <StrictMode>
+    {viewToken !== null ? (
+      <LiveViewer token={viewToken.trim().toLowerCase()} />
+    ) : isHost ? (
+      <HostConsole />
+    ) : (
+      <App />
+    )}
+  </StrictMode>,
 );
 
 // מטמון מדיה מתמשך (Service Worker) — לא-חוסם, נרשם ברקע אחרי הטעינה. במסך
