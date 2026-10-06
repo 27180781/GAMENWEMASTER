@@ -15,7 +15,8 @@
     "electron:dev": "npm run build && electron .",
     "dist:win": "npm run build && electron-builder --win --config electron-builder.yml --publish never",
     "seal": "node tools/seal-game.mjs",
-    "shots": "node tools/theme-shots.mjs"
+    "shots": "node tools/theme-shots.mjs",
+    "e2e:device": "node tools/device-e2e.mjs"
   },
   "dependencies": {
     "electron-updater": "^6.8.9",

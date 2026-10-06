@@ -60,6 +60,8 @@ export interface SavedGamePayload {
   config?: SealConfig;
   /** המשחק נבנה במחשב ולא הורד מהשרת — הרישיון שלו נערך בעורך. */
   local?: boolean;
+  /** הקוד של המשחק בספרייה (כשנטען ממנה) — כדי לדעת איזה משחק על המסך. */
+  code?: string;
 }
 
 /** מצב חלון המשחק ב-EXE. בדפדפן אין כזה — ושם משתמשים ב-Fullscreen API. */
@@ -162,6 +164,18 @@ interface TriviaDesktop {
   onUpdateStatus?: (cb: (s: UpdateStatus | null) => void) => () => void;
   /** דיווח שהמחשב חזר לרשת. */
   reportOnline?: () => void;
+  /** מנוי למצב המחשב מול מערכת יצירת המשחקים (מזהה, אישורים, משחקים שנשלחו). */
+  onDeviceState?: (cb: (s: DeviceState) => void) => () => void;
+  /** בדיקה עכשיו מול המערכת. */
+  deviceSync?: () => Promise<DeviceState | null>;
+  /** שם למחשב ('' = בלי שם). נשלח למערכת בבדיקה הבאה. */
+  deviceRename?: (name: string) => Promise<DeviceInfo | null>;
+  /** הורדת משחק שנשלח למחשב — בלי להחליף את המשחק הנוכחי. */
+  deviceDownload?: (request: DeviceDownloadRequest) => Promise<DeviceDownloadResult>;
+  /** הפסקת ההורדה של משחק שנשלח למחשב (מה שירד נשמר להמשך). */
+  deviceCancel?: () => void;
+  /** מנוי להתקדמות ההורדה של משחק שנשלח למחשב. */
+  onDeviceDownloadProgress?: (cb: (p: DeviceDownloadProgress) => void) => () => void;
 }
 
 /**
@@ -376,6 +390,14 @@ export interface LibraryGame {
   size: number;
   /** נבנה במחשב ולא הורד — אין לו עותק בשרת (גרסה ישנה: חסר). */
   local?: boolean;
+  /** המשחק במערכת יצירת המשחקים (null = לא ידוע). */
+  gameId?: string | null;
+  /** הגרסה של החבילה, כפי שהמערכת מכריזה עליה (null = לא ידוע). */
+  version?: string | null;
+  /** נערך בעורך שבמחשב אחרי ההורדה (ms; 0 = לא נערך). */
+  editedAt?: number;
+  /** נשלח למחשב והורד ברקע, ועוד לא נפתח. */
+  pendingOpen?: boolean;
 }
 
 /** האם ה-EXE מנהל ספריית משחקים שהורדו. */
@@ -815,4 +837,138 @@ export function onUpdateStatus(cb: (s: UpdateStatus | null) => void): () => void
     window.removeEventListener('online', onOnline);
     off();
   };
+}
+
+// ---------------------------------------------------------------------------
+// המחשב הזה מול מערכת יצירת המשחקים (electron/deviceSync.cjs): מזהה ושם,
+// האישורים שהמנהל נתן למחשב, ומשחקים שהמנהל שלח אליו מחלון הרישיון.
+// ---------------------------------------------------------------------------
+
+/** מה המנהל אישר למחשב הזה. נשמר במחשב, ולכן תקף גם בלי רשת. */
+export interface DevicePermissions {
+  /** בניית משחק חדש מאפס (ועריכה של משחק שנבנה כאן). */
+  createGame: boolean;
+  /** עריכה בתוכנה של משחקים שהורדו מהמערכת. */
+  editGame: boolean;
+}
+
+/** משחק שהמנהל שלח למחשב. code/version חסרים כשאין לו רישיון בתוקף. */
+export interface DeviceGame {
+  gameId: string;
+  name: string;
+  code: string | null;
+  version: string | null;
+  expiresAt: string | null;
+  reason?: 'no_license' | 'unavailable';
+}
+
+export interface DeviceInfo {
+  /** 8 ספרות. */
+  id: string;
+  /** השם כפי שהמערכת מכירה אותו. */
+  name: string | null;
+  /** שם שהוקלד כאן ועוד לא הגיע למערכת. */
+  pendingName: string | null;
+  /** המערכת כבר מכירה את המחשב. */
+  registered: boolean;
+  permissions: DevicePermissions;
+}
+
+/**
+ * - `off` — אין חיבור למערכת בתוכנה הזו (EXE סגור, כלי החתימה, פיתוח בלי שרת).
+ * - `starting` — יש מזהה; הבדיקה הראשונה עוד לא חזרה.
+ * - `ok` — הבדיקה האחרונה הצליחה.
+ * - `offline` / `busy` / `error` — הבדיקה האחרונה נכשלה; `games` מהבדיקה הקודמת נשאר.
+ * - `unavailable` — המערכת עוד לא מכירה את הבדיקה (שרת ישן).
+ */
+export interface DeviceState {
+  state: 'off' | 'starting' | 'ok' | 'offline' | 'busy' | 'unavailable' | 'error';
+  syncing: boolean;
+  permissions: DevicePermissions;
+  device: DeviceInfo | null;
+  games: DeviceGame[];
+  checkedAt: number | null;
+  error: string | null;
+  /** משחק שנשלח למחשב ויורד עכשיו. */
+  downloading: { code: string; gameId: string | null; name: string } | null;
+  seq: number;
+}
+
+export interface DeviceDownloadRequest {
+  code: string;
+  gameId: string;
+  name: string;
+  /** הגרסה שהבדיקה הכריזה עליה. */
+  version: string | null;
+  /** לסמן "נשלח ועוד לא נפתח" (הורדה ברקע). */
+  pendingOpen: boolean;
+}
+
+export interface DeviceDownloadResult {
+  ok: boolean;
+  code?: string;
+  error?: string;
+  /** ההורדה הופסקה (ביטול, או התחלת משחק) — מה שירד נשמר להמשך. */
+  aborted?: boolean;
+  /** הורדה אחרת פעילה. */
+  busy?: boolean;
+}
+
+export type DeviceDownloadProgress = DownloadProgress & { code: string };
+
+/** האם התוכנה מכירה את החיבור למערכת (EXE חדש מספיק). */
+export function canUseDevice(): boolean {
+  return typeof desktop()?.onDeviceState === 'function';
+}
+
+/** מנוי למצב המחשב. המצב הנוכחי מגיע מיד. מחזיר פונקציית ביטול-מנוי. */
+export function onDeviceState(cb: (s: DeviceState) => void): () => void {
+  const fn = desktop()?.onDeviceState;
+  if (typeof fn !== 'function') return () => {};
+  return fn(cb);
+}
+
+/** בדיקה עכשיו מול המערכת. */
+export async function deviceSyncNow(): Promise<DeviceState | null> {
+  const fn = desktop()?.deviceSync;
+  if (typeof fn !== 'function') return null;
+  try {
+    return await fn();
+  } catch {
+    return null;
+  }
+}
+
+/** שם למחשב ('' = בלי שם). null בכישלון. */
+export async function deviceRename(name: string): Promise<DeviceInfo | null> {
+  const fn = desktop()?.deviceRename;
+  if (typeof fn !== 'function') return null;
+  try {
+    return await fn(name);
+  } catch {
+    return null;
+  }
+}
+
+/** הורדת משחק שנשלח למחשב, בלי להחליף את המשחק הנוכחי. */
+export async function deviceDownload(request: DeviceDownloadRequest): Promise<DeviceDownloadResult> {
+  const fn = desktop()?.deviceDownload;
+  if (typeof fn !== 'function') return { ok: false, error: 'לא זמין בגרסה הזו' };
+  try {
+    return await fn(request);
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+/** הפסקת ההורדה של משחק שנשלח למחשב. */
+export function deviceCancel(): void {
+  desktop()?.deviceCancel?.();
+}
+
+/** מנוי להתקדמות ההורדה של משחק שנשלח למחשב. */
+export function onDeviceDownloadProgress(cb: (p: DeviceDownloadProgress) => void): () => void {
+  const fn = desktop()?.onDeviceDownloadProgress;
+  if (typeof fn !== 'function') return () => {};
+  return fn(cb);
 }

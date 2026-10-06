@@ -3341,6 +3341,193 @@ body {
   color: #5a6076;
 }
 
+/* ---- המחשב הזה מול מערכת יצירת המשחקים (DevicePanel) — פינת מסך הפתיחה ---- */
+.device-panel {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 5;
+  width: 340px;
+  max-height: calc(100% - 110px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 20px 16px;
+  background: #fff;
+  border: 1px solid #e3e5ea;
+  border-radius: 26px;
+  box-shadow: 0 16px 40px rgba(20, 20, 40, 0.12);
+  color: #171a2b;
+  text-align: right;
+  direction: rtl;
+}
+.device-head { display: flex; align-items: center; gap: 12px; }
+.device-head-icon { font-size: 30px; line-height: 1; }
+.device-head-text { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
+.device-head-label { font-size: 13px; font-weight: 700; color: #5a6076; }
+.device-id {
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: #2b2560;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.device-sync {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 2px solid #cfd4e2;
+  background: #f9fafc;
+  color: #5a6076;
+  font-size: 20px;
+  cursor: pointer;
+}
+.device-sync:not(:disabled):hover { border-color: #6c5ce7; color: #6c5ce7; }
+.device-sync:disabled { opacity: 0.5; cursor: default; }
+.device-name-row { display: flex; align-items: center; gap: 6px; }
+.device-name {
+  font-size: 19px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.device-name--empty { color: #8a90a6; font-weight: 600; }
+.device-name-edit {
+  border: none;
+  background: transparent;
+  color: #6c5ce7;
+  font-size: 18px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.device-name-edit:hover { background: #f3f0fe; }
+.device-name-form { display: flex; gap: 6px; }
+.device-name-form input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 2px solid #cfd4e2;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 16px;
+}
+.device-name-form input:focus { outline: none; border-color: #6c5ce7; }
+.device-name-form button,
+.device-act {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 2px solid #6c5ce7;
+  background: #f3f0fe;
+  color: #4b3fb5;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.device-name-form button:hover,
+.device-act:not(:disabled):hover { background: #ebe6fd; }
+.device-act:disabled { opacity: 0.45; cursor: default; }
+.device-name-form .device-plain,
+.device-act.device-plain { border-color: #cfd4e2; background: #fff; color: #5a6076; }
+.device-note { margin: 0; font-size: 12.5px; line-height: 1.5; color: #5a6076; }
+.device-status { margin: 0; font-size: 14px; font-weight: 600; }
+.device-status--ok { color: #1a7f4b; }
+.device-status--warn { color: #a8620d; }
+.device-status--muted { color: #5a6076; }
+.device-games { border-top: 1px solid #eceef3; padding-top: 10px; }
+.device-games-title { margin: 0 0 6px; font-size: 14px; font-weight: 800; color: #3d4256; }
+.device-games ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.device-game {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid #e3e5ee;
+  border-radius: 12px;
+  background: #fafbfd;
+}
+.device-game-text { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
+/* עד שתי שורות — שמות משחקים ארוכים, וההבדל ביניהם הוא לרוב בסוף. */
+.device-game-name {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.device-game-status { font-size: 12.5px; color: #5a6076; }
+.device-game-status.is-failed { color: #c0263f; }
+.device-perms {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding-top: 10px;
+  border-top: 1px solid #eceef3;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+.device-perms .is-on { color: #1a7f4b; }
+.device-perms .is-off { color: #7a8095; }
+
+/* "בניית משחק חדש" נעול עד שהמנהל מאשר את המחשב */
+.offline-open-lock { margin: -12px 0 0; max-width: 620px; font-size: 15px; color: #7a8095; text-align: center; }
+
+/* ---- הודעות המחשב מעל מסך ההגדרות (DeviceNotices) — רק כשיש מה לעשות ---- */
+.device-notices {
+  position: absolute;
+  top: 18px;
+  right: 24px;
+  z-index: 5; /* בתוך מסך ההגדרות: מעל התוכן, מתחת לחלון ההגדרות המתקדמות */
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 780px;
+  direction: rtl;
+}
+.device-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-radius: 14px;
+  background: rgba(20, 20, 40, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+}
+.device-notice--ok { background: rgba(26, 127, 75, 0.92); }
+.device-notice--warn { background: rgba(168, 98, 13, 0.94); }
+.device-notice span { flex: 1 1 auto; }
+.device-notice button {
+  flex: 0 0 auto;
+  padding: 5px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.device-notice button:not(:disabled):hover { background: rgba(255, 255, 255, 0.26); }
+.device-notice button:disabled { opacity: 0.5; cursor: default; }
+.device-notice .device-notice-x { border: none; background: transparent; padding: 4px 6px; }
+
 /* טעינת משחק מהשרת לפי קוד — חלופה לטעינת ZIP */
 .offline-open-code {
   display: flex;
@@ -3592,6 +3779,8 @@ body {
   text-underline-offset: 4px;
 }
 .settings-pick-another:hover { opacity: 1; }
+/* נעול: המנהל עוד לא אישר למחשב הזה (ההסבר ב-title) */
+.settings-pick-another:disabled { opacity: 0.4; cursor: not-allowed; text-decoration: none; }
 
 /* כפתור תפריט מפעיל צף (EXE) — עדין בפינה שמאל-תחתונה, מתחזק במעבר עכבר */
 .operator-menu-fab {

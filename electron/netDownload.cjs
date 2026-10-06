@@ -35,11 +35,12 @@ function header(res, name) {
  * @param {typeof import('electron').net} net
  * @param {string} url
  * @param {string} dest נתיב היעד הסופי (החלק נכתב ל-`dest.part`)
- * @param {{ onProgress?: (p: { received: number, total: number }) => void, headers?: Record<string, string>, idleMs?: number, ceilingMs?: number }} [opts]
+ * @param {{ onProgress?: (p: { received: number, total: number }) => void, headers?: Record<string, string>, idleMs?: number, ceilingMs?: number, signal?: AbortSignal }} [opts]
+ *   signal — הפסקה מבחוץ (המשחק שנשלח למחשב בוטל): הבקשה נסגרת והחלק נשאר להמשך.
  * @returns {Promise<FileResult>}
  */
 function downloadToFile(net, url, dest, opts = {}) {
-  const { onProgress = () => {}, headers = {}, idleMs = IDLE_MS, ceilingMs = CEILING_MS } = opts;
+  const { onProgress = () => {}, headers = {}, idleMs = IDLE_MS, ceilingMs = CEILING_MS, signal } = opts;
   return new Promise((resolve) => {
     const part = `${dest}.part`;
     let start = 0;
@@ -64,6 +65,7 @@ function downloadToFile(net, url, dest, opts = {}) {
       settled = true;
       if (idle !== null) clearTimeout(idle);
       clearTimeout(ceiling);
+      signal?.removeEventListener('abort', onAbort);
       try {
         req?.abort();
       } catch {
@@ -76,6 +78,12 @@ function downloadToFile(net, url, dest, opts = {}) {
       resolve(result);
     };
     const ceiling = setTimeout(() => finish({ ok: false, error: 'ההורדה ארכה יותר מדי', retryable: true }), ceilingMs);
+    const onAbort = () => finish({ ok: false, error: 'ההורדה הופסקה', retryable: true });
+    if (signal?.aborted) {
+      onAbort();
+      return;
+    }
+    signal?.addEventListener('abort', onAbort, { once: true });
     const touch = () => {
       if (idle !== null) clearTimeout(idle);
       idle = setTimeout(() => finish({ ok: false, error: 'ההורדה נתקעה — בדקו את החיבור לאינטרנט', retryable: true }), idleMs);
