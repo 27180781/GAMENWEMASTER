@@ -276,4 +276,44 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
     ipcRenderer.on('seal:progress', listener);
     return () => ipcRenderer.removeListener('seal:progress', listener);
   },
+  /**
+   * מנוי למצב המחשב מול מערכת יצירת המשחקים: המזהה והשם, האישורים, והמשחקים
+   * שנשלחו אליו. המצב הנוכחי משודר מיד גם למנוי חדש; `seq` מבטיח שתשובה
+   * ישנה לא תדרוס שידור חדש יותר.
+   */
+  onDeviceState(/** @type {(s: unknown) => void} */ cb) {
+    let lastSeq = -1;
+    const deliver = (/** @type {unknown} */ s) => {
+      const seq = Number(/** @type {{ seq?: unknown } | null} */ (s)?.seq) || 0;
+      if (s === null || s === undefined || seq < lastSeq) return;
+      lastSeq = seq;
+      cb(s);
+    };
+    const listener = (/** @type {unknown} */ _e, /** @type {unknown} */ s) => deliver(s);
+    ipcRenderer.on('device:state', listener);
+    void ipcRenderer.invoke('device:info').then(deliver);
+    return () => ipcRenderer.removeListener('device:state', listener);
+  },
+  /** בדיקה עכשיו מול המערכת; מחזיר את המצב שאחריה. */
+  deviceSync() {
+    return ipcRenderer.invoke('device:sync');
+  },
+  /** שם שהמפעיל הקליד למחשב ('' = בלי שם). נשלח למערכת בבדיקה הבאה. */
+  deviceRename(/** @type {string} */ name) {
+    return ipcRenderer.invoke('device:rename', name);
+  },
+  /** הורדת משחק שנשלח למחשב — בלי להחליף את המשחק הנוכחי. */
+  deviceDownload(/** @type {unknown} */ request) {
+    return ipcRenderer.invoke('device:download', request);
+  },
+  /** הפסקת ההורדה של משחק שנשלח למחשב (מה שירד נשמר להמשך). */
+  deviceCancel() {
+    void ipcRenderer.invoke('device:cancel');
+  },
+  /** מנוי להתקדמות ההורדה של משחק שנשלח למחשב. מחזיר פונקציית ביטול-מנוי. */
+  onDeviceDownloadProgress(/** @type {(p: unknown) => void} */ cb) {
+    const listener = (/** @type {unknown} */ _e, /** @type {unknown} */ p) => cb(p);
+    ipcRenderer.on('device:downloadProgress', listener);
+    return () => ipcRenderer.removeListener('device:downloadProgress', listener);
+  },
 });

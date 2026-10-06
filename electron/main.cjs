@@ -597,6 +597,9 @@ async function downloadGameByCode(code, onProgress) {
       downloadFile: (url, dest, opts) => downloadToFile(net, url, dest, opts),
       onProgress,
       log: (msg) => console.log(msg),
+      // הקוד כבר במחשב (הוקלד שוב כדי לקבל את הגרסה האחרונה): קבצים שלא
+      // השתנו מועתקים מהחבילה הקיימת במקום לרדת שוב.
+      seedFrom: fs.existsSync(libraryZipPath(clean)) ? libraryZipPath(clean) : null,
     });
   } catch (err) {
     const status = /** @type {{ status?: number }} */ (err).status;
@@ -1634,6 +1637,314 @@ function openHostWindow() {
   });
 }
 
+// ---------------------------------------------------------------------------
+// המחשב הזה מול מערכת יצירת המשחקים: מזהה ושם, ומשחקים שהמנהל שולח אליו
+// (deviceIdentity.cjs, deviceSync.cjs). כאן רק הרשת, התזמון והחיבור לחלון;
+// מה לעשות עם התשובה מחליט ה-renderer (src/app/devicePlan.ts), כי רק הוא
+// יודע מה מוצג עכשיו על המסך.
+// ---------------------------------------------------------------------------
+const deviceIdentity = require('./deviceIdentity.cjs');
+const { syncDevice, haveFromLibrary, publicDevice } = require('./deviceSync.cjs');
+
+/** כמה זמן אחרי הפתיחה בודקים לראשונה — אחרי שהמשחק האחרון כבר נטען. */
+const DEVICE_FIRST_SYNC_MS = 4000;
+const DEVICE_RETRY_MS = {
+  offline: 2 * 60 * 1000,
+  busy: 60 * 1000,
+  unavailable: 30 * 60 * 1000,
+  error: 5 * 60 * 1000,
+};
+
+/**
+ * רק בתוכנה הרגילה: לא ב-EXE סגור (המשחק שלו קבוע) ולא בכלי החתימה. בגרסת
+ * פיתוח — רק מול שרת שהוגדר במפורש, כדי שהרצה מקומית לא תירשם כמחשב.
+ */
+function deviceSyncEnabled() {
+  if (sealedGame !== null || isSealerBuild()) return false;
+  return app.isPackaged || Boolean(process.env.TRIVIA_REMOTE_URL) || process.env.TRIVIA_DEVICE_SYNC === '1';
+}
+
+/**
+ * מה המנהל אישר למחשב הזה (deviceIdentity.cjs): בניית משחק חדש, ועריכה.
+ * נשמר במחשב כפי שהגיע בתשובה האחרונה, ולכן תקף גם בלי רשת. בהרצת פיתוח
+ * בלי שרת — הכול פתוח, כדי שאפשר יהיה לעבוד על העורך.
+ * @returns {import('./deviceIdentity.cjs').Permissions}
+ */
+function devicePermissions() {
+  if (sealedGame !== null || isSealerBuild()) return { ...deviceIdentity.NO_PERMISSIONS };
+  if (!deviceSyncEnabled()) return app.isPackaged ? { ...deviceIdentity.NO_PERMISSIONS } : { createGame: true, editGame: true };
+  try {
+    return { ...deviceIdentity.loadDevice(userData()).permissions };
+  } catch {
+    return { ...deviceIdentity.NO_PERMISSIONS };
+  }
+}
+
+/** הודעה למי שמנסה לעקוף את הכפתור הנעול — המספר הוא מה שמוסרים למנהל. */
+function permissionError(what) {
+  let id = '';
+  try {
+    id = deviceIdentity.formatDeviceId(deviceIdentity.loadDevice(userData()).id);
+  } catch {
+    /* בלי מספר */
+  }
+  return `${what} במחשב הזה דורשת אישור${id ? ` (מספר המחשב: ${id})` : ''}`;
+}
+
+/**
+ * המצב שה-renderer רואה. `games` ו-`checkedAt` הם מהבדיקה המוצלחת האחרונה,
+ * ונשארים גם כשהבדיקה הבאה נכשלת (אין רשת באולם — המשחקים עדיין במחשב).
+ */
+let deviceState = {
+  state: 'off',
+  syncing: false,
+  /** @type {import('./deviceIdentity.cjs').Permissions} */
+  permissions: { createGame: false, editGame: false },
+  /** @type {ReturnType<typeof publicDevice> | null} */
+  device: null,
+  /** @type {import('./deviceSync.cjs').DeviceGame[]} */
+  games: [],
+  /** @type {number | null} */
+  checkedAt: null,
+  /** @type {string | null} */
+  error: null,
+  /** @type {{ code: string, gameId: string | null, name: string } | null} */
+  downloading: null,
+  seq: 0,
+};
+
+/** @param {Partial<typeof deviceState>} patch */
+function pushDeviceState(patch) {
+  // seq: ה-preload מתעלם ממצב ישן שמגיע אחרי חדש (השידור החוזר בפתיחת החלון).
+  deviceState = { ...deviceState, ...patch, seq: deviceState.seq + 1 };
+  sendToRenderer('device:state', deviceState);
+}
+
+/**
+ * POST ל-offline-device. מחזיר { status, body } לכל תשובה (גם 4xx/5xx), וזורק
+ * רק על כשל רשת — זה ההבדל בין "השרת אמר לא" לבין "אין רשת".
+ * @param {Record<string, unknown>} body
+ * @returns {Promise<{ status: number, body: unknown }>}
+ */
+function postDevice(body) {
+  return new Promise((resolve, reject) => {
+    const req = net.request({ method: 'POST', url: `${REMOTE_BASE_URL}/offline-device` });
+    req.setHeader('apikey', REMOTE_ANON_KEY);
+    req.setHeader('Authorization', `Bearer ${REMOTE_ANON_KEY}`);
+    req.setHeader('Content-Type', 'application/json');
+    const timer = setTimeout(() => {
+      try {
+        req.abort();
+      } catch {
+        /* נסגר */
+      }
+      reject(new Error('השרת לא ענה בזמן'));
+    }, REMOTE_IDLE_MS);
+    req.on('error', (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+    req.on('response', (res) => {
+      /** @type {Buffer[]} */
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('error', (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+      res.on('end', () => {
+        clearTimeout(timer);
+        let parsed = null;
+        try {
+          parsed = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        } catch {
+          parsed = null;
+        }
+        resolve({ status: res.statusCode, body: parsed });
+      });
+    });
+    req.end(JSON.stringify(body));
+  });
+}
+
+/** @type {NodeJS.Timeout | null} */
+let deviceTimer = null;
+/** @type {Promise<typeof deviceState> | null} */
+let deviceSyncRun = null;
+/** שם שהוקלד בזמן שבדיקה הייתה בדרך — שולחים בדיקה נוספת מיד אחריה. */
+let deviceSyncAgain = false;
+
+/** @param {number} ms */
+function scheduleDeviceSync(ms) {
+  if (deviceTimer !== null) clearTimeout(deviceTimer);
+  deviceTimer = setTimeout(() => void runDeviceSync(), ms);
+}
+
+/** בדיקה אחת מול השרת. בדיקה שכבר בדרך — מחכים לה במקום לשלוח שנייה. */
+function runDeviceSync() {
+  if (!deviceSyncEnabled()) return Promise.resolve(deviceState);
+  if (deviceSyncRun !== null) return deviceSyncRun;
+  deviceSyncRun = (async () => {
+    pushDeviceState({ syncing: true });
+    let next = DEVICE_RETRY_MS.error;
+    try {
+      lib.libraryBackfill(userData());
+      const res = await syncDevice({
+        userData: userData(),
+        post: postDevice,
+        have: haveFromLibrary(libraryList()),
+        appVersion: app.getVersion(),
+        hostname: require('node:os').hostname(),
+        platform: process.platform,
+      });
+      if (res.state === 'ok') {
+        pushDeviceState({
+          state: 'ok',
+          syncing: false,
+          device: res.device,
+          permissions: { ...res.device.permissions },
+          games: res.games,
+          checkedAt: Date.now(),
+          error: null,
+        });
+        next = res.pollSeconds * 1000;
+      } else {
+        if (res.state === 'error') console.warn('[device] הבדיקה מול השרת נכשלה:', res.error);
+        pushDeviceState({ state: res.state, syncing: false, device: res.device, error: res.error ?? null });
+        next = DEVICE_RETRY_MS[res.state];
+      }
+    } catch (err) {
+      console.warn('[device] הבדיקה מול השרת נכשלה:', /** @type {Error} */ (err).message);
+      pushDeviceState({ state: 'error', syncing: false, error: /** @type {Error} */ (err).message });
+    } finally {
+      deviceSyncRun = null;
+      if (deviceSyncAgain) {
+        deviceSyncAgain = false;
+        next = 500;
+      }
+      scheduleDeviceSync(next);
+    }
+    return deviceState;
+  })();
+  return deviceSyncRun;
+}
+
+function startDeviceSync() {
+  if (!deviceSyncEnabled()) {
+    pushDeviceState({ permissions: devicePermissions() });
+    return;
+  }
+  try {
+    const device = deviceIdentity.loadDevice(userData());
+    pushDeviceState({ state: 'starting', device: publicDevice(device), permissions: { ...device.permissions } });
+  } catch (err) {
+    console.warn('[device] יצירת מזהה למחשב נכשלה:', /** @type {Error} */ (err).message);
+    return;
+  }
+  scheduleDeviceSync(DEVICE_FIRST_SYNC_MS);
+}
+
+/**
+ * הורדה אחת בכל רגע: משחק שהמפעיל ביקש (קוד שהוקלד) או משחק שנשלח למחשב.
+ * בקשה של המפעיל קודמת — הורדה ברקע נעצרת בשבילה (מה שירד נשמר להמשך).
+ * @type {{ kind: 'manual' | 'device', controller: AbortController | null, done: Promise<unknown> } | null}
+ */
+let activeDownload = null;
+
+/**
+ * הורדה שהמפעיל ביקש: עוצרת הורדה ברקע אם יש, ומחכה שתשתחרר.
+ * @template T
+ * @param {() => Promise<T>} run
+ * @returns {Promise<T | { ok: false, error: string }>}
+ */
+async function manualDownload(run) {
+  if (activeDownload !== null && activeDownload.kind === 'device') {
+    activeDownload.controller?.abort();
+    await activeDownload.done.catch(() => {});
+  }
+  if (activeDownload !== null) return { ok: false, error: 'הורדה אחרת כבר פעילה — המתינו לסיומה' };
+  const done = run();
+  activeDownload = { kind: 'manual', controller: null, done };
+  try {
+    const res = await done;
+    // משחק שנשלח למחשב והורד ידנית — המערכת תראה שהוא כבר כאן.
+    if (/** @type {{ ok?: boolean }} */ (res)?.ok === true && deviceSyncEnabled()) scheduleDeviceSync(1500);
+    return res;
+  } finally {
+    activeDownload = null;
+  }
+}
+
+/**
+ * החבילה הקודמת של אותו משחק — ממנה מועתקים קבצים שלא השתנו. עדיפות לאותו
+ * קוד (העותק שיוחלף), ואחרת העותק החדש ביותר.
+ * @param {string} gameId
+ * @param {string} code
+ * @returns {string | null}
+ */
+function seedPackageFor(gameId, code) {
+  const copies = libraryList().filter((g) => !g.local && g.gameId === gameId);
+  const pick = copies.find((g) => g.code === code) ?? copies[0];
+  return pick === undefined ? null : libraryZipPath(pick.code);
+}
+
+/**
+ * הורדת משחק שנשלח למחשב, לפי הקוד שהבדיקה החזירה — בדיוק כמו קוד שהוקלד,
+ * אבל בלי להחליף את המשחק הנוכחי (`select: false`): מה פותחים ומתי מחליט
+ * ה-renderer. עותקים ישנים של אותו משחק נמחקים אחרי ההצלחה.
+ * @param {unknown} request
+ */
+async function deviceDownload(request) {
+  if (!deviceSyncEnabled()) return { ok: false, error: 'לא זמין בתוכנה הזו' };
+  const r = /** @type {Record<string, unknown>} */ (request !== null && typeof request === 'object' ? request : {});
+  const code = typeof r.code === 'string' ? r.code.trim() : '';
+  if (!lib.isSafeCode(code)) return { ok: false, error: 'קוד משחק לא תקין' };
+  if (activeDownload !== null) return { ok: false, busy: true, error: 'הורדה אחרת פעילה' };
+  const gameId = typeof r.gameId === 'string' ? r.gameId.toLowerCase() : null;
+  const name = typeof r.name === 'string' ? r.name : '';
+  const controller = new AbortController();
+  pushDeviceState({ downloading: { code, gameId, name } });
+  const done = (async () => {
+    try {
+      return await downloadGameDirect(code, {
+        userData: userData(),
+        fetchManifest: fetchGameManifest,
+        downloadFile: (url, dest, opts) => downloadToFile(net, url, dest, opts),
+        onProgress: (p) => sendToRenderer('device:downloadProgress', { code, ...p }),
+        log: (msg) => console.log(msg),
+        seedFrom: gameId === null ? null : seedPackageFor(gameId, code),
+        signal: controller.signal,
+        select: false,
+        source: 'device',
+        pendingOpen: r.pendingOpen === true,
+        expectedVersion: typeof r.version === 'string' ? r.version : null,
+      });
+    } catch (err) {
+      const status = /** @type {{ status?: number }} */ (err).status;
+      return {
+        ok: false,
+        error: status !== undefined ? remoteErrorMessage(status) : `החיבור לשרת נכשל: ${/** @type {Error} */ (err).message}`,
+        resumable: status === undefined || status >= 500,
+      };
+    }
+  })();
+  activeDownload = { kind: 'device', controller, done };
+  try {
+    const res = await done;
+    if (res.ok) {
+      const removed = lib.libraryDedupe(userData(), res.gameId ?? gameId ?? '', code);
+      if (removed.length > 0) console.log('[device] עותקים ישנים של המשחק נמחקו:', removed.join(', '));
+      scheduleDeviceSync(1500); // שהמערכת תראה מיד שהמשחק כבר כאן
+    } else {
+      console.warn('[device] הורדת משחק שנשלח למחשב נכשלה:', code, res.error);
+    }
+    return { ...res, code };
+  } finally {
+    activeDownload = null;
+    pushDeviceState({ downloading: null });
+  }
+}
+
 app.whenReady().then(() => {
   if (!gotSingleInstanceLock) return; // מופע משני — נסגר; לא מרימים כלום
   createSplash(); // "התוכנה נטענת" — לפני כל עבודה כבדה, שיהיה סימן חיים מיד
@@ -1643,6 +1954,9 @@ app.whenReady().then(() => {
   // עדכון אוטומטי — אחרי loadSealedGame, שהבדיקה "האם זה EXE חתום" תהיה נכונה.
   // ההשהיה נותנת למשחק להיטען קודם; בדיקת הרשת אינה דחופה.
   setTimeout(startAutoUpdate, 20000);
+  // המחשב מול המערכת: מזהה, אישורים ומשחקים שנשלחו אליו. גם הוא אחרי
+  // loadSealedGame — ב-EXE סגור הוא כבוי.
+  startDeviceSync();
   // עדכון עצמי של כלי "חתום EXE" — מסלול נפרד, כי הקובץ הנייד אינו נתמך
   // ב-electron-updater. ההשהיה קצרה יותר: הכלי אינו מריץ אירוע חי.
   setTimeout(() => void selfUpdateSealer(), 8000);
@@ -1651,6 +1965,8 @@ app.whenReady().then(() => {
     // הורדת עדכון שנעצרה ממשיכה מיד כשהרשת חוזרת — בלי להמתין למרווח בין בדיקות.
     if (lastUpdateState !== null && lastUpdateState.state === 'paused') lastUpdateCheck = 0;
     checkForUpdate();
+    // גם המחשב בודק מיד אם המערכת שלחה לו משחק, במקום לחכות לבדיקה הבאה.
+    if (deviceSyncEnabled() && deviceState.state !== 'ok' && deviceState.state !== 'off') scheduleDeviceSync(1000);
   });
   /** מצב שרת הקליקרים האחרון — לחלון שנפתח אחרי שהאירוע כבר שודר. */
   ipcMain.handle('rf317:serverState', () => lastServerState);
@@ -1658,6 +1974,27 @@ app.whenReady().then(() => {
   ipcMain.handle('app:updateState', () => lastUpdateState);
   /** מספר הגרסה של התוכנה הרצה — מוצג תמיד, גם בלי עדכון אוטומטי. */
   ipcMain.handle('app:version', () => app.getVersion());
+  // המחשב מול מערכת יצירת המשחקים: המצב האחרון (לחלון שנפתח אחרי השידור),
+  // בדיקה עכשיו, שם שהמפעיל הקליד, והורדת משחק שנשלח למחשב.
+  ipcMain.handle('device:info', () => deviceState);
+  ipcMain.handle('device:sync', () => runDeviceSync());
+  ipcMain.handle('device:rename', (_e, name) => {
+    if (!deviceSyncEnabled()) return null;
+    try {
+      const device = deviceIdentity.setPendingName(userData(), name);
+      pushDeviceState({ device: publicDevice(device) });
+      if (deviceSyncRun !== null) deviceSyncAgain = true;
+      else void runDeviceSync();
+      return publicDevice(device);
+    } catch (err) {
+      console.warn('[device] שמירת השם נכשלה:', /** @type {Error} */ (err).message);
+      return null;
+    }
+  });
+  ipcMain.handle('device:download', (_e, request) => deviceDownload(request));
+  ipcMain.handle('device:cancel', () => {
+    if (activeDownload !== null && activeDownload.kind === 'device') activeDownload.controller?.abort();
+  });
   // בקשת הפעלה של תוכנת הקליטה מה-renderer (בחירת "שחק עם שלטים").
   ipcMain.handle('rf317:launch', () => {
     launchReceiver();
@@ -1686,6 +2023,11 @@ app.whenReady().then(() => {
   ipcMain.handle('game:saveEdited', async (_e, dataJson) => {
     if (sealedGame !== null) return { ok: false, error: 'משחק סגור אינו ניתן לעריכה' };
     if (isSealerBuild()) return { ok: false, error: 'לא זמין בכלי החתימה' };
+    // אותו כלל כמו הכפתור במסך: עריכה מאושרת, או משחק שנבנה כאן עם אישור בנייה.
+    const perms = devicePermissions();
+    if (!perms.editGame && !(perms.createGame && lib.currentIsLocal(userData()))) {
+      return { ok: false, error: permissionError('עריכה') };
+    }
     try {
       const res = await saveEditedGame(dataJson);
       // משחק שנבנה במחשב: הרשימה במסך הפתיחה מציגה את השם ששמור בקובץ.
@@ -1695,6 +2037,8 @@ app.whenReady().then(() => {
         } catch {
           /* השם ברשימה אינו קריטי */
         }
+        // עדכון שהמערכת תשלח לא יחליף בשקט את מה שנערך כאן.
+        lib.libraryMarkEdited(userData());
       }
       return res;
     } catch (err) {
@@ -1708,6 +2052,7 @@ app.whenReady().then(() => {
   ipcMain.handle('game:create', async (_e, name, dataJson) => {
     if (sealedGame !== null) return { ok: false, error: 'לא זמין במשחק סגור' };
     if (isSealerBuild()) return { ok: false, error: 'לא זמין בכלי החתימה' };
+    if (!devicePermissions().createGame) return { ok: false, error: permissionError('בניית משחק חדש') };
     try {
       return await localGame.createLocalGame(userData(), String(name ?? ''), String(dataJson ?? ''));
     } catch (err) {
@@ -1718,9 +2063,12 @@ app.whenReady().then(() => {
   });
   ipcMain.handle('game:downloadByCode', async (e, code) => {
     if (isSealerBuild()) return { ok: false, error: 'לא זמין בכלי החתימה' };
-    return downloadGameByCode(code, (p) => {
-      if (!e.sender.isDestroyed()) e.sender.send('game:downloadProgress', p);
-    });
+    // הורדה ברקע של משחק שנשלח למחשב נעצרת בשביל מה שהמפעיל ביקש.
+    return manualDownload(() =>
+      downloadGameByCode(code, (p) => {
+        if (!e.sender.isDestroyed()) e.sender.send('game:downloadProgress', p);
+      }),
+    );
   });
   // משחק מוטבע ("סגור") ב-EXE — { bytes, config } או null.
   ipcMain.handle('game:sealed', () => sealedGame);
@@ -1966,8 +2314,12 @@ app.whenReady().then(() => {
         /* אין מטא — שם ריק */
       }
       if (config !== null) return { ...res, config, name };
+      // הקוד בספרייה — כך ה-renderer יודע איזה עותק על המסך (משחק שנשלח למחשב
+      // מתעדכן רק כשהעותק שלו אינו מוצג).
+      const code = lib.currentCode(userData());
+      const extra = code !== null ? { code } : {};
       // משחק שנבנה במחשב — העורך מציג לו גם את הגדרת הרישיון.
-      return lib.currentIsLocal(userData()) ? { ...res, name, local: true } : { ...res, name };
+      return lib.currentIsLocal(userData()) ? { ...res, ...extra, name, local: true } : { ...res, ...extra, name };
     } catch (err) {
       console.error('[game] טעינת משחק שמור נכשלה:', /** @type {Error} */ (err).message);
       return null;

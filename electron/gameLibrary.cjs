@@ -16,6 +16,8 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { readZipDirectory, readZipEntry } = require('./zipRead.cjs');
+const { findGameEntryName } = require('./gameZip.cjs');
 
 /**
  * קוד תקין לשם קובץ. זו בדיוק התבנית שהורדה לפי קוד מקבלת, ולכן קוד שעבר
@@ -87,6 +89,14 @@ function libraryList(userData) {
         size,
         // משחק שנבנה במחשב (localGame.cjs) — אין לו עותק בשרת.
         local: meta?.local === true,
+        // המשחק במערכת יצירת המשחקים והגרסה של החבילה (ראו libraryBackfill) —
+        // כך התוכנה יודעת מה כבר אצלה כשהמערכת שולחת לה משחק או עדכון.
+        gameId: typeof meta?.gameId === 'string' ? meta.gameId : null,
+        version: typeof meta?.version === 'string' ? meta.version : null,
+        // נערך בעורך שבמחשב אחרי ההורדה — עדכון מהמערכת היה מוחק את השינויים.
+        editedAt: Number(meta?.editedAt) || 0,
+        // נשלח למחשב והורד ברקע, ועוד לא נפתח.
+        pendingOpen: meta?.pendingOpen === true,
       });
     }
     out.sort((a, b) => b.savedAt - a.savedAt || a.code.localeCompare(b.code));
@@ -102,12 +112,28 @@ function libraryList(userData) {
  */
 function librarySelect(userData, code) {
   if (!isSafeCode(code) || !fs.existsSync(libraryZipPath(userData, code))) return false;
-  const name = String(readJson(libraryMetaPath(userData, code))?.name ?? `משחק ${code}`);
+  const meta = readJson(libraryMetaPath(userData, code));
+  const name = String(meta?.name ?? `משחק ${code}`);
   try {
     fs.writeFileSync(
       lastGameMetaPath(userData),
       JSON.stringify({ name, code, savedAt: Date.now() }),
     );
+  } catch {
+    return false;
+  }
+  // משחק שנשלח למחשב ונפתח עכשיו — כבר לא "ממתין לפתיחה".
+  if (meta?.pendingOpen === true) {
+    const { pendingOpen: _done, ...rest } = meta;
+    writeMeta(userData, code, rest);
+  }
+  return true;
+}
+
+/** כתיבת המטא של משחק בספרייה. @returns {boolean} */
+function writeMeta(userData, code, meta) {
+  try {
+    fs.writeFileSync(libraryMetaPath(userData, code), JSON.stringify(meta));
     return true;
   } catch {
     return false;
@@ -117,22 +143,27 @@ function librarySelect(userData, code) {
 /**
  * רישום חבילה שהורדה (הקובץ כבר במקומו) וסימונה כנוכחית.
  * `extra.local` — משחק שנבנה במחשב ולא הורד (ראו localGame.cjs).
+ * `extra.gameId` / `extra.version` — המשחק במערכת והגרסה של החבילה.
+ * `extra.source` — 'device' כשהמערכת שלחה את המשחק למחשב (ראו deviceSync.cjs).
+ * `extra.pendingOpen` — הורד ברקע ועוד לא נפתח.
+ * `extra.select: false` — רישום בלבד, בלי להחליף את המשחק הנוכחי: הורדה ברקע
+ * לעולם אינה מחליפה את המשחק שהמפעיל בחר.
  */
 function libraryStore(userData, code, name, extra = {}) {
   if (!isSafeCode(code)) return false;
-  try {
-    fs.writeFileSync(
-      libraryMetaPath(userData, code),
-      JSON.stringify({
-        code,
-        name: String(name ?? ''),
-        savedAt: Date.now(),
-        ...(extra.local === true ? { local: true } : {}),
-      }),
-    );
-  } catch {
-    return false;
-  }
+  const ok = writeMeta(userData, code, {
+    code,
+    name: String(name ?? ''),
+    savedAt: Date.now(),
+    ...(extra.local === true ? { local: true } : {}),
+    // gameId נרשם תמיד במשחק שהורד (גם null), כדי ש-libraryBackfill לא יחפש שוב.
+    ...(extra.local === true ? {} : { gameId: typeof extra.gameId === 'string' ? extra.gameId.toLowerCase() : null }),
+    ...(typeof extra.version === 'string' ? { version: extra.version } : {}),
+    ...(typeof extra.source === 'string' ? { source: extra.source } : {}),
+    ...(extra.pendingOpen === true ? { pendingOpen: true } : {}),
+  });
+  if (!ok) return false;
+  if (extra.select === false) return true;
   return librarySelect(userData, code);
 }
 
@@ -180,6 +211,82 @@ function forgetCurrent(userData) {
   }
 }
 
+/**
+ * סימון המשחק הנוכחי כ"נערך במחשב" אחרי שמירה בעורך. עדכון שהמערכת שולחת
+ * למחשב לא יחליף אותו בלי לשאול — אחרת השינויים שנעשו כאן היו נמחקים בשקט.
+ */
+function libraryMarkEdited(userData) {
+  const code = currentCode(userData);
+  if (code === null) return false;
+  const meta = readJson(libraryMetaPath(userData, code));
+  if (meta === null) return false;
+  return writeMeta(userData, code, { ...meta, editedAt: Date.now() });
+}
+
+/**
+ * קריאת המשחק שבחבילה (id והגרסה מ-data.json) בלי לטעון אותה לזיכרון. null
+ * כשאין data.json קריא.
+ * @returns {{ gameId: string | null, version: string | null } | null}
+ */
+function readPackageInfo(zipPath) {
+  const entries = readZipDirectory(zipPath);
+  if (entries === null) return null;
+  const name = findGameEntryName(entries.map((e) => e.name));
+  const entry = name === null ? undefined : entries.find((e) => e.name === name);
+  if (entry === undefined) return null;
+  const buf = readZipEntry(zipPath, entry);
+  if (buf === null) return null;
+  try {
+    const data = JSON.parse(buf.toString('utf8'));
+    const id = typeof data?.id === 'string' ? data.id.toLowerCase() : null;
+    const version = typeof data?.metadata?.version === 'string' ? data.metadata.version : null;
+    return { gameId: id, version };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * משחקים שהורדו לפני שהתוכנה התחילה לרשום איזה משחק בכל חבילה (או בחבילת
+ * הגיבוי של השרת): קוראים את data.json פעם אחת ורושמים. בלי זה, משחק שכבר
+ * במחשב היה נראה "חסר" כשהמערכת שולחת אותו, ועותק שני שלו היה נוסף.
+ */
+function libraryBackfill(userData) {
+  let changed = 0;
+  for (const g of libraryList(userData)) {
+    if (g.local) continue;
+    const metaPath = libraryMetaPath(userData, g.code);
+    const meta = readJson(metaPath);
+    if (meta !== null && Object.prototype.hasOwnProperty.call(meta, 'gameId')) continue;
+    const info = readPackageInfo(libraryZipPath(userData, g.code));
+    const next = {
+      ...(meta ?? { code: g.code, name: '', savedAt: 0 }),
+      gameId: info?.gameId ?? null,
+      ...(info?.version ? { version: info.version } : {}),
+    };
+    if (writeMeta(userData, g.code, next)) changed += 1;
+  }
+  return changed;
+}
+
+/**
+ * עותקים ישנים של אותו משחק (קוד אחר — למשל אחרי חידוש רישיון) נמחקים כשהגיע
+ * עותק חדש. לא נוגעים במשחק הנוכחי, בעותק שנערך במחשב או במשחק מקומי.
+ * @returns {string[]} הקודים שנמחקו
+ */
+function libraryDedupe(userData, gameId, keepCode) {
+  if (typeof gameId !== 'string' || gameId === '') return [];
+  const current = readJson(lastGameMetaPath(userData))?.code;
+  const removed = [];
+  for (const g of libraryList(userData)) {
+    if (g.code === keepCode || g.gameId !== gameId.toLowerCase()) continue;
+    if (g.local || g.editedAt > 0 || g.code === current) continue;
+    libraryDelete(userData, g.code);
+    removed.push(g.code);
+  }
+  return removed;
+}
+
 /** מחיקת משחק מהספרייה. אם הוא הנוכחי — הבחירה מתבטלת גם היא. */
 function libraryDelete(userData, code) {
   if (!isSafeCode(code)) return false;
@@ -212,4 +319,8 @@ module.exports = {
   currentCode,
   currentIsLocal,
   renameCurrentLocal,
+  libraryMarkEdited,
+  libraryBackfill,
+  libraryDedupe,
+  readPackageInfo,
 };

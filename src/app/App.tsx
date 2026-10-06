@@ -28,6 +28,7 @@ import { GameEditor } from '../render/GameEditor.tsx';
 import { GuideScreen } from '../render/GuideScreen.tsx';
 import { GateChange, GateSetup, GateUnlock } from '../render/GateDialog.tsx';
 import { NewGameDialog } from '../render/NewGameDialog.tsx';
+import { DeviceNotices, DevicePanel, type DeviceNotice } from '../render/DevicePanel.tsx';
 import { licenseSources, type GameLicense } from './gameLicense.ts';
 import { newGameFile } from './newGame.ts';
 import {
@@ -58,12 +59,30 @@ import {
   canStreamMedia,
   desktopMediaClear,
   desktopLoadSavedGame,
+  canUseDevice,
+  onDeviceState,
+  deviceSyncNow,
+  deviceRename,
+  deviceDownload,
+  deviceCancel,
+  onDeviceDownloadProgress,
   type SealConfig,
   type UpdateStatus,
   type DownloadProgress,
   type LibraryGame,
   type GateStatus,
+  type DeviceState,
+  type DeviceDownloadProgress,
 } from './clickerBridge.ts';
+import {
+  MAX_ATTEMPTS,
+  attemptKey,
+  formatDeviceId,
+  nextDeliveryAction,
+  planDelivery,
+  type DeliveryAction,
+  type DeliveryItem,
+} from './devicePlan.ts';
 import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.ts';
 import { decodeInitialMedia } from './mediaDecode.ts';
 import { openPushChannel } from './pushChannel.ts';
@@ -94,6 +113,9 @@ import hadassah from '../../fixtures/hadassah-ozen.json';
 import masaa from '../../fixtures/masaa-sync-manual-link.json';
 import beficha from '../../fixtures/beficha-uvilvavcha.json';
 import neuwirth from '../../fixtures/neuwirth.json';
+
+/** פתיחה לבד של משחק שנשלח למחשב — רק בדקות הראשונות אחרי פתיחת התוכנה. */
+const DEVICE_AUTO_WINDOW_MS = 10 * 60 * 1000;
 
 const RAW_FIXTURES: Record<string, unknown> = {
   'hadassah-ozen': hadassah,
@@ -252,7 +274,7 @@ export function updateStatusText(status: UpdateStatus | null): string {
  * גרסה רצה אצלו ואם מנגנון העדכון בכלל פועל — וזו בדיוק השאלה שנשאלת כשמשהו
  * שהתווסף לא מופיע.
  */
-function VersionLine({ status }: { status: UpdateStatus | null }) {
+function VersionLine({ status, deviceId = null }: { status: UpdateStatus | null; deviceId?: string | null }) {
   const [version, setVersion] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
@@ -271,6 +293,8 @@ function VersionLine({ status }: { status: UpdateStatus | null }) {
     <div className="version-line" title="גרסת התוכנה ומצב העדכון האוטומטי">
       {/* תמיד הגרסה *הרצה*; גרסה חדשה שהורדה מופיעה בתוך נוסח המצב. */}
       חוויה בקליק{version !== null ? ` · גרסה ${version}` : ''} · {updateStatusText(status)}
+      {/* המספר שמוסרים למנהל כדי שישלח משחקים למחשב הזה או יאשר לו עריכה */}
+      {deviceId !== null && ` · מחשב ${formatDeviceId(deviceId)}`}
     </div>
   );
 }
@@ -400,6 +424,42 @@ export function App() {
   const refreshLibrary = useCallback(() => {
     if (canBrowseLibrary()) void gameLibrary().then(setLibrary);
   }, []);
+
+  /**
+   * המחשב הזה מול מערכת יצירת המשחקים (electron/deviceSync.cjs): המספר שלו,
+   * מה המנהל אישר לו, והמשחקים שנשלחו אליו. null = עוד לא ידוע, או דפדפן.
+   */
+  const [deviceState, setDeviceState] = useState<DeviceState | null>(null);
+  const [deviceProgress, setDeviceProgress] = useState<DeviceDownloadProgress | null>(null);
+  /** הורדה של משחק שנשלח למחשב. foreground = המשחק שעל המסך מתעדכן (נסגר עד שירד). */
+  const [deviceTask, setDeviceTask] = useState<{
+    code: string;
+    name: string;
+    mode: 'background' | 'foreground';
+  } | null>(null);
+  const [deviceNotice, setDeviceNotice] = useState<DeviceNotice | null>(null);
+  /**
+   * כמה פעמים נכשלה הורדה של כל גרסה בהפעלה הזו (attemptKey), ובאיזו בדיקה
+   * נוסתה לאחרונה — ניסיון חוזר מחכה לבדיקה הבאה ולא רץ מיד שוב.
+   */
+  const deviceAttemptsRef = useRef<Record<string, number>>({});
+  const deviceTriedRef = useRef(new Map<string, number>());
+  const [deviceAttemptsTick, setDeviceAttemptsTick] = useState(0);
+  /** הספרייה נקראה אחרי הבדיקה הזו (checkedAt) — בלי זה משחק שכבר כאן נראה "חדש". */
+  const [libraryAt, setLibraryAt] = useState<number | null>(null);
+  /** הקוד בספרייה של המשחק שעל המסך (null = קובץ ZIP מהדיסק / אין משחק). */
+  const [currentCode, setCurrentCode] = useState<string | null>(null);
+  /**
+   * פתיחה לבד (כמו קוד שהוקלד) רק בפתיחת התוכנה, לפני שהמפעיל נגע במשהו,
+   * ופעם אחת — אחרת משחק שנשלח באמצע היום היה מחליף את מה שעל המסך באירוע.
+   */
+  const operatorActedRef = useRef(false);
+  const autoUsedRef = useRef(false);
+  /** המשחק שההורדה שלו התחילה בפתיחת התוכנה — ייפתח לבד כשתסתיים. */
+  const autoCandidateRef = useRef<string | null>(null);
+  const launchedAtRef = useRef(Date.now());
+  /** המפעיל לחץ "עצירה" — לא מנסים שוב בהפעלה הזו. */
+  const deviceStopRef = useRef(false);
 
   /**
    * קוד גישה להחלפת/עריכת המשחק. null = עוד לא נבדק.
@@ -601,6 +661,7 @@ export function App() {
           applySeal(res.game, saved.config);
         }
         setCurrentLocal(saved.local === true);
+        setCurrentCode(saved.code ?? null);
         applyLoadedZip(res);
         return true;
       } catch (e) {
@@ -698,6 +759,7 @@ export function App() {
     try {
       revokeZip(); // עוזבים אופליין (אם היה) — משחררים את ה-Blob URLs שלו
       setOffline(false); // בחירת fixture / העלאת JSON — משחק אונליין
+      setCurrentCode(null);
       setMediaIssues([]);
       setMediaAlertDismissed(false);
       const { game, dropped } = parseGameFileLenient(raw);
@@ -743,6 +805,7 @@ export function App() {
       .then((res) => {
         applySeal(res.game, seal);
         setCurrentLocal(false); // קובץ ZIP מהדיסק — הרישיון שלו מהמערכת
+        setCurrentCode(null); // ואינו מהספרייה
         applyLoadedZip(res);
       })
       .catch((e: unknown) => setError(`טעינת ה-ZIP נכשלה:\n${(e as Error).message}`));
@@ -773,6 +836,7 @@ export function App() {
     try {
       const res = loadGameFromExtracted(saved);
       setCurrentLocal(saved.local === true);
+      setCurrentCode(saved.code ?? null);
       applyLoadedZip(res);
       return true;
     } catch (e) {
@@ -782,15 +846,19 @@ export function App() {
   };
 
   /** פתיחת משחק שכבר הורד — מיידית, בלי רשת ובלי הורדה מחדש. */
-  const openFromLibrary = async (code: string) => {
+  const openFromLibrary = async (code: string): Promise<boolean> => {
     setCodeError(null);
     if (!(await gameLibrarySelect(code))) {
       setCodeError('המשחק השמור לא נמצא — נסו להוריד אותו מחדש');
       refreshLibrary();
-      return;
+      return false;
     }
     setLoadNotice(null);
-    await openCurrentGame('העותק השמור אינו תקין — נסו להוריד מחדש');
+    if (await openCurrentGame('העותק השמור אינו תקין — נסו להוריד מחדש')) return true;
+    // הבחירה בדיסק כבר עברה למשחק הזה. אם על המסך נשאר משחק אחר (פתיחה ממסך
+    // ההגדרות), שמירה בעורך שלו הייתה נכתבת לקובץ של החדש — חוזרים למסך הפתיחה.
+    closeLoadedGame();
+    return false;
   };
 
   const removeFromLibrary = async (g: LibraryGame) => {
@@ -830,6 +898,7 @@ export function App() {
     zipRevokeRef.current = null;
     setOffline(false);
     setCurrentLocal(false);
+    setCurrentCode(null);
     setGame(null);
     setPendingGame(null);
     setLoadNotice(null);
@@ -870,7 +939,11 @@ export function App() {
   const newGameLayer = newGameOpen ? (
     <NewGameDialog onCreate={createNewGame} onClose={() => setNewGameOpen(false)} />
   ) : null;
-  const openNewGame = () => guard('בניית משחק חדש', () => setNewGameOpen(true));
+  const openNewGame = () => {
+    // הכפתור נעול כשהמנהל לא אישר; גם התהליך הראשי בודק (game:create).
+    if (createLocked) return;
+    guard('בניית משחק חדש', () => setNewGameOpen(true));
+  };
 
   /** החלת קובץ משחק מעודכן: רענון חם באמצע משחק, או עדכון התצוגה לפני התחלה. */
   const applyGame = useCallback((loaded: GameFile) => {
@@ -979,6 +1052,247 @@ export function App() {
     return () => window.clearTimeout(t);
   }, [countdown, pendingGame]);
 
+  // -------------------------------------------------------------------------
+  // המחשב הזה מול מערכת יצירת המשחקים: משחק שהמנהל שלח למחשב יורד כמו קוד
+  // שהוקלד, ועדכון שלו יורד כשהמשחק שונה במערכת. מה עושים ומתי — ב-
+  // devicePlan.ts; כאן רק החיבור למסך. משחק חי לעולם אינו מופרע.
+  // -------------------------------------------------------------------------
+  const deviceOn = desktopApp && canUseDevice();
+  useEffect(() => (deviceOn ? onDeviceState(setDeviceState) : undefined), [deviceOn]);
+  useEffect(() => (deviceOn ? onDeviceDownloadProgress(setDeviceProgress) : undefined), [deviceOn]);
+
+  // כל לחיצה או מקש = המפעיל כאן ובוחר בעצמו; מעכשיו רק הודעות, בלי פתיחה לבד.
+  useEffect(() => {
+    if (!deviceOn) return undefined;
+    const acted = () => {
+      operatorActedRef.current = true;
+    };
+    window.addEventListener('pointerdown', acted, true);
+    window.addEventListener('keydown', acted, true);
+    return () => {
+      window.removeEventListener('pointerdown', acted, true);
+      window.removeEventListener('keydown', acted, true);
+    };
+  }, [deviceOn]);
+
+  // הספרייה נקראת מחדש אחרי כל בדיקה ואחרי כל הורדה של המחשב: הבדיקה רושמת
+  // לכל חבילה ישנה איזה משחק היא (libraryBackfill), ובלי הקריאה הזו משחק
+  // שכבר במחשב היה נראה חדש ויורד שוב.
+  const deviceCheckedAt = deviceState?.checkedAt ?? null;
+  const deviceBusyCode = deviceState?.downloading?.code ?? null;
+  useEffect(() => {
+    if (deviceCheckedAt === null || deviceBusyCode !== null) return undefined;
+    let alive = true;
+    setLibraryAt(null);
+    void gameLibrary().then((list) => {
+      if (!alive) return;
+      setLibrary(list);
+      setLibraryAt(deviceCheckedAt);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [deviceCheckedAt, deviceBusyCode]);
+
+  const onScreenGameId = (game ?? pendingGame)?.id ?? null;
+  const deviceItems = useMemo(
+    () =>
+      deviceState === null || deviceState.state === 'off'
+        ? []
+        : planDelivery(deviceState.games, library, { code: currentCode, gameId: onScreenGameId }),
+    [deviceState, library, currentCode, onScreenGameId],
+  );
+  const deviceFailed = (item: DeliveryItem) => (deviceAttemptsRef.current[attemptKey(item.game)] ?? 0) >= MAX_ATTEMPTS;
+
+  /**
+   * הורדה של משחק שנשלח למחשב. background — בלי לגעת במסך; foreground —
+   * כמו קוד שהוקלד: המשחק שעל המסך (אם ההורדה תחליף אותו) נסגר, וכשההורדה
+   * מסתיימת המשחק נפתח. כישלון או עצירה מחזירים את מה שהיה על המסך.
+   */
+  const runDeviceDownload = async (item: DeliveryItem, mode: 'background' | 'foreground', pendingOpen: boolean) => {
+    const g = item.game;
+    if (g.code === null) return;
+    const key = attemptKey(g);
+    const prev = mode === 'foreground' && currentCode !== null && pendingGame !== null ? { code: currentCode } : null;
+    deviceStopRef.current = false;
+    setDeviceTask({ code: g.code, name: g.name, mode });
+    setDeviceProgress(null);
+    if (mode === 'foreground') {
+      setCodeError(null);
+      if (item.targetOnScreen) closeLoadedGame();
+    }
+    const res = await deviceDownload({
+      code: g.code,
+      gameId: g.gameId,
+      name: g.name,
+      version: g.version,
+      pendingOpen,
+    });
+    // הספרייה מתעדכנת לפני שהמשימה משתחררת — אחרת המשחק שזה עתה ירד היה
+    // נראה עדיין "חדש" ויורד שוב.
+    const list = await gameLibrary();
+    setLibrary(list);
+    setDeviceTask(null);
+    setDeviceProgress(null);
+    if (res.ok) {
+      if (mode === 'foreground' && (await openFromLibrary(g.code)) && prev !== null) {
+        setDeviceNotice({ kind: 'updated', name: g.name });
+      }
+      return;
+    }
+    if (res.aborted === true && deviceStopRef.current) {
+      // המפעיל עצר: לא מנסים שוב לבד בהפעלה הזו, ולא פותחים שום דבר לבד.
+      operatorActedRef.current = true;
+      deviceAttemptsRef.current = { ...deviceAttemptsRef.current, [key]: MAX_ATTEMPTS };
+    } else if (res.aborted === true || res.busy === true) {
+      // נעצר בגלל משחק שהתחיל או הורדה של המפעיל — ימשיך מאותה נקודה אחר כך.
+      deviceTriedRef.current.delete(key);
+    } else {
+      const n = (deviceAttemptsRef.current[key] ?? 0) + 1;
+      deviceAttemptsRef.current = { ...deviceAttemptsRef.current, [key]: n };
+      if (mode === 'foreground' && prev === null) setCodeError(res.error ?? 'הורדת המשחק נכשלה');
+      else if (n >= MAX_ATTEMPTS || mode === 'foreground') {
+        setDeviceNotice({ kind: 'failed', name: g.name, error: res.error ?? 'שגיאה לא ידועה' });
+      }
+    }
+    setDeviceAttemptsTick((t) => t + 1);
+    if (prev !== null && item.targetOnScreen) await openFromLibrary(prev.code);
+  };
+
+  /** פתיחת משחק שנשלח למחשב וכבר הורד. auto = בלי שהמפעיל ביקש (מוצגת הודעה). */
+  const openDelivered = async (item: DeliveryItem, auto: boolean) => {
+    const code = item.copy?.code;
+    if (code === undefined) return;
+    const prev = currentCode !== null && pendingGame !== null ? { code: currentCode, name: pendingGame.name } : null;
+    setDeviceNotice(null);
+    const opened = await openFromLibrary(code);
+    refreshLibrary(); // "ממתין לפתיחה" ירד מהמשחק שנפתח
+    if (opened && auto) {
+      setDeviceNotice({ kind: 'opened', name: item.game.name, prevCode: prev?.code ?? null, prevName: prev?.name ?? '' });
+    }
+  };
+
+  const runDeliveryAction = (action: DeliveryAction, auto: null | 'any' | string, cycle: number) => {
+    const { item } = action;
+    if (action.type === 'open') {
+      autoUsedRef.current = true;
+      void openDelivered(item, true);
+      return;
+    }
+    deviceTriedRef.current.set(attemptKey(item.game), cycle);
+    if (action.type === 'foreground') {
+      autoUsedRef.current = true;
+      void runDeviceDownload(item, 'foreground', false);
+      return;
+    }
+    // הורדה שהתחילה בפתיחת התוכנה — המשחק ייפתח לבד כשתסתיים (אם המפעיל לא נגע).
+    if (auto === 'any' && item.kind === 'new' && autoCandidateRef.current === null) {
+      autoCandidateRef.current = item.game.gameId.toLowerCase();
+    }
+    void runDeviceDownload(item, 'background', action.pendingOpen);
+  };
+
+  // הצעד הבא: אחרי כל בדיקה, כל הורדה וכל שינוי במסך.
+  useEffect(() => {
+    if (!deviceOn || deviceState === null || deviceState.checkedAt === null) return;
+    if (libraryAt !== deviceState.checkedAt) return;
+    const cycle = deviceState.checkedAt;
+    const quiet = game === null && !starting && sealConfig === null && sealTool === false && !showSeal;
+    const busy = deviceTask !== null || deviceState.downloading !== null || downloading !== null;
+    // פתיחה לבד רק כשהמסך פנוי לזה: אין חלון פתוח, ואין משחק מקובץ ZIP שנבחר ידנית.
+    const calm =
+      quiet &&
+      !editorOpen &&
+      !newGameOpen &&
+      !guideOpen &&
+      locked === null &&
+      loadNotice === null &&
+      error === null &&
+      (pendingGame === null || currentCode !== null);
+    let auto: null | 'any' | string = null;
+    if (calm && !operatorActedRef.current && !autoUsedRef.current) {
+      auto = Date.now() - launchedAtRef.current < DEVICE_AUTO_WINDOW_MS ? 'any' : autoCandidateRef.current;
+    }
+    const action = nextDeliveryAction(deviceItems, {
+      quiet,
+      busy,
+      auto,
+      attempts: (k) => (deviceTriedRef.current.get(k) === cycle ? MAX_ATTEMPTS : (deviceAttemptsRef.current[k] ?? 0)),
+    });
+    if (action !== null) runDeliveryAction(action, auto, cycle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runDeliveryAction נבנית מחדש בכל רינדור; התלויות הן המצב שעליו היא מחליטה
+  }, [
+    deviceOn,
+    deviceState,
+    libraryAt,
+    deviceItems,
+    game,
+    starting,
+    deviceTask,
+    downloading,
+    editorOpen,
+    newGameOpen,
+    guideOpen,
+    locked,
+    loadNotice,
+    error,
+    pendingGame,
+    currentCode,
+    sealConfig,
+    sealTool,
+    showSeal,
+    deviceAttemptsTick,
+  ]);
+
+  // משחק מתחיל: הורדה ברקע נעצרת (מה שירד נשמר), שלא תתחרה ברשת של הטלפונים.
+  useEffect(() => {
+    if ((game !== null || starting) && deviceTask?.mode === 'background') deviceCancel();
+  }, [game, starting, deviceTask]);
+  useEffect(() => {
+    if (game !== null) setDeviceNotice(null);
+  }, [game]);
+
+  /** "עדכון" / "הורדה" / "טעינת העדכון" שהמפעיל ביקש — כמו קוד שהוקלד. */
+  const loadDelivered = (item: DeliveryItem) => {
+    if (item.game.code === null) return;
+    if (
+      (item.edited || (item.targetOnScreen && item.screenEdited)) &&
+      !window.confirm(
+        `העותק של "${item.game.name || 'המשחק'}" במחשב נערך כאן. טעינת העדכון תחליף אותו, והשינויים שנעשו במחשב יימחקו. להמשיך?`,
+      )
+    ) {
+      return;
+    }
+    guard('טעינת משחק שנשלח למחשב', () => {
+      const key = attemptKey(item.game);
+      deviceAttemptsRef.current = { ...deviceAttemptsRef.current, [key]: 0 };
+      deviceTriedRef.current.delete(key);
+      setDeviceNotice(null);
+      void runDeviceDownload(item, 'foreground', false);
+    });
+  };
+  const stopDeviceDownload = () => {
+    deviceStopRef.current = true;
+    deviceCancel();
+  };
+
+  /** מה המנהל אישר למחשב הזה. נשמר במחשב — בלי רשת נשאר מה שהתקבל. */
+  const devicePerms = deviceState?.permissions ?? null;
+  const deviceNumber = deviceState?.device?.id ? formatDeviceId(deviceState.device.id) : null;
+  const lockText = (what: string) =>
+    `${what} במחשב הזה דורשת אישור מהמנהל במערכת יצירת המשחקים${deviceNumber !== null ? ` (מספר המחשב: ${deviceNumber})` : ''}`;
+  const createLocked = deviceOn && devicePerms?.createGame !== true;
+  const editLocked = deviceOn && !(devicePerms?.editGame === true || (currentLocal && devicePerms?.createGame === true));
+  const showDevicePanel =
+    deviceOn &&
+    deviceState !== null &&
+    deviceState.device !== null &&
+    deviceState.state !== 'off' &&
+    (deviceState.state !== 'unavailable' || deviceState.device.registered);
+  const fgDevice = deviceTask?.mode === 'foreground' ? deviceTask : null;
+  const bgDeviceName =
+    deviceTask?.mode === 'background' ? deviceTask.name || 'משחק' : (deviceState?.downloading?.name ?? null);
+
   // ב-URL הציבורי בלי קובץ משחק (‎?game=‎) מפנים לאתר הראשי במקום להציג את בורר
   // קבצי הבדיקה — כדי שלא ישחקו בקבצים שנועדו רק לנסיון. פיתוח מקומי ו-EXE אופליין
   // אינם מושפעים (ראו shouldRedirectHome).
@@ -1077,9 +1391,31 @@ export function App() {
           {...(sealConfig !== null ? { sealConfig } : {})}
           {...(desktopApp && sealConfig === null ? { onPickAnother: () => guard('החלפת המשחק', pickAnotherGame) } : {})}
           {...(desktopApp && sealConfig === null && canCreateGame() ? { onNewGame: openNewGame } : {})}
+          {...(createLocked ? { newGameLocked: lockText('בניית משחק חדש') } : {})}
           {...(currentLocal && sealConfig === null ? { sources: licenseSources(pendingGame) } : {})}
           {...(offline && sealConfig === null && canSaveEdits()
             ? { onEditGame: () => guard('עריכת המשחק', () => setEditorOpen(true)) }
+            : {})}
+          {...(editLocked ? { editLocked: lockText('עריכה') } : {})}
+          {...(deviceOn
+            ? {
+                overlay: (
+                  <DeviceNotices
+                    notice={deviceNotice}
+                    items={deviceItems}
+                    downloadingName={bgDeviceName}
+                    progress={deviceProgress}
+                    onDismiss={() => setDeviceNotice(null)}
+                    onBack={(code) => {
+                      setDeviceNotice(null);
+                      void openFromLibrary(code);
+                    }}
+                    onOpen={(item) => guard('החלפת המשחק', () => void openDelivered(item, false))}
+                    onLoad={loadDelivered}
+                    onCancel={stopDeviceDownload}
+                  />
+                ),
+              }
             : {})}
           {...(offline ? { onOpenGuide: () => setGuideOpen(true) } : {})}
           onSave={(saved) => {
@@ -1091,7 +1427,7 @@ export function App() {
           }}
         />
         {updateStatus !== null && <UpdateBadge status={updateStatus} />}
-        <VersionLine status={updateStatus} />
+        <VersionLine status={updateStatus} deviceId={deviceState?.device?.id ?? null} />
         {gateLayer}
         {newGameLayer}
         {mediaIssues.length > 0 && !mediaAlertDismissed && (
@@ -1178,6 +1514,11 @@ export function App() {
    * הלחיצה, מבקשים קוד, ורק אז פותחים אותו בתוכנה.
    */
   const onPickZip = (e: React.MouseEvent) => {
+    // משחק שנשלח למחשב יורד ויפתח מיד כשיסתיים — קובץ אחר עכשיו היה מוחלף בו.
+    if (fgDevice !== null) {
+      e.preventDefault();
+      return;
+    }
     if (gate?.enabled !== true) return;
     e.preventDefault();
     guard('טעינת קובץ משחק', () => zipInputRef.current?.click());
@@ -1208,7 +1549,7 @@ export function App() {
                 {canDownloadByCode()
                   ? 'בחרו קובץ משחק (ZIP), או הקלידו את קוד המשחק כדי למשוך אותו מהשרת'
                   : 'בחרו את קובץ המשחק (ZIP) כדי להתחיל'}
-                {canCreateGame() && <><br />או בנו כאן משחק חדש מאפס</>}
+                {canCreateGame() && !createLocked && <><br />או בנו כאן משחק חדש מאפס</>}
               </p>
               <label className="picker-button offline-open-load" onClick={onPickZip}>
                 📦 טעינת משחק (ZIP)
@@ -1221,7 +1562,7 @@ export function App() {
                   className="offline-open-code"
                   onSubmit={(e) => {
                     e.preventDefault();
-                    if (gameCode.trim() === '' || downloading !== null) return;
+                    if (gameCode.trim() === '' || downloading !== null || fgDevice !== null) return;
                     guard('טעינת משחק לפי קוד', () => void loadFromCode(gameCode));
                   }}
                 >
@@ -1232,13 +1573,13 @@ export function App() {
                     inputMode="numeric"
                     placeholder="קוד משחק"
                     value={gameCode}
-                    disabled={downloading !== null}
+                    disabled={downloading !== null || fgDevice !== null}
                     onChange={(e) => {
                       setGameCode(e.target.value);
                       setCodeError(null);
                     }}
                   />
-                  <button type="submit" disabled={gameCode.trim() === '' || downloading !== null}>
+                  <button type="submit" disabled={gameCode.trim() === '' || downloading !== null || fgDevice !== null}>
                     ☁ טען מהשרת
                   </button>
                 </form>
@@ -1248,17 +1589,29 @@ export function App() {
                 <button
                   type="button"
                   className="offline-open-new"
-                  disabled={downloading !== null}
+                  disabled={downloading !== null || fgDevice !== null || createLocked}
                   onClick={openNewGame}
                 >
-                  ✨ בניית משחק חדש
+                  {createLocked ? '🔒' : '✨'} בניית משחק חדש
                 </button>
               )}
+              {/* נעול עד שהמנהל מאשר את המחשב — גם בלי רשת, לפי האישור האחרון שהתקבל. */}
+              {canCreateGame() && createLocked && <p className="offline-open-lock">🔒 {lockText('בניית משחק חדש')}</p>}
               {downloading !== null && <DownloadBar progress={downloading} />}
+              {/* משחק שנשלח למחשב יורד ונפתח — כמו קוד שהוקלד */}
+              {fgDevice !== null && (
+                <div className="offline-open-dl">
+                  <p className="offline-open-note">📥 משחק שנשלח למחשב הזה: {fgDevice.name || 'משחק'}</p>
+                  <DownloadBar progress={deviceProgress ?? { phase: 'connect' }} />
+                  <button type="button" className="offline-open-clear" onClick={stopDeviceDownload}>
+                    עצירת ההורדה
+                  </button>
+                </div>
+              )}
               {codeError !== null && <p className="offline-open-error">{codeError}</p>}
 
               {/* משחקים שכבר הורדו — פתיחה מיידית בלי רשת ובלי הורדה מחדש. */}
-              {library.length > 0 && downloading === null && (
+              {library.length > 0 && downloading === null && fgDevice === null && (
                 <section className="lib">
                   <h2 className="lib-title">
                     {library.some((g) => g.local) ? 'המשחקים במחשב' : 'משחקים שהורדו למחשב'}
@@ -1334,7 +1687,7 @@ export function App() {
                 </button>
               )}
               {updateStatus !== null && <UpdateBadge status={updateStatus} />}
-        <VersionLine status={updateStatus} />
+              <VersionLine status={updateStatus} deviceId={deviceState?.device?.id ?? null} />
               {gateLayer}
               {newGameLayer}
               {sealCapable && (
@@ -1365,6 +1718,22 @@ export function App() {
               )}
             </div>
           </div>
+          {showDevicePanel && deviceState !== null && (
+            <DevicePanel
+              state={deviceState}
+              items={deviceItems}
+              downloadingCode={deviceTask?.code ?? deviceState.downloading?.code ?? null}
+              progress={deviceProgress}
+              failed={deviceFailed}
+              busy={downloading !== null || fgDevice !== null}
+              screenCode={currentCode}
+              onSync={() => void deviceSyncNow()}
+              onRename={(name) => guard('שינוי שם המחשב', () => void deviceRename(name))}
+              onOpen={(item) => guard('החלפת המשחק', () => void openDelivered(item, false))}
+              onLoad={loadDelivered}
+              onCancel={stopDeviceDownload}
+            />
+          )}
         </div>
       </Shell>
     );

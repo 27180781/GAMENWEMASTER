@@ -7,7 +7,7 @@
  *   • שאר המצבים (‏⚙ באמצע משחק, או משחק אונליין אמיתי) — הטופס המלא.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { GameFile } from '../engine/index.ts';
 import { type AutoTransition, type GameSettings } from '../app/urlParams.ts';
 import {
@@ -41,6 +41,14 @@ interface SettingsScreenProps {
   /** EXE בלבד — בניית משחק חדש מאפס (לא זמין במשחק סגור). */
   onNewGame?: () => void;
   /**
+   * הכפתור מוצג נעול (🔒) עם ההסבר הזה: המנהל עוד לא אישר למחשב הזה בניית
+   * משחק חדש / עריכה. האישור נשמר במחשב, ולכן בלי רשת הכפתור נשאר כפי שהיה.
+   */
+  newGameLocked?: string;
+  editLocked?: string;
+  /** הודעות מעל המסך (משחק שנשלח למחשב) — בתוך המסך, מתחת לחלונות הקופצים שלו. */
+  overlay?: ReactNode;
+  /**
    * מקורות ההצבעה שהרישיון מתיר — רק למשחק שנבנה במחשב, שהרישיון שלו נקבע
    * בתוכנה. חסר = כמו היום (הכול לפי הקוד והחותמת).
    */
@@ -63,6 +71,9 @@ export function SettingsScreen({
   onPickAnother,
   onEditGame,
   onNewGame,
+  newGameLocked,
+  editLocked,
+  overlay,
   onOpenGuide,
   sealConfig,
   sources,
@@ -522,13 +533,23 @@ export function SettingsScreen({
           </button>
         )}
         {onNewGame && (
-          <button className="settings-pick-another" onClick={onNewGame}>
-            ✨ משחק חדש
+          <button
+            className="settings-pick-another"
+            onClick={onNewGame}
+            disabled={newGameLocked !== undefined}
+            {...(newGameLocked !== undefined ? { title: newGameLocked } : {})}
+          >
+            {newGameLocked !== undefined ? '🔒' : '✨'} משחק חדש
           </button>
         )}
         {onEditGame && (
-          <button className="settings-pick-another" onClick={onEditGame}>
-            ✏️ עריכת המשחק
+          <button
+            className="settings-pick-another"
+            onClick={onEditGame}
+            disabled={editLocked !== undefined}
+            {...(editLocked !== undefined ? { title: editLocked } : {})}
+          >
+            {editLocked !== undefined ? '🔒' : '✏️'} עריכת המשחק
           </button>
         )}
         {onOpenGuide && (
@@ -565,6 +586,7 @@ export function SettingsScreen({
   if (clickerCapable && mode === 'start') {
     return (
       <div className="screen settings-screen clicker-intro-screen">
+        {overlay}
         <div className="screen-content clicker-intro">
           <div className="clicker-intro-card">
             <div className="clicker-intro-icon" aria-hidden="true">
@@ -630,6 +652,7 @@ export function SettingsScreen({
   if (demoIntro) {
     return (
       <div className="screen settings-screen demo-intro-screen">
+        {overlay}
         <div className="screen-content demo-intro">
           <div className="demo-intro-card">
             <div className="demo-intro-bubble">
@@ -661,6 +684,7 @@ export function SettingsScreen({
   if (onlinePhone) {
     return (
       <div className="screen settings-screen online-start-screen">
+        {overlay}
         <div className="screen-content online-start">
           {/* הוראות הפעלה בלבד — מספר הטלפון והקוד ירדו מהמסך הזה (מוצגים בבאנר
               העליון ובמסך ההתחברות). כרטיס אחד ממורכז. */}
@@ -695,6 +719,7 @@ export function SettingsScreen({
   // הטופס המלא — ⚙ באמצע משחק, או מסך פתיחה של משחק אונליין בלי קוד
   return (
     <div className="screen settings-screen">
+      {overlay}
       <div className="screen-content demo-settings">
         <h1 className="demo-title">הגדרות משחק ⚙</h1>
         <p className="demo-game-name">
