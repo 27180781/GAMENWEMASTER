@@ -10,7 +10,15 @@
  * המשתמש — עד אז סרטונים מתנגנים מושתקים) ומסך מלא. שניהם מקומיים לגמרי.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  Component,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { AudioManager, type SoundChannel } from '../app/AudioManager.ts';
 import { JOIN_DIAL_DISPLAY } from '../app/urlParams.ts';
 import { EMPTY_ROSTER, type RosterData } from '../app/roster.ts';
@@ -112,6 +120,50 @@ function WaitingScreen({ connection }: { connection: ViewerConnection }) {
   );
 }
 
+/** מה שמוצג כשהמסך לא הצליח להצטייר — עד העדכון הבא מהמסך הראשי. */
+function ScreenFallback() {
+  return (
+    <div className="live-waiting" dir="rtl">
+      <div className="live-waiting-box">
+        <div className="live-waiting-icon">📺</div>
+        <h1>מסך הצפייה</h1>
+        <p>ממתינים לעדכון מהמסך הראשי…</p>
+        <span className="spinner" />
+      </div>
+    </div>
+  );
+}
+
+interface RenderGuardProps {
+  /** מתחלף בכל עדכון מהמסך הראשי — ואז מנסים לצייר שוב. */
+  resetKey: unknown;
+  fallback: ReactNode;
+  children: ReactNode;
+}
+
+/**
+ * שגיאה בציור (למשל מצב ממסך ראשי בגרסה אחרת) לא משאירה דף ריק ולא עוצרת את
+ * החיבור: מוצג `fallback`, והעדכון הבא מנסה שוב.
+ */
+class RenderGuard extends Component<RenderGuardProps, { failed: boolean; key: unknown }> {
+  state = { failed: false, key: this.props.resetKey };
+
+  static getDerivedStateFromProps(
+    props: RenderGuardProps,
+    state: { failed: boolean; key: unknown },
+  ): { failed: boolean; key: unknown } | null {
+    return props.resetKey === state.key ? null : { failed: false, key: props.resetKey };
+  }
+
+  static getDerivedStateFromError(): { failed: boolean } {
+    return { failed: true };
+  }
+
+  render(): ReactNode {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
+
 export function LiveViewer({ token }: { token: string }) {
   if (!isViewToken(token)) {
     return (
@@ -153,20 +205,31 @@ function ValidLiveViewer({ token }: { token: string }) {
   const snap = update.snapshot;
 
   return (
-    <ViewerChrome
-      connection={update.connection}
-      hasSnapshot={snap !== null}
-      soundSource={snap}
-      toLocal={update.toLocal}
-    >
-      {(soundOn) =>
-        snap === null ? (
-          <WaitingScreen connection={update.connection} />
-        ) : (
-          <LiveScreen snap={snap} toLocal={update.toLocal} soundOn={soundOn} />
-        )
+    <RenderGuard
+      resetKey={snap}
+      fallback={
+        <div className="live-viewer">
+          <ScreenFallback />
+        </div>
       }
-    </ViewerChrome>
+    >
+      <ViewerChrome
+        connection={update.connection}
+        hasSnapshot={snap !== null}
+        soundSource={snap}
+        toLocal={update.toLocal}
+      >
+        {(soundOn) =>
+          snap === null ? (
+            <WaitingScreen connection={update.connection} />
+          ) : (
+            <RenderGuard resetKey={snap} fallback={<ScreenFallback />}>
+              <LiveScreen snap={snap} toLocal={update.toLocal} soundOn={soundOn} />
+            </RenderGuard>
+          )
+        }
+      </ViewerChrome>
+    </RenderGuard>
   );
 }
 
