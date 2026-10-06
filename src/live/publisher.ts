@@ -133,21 +133,23 @@ export class LivePublisher {
     if (this.stopped || this.inFlight || this.status.state === 'superseded') return;
     if (!this.dirty && !this.needKey) return;
     this.dirty = false;
-    let built: LiveSnapshot | null;
+    let target: LiveSnapshot;
+    let ops: PatchOp[] | null = null;
     try {
-      built = this.build();
+      const built = this.build();
+      if (built === null) return;
+      // JSON טהור: מה שלא עובר ברשת (undefined, פונקציות) לא ייכנס להשוואה.
+      target = JSON.parse(JSON.stringify(built)) as LiveSnapshot;
+      const full = this.needKey || this.acked === null || this.patchesSinceKey >= this.keyEvery;
+      if (!full) ops = diff(this.acked, target);
     } catch {
       // שגיאה בבנייה לא מפילה את המשחק — מנסים שוב בשינוי הבא.
       return;
     }
-    if (built === null) return;
-    // JSON טהור: מה שלא עובר ברשת (undefined, פונקציות) לא ייכנס להשוואה.
-    const target = JSON.parse(JSON.stringify(built)) as LiveSnapshot;
-    if (this.needKey || this.acked === null || this.patchesSinceKey >= this.keyEvery) {
+    if (ops === null) {
       await this.send({ kind: 'key', data: target }, target);
       return;
     }
-    const ops = diff(this.acked, target);
     if (ops.length === 0) return;
     await this.send({ kind: 'patch', ops }, target);
   }
