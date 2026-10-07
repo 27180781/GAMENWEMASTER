@@ -87,7 +87,7 @@
 .game-root[data-visual-theme='led'] :is(.q-card, .lobby-join-code) { border-color: var(--led-rim); }
 
 /* השאלה: פס אור שחולף לאורך הלוח מדי פעם (שכבה בתוך התיבה, בלי להזיז דבר) */
-.game-root[data-visual-theme='led'] .q-question { position: relative; overflow: hidden; }
+.game-root[data-visual-theme='led'] .q-question { position: relative; }
 .game-root[data-visual-theme='led'] .q-question::after {
   content: '';
   position: absolute;

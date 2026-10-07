@@ -205,28 +205,36 @@
 }
 .game-root[data-visual-theme='gala'] :is(.raffle-title, .bet-title) { color: #e3c77d; }
 
-/* טקסט חופשי על הרקע: הילה כחולה-לילה ונגיעת זהב חמה */
-.game-root[data-visual-theme='gala'] :is(.podium-name, .podium-score, .raffle-name) {
-  text-shadow: 0 0 2px rgba(6, 8, 20, 0.9), 0 4px 18px rgba(6, 8, 20, 0.8), 0 0 28px rgba(230, 200, 130, 0.4);
+/* טקסט חופשי שעומד ישירות על הרקע: הילה כחולה-לילה צפופה סביב האותיות ונגיעת זהב
+   חמה — הסריף הדק נשאר קריא גם על רקע בהיר ועמוס שהבעלים העלה */
+.game-root[data-visual-theme='gala'] :is(
+  .podium-name, .podium-score, .raffle-name, .opening-hint, .lobby-join-label,
+  .q-flyer:not(.q-flyer--bubble) .q-flyer-nm, .slide-counter, .leaders-empty, .winners-empty, .lobby-empty
+) {
+  text-shadow:
+    0 0 2px #060814,
+    0 0 6px #060814,
+    0 2px 14px rgba(6, 8, 20, 0.9),
+    0 0 30px rgba(230, 200, 130, 0.35);
 }
 
 /* ---- רקע הגיבוי (כשאין מדיה): לילה כחול-שחור, בוקה חם ורך ומסגרת זהב דקה ---- */
 .game-root[data-visual-theme='gala'] :is(.slide-screen, .leaders-overlay, .sl-overlay) {
   background:
-    radial-gradient(circle at 9% 18%, rgba(255, 214, 150, 0.13) 0, rgba(255, 214, 150, 0.098) 41px, rgba(255, 214, 150, 0.033) 53px, transparent 58px),
-    radial-gradient(circle at 17% 30%, rgba(240, 196, 120, 0.15) 0, rgba(240, 196, 120, 0.112) 15px, rgba(240, 196, 120, 0.037) 20px, transparent 22px),
-    radial-gradient(circle at 24% 12%, rgba(240, 196, 120, 0.11) 0, rgba(240, 196, 120, 0.083) 24px, rgba(240, 196, 120, 0.028) 31px, transparent 34px),
-    radial-gradient(circle at 84% 22%, rgba(255, 228, 180, 0.14) 0, rgba(255, 228, 180, 0.105) 33px, rgba(255, 228, 180, 0.035) 42px, transparent 46px),
-    radial-gradient(circle at 91% 40%, rgba(255, 214, 150, 0.16) 0, rgba(255, 214, 150, 0.12) 12px, rgba(255, 214, 150, 0.04) 16px, transparent 18px),
-    radial-gradient(circle at 76% 10%, rgba(255, 228, 180, 0.14) 0, rgba(255, 228, 180, 0.105) 18px, rgba(255, 228, 180, 0.035) 23px, transparent 26px),
-    radial-gradient(circle at 12% 72%, rgba(255, 214, 150, 0.18) 0, rgba(255, 214, 150, 0.135) 28px, rgba(255, 214, 150, 0.045) 36px, transparent 40px),
-    radial-gradient(circle at 21% 90%, rgba(255, 228, 180, 0.11) 0, rgba(255, 228, 180, 0.083) 14px, rgba(255, 228, 180, 0.028) 18px, transparent 20px),
-    radial-gradient(circle at 88% 78%, rgba(255, 228, 180, 0.12) 0, rgba(255, 228, 180, 0.09) 37px, rgba(255, 228, 180, 0.03) 47px, transparent 52px),
-    radial-gradient(circle at 80% 93%, rgba(240, 196, 120, 0.19) 0, rgba(240, 196, 120, 0.143) 17px, rgba(240, 196, 120, 0.048) 22px, transparent 24px),
-    radial-gradient(circle at 5% 48%, rgba(255, 214, 150, 0.18) 0, rgba(255, 214, 150, 0.135) 11px, rgba(255, 214, 150, 0.045) 14px, transparent 16px),
-    radial-gradient(circle at 95% 62%, rgba(240, 196, 120, 0.13) 0, rgba(240, 196, 120, 0.098) 20px, rgba(240, 196, 120, 0.033) 25px, transparent 28px),
-    radial-gradient(circle at 33% 6%, rgba(240, 196, 120, 0.14) 0, rgba(240, 196, 120, 0.105) 10px, rgba(240, 196, 120, 0.035) 12px, transparent 14px),
-    radial-gradient(circle at 67% 95%, rgba(255, 214, 150, 0.2) 0, rgba(255, 214, 150, 0.15) 11px, rgba(255, 214, 150, 0.05) 14px, transparent 16px),
+    radial-gradient(circle at 9% 18%, rgba(255, 196, 110, 0.13) 0, rgba(255, 196, 110, 0.098) 41px, rgba(255, 196, 110, 0.033) 53px, transparent 58px),
+    radial-gradient(circle at 17% 30%, rgba(246, 180, 86, 0.15) 0, rgba(246, 180, 86, 0.112) 15px, rgba(246, 180, 86, 0.037) 20px, transparent 22px),
+    radial-gradient(circle at 24% 12%, rgba(246, 180, 86, 0.11) 0, rgba(246, 180, 86, 0.083) 24px, rgba(246, 180, 86, 0.028) 31px, transparent 34px),
+    radial-gradient(circle at 84% 22%, rgba(255, 214, 140, 0.14) 0, rgba(255, 214, 140, 0.105) 33px, rgba(255, 214, 140, 0.035) 42px, transparent 46px),
+    radial-gradient(circle at 91% 40%, rgba(255, 196, 110, 0.16) 0, rgba(255, 196, 110, 0.12) 12px, rgba(255, 196, 110, 0.04) 16px, transparent 18px),
+    radial-gradient(circle at 76% 10%, rgba(255, 214, 140, 0.14) 0, rgba(255, 214, 140, 0.105) 18px, rgba(255, 214, 140, 0.035) 23px, transparent 26px),
+    radial-gradient(circle at 12% 72%, rgba(255, 196, 110, 0.18) 0, rgba(255, 196, 110, 0.135) 28px, rgba(255, 196, 110, 0.045) 36px, transparent 40px),
+    radial-gradient(circle at 21% 90%, rgba(255, 214, 140, 0.11) 0, rgba(255, 214, 140, 0.083) 14px, rgba(255, 214, 140, 0.028) 18px, transparent 20px),
+    radial-gradient(circle at 88% 78%, rgba(255, 214, 140, 0.12) 0, rgba(255, 214, 140, 0.09) 37px, rgba(255, 214, 140, 0.03) 47px, transparent 52px),
+    radial-gradient(circle at 80% 93%, rgba(246, 180, 86, 0.19) 0, rgba(246, 180, 86, 0.143) 17px, rgba(246, 180, 86, 0.048) 22px, transparent 24px),
+    radial-gradient(circle at 5% 48%, rgba(255, 196, 110, 0.18) 0, rgba(255, 196, 110, 0.135) 11px, rgba(255, 196, 110, 0.045) 14px, transparent 16px),
+    radial-gradient(circle at 95% 62%, rgba(246, 180, 86, 0.13) 0, rgba(246, 180, 86, 0.098) 20px, rgba(246, 180, 86, 0.033) 25px, transparent 28px),
+    radial-gradient(circle at 33% 6%, rgba(246, 180, 86, 0.14) 0, rgba(246, 180, 86, 0.105) 10px, rgba(246, 180, 86, 0.035) 12px, transparent 14px),
+    radial-gradient(circle at 67% 95%, rgba(255, 196, 110, 0.2) 0, rgba(255, 196, 110, 0.15) 11px, rgba(255, 196, 110, 0.05) 14px, transparent 16px),
     radial-gradient(ellipse at 50% 120%, color-mix(in srgb, rgb(var(--main-rgb, 34, 43, 69)) 30%, #1a1f4a) 0%, transparent 60%),
     radial-gradient(ellipse at 50% 30%, #121735 0%, #070914 70%, #030409 100%);
   background-repeat: no-repeat;

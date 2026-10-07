@@ -161,12 +161,7 @@
   font-size: 36px;
   line-height: 1;
   color: #111;
-  background: #ffe14d;
-  clip-path: polygon(
-    50% 0%, 59% 26%, 82% 8%, 74% 34%, 100% 30%, 79% 50%, 100% 70%, 74% 66%,
-    82% 92%, 59% 74%, 50% 100%, 41% 74%, 18% 92%, 26% 66%, 0% 70%, 21% 50%,
-    0% 30%, 26% 34%, 18% 8%, 41% 26%
-  );
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='50,3 59,27 81,10 74,35 97,31 79,50 97,69 74,65 81,90 59,73 50,97 41,73 19,90 26,65 3,69 21,50 3,31 26,35 19,10 41,27' fill='%23ffe14d' stroke='%23111' stroke-width='5' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
   transform: translateY(-50%);
   animation: vt-comic-pow 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both, vt-comic-wobble 1.8s ease-in-out 0.5s infinite;
   pointer-events: none;
