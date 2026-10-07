@@ -18,6 +18,7 @@ import { themeRootProps } from '../render/theme.ts';
 import { GameHost } from './GameHost.tsx';
 import { prefetchBackup, resolveBackupConfig } from './backup.ts';
 import { useMediaPreload } from './useMediaPreload.ts';
+import { useClickerSave } from './useClickerSave.ts';
 import { MediaLoadBar, MediaLoadDot } from '../render/MediaLoadBar.tsx';
 import { StartupOverlay } from '../render/StartupOverlay.tsx';
 import { ErrorScreen } from '../render/ErrorScreen.tsx';
@@ -87,15 +88,11 @@ import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.
 import { decodeInitialMedia } from './mediaDecode.ts';
 import { openPushChannel } from './pushChannel.ts';
 import {
-  EMPTY_ROSTER,
-  fingerprintUsers,
   loadRoster,
   loadRosterSource,
-  mergeGameUsers,
-  parseGameUsers,
-  rosterIsStale,
   saveRoster,
   saveRosterSource,
+  syncRosterWithFile,
 } from './roster.ts';
 import { VOTE_SERVER_URL } from './socketAdapter.ts';
 import {
@@ -125,25 +122,20 @@ const RAW_FIXTURES: Record<string, unknown> = {
 };
 
 /**
- * מיזוג שמות/קבוצות משדה `users` של קובץ המשחק אל המרשם השמור (לפי id המשחק).
- * אידמפוטנטי (upsert לפי מספר; קטגוריה/קבוצות לפי שם) — בטוח להריץ גם בטעינה
- * וגם בכל רענון חם באמצע משחק.
+ * מיזוג שמות/קבוצות מקובץ המשחק (`users`, ושמות שממתינים לשלט ב-`pendingUsers`)
+ * אל המרשם השמור (לפי id המשחק). אידמפוטנטי — בטוח להריץ גם בטעינה וגם בכל
+ * רענון חם באמצע משחק. הכללים עצמם ב-syncRosterWithFile (roster.ts).
  */
 function mergeUsersIntoRoster(file: GameFile, opts: { sealed?: boolean } = {}): void {
-  const users = parseGameUsers(file.users);
-  if (users.length === 0) return;
-  const categoryName = file.name.trim() !== '' ? file.name.trim() : 'קבוצות המשחק';
-
-  // מהדורה חדשה של אותו משחק: אותו id, אבל רשימת משתתפים אחרת (למשל EXE שנחתם
-  // מחדש עם מספרי שלטים אחרים). המרשם ממוזג ולעולם אינו מוחק, ולכן בלי הבדיקה
-  // הזו המספרים הישנים היו נשארים לצד החדשים. כשהרשימה השתנתה — בונים מחדש.
-  const fingerprint = fingerprintUsers(String(file.users ?? ''));
-  const previous = loadRosterSource(file.id);
-  const stale = rosterIsStale(previous, fingerprint, opts.sealed === true);
-  const base = stale ? { ...EMPTY_ROSTER } : loadRoster(file.id);
-
-  saveRoster(file.id, mergeGameUsers(base, users, categoryName));
-  saveRosterSource(file.id, fingerprint);
+  const result = syncRosterWithFile(
+    loadRoster(file.id),
+    file,
+    loadRosterSource(file.id),
+    opts.sealed === true,
+  );
+  if (result === null) return;
+  saveRoster(file.id, result.roster);
+  saveRosterSource(file.id, result.source);
 }
 
 function useHash(): string {
@@ -381,6 +373,8 @@ export function App() {
   /** משחק שנטען וממתין למסך ההגדרות (המסך הראשון תמיד). */
   const [pendingGame, setPendingGame] = useState<GameFile | null>(null);
   const [game, setGame] = useState<GameFile | null>(null);
+  /** מספרי שלטים שנקלטו בלחיצה לשמות מהבונה — נשמרים בבונה (clickerSave.ts). */
+  const clickerSave = useClickerSave(game ?? pendingGame, backupUrlOverride);
   /** האם המשחק נטען כמשחק אופליין (ZIP) — משפיע על באנר/רישיון במשחק. */
   const [offline, setOffline] = useState(false);
   /** בעיות מדיה שזוהו בטעינה (קישורים שבורים / נכסים חסרים). */
@@ -1333,6 +1327,8 @@ export function App() {
           voteServerUrl={params.voteServer ?? VOTE_SERVER_URL}
           offline={offline}
           onApplyGame={applyRawGame}
+          clickerSave={clickerSave.view}
+          onRosterChange={clickerSave.nudge}
         />
         {/* בזמן משחק — עיגול זעיר בפינה, לא פס מלא שמכער את המסך */}
         {!mediaPreload.done && <MediaLoadDot {...mediaPreload} />}

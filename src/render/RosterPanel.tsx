@@ -32,6 +32,7 @@ import {
 import { groupBonusOf, normalizeDelta } from '../engine/scoreAdjust.ts';
 import { importSheet, summaryText, type ImportMode } from '../app/rosterImport.ts';
 import { readSheetRows } from '../app/xlsxRead.ts';
+import { clickerSaveLines, type ClickerSaveView } from '../app/clickerSave.ts';
 
 interface RosterPanelProps {
   roster: RosterData;
@@ -42,6 +43,8 @@ interface RosterPanelProps {
   /** מצב "קליטה חכמה" פעיל — כל לחיצת שלט נקלטת לרשימה. */
   captureOn?: boolean;
   onToggleCapture?: (on: boolean) => void;
+  /** שמירת מספרי השלטים בבונה (לשמות שהגיעו מהבונה) — שורת מצב מתחת לקליטה. */
+  saveStatus?: ClickerSaveView | null;
   /**
    * תיקון ניקוד ידני. ארבעת השדות האלה מגיעים יחד, ורק כשיש משחק פעיל —
    * לפני תחילת משחק אין ניקוד לתקן, ואז הפקדים כלל אינם מוצגים.
@@ -120,6 +123,7 @@ export function RosterPanel({
   onOpenConnect,
   captureOn = false,
   onToggleCapture,
+  saveStatus = null,
   scores,
   groupBonus,
   onAdjustPlayer,
@@ -182,6 +186,8 @@ export function RosterPanel({
   };
 
   const waitingRemotes = roster.players.filter((p) => p.name.trim() === '').length;
+  /** שמות בתור שהגיעו מרשימת המשתתפים בבונה (בלי מספר שלט). */
+  const queuedFromBuilder = roster.pendingNames.filter((p) => p.participantId !== undefined).length;
 
   const addPlayer = () => {
     if (newNum.trim() === '') return;
@@ -255,6 +261,11 @@ export function RosterPanel({
                   {waitingRemotes > 0 ? ` · ${waitingRemotes} ממתינים לשם` : ''}
                 </div>
               )}
+              {clickerSaveLines(saveStatus).map((line) => (
+                <p key={line.tone} className={`roster-save-status roster-save-status--${line.tone}`}>
+                  {line.text}
+                </p>
+              ))}
 
               {(captureOn || roster.pendingNames.length > 0) && (
                 <div className="roster-pending">
@@ -282,6 +293,11 @@ export function RosterPanel({
                     אקסל של שם · קבוצה בלבד (בלי מספרי שלטים). השורה הראשונה כותרת. השמות
                     משתבצים לשלטים שכבר נלחצו לפי הסדר, והעודף ממתין ללחיצות הבאות.
                   </p>
+                  {queuedFromBuilder > 0 && (
+                    <p className="roster-import-hint roster-pending-source">
+                      📋 {queuedFromBuilder} מהשמות בתור הגיעו מרשימת המשתתפים במערכת
+                    </p>
+                  )}
                   <textarea
                     className="roster-names-draft"
                     placeholder={'או הקלדה — שם בכל שורה\nאפשר גם: שם, קבוצה'}

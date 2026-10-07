@@ -98,7 +98,8 @@ export function SlideAdvanced({
   onClose,
 }: SlideAdvancedProps) {
   const shown = new Set<AdvancedSetting>(advancedSettingsFor(slide.type));
-  const groups = gameGroupNames(parseGameUsers(game.users));
+  // קבוצות של משתתפים בלי מספר שלט (pendingUsers) הן קבוצות לכל דבר.
+  const groups = gameGroupNames([...parseGameUsers(game.users), ...game.pendingUsers]);
   const setting = slide.setting;
   const closeRef = useRef<HTMLButtonElement>(null);
 

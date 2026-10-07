@@ -4322,6 +4322,12 @@ body {
   font-size: 14px;
 }
 
+/* שמירת מספרי השלטים בבונה (clickerSave.ts) */
+.roster-save-status { margin: 0; font-size: 13px; line-height: 1.5; }
+.roster-save-status--ok { color: #86efac; }
+.roster-save-status--wait { opacity: 0.8; }
+.roster-save-status--warn { color: #fcd34d; }
+
 .roster-pending {
   display: flex;
   flex-direction: column;

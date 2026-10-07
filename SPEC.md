@@ -63,6 +63,7 @@ interface GameFile {
   cloudinaryFolder: string;
   credit: string | null;
   users: string;              // JSON-string, בד"כ "{}"
+  pendingUsers?: { id: string; name: string; groupName: string }[]; // שמות בלי מספר שלט (INTEGRATION.md)
   room: string | null;
   baseUrl: string;
   cloudinaryAbsolutePathImage: string;
