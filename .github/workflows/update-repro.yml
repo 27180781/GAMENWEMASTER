@@ -1,0 +1,61 @@
+# Temporary: reproduce the auto-update download on a clean Windows machine.
+# Not for main.
+name: Update repro (temporary)
+
+on:
+  push:
+    branches: [claude/project-thread-rds2yu]
+    paths: ['.github/workflows/update-repro.yml']
+
+jobs:
+  repro:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        from: ['0.1.196']
+    env:
+      REL: https://github.com/27180781/GAMENWEMASTER/releases/download/desktop-latest
+      # Device check-in goes nowhere, so the runner never registers as a computer.
+      TRIVIA_REMOTE_URL: http://127.0.0.1:9/functions/v1
+    steps:
+      - name: Download and install ${{ matrix.from }} silently (per user)
+        shell: pwsh
+        run: |
+          $f = "$env:RUNNER_TEMP\HavayaBeClick-Setup-${{ matrix.from }}.exe"
+          Invoke-WebRequest "$env:REL/HavayaBeClick-Setup-${{ matrix.from }}.exe" -OutFile $f
+          "downloaded: $((Get-Item $f).Length) bytes, sha512 $((Get-FileHash $f -Algorithm SHA512).Hash)"
+          $p = Start-Process -FilePath $f -ArgumentList '/S' -Wait -PassThru
+          "installer exit: $($p.ExitCode)"
+      - name: Updater cache after install
+        shell: pwsh
+        run: |
+          $c = "$env:LOCALAPPDATA\trivia-engine-updater"
+          "LOCALAPPDATA=$env:LOCALAPPDATA"
+          if (Test-Path $c) { Get-ChildItem $c -Recurse -Force | ForEach-Object { "{0}`t{1}`t{2}" -f $_.FullName, $_.Length, $_.LastWriteTime } } else { "NO CACHE DIR $c" }
+          Get-ChildItem "$env:LOCALAPPDATA" -Directory | Select-Object -ExpandProperty Name
+          $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter *.exe -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch 'Uninstall|elevate|RF317' } | Select-Object -First 1
+          "app exe: $($exe.FullName)"
+          "APP_EXE=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Run the app and watch the update download
+        shell: pwsh
+        run: |
+          $out = "$env:RUNNER_TEMP\app-out.txt"; $err = "$env:RUNNER_TEMP\app-err.txt"
+          $p = Start-Process -FilePath $env:APP_EXE -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
+          $pending = "$env:LOCALAPPDATA\trivia-engine-updater\pending"
+          for ($i = 0; $i -lt 48; $i++) {
+            Start-Sleep -Seconds 5
+            $done = (Test-Path "$pending\update-info.json")
+            $partSize = (Get-ChildItem $pending -Filter *.part -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum
+            "t=$(($i+1)*5)s update-info=$done part=$partSize"
+            if ($done) { Start-Sleep -Seconds 10; break }
+          }
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          Get-Process | Where-Object { $_.Path -like "$env:LOCALAPPDATA\Programs\*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+          "----- stdout -----"; Get-Content $out -Encoding utf8 -ErrorAction SilentlyContinue | Select-String -Pattern 'update|blockmap|MB' 
+          "----- stderr (update lines) -----"; Get-Content $err -Encoding utf8 -ErrorAction SilentlyContinue | Select-String -Pattern 'update|blockmap|MB'
+          "----- cache -----"
+          Get-ChildItem "$env:LOCALAPPDATA\trivia-engine-updater" -Recurse -Force | ForEach-Object { "{0}`t{1}" -f $_.FullName, $_.Length }
+          $ri = "$pending\HavayaBeClick-Setup-*.exe.resume.json"
+          Get-ChildItem $pending -Filter *.json -ErrorAction SilentlyContinue | ForEach-Object { "== $($_.Name)"; Get-Content $_.FullName }
