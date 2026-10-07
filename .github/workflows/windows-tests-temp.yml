@@ -1,0 +1,26 @@
+# Temporary: run the unit tests on Windows before merging. Not for main.
+name: Windows tests (temporary)
+
+on:
+  push:
+    branches: [claude/project-thread-rds2yu]
+    paths: ['.github/workflows/windows-tests-temp.yml']
+
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    # A red run e-mails the repository owner; the verdict is the RESULT line.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: npm test
+        shell: bash
+        run: |
+          if npm test; then echo "RESULT: PASSED"; else echo "RESULT: FAILED"; fi
+          exit 0
