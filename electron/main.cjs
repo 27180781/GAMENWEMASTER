@@ -270,7 +270,7 @@ function updateLog(msg) {
   }
 }
 
-/** תיקיית משתמש (הורדות / שולחן העבודה), או null כשאין. @param {'downloads' | 'desktop'} name */
+/** תיקיית משתמש (הורדות), או null כשאין. @param {'downloads'} name */
 function userFolder(name) {
   try {
     return app.getPath(name);
@@ -386,7 +386,10 @@ async function downloadUpdateResumable(info) {
       cacheDir,
       pendingDir,
       installerName: fileName.split(version).join(installed),
-      folders: [userFolder('downloads'), userFolder('desktop')].filter((d) => d !== null),
+      targetName: fileName,
+      // לא שולחן העבודה: הוא מסונכרן לרוב ל-OneDrive, וקריאה מקובץ שנשאר רק בענן
+      // מורידה אותו כולו — בדיוק מה שמנסים לחסוך.
+      folders: [userFolder('downloads')].filter((d) => d !== null),
     });
     const picked = pickOldInstaller({ installers, maps: [serverOldMap, cachedOldMap], sizeOf: fileSizeOrZero });
     updateLog(

@@ -43,7 +43,7 @@ const mod = require('../electron/updateDownload.cjs') as {
   parseBlockMap: (buf: Buffer | null) => BlockMap | null;
   blockMapSize: (map: BlockMap) => number;
   pickOldBlockMap: (candidates: (BlockMap | null)[], oldSize: number) => BlockMap | null;
-  installerCandidates: (a: { cacheDir: string; pendingDir: string; installerName: string; folders?: string[]; list?: (dir: string) => string[] }) => string[];
+  installerCandidates: (a: { cacheDir: string; pendingDir: string; installerName: string; targetName?: string; folders?: string[]; list?: (dir: string) => string[] }) => string[];
   pickOldInstaller: (a: { installers: string[]; maps: (BlockMap | null)[]; sizeOf: (file: string) => number }) => {
     oldFile: string | null;
     oldBlockMap: BlockMap | null;
@@ -397,13 +397,14 @@ describe('downloadUpdate', () => {
 
   it('installerCandidates: installer.exe, אחר כך pending (הגרסה המותקנת קודם), אחר כך הורדות לפי השם', () => {
     const listing: Record<string, string[]> = {
-      '/c/pending': ['update-info.json', 'temp-Setup-9.exe', 'Setup-9.exe', 'Setup-8.exe', 'Setup-9.exe.part'],
+      '/c/pending': ['update-info.json', 'temp-Setup-9.exe', 'Setup-9.exe', 'Setup-8.exe', 'Setup-9.exe.part', 'Setup-10.exe'],
       '/dl': ['TriviaEngine-Setup.exe', 'Setup-8(2).exe', 'Setup-8.exe', 'Setup-80.exe', 'TriviaEngine-Setup (3).exe', 'other.exe'],
     };
     const out = mod.installerCandidates({
       cacheDir: '/c',
       pendingDir: '/c/pending',
       installerName: 'Setup-8.exe',
+      targetName: 'Setup-10.exe', // מה שמורידים עכשיו — לא בסיס להפרש
       folders: ['/dl', '/missing'],
       list: (d) => listing[d] ?? [],
     });

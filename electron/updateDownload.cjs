@@ -418,22 +418,24 @@ function pickOldBlockMap(candidates, oldSize) {
  *      נשאר מגרסה קודמת, וזה כל מה שנדרש כדי שכל עדכון יירד במלואו.
  *   2. מתקינים ב-pending: העדכון שהתקין את הגרסה הנוכחית נשאר שם (קודם כאלה בשם
  *      של הגרסה המותקנת), והעדכון האחרון שהורד ותואם ל-current.blockmap.
- *   3. המתקין שהמשתמש הוריד — בתיקיות שמועברות (הורדות, שולחן העבודה): בשם עם
- *      הגרסה, כולל "(1)" של הורדה חוזרת, או בשם הקבוע TriviaEngine-Setup.exe.
+ *   3. המתקין שהמשתמש הוריד — בתיקיות שמועברות (תיקיית ההורדות): בשם עם הגרסה,
+ *      כולל "(1)" של הורדה חוזרת, או בשם הקבוע TriviaEngine-Setup.exe.
  * כל זוג קובץ+מפה תואמים מתאים להפרש, גם של גרסה אחרת מהמותקנת — pickOldInstaller
  * בוחר רק קובץ שגודלו שווה בדיוק לאחת המפות, ובסוף sha512 מכריע.
- * @param {{ cacheDir: string, pendingDir: string, installerName: string, folders?: string[], list?: (dir: string) => string[] }} args
+ * @param {{ cacheDir: string, pendingDir: string, installerName: string, targetName?: string, folders?: string[], list?: (dir: string) => string[] }} args
  *   installerName — שם המתקין של הגרסה המותקנת (HavayaBeClick-Setup-0.1.N.exe).
+ *   targetName — שם המתקין שמורידים עכשיו: עותק שלו ב-pending שלא עבר את האימות
+ *   (downloadUpdate בודק קודם) פגום, ואינו בסיס להפרש.
  * @returns {string[]}
  */
-function installerCandidates({ cacheDir, pendingDir, installerName, folders = [], list = listDir }) {
+function installerCandidates({ cacheDir, pendingDir, installerName, targetName = '', folders = [], list = listDir }) {
   const out = [path.join(cacheDir, 'installer.exe')];
   const lower = installerName.toLowerCase();
   const base = lower.replace(/\.exe$/, '');
   const escape = (/** @type {string} */ t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  // ב-pending: כל מתקין שלם (לא temp- של electron-updater, לא .part), של הגרסה המותקנת קודם.
+  // ב-pending: כל מתקין שלם (לא temp- של electron-updater, לא .part, לא היעד), של הגרסה המותקנת קודם.
   const pendingExes = list(pendingDir)
-    .filter((n) => /\.exe$/i.test(n) && !/^temp-/i.test(n))
+    .filter((n) => /\.exe$/i.test(n) && !/^temp-/i.test(n) && n.toLowerCase() !== targetName.toLowerCase())
     .sort((a, b) => Number(b.toLowerCase() === lower) - Number(a.toLowerCase() === lower));
   out.push(...pendingExes.map((n) => path.join(pendingDir, n)));
   const named = new RegExp(`^${escape(base)}( ?\\(\\d+\\))?\\.exe$`, 'i');
