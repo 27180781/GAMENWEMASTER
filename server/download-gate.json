@@ -1,0 +1,10 @@
+{
+  "about": "גיבוב scrypt של קוד הגישה לגרסה הניידת ולכלי החתימה (server/download-gate.mjs). הקוד עצמו אינו כאן.",
+  "v": 1,
+  "kdf": "scrypt",
+  "N": 131072,
+  "r": 8,
+  "p": 1,
+  "salt": "83927906aa35aa6aba7a8b2f48c3f727",
+  "hash": "1896bc639be6f98a2fa77b77985d98e14d880a1344cc4c20a7a04fb3316f2116"
+}
