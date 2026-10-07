@@ -26,7 +26,7 @@ import { ClickerDiagnostic } from '../render/ClickerDiagnostic.tsx';
 import { FloatingWindowControls } from '../render/WindowControls.tsx';
 import { SealScreen } from '../render/SealScreen.tsx';
 import { GameEditor } from '../render/GameEditor.tsx';
-import { GuideScreen } from '../render/GuideScreen.tsx';
+import { GuideButton, GuideScreen } from '../render/GuideScreen.tsx';
 import { GateChange, GateSetup, GateUnlock } from '../render/GateDialog.tsx';
 import { NewGameDialog } from '../render/NewGameDialog.tsx';
 import { DeviceNotices, DevicePanel, type DeviceNotice } from '../render/DevicePanel.tsx';
@@ -1546,6 +1546,15 @@ export function App() {
     );
   }
 
+  // סרטוני ההדרכה גם לפני שנטען משחק: מי שפותח את התוכנה בפעם הראשונה מתחיל כאן.
+  if (desktopApp && guideOpen) {
+    return (
+      <Shell bare fullWindow>
+        <GuideScreen onClose={() => setGuideOpen(false)} />
+      </Shell>
+    );
+  }
+
   if (desktopApp) {
     return (
       <Shell>
@@ -1608,6 +1617,7 @@ export function App() {
               )}
               {/* נעול עד שהמנהל מאשר את המחשב — גם בלי רשת, לפי האישור האחרון שהתקבל. */}
               {canCreateGame() && createLocked && <p className="offline-open-lock">🔒 {lockText('בניית משחק חדש')}</p>}
+              <GuideButton onClick={() => setGuideOpen(true)} />
               {downloading !== null && <DownloadBar progress={downloading} />}
               {/* משחק שנשלח למחשב יורד ונפתח — כמו קוד שהוקלד */}
               {fgDevice !== null && (
