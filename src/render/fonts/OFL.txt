@@ -1,3 +1,13 @@
-Suez One, Assistant and Frank Ruhl Libre are licensed under the SIL Open Font License 1.1
+The fonts in this folder are licensed under the SIL Open Font License 1.1
 (https://openfontlicense.org). Downloaded from Google Fonts (Hebrew + Latin subsets) for the
-visual themes in src/render/themes.css.
+visual themes in src/render/themes.css and src/render/themes/*.css.
+
+Suez One — Copyright 2016 The Suez One Project Authors (https://github.com/googlefonts/suez-one)
+Assistant — Copyright 2010 The Assistant Project Authors (https://github.com/hafontia/Assistant)
+Frank Ruhl Libre — Copyright 2015 The Frank Ruhl Libre Project Authors (https://github.com/fontef/frankruhllibre)
+Secular One — Copyright 2016 The Secular One Project Authors (https://github.com/googlefonts/secular)
+Fredoka — Copyright 2016 The Fredoka Project Authors (https://github.com/hafontia/Fredoka)
+David Libre — Copyright 2016 The David Libre Project Authors (https://github.com/meirsadan/david-libre)
+Bellefair — Copyright 2015 The Bellefair Project Authors (https://github.com/shinntype/bellefair)
+Rubik Dirt — Copyright 2020 The Rubik Filtered Project Authors (https://github.com/NaN-xyz/Rubik-Filtered)
+Heebo — Copyright 2015 The Heebo Project Authors (https://github.com/OdedEzer/heebo)
