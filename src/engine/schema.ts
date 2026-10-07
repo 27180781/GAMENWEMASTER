@@ -606,6 +606,51 @@ export const assetEntrySchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// שמות שממתינים לשלט (pendingUsers) — משתתפים שהועלו בבונה בלי מספר שלט
+// ---------------------------------------------------------------------------
+
+/**
+ * משתתף מרשימת המשתתפים בבונה שאין לו עדיין מספר שלט. הוא אינו נכנס ל-`users`
+ * (שם המפתח הוא המספר), אלא לתור "קליטת שלטים בלחיצה": השלט הבא שנלחץ יקבל
+ * אותו. `id` הוא מזהה המשתתף בבונה ('' אם חסר).
+ */
+export interface PendingUser {
+  id: string;
+  name: string;
+  groupName: string;
+}
+
+/**
+ * נרמול `pendingUsers` — מערך, או מחרוזת JSON של מערך (כמו `users`). לעולם לא
+ * נכשל: רשומה פגומה נזרקת, ושדה חסר או פגום הוא רשימה ריקה. שדה עליון שנכשל
+ * היה מפיל את טעינת המשחק כולו, ושמות הם תוספת שאינה שווה את זה.
+ */
+export function normalizePendingUsers(raw: unknown): PendingUser[] {
+  let value: unknown = raw;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed === '') return [];
+    try {
+      value = JSON.parse(trimmed);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(value)) return [];
+  const out: PendingUser[] = [];
+  for (const entry of value) {
+    if (entry === null || typeof entry !== 'object') continue;
+    const e = entry as Record<string, unknown>;
+    const name = typeof e.name === 'string' ? e.name.trim() : '';
+    if (name === '') continue;
+    const id = typeof e.id === 'string' || typeof e.id === 'number' ? String(e.id).trim() : '';
+    const groupName = typeof e.groupName === 'string' ? e.groupName.trim() : '';
+    out.push({ id, name, groupName });
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // המבנה העליון (SPEC 3.1)
 // ---------------------------------------------------------------------------
 
@@ -621,6 +666,8 @@ export const gameFileSchema = z.object({
   cloudinaryFolder: z.string().optional().default(''),
   credit: z.string().nullable().optional().default(null),
   users: z.string().optional().default('{}'),
+  /** משתתפים בלי מספר שלט — ממתינים לשיוך בלחיצה (ראו normalizePendingUsers). */
+  pendingUsers: z.unknown().optional().transform(normalizePendingUsers),
   // room (קוד החדר / קוד המשחק) יכול להגיע כמספר (למשל 2047) או כמחרוזת —
   // מנרמלים למחרוזת (או null) לשימוש כ-GAME_ID מול שרת ההצבעות.
   room: z

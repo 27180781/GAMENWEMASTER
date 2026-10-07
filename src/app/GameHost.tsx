@@ -135,7 +135,8 @@ import {
   type BackupData,
 } from './backup.ts';
 import { backupToSnapshot, buildBackupPayload, rosterFromBackup } from './backupState.ts';
-import { canDiskBackup, diskBackupKey, loadDiskBackup, saveDiskBackup } from './diskBackup.ts';
+import type { ClickerSaveView } from './clickerSave.ts';
+import { canDiskBackup, diskBackupKey, diskBackupKeys, loadDiskBackupAny, saveDiskBackup } from './diskBackup.ts';
 import { downloadGameReport, buildGameReportBytes, reportFilename } from './gameReport.ts';
 import { buildFunctionPayload, sendFunctionApi } from './functionApi.ts';
 import { useConnectionHealth } from './useConnectionHealth.ts';
@@ -218,6 +219,10 @@ interface GameHostProps {
   offline: boolean;
   /** החלת משחק מעודכן מעריכה חיה במסך המנחה (עובר פענוח סלחני ו-hot-swap). */
   onApplyGame?: (raw: unknown) => void;
+  /** שמירת מספרי השלטים בבונה (useClickerSave) — לשורת המצב במרשם. */
+  clickerSave?: ClickerSaveView | null;
+  /** המרשם השתנה — כדי ששיוך חדש של שלט לשם מהבונה יישלח לבונה. */
+  onRosterChange?: () => void;
 }
 
 export function GameHost({
@@ -228,6 +233,8 @@ export function GameHost({
   voteServerUrl,
   offline,
   onApplyGame,
+  clickerSave = null,
+  onRosterChange,
 }: GameHostProps) {
   // המנוע נוצר פעם אחת; רענון תוכן מתבצע דרך engine.updateGame בלי remount,
   // כדי לשמר את מהלך המשחק (ניקוד/מיקום). ראו useEffect על שינוי game למטה.
@@ -351,6 +358,10 @@ export function GameHost({
   applyGroupPressesRef.current = applyGroupPresses;
   const rosterRef = useRef(roster);
   rosterRef.current = roster;
+  // כל שינוי במרשם (לחיצה, שמות שנוספו, רענון) — אולי נקשר שלט לשם מהבונה.
+  useEffect(() => {
+    onRosterChange?.();
+  }, [roster, onRosterChange]);
   /** איזו חוליה בשרשרת הקליקרים שבורה (null = הכול תקין). */
   const clickerLinkHint = useClickerLink();
 
@@ -754,9 +765,9 @@ export function GameHost({
   const saveBackupNowRef = useRef(saveBackupNow);
   saveBackupNowRef.current = saveBackupNow;
 
-  // מפתח גיבוי הדיסק — מחרוזת יציבה (id+שם), נגזרת מחוץ לאפקט כדי שהבדיקה לא
+  // מפתחות גיבוי הדיסק — מחרוזת יציבה (id+שם), נגזרת מחוץ לאפקט כדי שהבדיקה לא
   // תרוץ מחדש על כל רענון-תוכן של אותו משחק (זהות האובייקט משתנה, המפתח לא).
-  const diskKey = diskBackupKey(game);
+  const diskKeys = diskBackupKeys(game).join('\u0000');
 
   // טעינה: בדיקת גיבוי חי קיים למשחק (התאוששות מקריסה/רענון). getBackup מנצל
   // prefetch שכבר רץ במסך ההגדרות — כך שהתוצאה זמינה מיד עם הכניסה למשחק.
@@ -764,7 +775,7 @@ export function GameHost({
     if (backupCfg === null && !diskBackup) return;
     let cancelled = false;
     setBackupChecking(true);
-    const check = backupCfg !== null ? getBackup(backupCfg, game.id) : loadDiskBackup(diskKey);
+    const check = backupCfg !== null ? getBackup(backupCfg, game.id) : loadDiskBackupAny(diskKeys.split('\u0000'));
     void check
       .then((data) => {
         if (cancelled || data === null) return;
@@ -779,7 +790,7 @@ export function GameHost({
     return () => {
       cancelled = true;
     };
-  }, [backupCfg, diskBackup, game.id, diskKey]);
+  }, [backupCfg, diskBackup, game.id, diskKeys]);
 
   /** שחזור מגיבוי: הניקוד והמיקום למנוע, ומרשם מגיבוי אם אין מקומי. */
   const resumeFromBackup = useCallback(
@@ -2952,6 +2963,7 @@ export function GameHost({
             onChange={updateRoster}
             captureOn={captureOn}
             onToggleCapture={setCaptureOn}
+            saveStatus={clickerSave}
             scores={state.scores}
             groupBonus={groupBonus}
             onAdjustPlayer={adjustPlayer}
