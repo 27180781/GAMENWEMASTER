@@ -1,0 +1,30 @@
+# זמני: npm test על Windows לפני מיזוג #232 (build-desktop מריץ את אותן בדיקות
+# על windows-latest אחרי המיזוג, וכישלון שם עוצר את השחרור). יוסר לפני המיזוג.
+name: tmp windows tests (#232)
+on:
+  push:
+    branches: [claude/project-thread-5lwqku]
+    paths: ['.github/workflows/tmp-windows-tests-232.yml']
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: npm ci and npm test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          npm ci --no-audit --no-fund 2>&1 | Select-Object -Last 5
+          $ci = $LASTEXITCODE
+          npm test 2>&1 | Tee-Object -FilePath test.log | Select-Object -Last 60
+          $t = $LASTEXITCODE
+          Write-Output "FILE desktopPrivateRelease:"
+          Select-String -Path test.log -Pattern 'desktopPrivateRelease' | Select-Object -First 5 | ForEach-Object { $_.Line }
+          Write-Output "RESULT: npm ci exit $ci, npm test exit $t"
+          exit 0
