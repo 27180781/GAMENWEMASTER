@@ -16,7 +16,7 @@ export type VisualTheme = (typeof VISUAL_THEMES)[number];
 
 export const VISUAL_THEME_LABELS: Record<VisualTheme, string> = {
   classic: 'קלאסי',
-  studio: 'אולפן טלוויזיה',
+  studio: 'אולפן',
   glass: 'זכוכית',
   scroll: 'מגילה',
   neon: 'ניאון',
