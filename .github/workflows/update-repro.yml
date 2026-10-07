@@ -14,7 +14,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scenario: [hebrewDir]
+        dest:
+          - 'usb\HavayaBeClick-Setup-0.1.196.exe'
+          - 'disk on key\HavayaBeClick-Setup-0.1.196.exe'
+          - 'דיסק\HavayaBeClick-Setup-0.1.196.exe'
+          - 'usb\התקנה.exe'
+          - 'usb\HavayaBeClick-Setup-0.1.196 - עותק.exe'
     env:
       REL: https://github.com/27180781/GAMENWEMASTER/releases/download/desktop-latest
       # Device check-in goes nowhere, so the runner never registers as a computer.
@@ -53,11 +58,6 @@ jobs:
         shell: pwsh
         run: |
           . "$env:RUNNER_TEMP\h.ps1"
-          switch ('${{ matrix.scenario }}') {
-            'fromD' {
-              Install-From '0.1.196' 'D:\usb\HavayaBeClick-Setup-0.1.196.exe'; Show-Cache 'after 196 from D:'; Run-App 'from196' 150; Show-Cache 'after update download'
-            }
-            'hebrewDir' {
-              Install-From '0.1.196' "$env:RUNNER_TEMP\דיסק און קי\התקנה.exe"; Show-Cache 'after 196 from a Hebrew path'; Run-App 'from196' 150; Show-Cache 'after update download'
-            }
-          }
+          $dest = Join-Path $env:RUNNER_TEMP '${{ matrix.dest }}'
+          Install-From '0.1.196' $dest; Show-Cache 'after 196'
+          if (Find-App) { Run-App 'from196' 150; Show-Cache 'after update download' } else { 'APP NOT INSTALLED' }
