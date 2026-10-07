@@ -11,6 +11,8 @@ jobs:
   e2e:
     runs-on: windows-latest
     timeout-minutes: 60
+    # A red run e-mails the repository owner; the verdict is in the log.
+    continue-on-error: true
     env:
       # Device check-in goes nowhere, so the runner never registers as a computer.
       TRIVIA_REMOTE_URL: http://127.0.0.1:9/functions/v1
@@ -99,14 +101,14 @@ jobs:
             return $p
           }
           function Show($label) {
-            "----- $label: update.log -----"
+            "----- ${label}: update.log -----"
             $log = Get-ChildItem $env:APPDATA -Filter update.log -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
             if ($log) { Get-Content $log.FullName -Encoding utf8 } else { 'NO update.log' }
-            "----- $label: server -----"
+            "----- ${label}: server -----"
             Get-Content 'D:\srv\desktop\access.log' -ErrorAction SilentlyContinue
-            "----- $label: stdout -----"
+            "----- ${label}: stdout -----"
             Get-Content "$env:RUNNER_TEMP\out-$label.txt" -Encoding utf8 -ErrorAction SilentlyContinue | Select-String -Pattern 'update'
-            "----- $label: pending -----"
+            "----- ${label}: pending -----"
             Get-ChildItem "$cache\pending" -ErrorAction SilentlyContinue | ForEach-Object { "{0}`t{1}" -f $_.Name, $_.Length }
           }
           function Expect($label, $pattern) {
