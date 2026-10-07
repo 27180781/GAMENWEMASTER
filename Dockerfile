@@ -20,6 +20,11 @@ RUN npm run build
 # (ראו docker-entrypoint.sh).
 ARG DESKTOP_ASSETS=1
 ENV DESKTOP_ASSETS=$DESKTOP_ASSETS
+# כשהריפו פרטי המהדורה נקראת רק עם מפתח (ראו fetch-desktop-assets.mjs).
+# CapRover מעביר את משתני הסביבה של האפליקציה גם לבנייה, כ-build args, ולכן
+# אותו GITHUB_RELEASES_TOKEN שמוגדר באפליקציה (לרענון שרץ במכולה) מגיע לכאן.
+# ARG ולא ENV: הערך זמין רק לשלב הזה, ושלב ה-nginx למטה לא נושא אותו.
+ARG GITHUB_RELEASES_TOKEN=""
 RUN node tools/fetch-desktop-assets.mjs dist/desktop
 
 FROM nginx:1.27-alpine

@@ -1,6 +1,9 @@
 # בניית ה-EXE הנייד (Windows) ופרסומו כ-Release להורדה, בכל דחיפה ל-main.
 # ה-EXE זמין בקישור יציב:
 #   https://github.com/27180781/GAMENWEMASTER/releases/download/desktop-latest/TriviaEngine-Portable.exe
+# הקישור פתוח לכולם רק כל עוד הריפו ציבורי. המהדורה היא מקור פנימי: שרת
+# האתר (tools/fetch-desktop-assets.mjs) והבונה (get-engine-exe) קוראים אותה,
+# וכשהריפו פרטי הם עושים זאת דרך ה-API עם המפתח GITHUB_RELEASES_TOKEN.
 
 name: Build Desktop EXE
 
@@ -9,8 +12,8 @@ name: Build Desktop EXE
 #
 # בטוח לסנן כאן משתי סיבות:
 #   • את פריסת האתר עושה CapRover בעצמו, ישירות מ-GitHub — לא ה-workflow הזה.
-#   • deploy-pages רץ על *כל* דחיפה ל-main ומריץ npm test, ולכן שינוי שאינו
-#     ברשימה כאן עדיין נבדק.
+#   • tests.yml רץ על *כל* דחיפה ל-main ומריץ npm test ובנייה, ולכן שינוי
+#     שאינו ברשימה כאן עדיין נבדק.
 on:
   push:
     branches: [main]
