@@ -30,6 +30,7 @@ import { GuideButton, GuideScreen } from '../render/GuideScreen.tsx';
 import { GateChange, GateSetup, GateUnlock } from '../render/GateDialog.tsx';
 import { NewGameDialog } from '../render/NewGameDialog.tsx';
 import { DeviceNotices, DevicePanel, type DeviceNotice } from '../render/DevicePanel.tsx';
+import { DeviceLockScreen } from '../render/DeviceLockScreen.tsx';
 import { licenseSources, type GameLicense } from './gameLicense.ts';
 import { newGameFile } from './newGame.ts';
 import {
@@ -67,6 +68,8 @@ import {
   deviceDownload,
   deviceCancel,
   onDeviceDownloadProgress,
+  canQuit,
+  desktopQuit,
   type SealConfig,
   type UpdateStatus,
   type DownloadProgress,
@@ -80,6 +83,7 @@ import { loadSettled } from './clickerSave.ts';
 import {
   MAX_ATTEMPTS,
   attemptKey,
+  deviceLockShown,
   formatDeviceId,
   nextDeliveryAction,
   planDelivery,
@@ -1226,6 +1230,8 @@ export function App() {
   // הצעד הבא: אחרי כל בדיקה, כל הורדה וכל שינוי במסך.
   useEffect(() => {
     if (!deviceOn || deviceState === null || deviceState.checkedAt === null) return;
+    // מחשב מושבת אינו מוריד ואינו פותח דבר (השרת ממילא לא שולח לו משחקים).
+    if (deviceState.blocked) return;
     if (libraryAt !== deviceState.checkedAt) return;
     const cycle = deviceState.checkedAt;
     const quiet = game === null && !starting && sealConfig === null && sealTool === false && !showSeal;
@@ -1279,6 +1285,19 @@ export function App() {
   useEffect(() => {
     if ((game !== null || starting) && deviceTask?.mode === 'background') deviceCancel();
   }, [game, starting, deviceTask]);
+
+  // «השבתת התוכנה»: רק אחרי שהמערכת אמרה במפורש שהמחשב הזה מושבת (נשמר במחשב,
+  // ולכן גם בלי רשת). משחק שרץ, עורך פתוח ובניית משחק חדש אינם נקטעים — מסך
+  // הנעילה מופיע כשהם נסגרים. הורדה של משחק שנשלח למחשב נעצרת.
+  const deviceBlocked = deviceOn && deviceState?.blocked === true;
+  const deviceLocked = deviceLockShown({
+    blocked: deviceBlocked,
+    playing: game !== null || starting,
+    editing: editorOpen || newGameOpen,
+  });
+  useEffect(() => {
+    if (deviceBlocked && deviceTask !== null) deviceCancel();
+  }, [deviceBlocked, deviceTask]);
   useEffect(() => {
     if (game !== null) setDeviceNotice(null);
   }, [game]);
@@ -1346,6 +1365,21 @@ export function App() {
             <p className="opening-hint">מעבירים אתכם לאתר הראשי…</p>
           </div>
         </div>
+      </Shell>
+    );
+  }
+
+  if (deviceLocked && deviceState !== null) {
+    return (
+      <Shell>
+        <DeviceLockScreen
+          state={deviceState}
+          onRetry={() => void deviceSyncNow()}
+          onQuit={canQuit() ? desktopQuit : null}
+        >
+          {updateStatus !== null && <UpdateBadge status={updateStatus} />}
+          <VersionLine status={updateStatus} deviceId={deviceState.device?.id ?? null} />
+        </DeviceLockScreen>
       </Shell>
     );
   }

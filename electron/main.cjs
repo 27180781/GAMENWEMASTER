@@ -1702,6 +1702,12 @@ const { syncDevice, haveFromLibrary, publicDevice } = require('./deviceSync.cjs'
 
 /** כמה זמן אחרי הפתיחה בודקים לראשונה — אחרי שהמשחק האחרון כבר נטען. */
 const DEVICE_FIRST_SYNC_MS = 4000;
+/**
+ * אחרי שההשבתה הגיעה (או בוטלה) בודקים שוב מיד, כדי שהמערכת תדע שהמחשב קיבל
+ * אותה — אחרת המנהל היה רואה "ממתין למחשב" עד הבדיקה הבאה. השרת דוחה בדיקה
+ * של אותו מחשב בתוך 3 שניות.
+ */
+const DEVICE_BLOCK_REPORT_MS = 5000;
 const DEVICE_RETRY_MS = {
   offline: 2 * 60 * 1000,
   busy: 60 * 1000,
@@ -1754,6 +1760,12 @@ let deviceState = {
   syncing: false,
   /** @type {import('./deviceIdentity.cjs').Permissions} */
   permissions: { createGame: false, editGame: false },
+  /**
+   * המנהל השבית את התוכנה במחשב הזה («השבתת התוכנה»): ה-renderer מציג מסך
+   * נעילה במקום מסך הפתיחה, אבל לא באמצע משחק. נשמר במחשב (deviceIdentity.cjs)
+   * ולכן תקף גם בלי רשת; false בכל מקרה אחר, כולל EXE סגור וכלי החתימה.
+   */
+  blocked: false,
   /** @type {ReturnType<typeof publicDevice> | null} */
   device: null,
   /** @type {import('./deviceSync.cjs').DeviceGame[]} */
@@ -1852,19 +1864,28 @@ function runDeviceSync() {
         platform: process.platform,
       });
       if (res.state === 'ok') {
+        if (res.blockChanged) console.log(res.device.blocked ? '[device] התוכנה הושבתה מהמערכת' : '[device] ההשבתה בוטלה');
         pushDeviceState({
           state: 'ok',
           syncing: false,
           device: res.device,
           permissions: { ...res.device.permissions },
+          blocked: res.device.blocked,
           games: res.games,
           checkedAt: Date.now(),
           error: null,
         });
-        next = res.pollSeconds * 1000;
+        next = res.blockChanged ? DEVICE_BLOCK_REPORT_MS : res.pollSeconds * 1000;
       } else {
         if (res.state === 'error') console.warn('[device] הבדיקה מול השרת נכשלה:', res.error);
-        pushDeviceState({ state: res.state, syncing: false, device: res.device, error: res.error ?? null });
+        // ההשבתה כפי שנשמרה במחשב: בדיקה שנכשלה לא נועלת ולא פותחת.
+        pushDeviceState({
+          state: res.state,
+          syncing: false,
+          device: res.device,
+          blocked: res.device.blocked,
+          error: res.error ?? null,
+        });
         next = DEVICE_RETRY_MS[res.state];
       }
     } catch (err) {
@@ -1890,7 +1911,13 @@ function startDeviceSync() {
   }
   try {
     const device = deviceIdentity.loadDevice(userData());
-    pushDeviceState({ state: 'starting', device: publicDevice(device), permissions: { ...device.permissions } });
+    // ההשבתה שנשמרה בבדיקה קודמת תקפה מהרגע הראשון, גם בלי רשת.
+    pushDeviceState({
+      state: 'starting',
+      device: publicDevice(device),
+      permissions: { ...device.permissions },
+      blocked: device.blocked,
+    });
   } catch (err) {
     console.warn('[device] יצירת מזהה למחשב נכשלה:', /** @type {Error} */ (err).message);
     return;

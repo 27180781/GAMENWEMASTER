@@ -31,17 +31,27 @@ const DEFAULT_POLL_SECONDS = 600;
  *   pendingName: string | null,
  *   registered: boolean,
  *   permissions: import('./deviceIdentity.cjs').Permissions,
+ *   blocked: boolean,
  * }} PublicDevice
  * @typedef {{ status: number, body: unknown }} PostResult
  * @typedef {(
- *   | { state: 'ok', device: PublicDevice, games: DeviceGame[], pollSeconds: number }
+ *   | { state: 'ok', device: PublicDevice, games: DeviceGame[], pollSeconds: number, blockChanged: boolean }
  *   | { state: 'offline' | 'busy' | 'unavailable' | 'error', device: PublicDevice, error?: string }
  * )} SyncResult
+ * blockChanged: ההשבתה השתנתה בתשובה הזו, ולכן מה שהמחשב דיווח בבקשה כבר אינו
+ * נכון — כדאי לבדוק שוב בקרוב, כדי שהמנהל יראה שהמחשב קיבל את השינוי.
  */
 
 /** בלי הסוד — זה מה שיוצא מהתהליך הראשי ל-renderer. @param {import('./deviceIdentity.cjs').Device} d */
 function publicDevice(d) {
-  return { id: d.id, name: d.name, pendingName: d.pendingName, registered: d.registered, permissions: { ...d.permissions } };
+  return {
+    id: d.id,
+    name: d.name,
+    pendingName: d.pendingName,
+    registered: d.registered,
+    permissions: { ...d.permissions },
+    blocked: d.blocked === true,
+  };
 }
 
 /**
@@ -133,6 +143,8 @@ async function syncDevice(deps) {
         appVersion,
         platform,
         have,
+        // מה שהמחשב מחזיק עכשיו — כך המנהל רואה אם ההשבתה (או הביטול שלה) כבר הגיעה.
+        blocked: device.blocked,
         // השם נשלח רק כשהוקלד כאן; בלעדיו השרת שומר את השם שלו.
         ...(typeof sentPending === 'string' ? { name: sentPending } : {}),
       });
@@ -145,8 +157,10 @@ async function syncDevice(deps) {
       return {
         state: 'ok',
         device: publicDevice(updated),
-        games: cleanGames(body.games),
+        // מחשב מושבת אינו מוריד דבר, גם אם שרת כלשהו שלח לו משחקים.
+        games: updated.blocked ? [] : cleanGames(body.games),
         pollSeconds: pollSeconds(body.pollSeconds),
+        blockChanged: updated.blocked !== device.blocked,
       };
     }
     if (res.status === 409 && conflicts === 0) {

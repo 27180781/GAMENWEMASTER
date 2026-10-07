@@ -15,6 +15,12 @@
  * ועריכה. כבויים עד שהמנהל מדליק אותם, ונשמרים כאן כפי שהגיעו בתשובה
  * האחרונה: בלי רשת המחשב ממשיך עם מה שכבר קיבל, ומשחק תמיד אפשר להריץ.
  *
+ * ההשבתה (`blocked`, «השבתת התוכנה» במערכת): הפוך מהאישורים — התוכנה פתוחה
+ * תמיד, ולעולם אינה מבקשת אישור להיפתח. היא ננעלת רק כשתשובה מוצלחת מהשרת
+ * אמרה במפורש `blocked: true` על המספר שלה; זה נשמר כאן, ולכן הנעילה נשארת
+ * גם בלי רשת, עד תשובה מוצלחת שאינה אומרת זאת. מחשב חדש, קובץ ישן בלי השדה,
+ * קובץ פגום, מספר שהוגרל מחדש, שרת ישן, תקלה או ניתוק — כולם פתוחים.
+ *
  * הקובץ מקבל את תיקיית הנתונים כפרמטר ואינו נוגע ב-Electron — ראו
  * tests/deviceIdentity.test.ts.
  */
@@ -38,6 +44,7 @@ const NAME_MAX = 60;
  *   createdAt: number,
  *   permissions: Permissions,
  *   permissionsAt: number,
+ *   blocked: boolean,
  * }} Device
  * @typedef {{ randomInt: (min: number, max: number) => number, randomBytes: (n: number) => Buffer }} Random
  */
@@ -84,6 +91,8 @@ function readDevice(userData) {
       createdAt: Number(d.createdAt) || 0,
       permissions: readPermissions(d.permissions),
       permissionsAt: Number(d.permissionsAt) || 0,
+      // רק true מפורש נועל — קובץ מגרסה ישנה (בלי השדה) פתוח.
+      blocked: d.blocked === true,
     };
   } catch {
     return null;
@@ -121,6 +130,7 @@ function loadDevice(userData, rand = crypto) {
     createdAt: Date.now(),
     permissions: { ...NO_PERMISSIONS },
     permissionsAt: 0,
+    blocked: false,
   };
   saveDevice(userData, device);
   return device;
@@ -129,7 +139,8 @@ function loadDevice(userData, rand = crypto) {
 /**
  * המספר שייך למחשב אחר (409 מהשרת): הגרלה מחדש. קורה כשתיקיית הנתונים הועתקה
  * ממחשב אחר, או בהתנגשות מקרית ברישום הראשון. שם שהוקלד כאן ועוד לא נשלח
- * עובר הלאה; שם ואישורים שהשרת כבר מכיר שייכים למחשב השני ואינם מועתקים.
+ * עובר הלאה; שם, אישורים והשבתה שהשרת כבר מכיר שייכים למחשב השני ואינם
+ * מועתקים — מספר חדש הוא מחשב חדש, ופתוח.
  * @param {string} userData
  * @param {Device} device
  * @param {Random} [rand]
@@ -145,6 +156,7 @@ function regenerateDevice(userData, device, rand = crypto) {
     createdAt: Date.now(),
     permissions: { ...NO_PERMISSIONS },
     permissionsAt: 0,
+    blocked: false,
   };
   while (next.id === device.id) next = { ...next, ...newIdentity(rand) };
   saveDevice(userData, next);
@@ -166,8 +178,21 @@ function setPendingName(userData, name) {
 }
 
 /**
- * תשובת השרת: השם והאישורים שלו גוברים, ושם שהוקלד כאן יורד מהתור רק אם לא
- * שונה שוב בזמן שהבקשה הייתה בדרך.
+ * ההשבתה מתוך תשובה מוצלחת: רק `blocked: true` מפורש על המספר שנשלח. כל דבר
+ * אחר — שדה חסר (שרת ישן), ערך אחר, או מספר אחר — פתוח.
+ * @param {unknown} serverDevice
+ * @param {string} sentId
+ */
+function readBlocked(serverDevice, sentId) {
+  const answer = /** @type {Record<string, unknown> | null} */ (
+    serverDevice !== null && typeof serverDevice === 'object' ? serverDevice : null
+  );
+  return answer?.blocked === true && answer.id === sentId;
+}
+
+/**
+ * תשובת השרת: השם, האישורים וההשבתה שלו גוברים, ושם שהוקלד כאן יורד מהתור
+ * רק אם לא שונה שוב בזמן שהבקשה הייתה בדרך.
  * @param {string} userData
  * @param {string} sentId
  * @param {string | null} sentPending
@@ -186,6 +211,7 @@ function applyServerAnswer(userData, sentId, sentPending, serverDevice) {
     registered: true,
     permissions: readPermissions(answer?.permissions),
     permissionsAt: Date.now(),
+    blocked: readBlocked(serverDevice, sentId),
   };
   saveDevice(userData, next);
   return next;
@@ -200,6 +226,7 @@ module.exports = {
   NAME_MAX,
   NO_PERMISSIONS,
   readPermissions,
+  readBlocked,
   devicePath,
   cleanName,
   readDevice,

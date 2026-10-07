@@ -3494,6 +3494,26 @@ body {
 /* "בניית משחק חדש" נעול עד שהמנהל מאשר את המחשב */
 .offline-open-lock { margin: -12px 0 0; max-width: 620px; font-size: 15px; color: #7a8095; text-align: center; }
 
+/* ---- «השבתת התוכנה»: מסך הנעילה (DeviceLockScreen) ---- */
+.device-lock { border-color: #f1c4cd; }
+.device-lock .offline-open-title { color: #b3213b; text-align: center; }
+.device-lock-id { margin: -6px 0 4px; font-size: 21px; color: #3a3f52; }
+.device-lock-id bdi { font-weight: 800; letter-spacing: 0.04em; }
+.device-lock-retry {
+  font-size: 21px;
+  font-weight: 800;
+  padding: 11px 34px;
+  border-radius: 40px;
+  border: 2px solid #3a3f52;
+  background: #fff;
+  color: #171a2b;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+.device-lock-retry:not(:disabled):hover { transform: translateY(-2px); background: #f3f4f7; }
+.device-lock-retry:disabled { opacity: 0.55; cursor: default; }
+.device-lock-status { margin: -10px 0 0; max-width: 560px; font-size: 15px; color: #7a8095; text-align: center; }
+
 /* ---- הודעות המחשב מעל מסך ההגדרות (DeviceNotices) — רק כשיש מה לעשות ---- */
 .device-notices {
   position: absolute;
