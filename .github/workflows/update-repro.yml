@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scenario: [allusers, over190, over190pending]
+        scenario: [hebrewDir]
     env:
       REL: https://github.com/27180781/GAMENWEMASTER/releases/download/desktop-latest
       # Device check-in goes nowhere, so the runner never registers as a computer.
@@ -26,6 +26,7 @@ jobs:
           @'
           function Get-Installer($v) { $f = "$env:RUNNER_TEMP\HavayaBeClick-Setup-$v.exe"; if (-not (Test-Path $f)) { Invoke-WebRequest "$env:REL/HavayaBeClick-Setup-$v.exe" -OutFile $f }; return $f }
           function Install($v, $extra) { $f = Get-Installer $v; $p = Start-Process -FilePath $f -ArgumentList (@('/S') + $extra) -Wait -PassThru; "install $v $extra exit $($p.ExitCode)" }
+          function Install-From($v, $dest) { $f = Get-Installer $v; New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null; Copy-Item $f $dest; $p = Start-Process -FilePath $dest -ArgumentList @('/S') -Wait -PassThru; "install $v from $dest exit $($p.ExitCode)" }
           function Show-Cache($label) {
             "===== cache: $label ====="
             $c = "$env:LOCALAPPDATA\trivia-engine-updater"
@@ -53,15 +54,10 @@ jobs:
         run: |
           . "$env:RUNNER_TEMP\h.ps1"
           switch ('${{ matrix.scenario }}') {
-            'allusers' {
-              Install '0.1.196' @('/allusers'); Show-Cache 'after 196 allusers'; Run-App 'from196' 150; Show-Cache 'after update download'
+            'fromD' {
+              Install-From '0.1.196' 'D:\usb\HavayaBeClick-Setup-0.1.196.exe'; Show-Cache 'after 196 from D:'; Run-App 'from196' 150; Show-Cache 'after update download'
             }
-            'over190' {
-              Install '0.1.190' @(); Show-Cache 'after 190'
-              Install '0.1.196' @(); Show-Cache 'after 196 over 190'; Run-App 'from196' 150; Show-Cache 'after update download'
-            }
-            'over190pending' {
-              Install '0.1.190' @(); Run-App 'from190' 200; Show-Cache '190 with a pending update'
-              Install '0.1.196' @(); Show-Cache 'after 196 over 190'; Run-App 'from196' 150; Show-Cache 'after update download'
+            'hebrewDir' {
+              Install-From '0.1.196' "$env:RUNNER_TEMP\דיסק און קי\התקנה.exe"; Show-Cache 'after 196 from a Hebrew path'; Run-App 'from196' 150; Show-Cache 'after update download'
             }
           }
