@@ -3,7 +3,8 @@
  */
 
 import { openGuide } from '../harness.mjs';
-import { demoZipB64 } from '../demoGame.mjs';
+import { DEMO_GAME, demoZipB64 } from '../demoGame.mjs';
+import { ofTotal } from '../chapters.mjs';
 
 export const meta = {
   slug: '02-bchirat-makor-hatzbaa',
@@ -13,10 +14,11 @@ export const meta = {
 };
 
 export async function record() {
-  const g = await openGuide({ ...meta, zipB64: await demoZipB64() });
+  // משחק עם קוד חדר (רישיון שכולל טלפונים) — כך מוצגות כל ארבע האפשרויות.
+  const g = await openGuide({ ...meta, zipB64: await demoZipB64({ ...DEMO_GAME, room: 2047 }) });
   const { page } = g;
 
-  await g.card('איך משחקים?', 'בחירת מקור ההצבעה', 'פרק 2 מתוך 6', 3600);
+  await g.card('איך משחקים?', 'בחירת מקור ההצבעה', ofTotal(meta), 3600);
   await g.cardOff();
 
   await page.waitForSelector('.clicker-intro-screen', { timeout: 15000 });
@@ -26,13 +28,13 @@ export async function record() {
 
   await g.point('button:has(.clicker-choice-title:text-is("שחק עם שלטים"))', { hold: 1500 });
   await g.say('"שחק עם שלטים" — התוכנה מפעילה לבד את תוכנת הקליטה של הריסיבר.');
-  await g.say('זו האפשרות הרגילה לאירוע עם שלטים פיזיים.', 3600);
+  await g.say('זו האפשרות הרגילה לאירוע עם שלטים פיזיים, והיא עובדת בלי אינטרנט.', 4200);
   await g.pointOff();
 
   if (choices.includes('שחק עם טלפונים')) {
     await g.point('button:has(.clicker-choice-title:text-is("שחק עם טלפונים"))', { hold: 1500 });
-    await g.say('"שחק עם טלפונים" — המשתתפים מצביעים מהנייד, דרך קוד חדר.');
-    await g.say('האפשרות הזו דורשת חיבור אינטרנט.', 3200);
+    await g.say('"שחק עם טלפונים" — המשתתפים מצביעים מהנייד, עם קוד החדר של המשחק.');
+    await g.say('האפשרות הזו דורשת אינטרנט במחשב בזמן המשחק.', 3400);
     await g.pointOff();
   }
   if (choices.includes('שלטים + טלפונים')) {
@@ -40,14 +42,18 @@ export async function record() {
     await g.say('אפשר גם לשלב: חלק מהקהל בשלטים וחלק בטלפונים.');
     await g.pointOff();
   }
+  await g.say('אפשרויות הטלפונים מופיעות רק במשחק שהרישיון שלו כולל טלפונים.', 4200);
 
   await g.point('button:has(.clicker-choice-title:text-is("מצב דמה"))', { hold: 1500 });
   await g.say('"מצב דמה" — הרצה עם משתתפים מדומים, בלי שום חומרה.');
   await g.say('מצוין כדי לבדוק את המשחק לפני האירוע.', 3400);
   await g.pointOff();
 
-  await g.point('button:has-text("הגדרות מתקדמות")', { hold: 1400 }).catch(() => {});
+  await g.point('button:has-text("הגדרות מתקדמות")', { hold: 1400 });
   await g.say('בהגדרות המתקדמות אפשר לכוון פרטים נוספים לפני שמתחילים.');
+  await g.pointOff();
+  await g.point('.settings-host-link', { hold: 1200 });
+  await g.say('ו"מסך מנחה" פותח חלון שליטה נפרד: המשחק על המקרן, והשליטה על מסך המחשב.');
   await g.pointOff();
   await g.sayOff();
 
