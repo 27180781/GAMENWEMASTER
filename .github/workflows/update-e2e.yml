@@ -86,7 +86,7 @@ jobs:
             if ($u) { Start-Process $u.FullName -ArgumentList '/S' -Wait; Start-Sleep -Seconds 3 }
             Remove-Item $cache -Recurse -Force -ErrorAction SilentlyContinue
             Get-ChildItem $env:APPDATA -Filter update.log -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force
-            Remove-Item "$downloads\HavayaBeClick-*", 'D:\srv\desktop\ignore-range', 'D:\srv\desktop\access.log' -Force -ErrorAction SilentlyContinue
+            Remove-Item "$downloads\HavayaBeClick-*", 'D:\srv\ignore-range', 'D:\srv\access.log' -Force -ErrorAction SilentlyContinue
           }
           function Install-9001 {
             $p = Start-Process 'D:\srv\desktop\HavayaBeClick-Setup-0.1.9001.exe' -ArgumentList '/S' -Wait -PassThru
@@ -105,7 +105,7 @@ jobs:
             $log = Get-ChildItem $env:APPDATA -Filter update.log -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
             if ($log) { Get-Content $log.FullName -Encoding utf8 } else { 'NO update.log' }
             "----- ${label}: server -----"
-            Get-Content 'D:\srv\desktop\access.log' -ErrorAction SilentlyContinue
+            Get-Content 'D:\srv\access.log' -ErrorAction SilentlyContinue
             "----- ${label}: stdout -----"
             Get-Content "$env:RUNNER_TEMP\out-$label.txt" -Encoding utf8 -ErrorAction SilentlyContinue | Select-String -Pattern 'update'
             "----- ${label}: pending -----"
@@ -141,19 +141,20 @@ jobs:
 
           # 4. Something on the way ignores Range: our own full download from byte 0, with the reason.
           Reset-All; Install-9001
-          New-Item 'D:\srv\desktop\ignore-range' -ItemType File | Out-Null
+          New-Item 'D:\srv\ignore-range' -ItemType File | Out-Null
           $p = Run-Update 'norange'; Kill-App; Show 'norange'
           Expect 'norange' 'range-blocked'
-          Remove-Item 'D:\srv\desktop\ignore-range' -Force
+          Remove-Item 'D:\srv\ignore-range' -Force
 
           # 5. Install on quit: close the window normally, the update installs, and the next update
           #    compares against the new installer.
           Reset-All; Install-9001
           $p = Run-Update 'quit'
           taskkill /PID $p.Id | Out-Null
-          for ($i = 0; $i -lt 30; $i++) { Start-Sleep -Seconds 3; $v = (Get-Item (Find-App) -ErrorAction SilentlyContinue).VersionInfo.ProductVersion; if ($v -eq '0.1.9002') { break } }
+          for ($i = 0; $i -lt 30; $i++) { Start-Sleep -Seconds 3; $a = Find-App; if ($a) { $v = (Get-Item $a).VersionInfo.ProductVersion; if ($v -eq '0.1.9002') { break } } }
           "installed after quit: $v ; installer.exe = $((Get-Item "$cache\installer.exe" -ErrorAction SilentlyContinue).Length) (9002 = $((Get-Item 'D:\srv\desktop\HavayaBeClick-Setup-0.1.9002.exe').Length))"
           Show 'quit'
+          if ($v -ne '0.1.9002') { $failures += 'quit' }
 
           Stop-Process -Id $srv.Id -Force -ErrorAction SilentlyContinue
           # Never fails the job: a red run e-mails the repository owner. The verdict is this line.
