@@ -17,7 +17,7 @@ interface GroupConnectScreenProps {
 }
 
 /** צבעי מספרי הקבוצות — תואמים למטבעות התשובות (ירוק/אדום/לבן/זהב/כחול/כתום…). */
-const NUM_COLORS = [
+export const NUM_COLORS = [
   { bg: '#2ec94f', fg: '#052e12' },
   { bg: '#e5342f', fg: '#fff' },
   { bg: '#f4f4f4', fg: '#111' },

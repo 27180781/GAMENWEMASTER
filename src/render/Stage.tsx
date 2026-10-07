@@ -9,7 +9,7 @@
  * מה ששובר את המרכוז בכל מסך שאינו 16:9.
  */
 
-import { useLayoutEffect, useState, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 
 export const STAGE_WIDTH = 1920;
 export const STAGE_HEIGHT = 1080;
@@ -32,18 +32,37 @@ function currentTransform(): string {
   return stageTransform(window.innerWidth, window.innerHeight);
 }
 
-export function Stage({ children }: { children: ReactNode }) {
+/**
+ * ‏fit="parent" — הבמה נכנסת לתוך האלמנט שמכיל אותה ולא לכל החלון (מסך הצפייה
+ * עם שלט ההצבעה לידו). ברירת המחדל — כל החלון, כמו תמיד.
+ */
+export function Stage({
+  children,
+  fit = 'window',
+}: {
+  children: ReactNode;
+  fit?: 'window' | 'parent';
+}) {
+  const ref = useRef<HTMLDivElement>(null);
   const [transform, setTransform] = useState(currentTransform);
 
   useLayoutEffect(() => {
+    const parent = ref.current?.parentElement ?? null;
+    if (fit === 'parent' && parent !== null && typeof ResizeObserver !== 'undefined') {
+      const update = () => setTransform(stageTransform(parent.clientWidth, parent.clientHeight));
+      const observer = new ResizeObserver(update);
+      observer.observe(parent);
+      update();
+      return () => observer.disconnect();
+    }
     const update = () => setTransform(currentTransform());
     window.addEventListener('resize', update);
     update();
     return () => window.removeEventListener('resize', update);
-  }, []);
+  }, [fit]);
 
   return (
-    <div className="stage" style={{ transform }}>
+    <div ref={ref} className="stage" style={{ transform }}>
       {children}
     </div>
   );
