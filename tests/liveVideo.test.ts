@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 // @ts-expect-error — שרת ב-JS, בלי הצהרות טיפוסים
 import { startRelay, viewTokenFor } from '../server/live-relay.mjs';
 // @ts-expect-error — שרת ב-JS, בלי הצהרות טיפוסים
-import { createVideo, publishKeyFor } from '../server/live-video.mjs';
+import { createVideo, publishKeyFor, videoParticipantsOf } from '../server/live-video.mjs';
 
 const sha = (text: string) => createHash('sha256').update(text).digest('hex');
 
@@ -275,6 +275,23 @@ describe('וידאו המנחה — זכאות ומפתח', () => {
     expect(reply.status).toBe(200);
     expect(reply.body.iceServers).toEqual([{ urls: ['stun:stun.cloudflare.com:3478'] }]);
     expect(reply.body.maxViewers).toBe(55);
+  });
+
+  it('התקרה לפי מה שנקנה (hostVideoLimit), ולא יותר מהרישיון', async () => {
+    const world = fakeWorld();
+    const { host } = await start({ world });
+    // הרישיון הוגדל ל-300, הווידאו נקנה ל-100: 100 ועוד 10%.
+    world.games.set(
+      GAME,
+      entitledGame({
+        setting: { hostVideo: true, hostVideoLimit: 100, limit: { type: 'phones', number: 300 } },
+      }),
+    );
+    expect((await host('config')).body.maxViewers).toBe(110);
+    expect(videoParticipantsOf({ hostVideoLimit: 500, limit: { number: 80 } })).toBe(80);
+    expect(videoParticipantsOf({ hostVideoLimit: 40 })).toBe(40);
+    expect(videoParticipantsOf({ hostVideoLimit: 0, limit: { number: 80 } })).toBe(80);
+    expect(videoParticipantsOf({ limit: {} })).toBeUndefined();
   });
 
   it('עם מפתח TURN: הרשאה זמנית מ-Cloudflare, בלי פורט 53', async () => {

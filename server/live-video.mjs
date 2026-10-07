@@ -10,8 +10,9 @@
  *   `setting.hostVideo` במשחק טלפונים, וקוד החדר שבו הוא החדר שהמנחה טוען.
  *   המנחה מוכיח שהוא המסך הראשי כמו בשידור המסך: מפתח P שנגזר ממזהה המשחק
  *   ומקוד החדר (src/live/token.ts).
- * - **תקרת צופים.** כמספר המשתתפים ברישיון ועוד מרווח קטן (רענונים, טלפון
- *   שני), ותקרה כוללת לכל השרת — כדי שקישור שדלף לא יגדיל את החשבון.
+ * - **תקרת צופים.** כמספר המשתתפים שהווידאו נקנה עבורם (`setting.hostVideoLimit`,
+ *   ובלעדיו המשתתפים ברישיון) ועוד מרווח קטן (רענונים, טלפון שני), ותקרה כוללת
+ *   לכל השרת — כדי שקישור שדלף לא יגדיל את החשבון.
  * - Cloudflare גובה רק על מה שיוצא לצופים. צופה שעזב (sendBeacon) או שהפסיק
  *   לדפוק — החיבור שלו נסגר; שידור שהמנחה שלו השתתק — נסגר.
  *
@@ -97,7 +98,20 @@ function viewTokenOf(publishKey) {
   return sha256(VIEW_PREFIX + publishKey).slice(0, 20);
 }
 
-/** תקרת צופי הווידאו של משחק: המשתתפים ברישיון ועוד מרווח, ולא מעל התקרה הכוללת. */
+/**
+ * כמה משתתפים הווידאו מכסה: מה שנקנה (`hostVideoLimit` — אחרי הגדלת רישיון
+ * הבעלים משלים על הנוספים), ולא יותר מהרישיון. בלי מספר — המשתתפים ברישיון.
+ */
+export function videoParticipantsOf(setting) {
+  const paid = Number(setting?.hostVideoLimit);
+  const licence = Number(setting?.limit?.number);
+  const hasPaid = Number.isFinite(paid) && paid > 0;
+  const hasLicence = Number.isFinite(licence) && licence > 0;
+  if (hasPaid && hasLicence) return Math.min(paid, licence);
+  return hasPaid ? paid : setting?.limit?.number;
+}
+
+/** תקרת צופי הווידאו של משחק: המשתתפים ועוד מרווח, ולא מעל התקרה הכוללת. */
 export function viewerCapFor(limitNumber, cfg) {
   const n = Number(limitNumber);
   const base =
@@ -265,7 +279,7 @@ export function createVideo({
             ? {
                 ok: true,
                 room: normalizeRoom(json.room),
-                cap: viewerCapFor(setting.limit?.number, cfg),
+                cap: viewerCapFor(videoParticipantsOf(setting), cfg),
               }
             : { ok: false, error: 'not-entitled' };
       }
