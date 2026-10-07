@@ -75,6 +75,8 @@ import {
   type DeviceState,
   type DeviceDownloadProgress,
 } from './clickerBridge.ts';
+import { applyReleases, loadReleases, pruneReleases, saveReleases } from './clickerRelease.ts';
+import { loadSettled } from './clickerSave.ts';
 import {
   MAX_ATTEMPTS,
   attemptKey,
@@ -90,6 +92,7 @@ import { openPushChannel } from './pushChannel.ts';
 import {
   loadRoster,
   loadRosterSource,
+  parseGameUsers,
   saveRoster,
   saveRosterSource,
   syncRosterWithFile,
@@ -125,17 +128,28 @@ const RAW_FIXTURES: Record<string, unknown> = {
  * מיזוג שמות/קבוצות מקובץ המשחק (`users`, ושמות שממתינים לשלט ב-`pendingUsers`)
  * אל המרשם השמור (לפי id המשחק). אידמפוטנטי — בטוח להריץ גם בטעינה וגם בכל
  * רענון חם באמצע משחק. הכללים עצמם ב-syncRosterWithFile (roster.ts).
+ *
+ * שיוכים ישנים שבוטלו ב«שיוך מחדש» מוסתרים מהקובץ עד שהוא עצמו מראה שהבונה
+ * מחק אותם (clickerRelease.ts), אחרת הקובץ היה מחזיר אותם.
  */
 function mergeUsersIntoRoster(file: GameFile, opts: { sealed?: boolean } = {}): void {
+  const releases = loadReleases(file.id);
   const result = syncRosterWithFile(
     loadRoster(file.id),
-    file,
+    applyReleases(file, releases),
     loadRosterSource(file.id),
     opts.sealed === true,
   );
-  if (result === null) return;
-  saveRoster(file.id, result.roster);
-  saveRosterSource(file.id, result.source);
+  if (result !== null) {
+    saveRoster(file.id, result.roster);
+    saveRosterSource(file.id, result.source);
+  }
+  const settled = loadSettled(file.id);
+  const pruned = pruneReleases(releases, parseGameUsers(file.users), (participantId, clickerId) => {
+    const answer = settled[participantId];
+    return answer?.clickerId === clickerId && (answer.status === 'saved' || answer.status === 'already');
+  });
+  if (pruned !== releases) saveReleases(file.id, pruned);
 }
 
 function useHash(): string {
@@ -1329,6 +1343,7 @@ export function App() {
           onApplyGame={applyRawGame}
           clickerSave={clickerSave.view}
           onRosterChange={clickerSave.nudge}
+          onReleaseClickers={clickerSave.release}
         />
         {/* בזמן משחק — עיגול זעיר בפינה, לא פס מלא שמכער את המסך */}
         {!mediaPreload.done && <MediaLoadDot {...mediaPreload} />}

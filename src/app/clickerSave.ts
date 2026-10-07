@@ -10,10 +10,22 @@
  * participantId שעדיין ממתין בקובץ) פחות מה שהשרת כבר ענה עליו (נשמר ב-
  * localStorage לפי משחק). לכן מחשב בלי אינטרנט, או תוכנה שנסגרה באמצע,
  * ממשיכים מאותה נקודה כשהרשת חוזרת.
+ *
+ * «שיוך מחדש» מוסיף לפני כל אלה את מחיקת השיוכים הישנים בבונה
+ * (clickerRelease.ts): כל עוד יש מחיקה שלא נענתה, שום שיוך חדש לא נשלח. אחרת
+ * שלט שעבר בשיוך החדש למשתתף אחר היה נדחה כ«תפוס» בידי המשתתף הקודם.
  */
 
 import type { BackupConfig } from './backup.ts';
-import type { GamePendingUser, RosterData } from './roster.ts';
+import {
+  releaseKey,
+  releasesToSend,
+  summarizeReleases,
+  type ReleaseMap,
+  type ReleaseOutcome,
+  type ReleaseSummary,
+} from './clickerRelease.ts';
+import type { GamePendingUser, ReleasedClicker, RosterData } from './roster.ts';
 
 /** התשובה של השרת לכל שיוך (ושתי תשובות שחלות על כל הבקשה). */
 export type ClickerSaveStatus =
@@ -238,14 +250,21 @@ export interface ClickerSaveView extends ClickerSaveSummary {
   sending: boolean;
   /** הניסיון האחרון נכשל (אין רשת / השרת לא ענה) — ננסה שוב לבד. */
   failing: boolean;
+  /** «שיוך מחדש»: מחיקות בבונה (clickerRelease.ts). */
+  releases: ReleaseSummary;
 }
 
 export interface ClickerSaverOptions {
-  pending: readonly GamePendingUser[];
+  /** הממתינים לשלט בקובץ, אחרי applyReleases. נקרא מחדש בכל שליחה. */
+  readPending: () => readonly GamePendingUser[];
   readRoster: () => RosterData;
   readSettled: () => SettledMap;
   writeSettled: (settled: SettledMap) => void;
   send: (assignments: ClickerAssignment[]) => Promise<SendOutcome>;
+  /** «שיוך מחדש»: השיוכים שבוטלו, ושליחתם למחיקה בבונה. בלעדיהם אין מחיקות. */
+  readReleases?: () => ReleaseMap;
+  writeReleases?: (map: ReleaseMap) => void;
+  sendReleases?: (releases: ReleasedClicker[]) => Promise<ReleaseOutcome>;
   setTimer?: (fn: () => void, ms: number) => unknown;
   clearTimer?: (handle: unknown) => void;
   now?: () => number;
@@ -273,8 +292,9 @@ export class ClickerSaver {
   }
 
   view(): ClickerSaveView {
-    const summary = summarizeClickerSave(this.opts.readRoster(), this.opts.pending, this.opts.readSettled());
-    return { ...summary, sending: this.sending, failing: this.failures > 0 };
+    const summary = summarizeClickerSave(this.opts.readRoster(), this.opts.readPending(), this.opts.readSettled());
+    const releases = summarizeReleases(this.opts.readReleases?.() ?? {});
+    return { ...summary, sending: this.sending, failing: this.failures > 0, releases };
   }
 
   subscribe(fn: () => void): () => void {
@@ -323,15 +343,27 @@ export class ClickerSaver {
     }, ms);
   }
 
-  /** שליחת כל מה שממתין. רצה אחת בכל פעם; קריאה באמצע שליחה תרוץ אחריה. */
+  private pendingReleases(): ReleasedClicker[] {
+    return this.opts.sendReleases === undefined ? [] : releasesToSend(this.opts.readReleases?.() ?? {});
+  }
+
+  private pendingAssignments(): ClickerAssignment[] {
+    return assignmentsToSend(this.opts.readRoster(), this.opts.readPending(), this.opts.readSettled());
+  }
+
+  /**
+   * שליחת כל מה שממתין: קודם מחיקות («שיוך מחדש»), ורק כשכולן נענו — שיוכים.
+   * רצה אחת בכל פעם; קריאה באמצע שליחה תרוץ אחריה.
+   */
   async flush(): Promise<void> {
     if (this.stopped) return;
     if (this.sending) {
       this.again = true;
       return;
     }
-    const todo = assignmentsToSend(this.opts.readRoster(), this.opts.pending, this.opts.readSettled());
-    if (todo.length === 0) {
+    const releases = this.pendingReleases();
+    const todo = releases.length > 0 ? [] : this.pendingAssignments();
+    if (releases.length === 0 && todo.length === 0) {
       if (this.failures > 0) {
         this.failures = 0;
         this.emit();
@@ -343,16 +375,20 @@ export class ClickerSaver {
     this.emit();
     let failed = false;
     try {
-      for (let i = 0; i < todo.length && !failed; i += SAVE_BATCH) {
-        const chunk = todo.slice(i, i + SAVE_BATCH);
-        const out = await this.opts.send(chunk);
-        if (this.stopped) return;
-        if (out.kind === 'retry') {
-          failed = true;
-        } else {
-          this.opts.writeSettled({ ...this.opts.readSettled(), ...out.settled });
-          // תשובה שדילגה על שיוך — כמו כישלון, אחרת היינו שולחים אותו שוב ושוב.
-          if (chunk.some((a) => out.settled[a.participantId] === undefined)) failed = true;
+      if (releases.length > 0) {
+        failed = await this.sendReleases(releases);
+      } else {
+        for (let i = 0; i < todo.length && !failed; i += SAVE_BATCH) {
+          const chunk = todo.slice(i, i + SAVE_BATCH);
+          const out = await this.opts.send(chunk);
+          if (this.stopped) return;
+          if (out.kind === 'retry') {
+            failed = true;
+          } else {
+            this.opts.writeSettled({ ...this.opts.readSettled(), ...out.settled });
+            // תשובה שדילגה על שיוך — כמו כישלון, אחרת היינו שולחים אותו שוב ושוב.
+            if (chunk.some((a) => out.settled[a.participantId] === undefined)) failed = true;
+          }
         }
       }
     } catch {
@@ -366,10 +402,44 @@ export class ClickerSaver {
       this.schedule(RETRY_DELAYS_MS[Math.min(this.failures, RETRY_DELAYS_MS.length) - 1]!);
     } else {
       this.failures = 0;
-      const more = assignmentsToSend(this.opts.readRoster(), this.opts.pending, this.opts.readSettled());
-      if (more.length > 0) this.schedule(this.again ? 0 : 1500);
+      // אחרי המחיקות — השיוכים החדשים מיד.
+      if (this.pendingReleases().length > 0 || this.pendingAssignments().length > 0) {
+        this.schedule(this.again || releases.length > 0 ? 0 : 1500);
+      }
     }
     this.emit();
+  }
+
+  /** מחיקות בבונה, במנות. מחזיר true כשצריך לנסות שוב. */
+  private async sendReleases(releases: ReleasedClicker[]): Promise<boolean> {
+    const send = this.opts.sendReleases!;
+    for (let i = 0; i < releases.length; i += SAVE_BATCH) {
+      const chunk = releases.slice(i, i + SAVE_BATCH);
+      const out = await send(chunk);
+      if (this.stopped) return false;
+      if (out.kind === 'retry') return true;
+      const answered = new Set<string>();
+      const map: ReleaseMap = { ...(this.opts.readReleases?.() ?? {}) };
+      const settled: SettledMap = { ...this.opts.readSettled() };
+      let settledChanged = false;
+      for (const answer of out.answers) {
+        const key = releaseKey(answer.participantId, answer.clickerId);
+        answered.add(key);
+        if (map[key]?.status !== 'pending') continue;
+        map[key] = { ...map[key]!, status: answer.status };
+        // המספר כבר לא שמור בבונה: שיוך שנשמר קודם צריך להישלח שוב, גם אם זה
+        // אותו שלט (נלחץ שוב לאותו שם אחרי «שיוך מחדש»).
+        if ((answer.status === 'released' || answer.status === 'already') && answer.participantId in settled) {
+          delete settled[answer.participantId];
+          settledChanged = true;
+        }
+      }
+      this.opts.writeReleases?.(map);
+      if (settledChanged) this.opts.writeSettled(settled);
+      // תשובה שדילגה על מחיקה — כמו כישלון, אחרת היינו שולחים אותה שוב ושוב.
+      if (chunk.some((e) => !answered.has(releaseKey(e.participantId, e.clickerId)))) return true;
+    }
+    return false;
   }
 }
 
@@ -390,6 +460,30 @@ function verb(n: number, one: string, many: string): string {
 export function clickerSaveLines(view: ClickerSaveView | null): { tone: 'ok' | 'wait' | 'warn'; text: string }[] {
   if (view === null) return [];
   const lines: { tone: 'ok' | 'wait' | 'warn'; text: string }[] = [];
+  const { releasing, kept, noLicense } = view.releases;
+  if (releasing > 0) {
+    const n = releasing;
+    lines.push({
+      tone: 'wait',
+      text: view.failing
+        ? `⏳ ${count(n)} מהשיוך הקודם ${verb(n, 'ממתין', 'ממתינים')} למחיקה במערכת. אין חיבור כרגע, וננסה שוב לבד.`
+        : `⏳ מוחק במערכת ${count(n)} מהשיוך הקודם…`,
+    });
+  }
+  if (kept > 0) {
+    const n = kept;
+    lines.push({
+      tone: 'warn',
+      text: `⚠️ ${count(n)} מהשיוך הקודם לא ${verb(n, 'נמחק', 'נמחקו')} במערכת, כי שינו ${verb(n, 'אותו', 'אותם')} שם. בטעינה הבאה של המשחק ${verb(n, 'הוא יחזור', 'הם יחזרו')} מהמערכת.`,
+    });
+  }
+  if (noLicense > 0) {
+    const n = noLicense;
+    lines.push({
+      tone: 'warn',
+      text: `⚠️ ${count(n)} מהשיוך הקודם לא ${verb(n, 'נמחק', 'נמחקו')} במערכת: אין למשחק רישיון קליקרים בתוקף. כאן השיוך החדש עובד כרגיל.`,
+    });
+  }
   if (view.waiting > 0) {
     const n = view.waiting;
     lines.push({

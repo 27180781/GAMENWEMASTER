@@ -93,11 +93,14 @@ import {
   captureRemote,
   categoryMemberTotal,
   displayName,
+  forgetRosterSourceIds,
   groupCounts,
   loadRoster,
   playerGroupNames,
+  reassignRoster,
   resetCategoryMemberships,
   saveRoster,
+  type ReleasedClicker,
   type RosterData,
 } from './roster.ts';
 import { selectPlayersToRemove } from './functionPlayers.ts';
@@ -221,6 +224,8 @@ interface GameHostProps {
   onApplyGame?: (raw: unknown) => void;
   /** שמירת מספרי השלטים בבונה (useClickerSave) — לשורת המצב במרשם. */
   clickerSave?: ClickerSaveView | null;
+  /** «שיוך מחדש»: שיוכים ישנים של משתתפים מהבונה, למחיקה שם (useClickerSave). */
+  onReleaseClickers?: (entries: ReleasedClicker[]) => void;
   /** המרשם השתנה — כדי ששיוך חדש של שלט לשם מהבונה יישלח לבונה. */
   onRosterChange?: () => void;
 }
@@ -234,6 +239,7 @@ export function GameHost({
   offline,
   onApplyGame,
   clickerSave = null,
+  onReleaseClickers,
   onRosterChange,
 }: GameHostProps) {
   // המנוע נוצר פעם אחת; רענון תוכן מתבצע דרך engine.updateGame בלי remount,
@@ -399,6 +405,21 @@ export function GameHost({
   useEffect(() => {
     if (!captureOn) setCaptureFlash(null);
   }, [captureOn]);
+
+  /**
+   * «שיוך מחדש» (אחרי אישור בלשונית השמות): השמות שקיבלו שלט בתוכנה חוזרים
+   * לתור, השיוכים הישנים של משתתפים מהבונה נמחקים גם שם, והקליטה נדלקת כדי
+   * שהלחיצה הבאה תתפוס את השם הראשון.
+   */
+  const reassign = useCallback(() => {
+    const res = reassignRoster(rosterRef.current);
+    if (res.cleared === 0) return;
+    forgetRosterSourceIds(game.id, res.released.map((r) => r.clickerId));
+    updateRoster(res.roster);
+    if (res.released.length > 0) onReleaseClickers?.(res.released);
+    setCaptureFlash(null);
+    setCaptureOn(true);
+  }, [game.id, updateRoster, onReleaseClickers]);
   // אם הקטגוריה של מסך ההתחברות נמחקה — סוגרים אותו (אחרת המקשים נחסמים בלי מסך נראה)
   useEffect(() => {
     if (connectCategory !== null && !roster.categories.some((c) => c.id === connectCategory)) {
@@ -2963,6 +2984,7 @@ export function GameHost({
             onChange={updateRoster}
             captureOn={captureOn}
             onToggleCapture={setCaptureOn}
+            onReassign={reassign}
             saveStatus={clickerSave}
             scores={state.scores}
             groupBonus={groupBonus}

@@ -20,6 +20,24 @@ export interface Player {
    * ונקשר לשלט בלחיצה. כך יודעים שהשיוך הזה עדיין לא ידוע לבונה.
    */
   participantId?: string;
+  /**
+   * השיוך נעשה בתוכנה: השלט נקלט בלחיצה, או שהשם הגיע אליו מהתור. «שיוך מחדש»
+   * מחזיר לתור בדיוק את השמות האלה, עם הקבוצה שהגיעה איתם מהתור. גם מספר שנשמר
+   * בבונה מלחיצה מגיע מסומן (`pressed` ב-`users`). מספר שהוקלד כאן או בבונה,
+   * או שיובא מאקסל עם מספרים, אינו מסומן ואינו מתאפס.
+   */
+  pressed?: PressedFrom;
+}
+
+/** הקבוצה שהגיעה עם השם מהתור (group ריק = בלי קבוצה). */
+export interface PressedFrom {
+  group: string;
+  category?: string;
+}
+
+function samePressed(a: PressedFrom | undefined, b: PressedFrom | undefined): boolean {
+  if (a === undefined || b === undefined) return a === b;
+  return a.group === b.group && a.category === b.category;
 }
 
 export interface Group {
@@ -333,20 +351,23 @@ export function reconcilePending(roster: RosterData, categoryName: string): Rost
   for (let i = 0; i < take; i += 1) {
     const player = waiting[i]!;
     const next = pending[i]!;
-    r = upsertPlayer(r, player.id, next.name);
-    if (next.participantId !== undefined) {
-      // השם הגיע מהבונה: השלט שתפס אותו נושא את המשתתף, כדי שטעינה הבאה של
-      // הקובץ לא תחזיר את השם לתור, וכדי שאפשר יהיה לדווח את המספר לבונה.
-      const participantId = next.participantId;
-      r = {
-        ...r,
-        players: r.players.map((p) => (p.id === player.id ? { ...p, participantId } : p)),
-      };
-    }
-    if (next.group.trim() !== '') {
-      // הקטגוריה של השם עצמו קודמת — כך שם מקובץ "מחלקה" נשאר תחת "מחלקה"
-      // גם כשהלחיצה שתופסת אותו מגיעה הרבה אחרי הייבוא.
-      const ensured = ensureGroupByName(r, next.category ?? categoryName, next.group);
+    const grouped = next.group.trim() !== '';
+    // הקטגוריה של השם עצמו קודמת — כך שם מקובץ "מחלקה" נשאר תחת "מחלקה"
+    // גם כשהלחיצה שתופסת אותו מגיעה הרבה אחרי הייבוא.
+    const category = next.category ?? categoryName;
+    // השם הגיע מהבונה: השלט שתפס אותו נושא את המשתתף, כדי שטעינה הבאה של
+    // הקובץ לא תחזיר את השם לתור, וכדי שאפשר יהיה לדווח את המספר לבונה. שם
+    // שהוקלד כאן מנקה מזהה ששרד על השלט משם קודם.
+    const bound: Player = {
+      ...player,
+      name: next.name,
+      pressed: { group: next.group, ...(grouped ? { category } : {}) },
+    };
+    if (next.participantId !== undefined) bound.participantId = next.participantId;
+    else delete bound.participantId;
+    r = { ...r, players: r.players.map((p) => (p.id === player.id ? bound : p)) };
+    if (grouped) {
+      const ensured = ensureGroupByName(r, category, next.group);
       r = assignGroup(ensured.roster, player.id, ensured.categoryId, ensured.groupId);
     }
   }
@@ -380,7 +401,10 @@ export function captureRemote(
   if (existing !== undefined) {
     return { roster, id, name: existing.name, isNew: false };
   }
-  const withPlayer: RosterData = { ...roster, players: [...roster.players, { id, name: '' }] };
+  const withPlayer: RosterData = {
+    ...roster,
+    players: [...roster.players, { id, name: '', pressed: { group: '' } }],
+  };
   const next = reconcilePending(withPlayer, categoryName);
   const player = next.players.find((p) => p.id === id);
   return { roster: next, id, name: player?.name ?? '', isNew: true };
@@ -418,6 +442,69 @@ export function clearPendingNames(roster: RosterData): RosterData {
   return roster.pendingNames.length === 0 ? roster : { ...roster, pendingNames: [] };
 }
 
+/** מספר שלט אמיתי (הריסיבר מדווח 1–9999) — רק מספר כזה נשמר בבונה מלחיצה. */
+const CLICKER_ID = /^[1-9][0-9]{0,3}$/;
+
+/** שיוך של משתתף מהבונה שבוטל ב«שיוך מחדש»: המשתתף, והשלט שהיה לו. */
+export interface ReleasedClicker {
+  participantId: string;
+  clickerId: string;
+}
+
+export interface ReassignResult {
+  roster: RosterData;
+  /** כמה שמות חזרו לתור. */
+  returned: number;
+  /** כמה שלטים ירדו מהרשימה (כולל שלטים שנלחצו ועוד לא קיבלו שם). */
+  cleared: number;
+  /** שיוכים של משתתפים מהבונה, כדי למחוק שם מספר שנשמר מלחיצה. */
+  released: ReleasedClicker[];
+}
+
+/**
+ * «שיוך מחדש»: מבטל את השיוכים שנעשו בתוכנה ומתחיל מההתחלה. כל שם שקיבל שלט
+ * בלחיצה או מהתור (`pressed`) חוזר לראש התור, לפי הסדר שבו נקשר, ולפני השמות
+ * שעוד חיכו. השלטים יורדים מהרשימה, וגם שלטים שנלחצו ועוד לא קיבלו שם, ולכן
+ * הלחיצה הבאה תופסת שוב את השם הראשון. שמות עם מספר שהוקלד (כאן או בבונה) או
+ * שיובא מאקסל עם מספרים נשארים כמו שהם.
+ *
+ * מה שנשמר בבונה מהשיוך הישן חוזר ב-`released`: מי שקורא לכאן שולח אותם לבונה
+ * (clickerSave.ts) ומסתיר אותם מהקובץ עד שהבונה יאשר (clickerRelease.ts), אחרת
+ * הטעינה הבאה של המשחק הייתה מחזירה את המספרים הישנים.
+ */
+export function reassignRoster(roster: RosterData): ReassignResult {
+  const reset = roster.players.filter((p) => p.pressed !== undefined || p.name.trim() === '');
+  if (reset.length === 0) return { roster, returned: 0, cleared: 0, released: [] };
+
+  const back: PendingName[] = [];
+  const backIds = new Set<string>();
+  const released: ReleasedClicker[] = [];
+  for (const p of reset) {
+    const participantId = p.participantId;
+    if (participantId !== undefined && CLICKER_ID.test(p.id)) released.push({ participantId, clickerId: p.id });
+    const name = p.name.trim();
+    if (name === '' || (participantId !== undefined && backIds.has(participantId))) continue;
+    const group = p.pressed?.group.trim() ?? '';
+    const category = p.pressed?.category;
+    back.push({
+      name,
+      group,
+      ...(group !== '' && category !== undefined ? { category } : {}),
+      ...(participantId !== undefined ? { participantId } : {}),
+    });
+    if (participantId !== undefined) backIds.add(participantId);
+  }
+
+  const waiting = roster.pendingNames.filter((n) => n.participantId === undefined || !backIds.has(n.participantId));
+  const without = removePlayers(roster, reset.map((p) => p.id));
+  return {
+    roster: { ...without, pendingNames: [...back, ...waiting] },
+    returned: back.length,
+    cleared: reset.length,
+    released,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // ייבוא שמות/קבוצות מקובץ המשחק (שדה users ב-JSON)
 // ---------------------------------------------------------------------------
@@ -429,11 +516,13 @@ export interface GameUser {
   groupName: string;
   /** מזהה המשתתף בבונה. חסר בקבצים ישנים ובמשחקים שלא נבנו בבונה. */
   participantId?: string;
+  /** המספר נשמר בבונה מלחיצה בתוכנה ולא שונה שם מאז («שיוך מחדש» מאפס אותו). */
+  pressed?: true;
 }
 
 /**
  * פענוח שדה users מקובץ המשחק (מחרוזת JSON או אובייקט) לרשימת משתמשים.
- * מבנה: { "<remoteId>": { remoteId, name, groupName?, participantId? }, ... }.
+ * מבנה: { "<remoteId>": { remoteId, name, groupName?, participantId?, pressed? }, ... }.
  */
 export function parseGameUsers(raw: unknown): GameUser[] {
   let obj: unknown = raw;
@@ -459,6 +548,7 @@ export function parseGameUsers(raw: unknown): GameUser[] {
       name: String(v.name ?? '').trim(),
       groupName: String(v.groupName ?? '').trim(),
       ...(participantId !== '' ? { participantId } : {}),
+      ...(v.pressed === true ? { pressed: true as const } : {}),
     });
   }
   return users;
@@ -477,21 +567,33 @@ export function mergeGameUsers(roster: RosterData, users: GameUser[], categoryNa
   let r = roster;
   for (const u of users) r = upsertPlayer(r, u.remoteId, u.name);
 
-  const participantAt = new Map(users.map((u) => [u.remoteId, u.participantId]));
-  if (r.players.some((p) => participantAt.has(p.id) && participantAt.get(p.id) !== p.participantId)) {
-    r = {
-      ...r,
-      players: r.players.map((p) => {
-        if (!participantAt.has(p.id)) return p;
-        const participantId = participantAt.get(p.id);
-        if (p.participantId === participantId) return p;
-        const next: Player = { ...p };
-        if (participantId === undefined) delete next.participantId;
-        else next.participantId = participantId;
-        return next;
-      }),
-    };
-  }
+  // המשתתף שבקובץ, וסימון «שיוך בלחיצה»: הסימון המקומי נשאר רק כל עוד המספר
+  // שייך באותו משתתף; אחרת קובע הקובץ (pressed = נשמר בבונה מלחיצה).
+  const userAt = new Map(users.map((u) => [u.remoteId, u]));
+  const players = r.players.map((p) => {
+    const u = userAt.get(p.id);
+    if (u === undefined) return p;
+    const participantId = u.participantId;
+    const sameBinding = participantId !== undefined && p.participantId === participantId;
+    const fromFile: PressedFrom | undefined =
+      u.pressed === true
+        ? { group: u.groupName, ...(u.groupName !== '' ? { category: categoryName } : {}) }
+        : undefined;
+    const pressed =
+      sameBinding && p.pressed !== undefined
+        ? p.pressed
+        : samePressed(p.pressed, fromFile)
+          ? p.pressed
+          : fromFile;
+    if (p.participantId === participantId && p.pressed === pressed) return p;
+    const next: Player = { ...p };
+    if (participantId === undefined) delete next.participantId;
+    else next.participantId = participantId;
+    if (pressed === undefined) delete next.pressed;
+    else next.pressed = pressed;
+    return next;
+  });
+  if (players.some((p, i) => p !== r.players[i])) r = { ...r, players };
 
   const grouped = users.filter((u) => u.groupName !== '');
   if (grouped.length === 0) return r;
@@ -672,8 +774,9 @@ export interface RosterSource {
 }
 
 /**
- * `users` בלי השדה participantId, כפי שהבונה שלח אותו לפני שהוסיף את השדה.
- * בזכותו קובץ שהשתנה רק בתוספת המזהים לא נחשב לרשימה חדשה. null = אין מה להסיר.
+ * `users` בלי השדות participantId ו-pressed, כפי שהבונה שלח אותו לפני שהוסיף
+ * אותם. בזכותו קובץ שהשתנה רק בתוספת השדות לא נחשב לרשימה חדשה. null = אין
+ * מה להסיר.
  */
 export function usersWithoutParticipantIds(raw: string): string | null {
   let obj: unknown;
@@ -686,9 +789,10 @@ export function usersWithoutParticipantIds(raw: string): string | null {
   let changed = false;
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
-    if (value !== null && typeof value === 'object' && 'participantId' in value) {
+    if (value !== null && typeof value === 'object' && ('participantId' in value || 'pressed' in value)) {
       const rest = { ...(value as Record<string, unknown>) };
       delete rest.participantId;
+      delete rest.pressed;
       out[key] = rest;
       changed = true;
     } else {
@@ -797,10 +901,24 @@ export function normalizeRoster(raw: unknown): RosterData {
       ? { participantId: v.participantId.trim() }
       : {};
 
+  const pressedOf = (v: Record<string, unknown>): { pressed?: PressedFrom } => {
+    const raw = v.pressed;
+    if (raw === null || typeof raw !== 'object') return {};
+    const from = raw as Record<string, unknown>;
+    const group = typeof from.group === 'string' ? from.group.trim() : '';
+    const category = typeof from.category === 'string' ? from.category.trim() : '';
+    return { pressed: { group, ...(group !== '' && category !== '' ? { category } : {}) } };
+  };
+
   const players: Player[] = Array.isArray(obj.players)
     ? obj.players
         .filter((p): p is Record<string, unknown> => p !== null && typeof p === 'object')
-        .map((p) => ({ id: String(p.id ?? '').trim(), name: String(p.name ?? ''), ...participantOf(p) }))
+        .map((p) => ({
+          id: String(p.id ?? '').trim(),
+          name: String(p.name ?? ''),
+          ...participantOf(p),
+          ...pressedOf(p),
+        }))
         .filter((p) => p.id !== '')
     : [];
 
@@ -933,6 +1051,20 @@ export function saveRosterSource(gameId: string, source: RosterSource): void {
   } catch {
     /* מכסת אחסון חריגה — מתעלמים */
   }
+}
+
+/**
+ * «שיוך מחדש»: המספרים שבוטלו יוצאים מרשימת המספרים שהגיעו ב-`users` בפעם
+ * הקודמת. אחרת, כשהבונה ימחק אותם (או כשהם יוסתרו מהקובץ, clickerRelease.ts),
+ * המיזוג היה מוחק מהמרשם שלט שכבר נלחץ מחדש באותו מספר, לשם אחר.
+ */
+export function forgetRosterSourceIds(gameId: string, ids: readonly string[]): void {
+  if (ids.length === 0) return;
+  const source = loadRosterSource(gameId);
+  if (source === null || source.remoteIds === null) return;
+  const drop = new Set(ids);
+  const remoteIds = source.remoteIds.filter((id) => !drop.has(id));
+  if (remoteIds.length !== source.remoteIds.length) saveRosterSource(gameId, { ...source, remoteIds });
 }
 
 export function loadRoster(gameId: string): RosterData {

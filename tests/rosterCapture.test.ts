@@ -23,7 +23,7 @@ describe('captureRemote', () => {
     expect(res.isNew).toBe(true);
     expect(res.id).toBe('317');
     expect(res.name).toBe(''); // ★ "ממתין לשיוך"
-    expect(res.roster.players).toEqual([{ id: '317', name: '' }]);
+    expect(res.roster.players).toEqual([{ id: '317', name: '', pressed: { group: '' } }]);
   });
 
   it('לחיצה חוזרת על אותו שלט אינה מוסיפה אותו שוב — רק מציגה מי הוא', () => {
@@ -101,7 +101,7 @@ describe('captureRemote', () => {
   it('שם עם קבוצה — נוצרת קטגוריה וקבוצה, והשחקן משויך', () => {
     let r = captureRemote(EMPTY_ROSTER, '401', CAT).roster;
     r = addPendingNames(r, [{ name: 'יעל', group: 'ירושלים' }], 'עיר');
-    expect(r.players).toEqual([{ id: '401', name: 'יעל' }]);
+    expect(r.players).toEqual([{ id: '401', name: 'יעל', pressed: { group: 'ירושלים', category: 'עיר' } }]);
     const cat = r.categories.find((c) => c.name === 'עיר');
     expect(cat?.groups.map((g) => g.name)).toEqual(['ירושלים']);
     expect(playerGroupNames(r, '401')).toEqual(['ירושלים']);
