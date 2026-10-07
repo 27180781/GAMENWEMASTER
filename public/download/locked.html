@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <!-- מה ש-nginx מציג (עם 403) למי שמבקש את הגרסה הניידת או את כלי החתימה בלי
+         קוד — ראו nginx.conf ו-server/download-gate.mjs. -->
+    <title>חוויה בקליק — הקובץ נפתח עם קוד</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: 'Heebo', 'Assistant', 'Segoe UI', system-ui, sans-serif;
+        background: #0b0e1a;
+        color: #fff;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .card {
+        max-width: 520px;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 20px;
+        padding: 40px 32px;
+      }
+      h1 { font-size: 30px; margin-bottom: 14px; }
+      p { font-size: 18px; opacity: 0.8; line-height: 1.6; margin-bottom: 28px; }
+      a {
+        display: inline-block;
+        background: #facc15;
+        color: #111;
+        font-size: 20px;
+        font-weight: 800;
+        text-decoration: none;
+        padding: 14px 32px;
+        border-radius: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>🔒 הקובץ נפתח עם קוד</h1>
+      <p>הגרסה הניידת וכלי החתימה יורדים אחרי הקלדת קוד הגישה בעמוד ההורדה.</p>
+      <a href="/download/">לעמוד ההורדה</a>
+    </div>
+  </body>
+</html>
