@@ -1,1 +1,217 @@
 /* ערכת נושא 'neon' — ראו כללי הברזל בראש src/render/themes.css. */
+/*
+ * ניאון — ארקייד לילי: במה שחורה, צינורות אור בצבע המשחק סביב תיבת השאלה
+ * והתשובות (הילת box-shadow מ-‎--main-rgb‎ + קו צינור בהיר ודק), זוהר פנימי רך,
+ * טקסט עם הילה עדינה בצבע המשני, תשובה נכונה שזוהרת חזק, ורצפת רשת בפרספקטיבה
+ * עם פסי אור נודדים ברקע הגיבוי. גופן: Secular One (OFL).
+ *
+ * מילוי התיבות נשאר ‎var(--pill)‎ (mainColor) והטקסט secondaryColor — הערכה
+ * מוסיפה רק צללים/מסגרות פנימיות/הילות; אין שינוי גאומטריה.
+ */
+
+/* ---- גופן: Secular One (OFL, Google Fonts) ---- */
+@font-face {
+  font-family: 'VT Secular One';
+  src: url('../fonts/secular-one-hebrew.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+  ascent-override: 92%;
+  descent-override: 26%;
+  line-gap-override: 0%;
+  unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F;
+}
+@font-face {
+  font-family: 'VT Secular One';
+  src: url('../fonts/secular-one-latin.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+  ascent-override: 92%;
+  descent-override: 26%;
+  line-gap-override: 0%;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@keyframes vt-neon-buzz {
+  0%, 100% { filter: brightness(1) saturate(1); }
+  46% { filter: brightness(1.18) saturate(1.15); }
+  48% { filter: brightness(0.92) saturate(1); }
+  50% { filter: brightness(1.2) saturate(1.15); }
+}
+@keyframes vt-neon-streaks {
+  0% { background-position: -60% 18%, 160% 34%, -40% 8%, 0 0, 0 0, 0 0, 0 100%, 0 0; }
+  100% { background-position: 160% 18%, -60% 34%, 160% 8%, 0 0, 0 0, 0 0, 0 100%, 0 0; }
+}
+
+.game-root[data-visual-theme='neon'] {
+  /* צבע הצינור: צבע המשחק, ומעליו קו בהיר (ליבת הצינור) */
+  --vt-neon: rgb(var(--main-rgb, 139, 47, 201));
+  --vt-neon-a: color-mix(in srgb, rgb(var(--main-rgb, 139, 47, 201)) 60%, transparent);
+  --vt-neon-core: color-mix(in srgb, rgb(var(--main-rgb, 139, 47, 201)) 40%, #fff);
+}
+
+.game-root[data-visual-theme='neon'] :is(
+  .screen, .q-screen, .leaders-overlay, .raffle-overlay, .votes-overlay, .gs-overlay,
+  .bet-overlay, .sl-overlay, .join-banner, .gconn-screen
+) {
+  font-family: 'VT Secular One', 'Kanuba', 'Heebo', sans-serif;
+  font-synthesis: none;
+}
+
+/* ---- תיבות בצבע המשחק: צינור ניאון ---- */
+.game-root[data-visual-theme='neon'] :is(
+  .q-question, .q-title-pill, .subject-text, .function-card, .lobby-join-dial,
+  .q-score-drop, .q-survey-legend-item, .q-board-name, .bet-summary-chip
+) {
+  background-image:
+    radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.16), transparent 62%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.1));
+  box-shadow:
+    inset 0 0 0 2px var(--vt-neon-core),
+    inset 0 0 22px color-mix(in srgb, var(--vt-neon-core) 55%, transparent),
+    0 0 0 3px rgba(4, 2, 12, 0.9),
+    0 0 0 5px var(--vt-neon),
+    0 0 0 6.5px var(--vt-neon-core),
+    0 0 22px 4px var(--vt-neon-a),
+    0 0 60px 10px color-mix(in srgb, var(--vt-neon) 35%, transparent),
+    0 18px 40px rgba(0, 0, 0, 0.55);
+}
+.game-root[data-visual-theme='neon'] .q-question { animation: qpop 0.5s ease both, vt-neon-buzz 7s 0.5s linear infinite; }
+
+.game-root[data-visual-theme='neon'] :is(.lobby-join-code, .q-count-num, .q-count-track) {
+  border-color: var(--vt-neon-core);
+  box-shadow:
+    0 0 0 3px rgba(4, 2, 12, 0.88),
+    0 0 0 5px var(--vt-neon),
+    0 0 20px 3px var(--vt-neon-a),
+    0 14px 34px rgba(0, 0, 0, 0.5);
+}
+.game-root[data-visual-theme='neon'] .q-count-fill {
+  box-shadow: 0 0 14px var(--vt-neon-a), inset 0 0 0 1.5px rgba(255, 255, 255, 0.4);
+}
+
+/* טקסט על התיבות: הילה עדינה בצבע המשני (צבע הטקסט עצמו — לא פוגע בניגודיות) */
+.game-root[data-visual-theme='neon'] :is(
+  .q-question-text, .q-card-text, .q-title-pill, .subject-text, .function-card
+) {
+  text-shadow: 0 0 10px color-mix(in srgb, currentColor 45%, transparent);
+}
+
+/* ---- תשובות ---- */
+.game-root[data-visual-theme='neon'] .q-card {
+  border-color: var(--vt-neon-core);
+  background-image:
+    radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.14), transparent 66%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.1));
+  box-shadow:
+    inset 0 0 18px color-mix(in srgb, var(--vt-neon-core) 50%, transparent),
+    0 0 0 3px rgba(4, 2, 12, 0.88),
+    0 0 0 5px var(--vt-neon),
+    0 0 18px 3px var(--vt-neon-a),
+    0 12px 28px rgba(0, 0, 0, 0.5);
+}
+.game-root[data-visual-theme='neon'] .q-answers--images .q-card { background-image: none; }
+.game-root[data-visual-theme='neon'] .q-coin {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px rgba(4, 2, 12, 0.7), 0 0 12px rgba(255, 255, 255, 0.55), 0 6px 14px rgba(0, 0, 0, 0.45);
+}
+/* הנכונה: מילוי בצבע המשני (כמו בקלאסי) וזוהר חזק בצבע הזה */
+.game-root[data-visual-theme='neon'] .q-card--correct {
+  border-color: #fff;
+  box-shadow:
+    inset 0 0 20px rgba(255, 255, 255, 0.35),
+    0 0 0 3px rgba(4, 2, 12, 0.9),
+    0 0 0 6px var(--text),
+    0 0 0 8px #fff,
+    0 0 34px 8px color-mix(in srgb, var(--text) 80%, transparent),
+    0 0 90px 22px color-mix(in srgb, var(--text) 45%, transparent);
+  animation: qpop 0.4s ease both, vt-neon-buzz 1.6s linear infinite;
+}
+.game-root[data-visual-theme='neon'] .q-card--dim { opacity: 0.72; }
+
+/* ---- לוחות כהים ושורות טבלה: שחור עם קצה ניאון ---- */
+.game-root[data-visual-theme='neon'] :is(
+  .votes-panel, .gs-panel, .bet-panel, .raffle-box, .sl-side
+) {
+  background:
+    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--vt-neon) 16%, transparent), transparent 60%),
+    linear-gradient(180deg, rgba(10, 6, 24, 0.97), rgba(3, 2, 10, 0.97));
+  border-color: var(--vt-neon-core);
+  box-shadow:
+    inset 0 0 26px color-mix(in srgb, var(--vt-neon) 30%, transparent),
+    0 0 0 3px rgba(4, 2, 12, 0.9),
+    0 0 0 5px var(--vt-neon),
+    0 0 30px 6px var(--vt-neon-a),
+    0 30px 90px rgba(0, 0, 0, 0.6);
+}
+.game-root[data-visual-theme='neon'] :is(
+  .leader-card:not(.leader-card--top), .score-cell, .group-list li, .gs-card:not(.gs-card--lead),
+  .votes-col:not(.votes-col--correct), .bet-row, .sl-result, .lobby-count, .q-answered-pill, .q-live
+) {
+  background: linear-gradient(180deg, rgba(14, 9, 32, 0.86), rgba(4, 2, 12, 0.86));
+  border-color: color-mix(in srgb, var(--vt-neon-core) 75%, transparent);
+}
+.game-root[data-visual-theme='neon'] :is(.leader-card, .score-cell, .gs-card, .votes-col, .bet-col, .sl-result) {
+  border-color: var(--vt-neon-core);
+  box-shadow: inset 0 0 14px color-mix(in srgb, var(--vt-neon) 28%, transparent), 0 0 14px 1px var(--vt-neon-a);
+}
+.game-root[data-visual-theme='neon'] :is(.leader-card--top, .gs-card--lead, .votes-col--correct) {
+  box-shadow: 0 0 0 2px #fff, 0 0 26px 5px var(--vt-neon-a), 0 0 60px 10px color-mix(in srgb, var(--vt-neon) 35%, transparent);
+}
+.game-root[data-visual-theme='neon'] :is(.raffle-title, .bet-title) {
+  color: #fff;
+  text-shadow: 0 0 4px var(--vt-neon-core), 0 0 12px var(--vt-neon), 0 0 28px var(--vt-neon);
+}
+
+/* כותרות חופשיות: לבן עם הילת צינור */
+.game-root[data-visual-theme='neon'] :is(.podium-name, .podium-score, .raffle-name) {
+  text-shadow: 0 0 2px #000, 0 4px 14px rgba(0, 0, 0, 0.8), 0 0 22px var(--vt-neon-a);
+}
+.game-root[data-visual-theme='neon'] .q-flyer-av {
+  box-shadow: 0 0 0 2px rgba(4, 2, 12, 0.7), 0 0 14px rgba(255, 255, 255, 0.6), 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+.game-root[data-visual-theme='neon'] .q-flyer--bubble .q-flyer-nm {
+  box-shadow: 0 0 0 2px var(--vt-neon), 0 0 16px var(--vt-neon-a), 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+/* ---- רקע הגיבוי (כשאין מדיה): במה שחורה, רצפת רשת בפרספקטיבה, פסי אור נודדים ---- */
+.game-root[data-visual-theme='neon'] :is(.slide-screen, .leaders-overlay, .sl-overlay) {
+  background:
+    /* שלושה פסי אור נודדים */
+    linear-gradient(90deg, transparent, color-mix(in srgb, var(--vt-neon) 70%, #fff) 50%, transparent) no-repeat,
+    linear-gradient(90deg, transparent, rgba(34, 230, 255, 0.7) 50%, transparent) no-repeat,
+    linear-gradient(90deg, transparent, rgba(255, 60, 200, 0.55) 50%, transparent) no-repeat,
+    /* קו האופק */
+    linear-gradient(180deg, transparent calc(62% - 2px), color-mix(in srgb, var(--vt-neon) 60%, #fff) calc(62% - 1px), transparent calc(62% + 2px)) no-repeat,
+    /* שמיים שחורים מעל האופק (מכסים את הקונוס), ודעיכת הרשת ליד האופק */
+    linear-gradient(180deg, #030108 0, #0a0420 50%, color-mix(in srgb, var(--vt-neon) 22%, #0a0420) 61.9%, rgba(4, 2, 12, 0.85) 62%, rgba(4, 2, 12, 0) 80%) no-repeat,
+    /* קווי הרשת המתכנסים אל נקודת המגוז */
+    repeating-conic-gradient(from 90deg at 50% 62%, transparent 0deg 5.6deg, color-mix(in srgb, var(--vt-neon) 32%, transparent) 5.6deg 6deg) no-repeat,
+    /* קווי הרוחב של הרצפה */
+    repeating-linear-gradient(180deg, transparent 0 52px, color-mix(in srgb, var(--vt-neon) 28%, transparent) 52px 54px) no-repeat,
+    radial-gradient(ellipse 70% 40% at 50% 62%, color-mix(in srgb, var(--vt-neon) 30%, #120830), #04020c 75%);
+  background-size: 34% 2px, 26% 2px, 30% 2px, 100% 100%, 100% 100%, 100% 100%, 100% 38%, 100% 100%;
+  background-position: -60% 18%, 160% 34%, -40% 8%, 0 0, 0 0, 0 0, 0 100%, 0 0;
+  animation: vt-neon-streaks 9s linear infinite;
+}
+.game-root[data-visual-theme='neon'] .sl-board {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 38px, color-mix(in srgb, var(--vt-neon) 22%, transparent) 38px 40px),
+    repeating-linear-gradient(90deg, transparent 0 38px, color-mix(in srgb, var(--vt-neon) 22%, transparent) 38px 40px),
+    linear-gradient(160deg, #0c0720, #030108);
+  border-color: var(--vt-neon-core);
+  box-shadow: 0 0 0 3px rgba(4, 2, 12, 0.9), 0 0 0 5px var(--vt-neon), 0 0 30px 6px var(--vt-neon-a);
+}
+.game-root[data-visual-theme='neon'] .sl-cell {
+  box-shadow: inset 0 0 10px color-mix(in srgb, var(--vt-neon) 30%, transparent);
+}
+/* צבעי הסולם/הנחש/הסיום נשארים */
+.game-root[data-visual-theme='neon'] .sl-cell:not(.sl-cell--ladder, .sl-cell--snake, .sl-cell--end) {
+  border-color: color-mix(in srgb, var(--vt-neon-core) 55%, transparent);
+}
+
+/* ---- תנועה מופחתת ---- */
+@media (prefers-reduced-motion: reduce) {
+  .game-root[data-visual-theme='neon'] :is(.slide-screen, .leaders-overlay, .sl-overlay) { animation: none; }
+  .game-root[data-visual-theme='neon'] .q-question { animation: qpop 0.5s ease both; }
+  .game-root[data-visual-theme='neon'] .q-card--correct { animation: none; }
+}

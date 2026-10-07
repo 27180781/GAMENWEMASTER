@@ -1,1 +1,283 @@
-/* ערכת נושא 'led' — ראו כללי הברזל בראש src/render/themes.css. */
+/* ערכת נושא 'led' — «לוח תוצאות». ראו כללי הברזל בראש src/render/themes.css.
+ *
+ * לוח תוצאות של אצטדיון: התיבות נשארות בצבע המשחק אבל מקבלות שכבת נקודות LED
+ * (radial-gradient), מסגרת לוח כהה (box-shadow inset), פס צבע בקצה התחילי של כל
+ * תשובה (inset box-shadow, לא border), ספרות/טיימר/ניקוד זוהרים, טיימר שנקרא
+ * כמו שעון LED אדום, ובמת גיבוי שחורה עם מטריצת נקודות ופס סריקה.
+ * אין כאן שום שינוי גאומטרי: לא גדלים, לא ריפוד, לא letter-spacing.
+ */
+
+/* ---- גופן: Heebo (OFL), משקלים 500–900 ---- */
+@font-face {
+  font-family: 'VT Heebo';
+  src: url('../fonts/heebo-hebrew.woff2') format('woff2');
+  font-weight: 500 900;
+  font-display: swap;
+  ascent-override: 92%;
+  descent-override: 26%;
+  line-gap-override: 0%;
+  unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F;
+}
+@font-face {
+  font-family: 'VT Heebo';
+  src: url('../fonts/heebo-latin.woff2') format('woff2');
+  font-weight: 500 900;
+  font-display: swap;
+  ascent-override: 92%;
+  descent-override: 26%;
+  line-gap-override: 0%;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@keyframes vt-led-sweep {
+  0%, 62% { background-position: 160% 0; }
+  100% { background-position: -60% 0; }
+}
+@keyframes vt-led-flash {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.18) saturate(1.1); }
+}
+@keyframes vt-led-red {
+  0%, 100% { filter: drop-shadow(0 0 6px rgba(255, 46, 46, 0.75)); }
+  50% { filter: drop-shadow(0 0 14px rgba(255, 46, 46, 1)); }
+}
+
+.game-root[data-visual-theme='led'] {
+  --led-amber: #ffb627;
+  --led-red: #ff2e2e;
+  --led-bezel: #0a0b0f;
+  --led-rim: #2a2e38;
+  /* מטריצת הנקודות: נקודה בהירה במרכז כל תא, רשת כהה ביניהן — עובד על כל מילוי */
+  --led-dots:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.13) 0 0.9px, transparent 1.5px),
+    radial-gradient(circle at 50% 50%, transparent 0 1.7px, rgba(0, 0, 0, 0.11) 2.6px);
+  --led-dots-size: 6px 6px, 6px 6px;
+}
+
+.game-root[data-visual-theme='led'] :is(
+  .screen, .q-screen, .leaders-overlay, .raffle-overlay, .votes-overlay, .gs-overlay,
+  .bet-overlay, .sl-overlay, .join-banner, .gconn-screen
+) {
+  font-family: 'VT Heebo', 'Kanuba', 'Heebo', sans-serif;
+  font-synthesis: none;
+}
+
+/* ---- תיבות בצבע המשחק: נקודות LED, ברק עליון, מסגרת לוח כהה ---- */
+.game-root[data-visual-theme='led'] :is(
+  .q-question, .q-card, .q-title-pill, .subject-text, .function-card, .lobby-join-dial,
+  .lobby-join-code, .q-score-drop, .q-survey-legend-item, .q-board-name, .bet-summary-chip
+) {
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0) 38%, rgba(0, 0, 0, 0) 70%, rgba(0, 0, 0, 0.16)),
+    var(--led-dots);
+  background-size: 100% 100%, var(--led-dots-size);
+  box-shadow:
+    inset 0 0 0 3px var(--led-bezel),
+    inset 0 0 0 5px rgba(255, 255, 255, 0.1),
+    inset 0 0 22px rgba(0, 0, 0, 0.28),
+    0 0 0 3px var(--led-rim),
+    0 0 0 4px rgba(255, 255, 255, 0.14),
+    0 16px 38px rgba(0, 0, 0, 0.55);
+}
+.game-root[data-visual-theme='led'] :is(.q-question, .subject-text, .function-card) { border-radius: 14px; }
+.game-root[data-visual-theme='led'] :is(
+  .q-title-pill, .lobby-join-dial, .lobby-join-code, .q-score-drop, .q-survey-legend-item,
+  .q-board-name, .bet-summary-chip
+) { border-radius: 10px; }
+.game-root[data-visual-theme='led'] :is(.q-card, .lobby-join-code) { border-color: var(--led-rim); }
+
+/* השאלה: פס אור שחולף לאורך הלוח מדי פעם (שכבה בתוך התיבה, בלי להזיז דבר) */
+.game-root[data-visual-theme='led'] .q-question { position: relative; overflow: hidden; }
+.game-root[data-visual-theme='led'] .q-question::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.16) 50%, transparent 60%) no-repeat;
+  background-size: 60% 100%;
+  animation: vt-led-sweep 7s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* ---- תשובות: לוחות מלבניים עם פס צבע בקצה התחילי (בצבע המטבע של אותה תשובה) ---- */
+.game-root[data-visual-theme='led'] .q-answers > .q-card { --led-accent: #38b24a; }
+.game-root[data-visual-theme='led'] .q-answers > .q-card:nth-child(2) { --led-accent: #e23b3b; }
+.game-root[data-visual-theme='led'] .q-answers > .q-card:nth-child(3) { --led-accent: #f5f5f5; }
+.game-root[data-visual-theme='led'] .q-answers > .q-card:nth-child(4) { --led-accent: #f5c518; }
+.game-root[data-visual-theme='led'] .q-answers > .q-card:nth-child(5) { --led-accent: #3b82f6; }
+.game-root[data-visual-theme='led'] .q-answers > .q-card:nth-child(6) { --led-accent: #f97316; }
+.game-root[data-visual-theme='led'] .q-card {
+  --led-bar: -11px; /* RTL: הקצה התחילי הוא הימני */
+  border-radius: 12px;
+  box-shadow:
+    inset var(--led-bar) 0 0 var(--led-accent, var(--led-amber)),
+    inset calc(var(--led-bar) - 2px) 0 0 rgba(0, 0, 0, 0.35),
+    inset 0 0 0 2px var(--led-bezel),
+    inset 0 0 18px rgba(0, 0, 0, 0.25),
+    0 0 0 3px var(--led-bezel),
+    0 0 0 4px rgba(255, 255, 255, 0.12),
+    0 14px 32px rgba(0, 0, 0, 0.5);
+}
+.game-root[data-visual-theme='led'] .q-card:dir(ltr) { --led-bar: 11px; }
+.game-root[data-visual-theme='led'] .q-answers--images .q-card { border-radius: 12px; }
+.game-root[data-visual-theme='led'] .q-coin {
+  border-color: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 0 3px var(--led-bezel), 0 0 14px rgba(255, 255, 255, 0.25), 0 6px 14px rgba(0, 0, 0, 0.45);
+  text-shadow: 0 0 6px color-mix(in srgb, currentColor 55%, transparent);
+}
+/* הנכונה: הצבעים מתחלפים (styles.css), והלוח "נדלק" — טבעת לבנה זוהרת ופס בצבע הטקסט */
+.game-root[data-visual-theme='led'] .q-card--correct {
+  border-color: #fff;
+  box-shadow:
+    inset var(--led-bar) 0 0 var(--led-accent, var(--led-amber)),
+    inset 0 0 0 2px var(--led-bezel),
+    0 0 0 3px #fff,
+    0 0 0 7px color-mix(in srgb, var(--led-accent, var(--led-amber)) 70%, transparent),
+    0 0 48px color-mix(in srgb, var(--led-accent, var(--led-amber)) 75%, transparent),
+    0 14px 32px rgba(0, 0, 0, 0.5);
+  animation: vt-led-flash 1.2s ease-in-out infinite;
+}
+.game-root[data-visual-theme='led'] .q-card--dim { opacity: 0.72; }
+
+/* ---- ספרות: זוהר LED סביב הספרות שעל התיבות ---- */
+.game-root[data-visual-theme='led'] :is(.q-count-num, .q-score-drop-num, .lobby-join-code, .q-live b) {
+  font-variant-numeric: tabular-nums;
+  text-shadow:
+    0 0 1px currentColor,
+    0 0 10px color-mix(in srgb, currentColor 55%, transparent),
+    0 0 22px color-mix(in srgb, currentColor 30%, transparent);
+}
+
+/* ---- טיימר: שעון LED — עיגול עם טבעת אדומה זוהרת, פס מחולק למקטעים ---- */
+.game-root[data-visual-theme='led'] .q-count-num {
+  background-image: var(--led-dots);
+  background-size: var(--led-dots-size);
+  border-color: var(--led-bezel);
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 255, 255, 0.1),
+    inset 0 0 16px rgba(0, 0, 0, 0.35),
+    0 0 0 3px var(--led-red),
+    0 0 0 6px rgba(20, 3, 4, 0.9),
+    0 0 26px rgba(255, 46, 46, 0.65),
+    0 10px 26px rgba(0, 0, 0, 0.5);
+}
+.game-root[data-visual-theme='led'] .q-count-num--low {
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 255, 255, 0.1),
+    0 0 0 4px var(--led-red),
+    0 0 0 7px rgba(20, 3, 4, 0.9),
+    0 0 44px rgba(255, 46, 46, 0.95),
+    0 10px 26px rgba(0, 0, 0, 0.5);
+}
+.game-root[data-visual-theme='led'] .q-count-track {
+  border-radius: 10px;
+  border-color: var(--led-bezel);
+  background-image: var(--led-dots);
+  background-size: var(--led-dots-size);
+  box-shadow:
+    inset 0 2px 8px rgba(0, 0, 0, 0.4),
+    0 0 0 3px var(--led-rim),
+    0 0 0 4px rgba(255, 46, 46, 0.55),
+    0 0 18px rgba(255, 46, 46, 0.35),
+    0 12px 30px rgba(0, 0, 0, 0.5);
+}
+/* המילוי בצבע המשני, מחולק למקטעי LED */
+.game-root[data-visual-theme='led'] .q-count-fill {
+  background-image:
+    repeating-linear-gradient(90deg, transparent 0 14px, rgba(0, 0, 0, 0.42) 14px 18px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0) 55%);
+}
+.game-root[data-visual-theme='led'] .timer-ring { animation: vt-led-red 1.6s ease-in-out infinite; }
+.game-root[data-visual-theme='led'] .timer-ring-track { fill: rgba(8, 2, 3, 0.82); stroke: rgba(255, 46, 46, 0.35); }
+.game-root[data-visual-theme='led'] .timer-ring-value {
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 2px var(--led-red), 0 0 12px rgba(255, 46, 46, 0.9);
+}
+
+/* ---- לוחות כהים: לוח LED כבוי — שחור עם נקודות עמומות, מסגרת מתכת, פס ענבר עליון ---- */
+.game-root[data-visual-theme='led'] :is(
+  .votes-panel, .gs-panel, .bet-panel, .raffle-box, .sl-side
+) {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 182, 39, 0.09) 0 1.1px, transparent 1.8px) 0 0 / 7px 7px,
+    linear-gradient(180deg, rgba(20, 22, 28, 0.97), rgba(6, 7, 10, 0.97));
+  border-color: var(--led-rim);
+  border-radius: 14px;
+  box-shadow:
+    inset 0 4px 0 var(--led-amber),
+    inset 0 5px 14px rgba(255, 182, 39, 0.25),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.05),
+    0 0 0 6px var(--led-bezel),
+    0 0 0 8px var(--led-rim),
+    0 30px 90px rgba(0, 0, 0, 0.65);
+}
+/* שורות בטבלאות: תאי לוח כהים עם פס ענבר בקצה התחילי */
+.game-root[data-visual-theme='led'] :is(
+  .leader-card:not(.leader-card--top), .score-cell, .group-list li, .gs-card:not(.gs-card--lead),
+  .votes-col:not(.votes-col--correct), .bet-row, .sl-result, .lobby-count, .q-answered-pill, .q-live
+) {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.07) 0 0.9px, transparent 1.5px) 0 0 / 6px 6px,
+    linear-gradient(180deg, rgba(24, 26, 33, 0.9), rgba(8, 9, 12, 0.9));
+  border-color: rgba(255, 182, 39, 0.35);
+}
+.game-root[data-visual-theme='led'] :is(
+  .leader-card:not(.leader-card--top), .score-cell, .gs-card:not(.gs-card--lead), .bet-row, .sl-result
+) {
+  box-shadow: inset -6px 0 0 var(--led-amber), inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 8px 22px rgba(0, 0, 0, 0.4);
+}
+.game-root[data-visual-theme='led'] :is(.leader-card, .score-cell, .gs-card, .votes-col, .bet-col, .sl-result) {
+  border-radius: 10px;
+}
+.game-root[data-visual-theme='led'] .leader-card--top {
+  background-image: var(--led-dots);
+  background-size: var(--led-dots-size);
+  box-shadow: inset 0 0 0 2px var(--led-bezel), 0 0 0 3px var(--led-amber), 0 0 30px rgba(255, 182, 39, 0.55);
+}
+.game-root[data-visual-theme='led'] :is(.raffle-title, .bet-title) {
+  color: var(--led-amber);
+  text-shadow: 0 0 2px var(--led-amber), 0 0 14px rgba(255, 182, 39, 0.75);
+}
+
+/* כותרות חופשיות על הפודיום ובהגרלה: זוהר LED ענבר בנוסף לצל הכהה */
+.game-root[data-visual-theme='led'] :is(.podium-name, .podium-score, .raffle-name) {
+  text-shadow: 0 4px 16px rgba(0, 0, 0, 0.85), 0 0 4px rgba(0, 0, 0, 0.8), 0 0 24px rgba(255, 182, 39, 0.5);
+}
+.game-root[data-visual-theme='led'] .podium-score { font-variant-numeric: tabular-nums; }
+
+/* ---- רקע גיבוי (כשאין מדיה): מסך LED שחור עם מטריצת נקודות ופס סריקה שיורד ---- */
+.game-root[data-visual-theme='led'] :is(.slide-screen, .leaders-overlay, .sl-overlay) {
+  background:
+    linear-gradient(180deg, transparent 0%, transparent 46%, rgba(255, 182, 39, 0.05) 49%, rgba(255, 220, 150, 0.1) 50%, transparent 51%, transparent 100%),
+    radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0, 0, 0, 0.7) 100%),
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.075) 0 1.3px, transparent 2.1px),
+    radial-gradient(ellipse at 50% 112%, color-mix(in srgb, rgb(var(--main-rgb, 34, 43, 69)) 45%, transparent) 0%, transparent 60%),
+    linear-gradient(180deg, #07080c, #020203);
+  background-size: 100% 200%, 100% 100%, 9px 9px, 100% 100%, 100% 100%;
+  animation: vt-led-scan 9s linear infinite;
+}
+@keyframes vt-led-scan {
+  0% { background-position: 0 100%, 0 0, 0 0, 0 0, 0 0; }
+  100% { background-position: 0 -100%, 0 0, 0 0, 0 0, 0 0; }
+}
+.game-root[data-visual-theme='led'] .sl-board {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.06) 0 1px, transparent 1.7px) 0 0 / 7px 7px,
+    linear-gradient(180deg, #15171d, #07080b);
+  border-color: var(--led-rim);
+  border-radius: 14px;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.05), 0 0 0 6px var(--led-bezel), 0 0 0 8px var(--led-rim);
+}
+.game-root[data-visual-theme='led'] .sl-cell { border-radius: 8px; }
+/* צבעי הסולם/הנחש/הסיום נשארים */
+.game-root[data-visual-theme='led'] .sl-cell:not(.sl-cell--ladder, .sl-cell--snake, .sl-cell--end) {
+  border-color: rgba(255, 182, 39, 0.3);
+}
+
+/* ---- תנועה מופחתת ---- */
+@media (prefers-reduced-motion: reduce) {
+  .game-root[data-visual-theme='led'] :is(.slide-screen, .leaders-overlay, .sl-overlay, .q-card--correct, .timer-ring),
+  .game-root[data-visual-theme='led'] .q-question::after {
+    animation: none;
+  }
+}

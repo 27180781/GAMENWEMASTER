@@ -1,1 +1,214 @@
 /* ערכת נושא 'chalk' — ראו כללי הברזל בראש src/render/themes.css. */
+
+/* =========================================================================
+   לוח גיר — לוח ירוק של כיתה במסגרת עץ (רקע הגיבוי בלבד), תיבות בצבע המשחק
+   עם מרקם גיר עדין ומסגרת גיר מקווקוות בכתב יד, פינות "מצוירות ביד" וגופן
+   כתב יד קריא. לכיתות, בתי ספר ומסיבות סיום.
+   ========================================================================= */
+
+/* ---- גופן: Rubik Dirt (OFL, Rubik Filtered) — אותיות דפוס עבות עם שוליים
+   מחוספסים ומרקם "אבק גיר". נבחר על פני גופני כתב יד עבריים (Playpen Sans Hebrew,
+   Gveret Levin, Solitreo, Amatic SC) כי הם כתב רהוט/דק שקשה לקרוא מסוף האולם. ---- */
+@font-face {
+  font-family: 'VT Rubik Dirt';
+  src: url('../fonts/rubik-dirt-hebrew.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+  ascent-override: 92%;
+  descent-override: 26%;
+  line-gap-override: 0%;
+  unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F;
+}
+@font-face {
+  font-family: 'VT Rubik Dirt';
+  src: url('../fonts/rubik-dirt-latin.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+  ascent-override: 92%;
+  descent-override: 26%;
+  line-gap-override: 0%;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* מסגרת הגיר "נכתבת" כשהתיבה מופיעה */
+@keyframes vt-chalk-draw {
+  0% { outline-color: transparent; }
+  100% { outline-color: var(--vt-chalk-line); }
+}
+/* אבקת גיר נוצצת סביב התשובה הנכונה */
+@keyframes vt-chalk-dust {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(248, 246, 236, 0.95), 0 0 0 7px rgba(248, 246, 236, 0.25), 0 0 30px rgba(248, 246, 236, 0.55), 0 12px 28px rgba(0, 0, 0, 0.4); }
+  50% { box-shadow: 0 0 0 4px rgba(248, 246, 236, 0.95), 0 0 0 9px rgba(248, 246, 236, 0.12), 0 0 44px rgba(248, 246, 236, 0.75), 0 12px 28px rgba(0, 0, 0, 0.4); }
+}
+
+.game-root[data-visual-theme='chalk'] {
+  /* מרקם הגיר: משיכות אלכסוניות בהירות + כהות עדינות, ואבקה מרוחה בפינה */
+  --vt-chalk-texture:
+    radial-gradient(ellipse 60% 45% at 18% 12%, rgba(255, 255, 255, 0.16), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 88% 92%, rgba(255, 255, 255, 0.1), transparent 70%),
+    repeating-linear-gradient(-32deg, rgba(255, 255, 255, 0.07) 0 2px, transparent 2px 7px, rgba(0, 0, 0, 0.035) 7px 8px, transparent 8px 13px),
+    repeating-linear-gradient(58deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 11px);
+  /* צבעי הלוח והעץ (משטחים כהים ורקע גיבוי בלבד) */
+  --vt-board: #2c4a3a;
+  --vt-board-deep: #1c3226;
+  --vt-wood: #8a5a2e;
+  --vt-wood-dark: #5b3819;
+  --vt-chalk: #f6f3e6;
+}
+
+.game-root[data-visual-theme='chalk'] :is(
+  .screen, .q-screen, .leaders-overlay, .raffle-overlay, .votes-overlay, .gs-overlay,
+  .bet-overlay, .sl-overlay, .join-banner, .gconn-screen
+) {
+  font-family: 'VT Rubik Dirt', 'Kanuba', 'Heebo', sans-serif;
+  font-synthesis: none;
+}
+
+/* ---- תיבות בצבע המשחק: מרקם גיר, קו גיר מקווקו מבפנים, פינות "ביד" ---- */
+.game-root[data-visual-theme='chalk'] :is(
+  .q-question, .q-card, .q-title-pill, .subject-text, .function-card, .lobby-join-dial,
+  .lobby-join-code, .q-score-drop, .q-survey-legend-item, .q-board-name, .bet-summary-chip
+) {
+  /* קו הגיר: בצבע הטקסט של המשחק — כך הוא נראה על כל מילוי (לבן, כהה, צהוב) */
+  --vt-chalk-line: color-mix(in srgb, var(--text, var(--secondary-color, #17064f)) 62%, transparent);
+  background-image: var(--vt-chalk-texture);
+  outline: 3px dashed var(--vt-chalk-line);
+  outline-offset: -10px;
+  box-shadow:
+    inset 0 0 0 1.5px rgba(255, 255, 255, 0.28),
+    inset 0 -10px 24px rgba(0, 0, 0, 0.1),
+    0 12px 28px rgba(0, 0, 0, 0.38);
+}
+/* השאלה והתשובות: קו הגיר "נכתב" אחרי ההופעה (qpop נשאר כמו בבסיס) */
+.game-root[data-visual-theme='chalk'] .q-question {
+  animation: qpop 0.5s ease both, vt-chalk-draw 0.9s ease-out both;
+}
+.game-root[data-visual-theme='chalk'] .q-card {
+  animation: qpop 0.4s ease both, vt-chalk-draw 0.9s ease-out both;
+}
+/* פינות לא סימטריות — כמו מסגרת שצוירה ביד על הלוח */
+.game-root[data-visual-theme='chalk'] :is(.q-question, .subject-text, .function-card) {
+  border-radius: 34px 46px 30px 52px / 48px 30px 52px 34px;
+}
+.game-root[data-visual-theme='chalk'] .q-card {
+  border-radius: 30px 44px 26px 48px / 44px 28px 48px 30px;
+  border-color: color-mix(in srgb, var(--text, #17064f) 22%, transparent);
+  outline-offset: -9px;
+}
+.game-root[data-visual-theme='chalk'] :is(.q-title-pill, .lobby-join-dial, .lobby-join-code, .q-score-drop, .bet-summary-chip) {
+  border-radius: 22px 32px 20px 36px / 32px 20px 36px 22px;
+}
+.game-root[data-visual-theme='chalk'] :is(.q-title-pill, .q-score-drop, .q-survey-legend-item, .q-board-name, .bet-summary-chip) {
+  outline-width: 2px;
+  outline-offset: -7px;
+}
+/* תיבות קטנות במיוחד: בלי קו פנימי (היה נוגע בטקסט) — רק המרקם */
+.game-root[data-visual-theme='chalk'] :is(.q-survey-legend-item, .q-board-name) { outline-style: none; }
+
+/* מטבע האות: עיגול גיר. האות/האחוז בגופן נקי — המרקם של Rubik Dirt בגודל
+   הזה, על מטבע צבעוני, מטשטש את הספרות */
+.game-root[data-visual-theme='chalk'] .q-coin {
+  font-family: 'Kanuba', 'Heebo', sans-serif;
+  border-style: dashed;
+  border-color: var(--vt-chalk);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.18), 0 5px 12px rgba(0, 0, 0, 0.35);
+}
+
+/* הנכונה: הצבעים מתחלפים (styles.css), הקו המקווקו בצבע התיבה המקורית, ו"עיגול
+   גיר" לבן סביבה — כמו מורה שמקיף את התשובה */
+.game-root[data-visual-theme='chalk'] .q-card--correct {
+  --vt-chalk-line: color-mix(in srgb, var(--pill, #fff) 70%, transparent);
+  border-color: var(--text);
+  outline-color: var(--vt-chalk-line);
+  animation: qpop 0.4s ease both, vt-chalk-dust 2.2s ease-in-out infinite;
+  box-shadow: 0 0 0 4px rgba(248, 246, 236, 0.95), 0 0 0 7px rgba(248, 246, 236, 0.25), 0 0 30px rgba(248, 246, 236, 0.55), 0 12px 28px rgba(0, 0, 0, 0.4);
+}
+.game-root[data-visual-theme='chalk'] .q-answers--images .q-card { background-image: none; }
+
+/* מוני זמן/ספירה */
+.game-root[data-visual-theme='chalk'] :is(.q-count-num, .q-count-track) {
+  background-image: var(--vt-chalk-texture);
+  border-style: dashed;
+  border-color: var(--vt-chalk);
+  box-shadow: 0 0 0 3px rgba(28, 50, 38, 0.55), 0 10px 24px rgba(0, 0, 0, 0.4);
+}
+.game-root[data-visual-theme='chalk'] .q-count-fill {
+  background-image: repeating-linear-gradient(-32deg, rgba(255, 255, 255, 0.22) 0 3px, transparent 3px 9px);
+}
+
+/* ---- לוחות כהים: לוח גיר ירוק במסגרת עץ ---- */
+.game-root[data-visual-theme='chalk'] :is(
+  .votes-panel, .gs-panel, .bet-panel, .raffle-box, .sl-side
+) {
+  background:
+    radial-gradient(ellipse 55% 40% at 22% 18%, rgba(255, 255, 255, 0.07), transparent 70%),
+    radial-gradient(ellipse 45% 35% at 80% 85%, rgba(255, 255, 255, 0.05), transparent 70%),
+    repeating-linear-gradient(-32deg, rgba(255, 255, 255, 0.022) 0 2px, transparent 2px 9px),
+    linear-gradient(170deg, var(--vt-board), var(--vt-board-deep));
+  border-color: var(--vt-wood);
+  border-radius: 14px;
+  box-shadow:
+    inset 0 0 0 2px rgba(0, 0, 0, 0.35),
+    inset 0 0 70px rgba(0, 0, 0, 0.4),
+    0 0 0 6px var(--vt-wood-dark),
+    0 0 0 8px rgba(255, 220, 170, 0.18),
+    0 30px 90px rgba(0, 0, 0, 0.55);
+}
+/* שורות בטבלאות: משטח לוח עם קו גיר מקווקו */
+.game-root[data-visual-theme='chalk'] :is(
+  .leader-card:not(.leader-card--top), .score-cell, .group-list li, .gs-card:not(.gs-card--lead),
+  .votes-col:not(.votes-col--correct), .bet-row, .sl-result, .lobby-count, .q-answered-pill, .q-live
+) {
+  background:
+    repeating-linear-gradient(-32deg, rgba(255, 255, 255, 0.03) 0 2px, transparent 2px 9px),
+    linear-gradient(180deg, rgba(44, 74, 58, 0.9), rgba(28, 50, 38, 0.9));
+  border-color: rgba(246, 243, 230, 0.55);
+  border-style: dashed;
+}
+.game-root[data-visual-theme='chalk'] :is(.leader-card, .score-cell, .gs-card, .votes-col, .bet-col, .sl-result) {
+  border-radius: 14px 20px 12px 22px / 20px 12px 22px 14px;
+  border-style: dashed;
+}
+.game-root[data-visual-theme='chalk'] :is(.raffle-title, .bet-title) { color: var(--vt-chalk); }
+
+/* טקסט חופשי שעומד על הרקע: צל כהה רך כמו גיר על לוח — נוסף על ההילה בצבע הראשי */
+.game-root[data-visual-theme='chalk'] :is(.podium-name, .podium-score, .raffle-name) {
+  text-shadow: 0 0 2px rgba(20, 36, 27, 0.95), 0 0 8px rgba(20, 36, 27, 0.85), 0 4px 16px rgba(0, 0, 0, 0.7);
+}
+
+/* ---- רקע גיבוי (כשאין מדיה): לוח ירוק עם אבק גיר מרוח ומסגרת עץ ---- */
+.game-root[data-visual-theme='chalk'] :is(.slide-screen, .leaders-overlay, .sl-overlay) {
+  background:
+    radial-gradient(ellipse 38% 26% at 22% 24%, rgba(255, 255, 255, 0.07), transparent 70%),
+    radial-gradient(ellipse 44% 22% at 74% 70%, rgba(255, 255, 255, 0.06), transparent 70%),
+    radial-gradient(ellipse 30% 18% at 60% 18%, rgba(255, 255, 255, 0.04), transparent 70%),
+    repeating-linear-gradient(-28deg, rgba(255, 255, 255, 0.018) 0 2px, transparent 2px 11px),
+    radial-gradient(ellipse at 50% 50%, #33553f 0%, #263f30 60%, #1b2f23 100%);
+  box-shadow:
+    inset 0 0 0 16px var(--vt-wood),
+    inset 0 0 0 18px #a8743f,
+    inset 0 0 0 22px var(--vt-wood-dark),
+    inset 0 0 90px 30px rgba(0, 0, 0, 0.45);
+  animation: none;
+}
+.game-root[data-visual-theme='chalk'] .sl-board {
+  background:
+    radial-gradient(ellipse 50% 35% at 30% 15%, rgba(255, 255, 255, 0.06), transparent 70%),
+    repeating-linear-gradient(-28deg, rgba(255, 255, 255, 0.02) 0 2px, transparent 2px 11px),
+    linear-gradient(160deg, #2f4f3d, #1d3326);
+  border-color: var(--vt-wood);
+  border-radius: 16px;
+  box-shadow: inset 0 0 90px rgba(0, 0, 0, 0.45), 0 0 0 5px var(--vt-wood-dark), 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+.game-root[data-visual-theme='chalk'] .sl-cell { border-radius: 12px 18px 10px 20px / 18px 10px 20px 12px; }
+/* צבעי הסולם/הנחש/הסיום נשארים */
+.game-root[data-visual-theme='chalk'] .sl-cell:not(.sl-cell--ladder, .sl-cell--snake, .sl-cell--end) {
+  border-style: dashed;
+  border-color: rgba(246, 243, 230, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-root[data-visual-theme='chalk'] .q-question { animation: qpop 0.5s ease both; }
+  .game-root[data-visual-theme='chalk'] .q-card { animation: qpop 0.4s ease both; }
+  .game-root[data-visual-theme='chalk'] .q-card--correct { animation: none; }
+}

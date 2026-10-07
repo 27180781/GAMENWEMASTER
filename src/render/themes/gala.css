@@ -1,1 +1,257 @@
 /* ערכת נושא 'gala' — ראו כללי הברזל בראש src/render/themes.css. */
+
+/* =========================================================================
+   ערב גאלה — קווי זהב דקים כשיער (#c9a85c) כמסגרות, מסגרת כפולה סביב השאלה,
+   טיפוגרפיה סריפית מעודנת, הרבה אוויר, במת לילה כחולה-שחורה עם בוקה חמים
+   ונצנוץ זהב עדין על התשובה הנכונה. לחתונות, שבע ברכות, אירועי חברה וערבי הוקרה.
+   הצבעים של המשחק נשארים שלו; הזהב הוא רק קווים, הילות ועיטורים.
+   ========================================================================= */
+
+/* ---- גופנים (OFL, Google Fonts): David Libre לגוף, Bellefair לכותרות התצוגה ---- */
+@font-face {
+  font-family: 'VT David Libre';
+  src: url('../fonts/david-libre-hebrew.woff2') format('woff2');
+  font-weight: 400 600;
+  font-display: swap;
+  ascent-override: 92%;
+  descent-override: 26%;
+  line-gap-override: 0%;
+  unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F;
+}
+@font-face {
+  font-family: 'VT David Libre';
+  src: url('../fonts/david-libre-latin.woff2') format('woff2');
+  font-weight: 400 600;
+  font-display: swap;
+  ascent-override: 92%;
+  descent-override: 26%;
+  line-gap-override: 0%;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'VT David Libre';
+  src: url('../fonts/david-libre-bold-hebrew.woff2') format('woff2');
+  font-weight: 700 900;
+  font-display: swap;
+  ascent-override: 92%;
+  descent-override: 26%;
+  line-gap-override: 0%;
+  unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F;
+}
+@font-face {
+  font-family: 'VT David Libre';
+  src: url('../fonts/david-libre-bold-latin.woff2') format('woff2');
+  font-weight: 700 900;
+  font-display: swap;
+  ascent-override: 92%;
+  descent-override: 26%;
+  line-gap-override: 0%;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'VT Bellefair';
+  src: url('../fonts/bellefair-hebrew.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+  ascent-override: 92%;
+  descent-override: 26%;
+  line-gap-override: 0%;
+  unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F;
+}
+@font-face {
+  font-family: 'VT Bellefair';
+  src: url('../fonts/bellefair-latin.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+  ascent-override: 92%;
+  descent-override: 26%;
+  line-gap-override: 0%;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@keyframes vt-gala-shimmer {
+  0% { background-position: 130% 0, 0 0; }
+  55%, 100% { background-position: -30% 0, 0 0; }
+}
+@keyframes vt-gala-bokeh {
+  0%, 100% { background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0; }
+  50% { background-position: 11px -21px, -26px -8px, -17px -16px, -17px -17px, -11px -12px, -28px 16px, -28px -13px, -28px -17px, 20px 17px, 17px -19px, 26px 22px, 12px -16px, -25px 8px, 20px 17px, 0 0, 0 0; }
+}
+
+.game-root[data-visual-theme='gala'] :is(
+  .screen, .q-screen, .leaders-overlay, .raffle-overlay, .votes-overlay, .gs-overlay,
+  .bet-overlay, .sl-overlay, .join-banner, .gconn-screen
+) {
+  font-family: 'VT David Libre', 'Kanuba', 'Heebo', serif;
+  font-synthesis: none;
+}
+/* כותרות התצוגה הגדולות — סריף דק ומעודן של הזמנה לאירוע */
+.game-root[data-visual-theme='gala'] :is(
+  .opening-title, .lobby-title, .winners-title, .gconn-title, .gs-title, .sl-win-title,
+  .raffle-title, .bet-title
+) {
+  font-family: 'VT Bellefair', 'VT David Libre', 'Kanuba', serif;
+}
+
+/* ---- תיבות בצבע המשחק: פינות כמעט ישרות, קו זהב דק כשיער בשפה ובשוליים ---- */
+.game-root[data-visual-theme='gala'] :is(
+  .q-question, .q-card, .q-title-pill, .subject-text, .function-card, .lobby-join-dial,
+  .lobby-join-code, .q-score-drop, .q-survey-legend-item, .q-board-name, .bet-summary-chip
+) {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 42%, rgba(0, 0, 0, 0.06));
+  box-shadow:
+    inset 0 0 0 1.5px #c9a85c,
+    0 0 0 1px rgba(201, 168, 92, 0.35),
+    0 18px 46px rgba(4, 6, 18, 0.45);
+}
+.game-root[data-visual-theme='gala'] :is(.q-question, .subject-text, .function-card) { border-radius: 10px; }
+.game-root[data-visual-theme='gala'] :is(
+  .q-card, .q-title-pill, .lobby-join-dial, .lobby-join-code, .q-score-drop, .bet-summary-chip,
+  .q-survey-legend-item, .q-board-name
+) {
+  border-radius: 8px;
+}
+.game-root[data-visual-theme='gala'] :is(.q-card, .lobby-join-code) { border-color: rgba(201, 168, 92, 0.55); }
+
+/* מסגרת כפולה: קו שני בתוך הריפוד של השאלה / שקופית הטקסט / כרטיס הפונקציה */
+.game-root[data-visual-theme='gala'] :is(.q-question, .subject-text, .function-card) {
+  outline: 1px solid #c9a85c;
+  outline-offset: -9px;
+}
+.game-root[data-visual-theme='gala'] :is(.q-card, .lobby-join-dial, .q-title-pill) {
+  outline: 1px solid rgba(201, 168, 92, 0.7);
+  outline-offset: -7px;
+}
+/* יהלום זהב קטן במרכז הקו העליון והתחתון של השאלה — בתוך הריפוד הקיים */
+.game-root[data-visual-theme='gala'] .q-question { position: relative; }
+.game-root[data-visual-theme='gala'] .q-question::before,
+.game-root[data-visual-theme='gala'] .q-question::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  background: var(--pill);
+  border: 1px solid #c9a85c;
+  transform: translateX(-50%) rotate(45deg);
+  pointer-events: none;
+}
+.game-root[data-visual-theme='gala'] .q-question::before { top: 4px; }
+.game-root[data-visual-theme='gala'] .q-question::after { bottom: 4px; }
+
+.game-root[data-visual-theme='gala'] :is(.q-count-num, .q-count-track) {
+  border-color: #c9a85c;
+  box-shadow: inset 0 0 0 1px rgba(255, 240, 200, 0.35), 0 0 0 1px rgba(201, 168, 92, 0.4), 0 12px 30px rgba(4, 6, 18, 0.45);
+}
+.game-root[data-visual-theme='gala'] .q-count-fill {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0) 60%);
+}
+.game-root[data-visual-theme='gala'] .q-coin {
+  border-color: #c9a85c;
+  box-shadow: inset 0 0 0 1px rgba(255, 240, 200, 0.45), 0 0 0 1px rgba(201, 168, 92, 0.45), 0 6px 14px rgba(4, 6, 18, 0.4);
+}
+
+/* התשובה הנכונה: מילוי מוחלף (כמו בקלאסי), טבעת זהב והילה חמה, ונצנוץ זהב שחולף על פניה */
+.game-root[data-visual-theme='gala'] .q-card--correct {
+  border-color: #e6cf8f;
+  outline-color: #c9a85c;
+  box-shadow:
+    inset 0 0 0 1.5px #c9a85c,
+    0 0 0 2px #e6cf8f,
+    0 0 0 6px rgba(201, 168, 92, 0.22),
+    0 0 44px rgba(230, 200, 130, 0.6),
+    0 18px 46px rgba(4, 6, 18, 0.45);
+}
+.game-root[data-visual-theme='gala'] .q-card--correct:not(.q-answers--images .q-card) {
+  background-image:
+    linear-gradient(105deg, transparent 38%, rgba(255, 236, 180, 0.42) 47%, rgba(255, 250, 230, 0.6) 50%, rgba(255, 236, 180, 0.42) 53%, transparent 62%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 42%, rgba(0, 0, 0, 0.06));
+  background-size: 260% 100%, 100% 100%;
+  background-repeat: no-repeat;
+  animation: qpop 0.4s ease both, vt-gala-shimmer 3.2s ease-in-out 0.5s infinite;
+}
+.game-root[data-visual-theme='gala'] .q-answers--images .q-card { outline: none; }
+
+/* בועת שם המצביע: קו זהב דק במקום המתאר האפור */
+.game-root[data-visual-theme='gala'] .q-flyer--bubble .q-flyer-nm {
+  border-color: rgba(201, 168, 92, 0.85);
+  box-shadow: inset 0 0 0 1px rgba(201, 168, 92, 0.25), 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+/* ---- לוחות כהים: כחול-לילה עמוק, שפה בזהב וקו זהב פנימי ---- */
+.game-root[data-visual-theme='gala'] :is(
+  .votes-panel, .gs-panel, .bet-panel, .raffle-box, .sl-side
+) {
+  background:
+    radial-gradient(ellipse at 50% -10%, rgba(201, 168, 92, 0.12), transparent 55%),
+    linear-gradient(180deg, rgba(16, 20, 44, 0.97), rgba(6, 8, 20, 0.97));
+  border-color: rgba(201, 168, 92, 0.85);
+  border-radius: 10px;
+  outline: 1px solid rgba(201, 168, 92, 0.55);
+  outline-offset: -11px;
+  box-shadow: 0 0 0 1px rgba(201, 168, 92, 0.25), 0 30px 90px rgba(2, 3, 10, 0.65);
+}
+.game-root[data-visual-theme='gala'] :is(
+  .leader-card:not(.leader-card--top), .score-cell, .group-list li, .gs-card:not(.gs-card--lead),
+  .votes-col:not(.votes-col--correct), .bet-row, .sl-result, .lobby-count, .q-answered-pill, .q-live
+) {
+  background: linear-gradient(180deg, rgba(20, 25, 54, 0.84), rgba(8, 10, 26, 0.84));
+  border-color: rgba(201, 168, 92, 0.5);
+}
+.game-root[data-visual-theme='gala'] :is(.leader-card, .score-cell, .gs-card, .votes-col, .bet-col, .sl-result) {
+  border-radius: 8px;
+  border-color: rgba(201, 168, 92, 0.65);
+  box-shadow: inset 0 1px 0 rgba(255, 236, 190, 0.12), 0 10px 28px rgba(2, 3, 10, 0.35);
+}
+.game-root[data-visual-theme='gala'] :is(.raffle-title, .bet-title) { color: #e3c77d; }
+
+/* טקסט חופשי על הרקע: הילה כחולה-לילה ונגיעת זהב חמה */
+.game-root[data-visual-theme='gala'] :is(.podium-name, .podium-score, .raffle-name) {
+  text-shadow: 0 0 2px rgba(6, 8, 20, 0.9), 0 4px 18px rgba(6, 8, 20, 0.8), 0 0 28px rgba(230, 200, 130, 0.4);
+}
+
+/* ---- רקע הגיבוי (כשאין מדיה): לילה כחול-שחור, בוקה חם ורך ומסגרת זהב דקה ---- */
+.game-root[data-visual-theme='gala'] :is(.slide-screen, .leaders-overlay, .sl-overlay) {
+  background:
+    radial-gradient(circle at 9% 18%, rgba(255, 214, 150, 0.13) 0, rgba(255, 214, 150, 0.098) 41px, rgba(255, 214, 150, 0.033) 53px, transparent 58px),
+    radial-gradient(circle at 17% 30%, rgba(240, 196, 120, 0.15) 0, rgba(240, 196, 120, 0.112) 15px, rgba(240, 196, 120, 0.037) 20px, transparent 22px),
+    radial-gradient(circle at 24% 12%, rgba(240, 196, 120, 0.11) 0, rgba(240, 196, 120, 0.083) 24px, rgba(240, 196, 120, 0.028) 31px, transparent 34px),
+    radial-gradient(circle at 84% 22%, rgba(255, 228, 180, 0.14) 0, rgba(255, 228, 180, 0.105) 33px, rgba(255, 228, 180, 0.035) 42px, transparent 46px),
+    radial-gradient(circle at 91% 40%, rgba(255, 214, 150, 0.16) 0, rgba(255, 214, 150, 0.12) 12px, rgba(255, 214, 150, 0.04) 16px, transparent 18px),
+    radial-gradient(circle at 76% 10%, rgba(255, 228, 180, 0.14) 0, rgba(255, 228, 180, 0.105) 18px, rgba(255, 228, 180, 0.035) 23px, transparent 26px),
+    radial-gradient(circle at 12% 72%, rgba(255, 214, 150, 0.18) 0, rgba(255, 214, 150, 0.135) 28px, rgba(255, 214, 150, 0.045) 36px, transparent 40px),
+    radial-gradient(circle at 21% 90%, rgba(255, 228, 180, 0.11) 0, rgba(255, 228, 180, 0.083) 14px, rgba(255, 228, 180, 0.028) 18px, transparent 20px),
+    radial-gradient(circle at 88% 78%, rgba(255, 228, 180, 0.12) 0, rgba(255, 228, 180, 0.09) 37px, rgba(255, 228, 180, 0.03) 47px, transparent 52px),
+    radial-gradient(circle at 80% 93%, rgba(240, 196, 120, 0.19) 0, rgba(240, 196, 120, 0.143) 17px, rgba(240, 196, 120, 0.048) 22px, transparent 24px),
+    radial-gradient(circle at 5% 48%, rgba(255, 214, 150, 0.18) 0, rgba(255, 214, 150, 0.135) 11px, rgba(255, 214, 150, 0.045) 14px, transparent 16px),
+    radial-gradient(circle at 95% 62%, rgba(240, 196, 120, 0.13) 0, rgba(240, 196, 120, 0.098) 20px, rgba(240, 196, 120, 0.033) 25px, transparent 28px),
+    radial-gradient(circle at 33% 6%, rgba(240, 196, 120, 0.14) 0, rgba(240, 196, 120, 0.105) 10px, rgba(240, 196, 120, 0.035) 12px, transparent 14px),
+    radial-gradient(circle at 67% 95%, rgba(255, 214, 150, 0.2) 0, rgba(255, 214, 150, 0.15) 11px, rgba(255, 214, 150, 0.05) 14px, transparent 16px),
+    radial-gradient(ellipse at 50% 120%, color-mix(in srgb, rgb(var(--main-rgb, 34, 43, 69)) 30%, #1a1f4a) 0%, transparent 60%),
+    radial-gradient(ellipse at 50% 30%, #121735 0%, #070914 70%, #030409 100%);
+  background-repeat: no-repeat;
+  outline: 1px solid rgba(201, 168, 92, 0.45);
+  outline-offset: -26px;
+  animation: vt-gala-bokeh 30s ease-in-out infinite;
+}
+.game-root[data-visual-theme='gala'] .sl-board {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(201, 168, 92, 0.12), transparent 60%),
+    linear-gradient(160deg, #141a3c, #070914);
+  border-color: rgba(201, 168, 92, 0.85);
+  border-radius: 10px;
+  outline: 1px solid rgba(201, 168, 92, 0.5);
+  outline-offset: -10px;
+}
+.game-root[data-visual-theme='gala'] .sl-cell { border-radius: 6px; }
+/* צבעי הסולם/הנחש/הסיום נשארים */
+.game-root[data-visual-theme='gala'] .sl-cell:not(.sl-cell--ladder, .sl-cell--snake, .sl-cell--end) {
+  border-color: rgba(201, 168, 92, 0.38);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-root[data-visual-theme='gala'] :is(.slide-screen, .leaders-overlay, .sl-overlay) { animation: none; }
+  .game-root[data-visual-theme='gala'] .q-card--correct:not(.q-answers--images .q-card) {
+    animation: qpop 0.4s ease both;
+  }
+}
