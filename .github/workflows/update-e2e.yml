@@ -71,6 +71,7 @@ jobs:
             }
           }).listen(8765, '127.0.0.1');
           '@ | Out-File D:\srv.mjs -Encoding utf8
+          $ErrorActionPreference = 'Continue'
           $srv = Start-Process node -ArgumentList 'D:\srv.mjs', 'D:\srv' -PassThru -WindowStyle Hidden
           Start-Sleep -Seconds 2
 
@@ -83,14 +84,24 @@ jobs:
           function Reset-All {
             Get-Process | Where-Object { $_.Path -like '*חוויה בקליק*' } | Stop-Process -Force -ErrorAction SilentlyContinue
             $u = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter 'Uninstall*.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($u) { Start-Process $u.FullName -ArgumentList '/S' -Wait; Start-Sleep -Seconds 3 }
+            if ($u) {
+              Start-Process $u.FullName -ArgumentList '/S' -Wait
+              for ($i = 0; $i -lt 40 -and (Find-App); $i++) { Start-Sleep -Seconds 2 }
+              for ($i = 0; $i -lt 20 -and (Get-Process | Where-Object { $_.Name -like 'Un_*' -or $_.Name -like 'Au_*' }); $i++) { Start-Sleep -Seconds 2 }
+              Start-Sleep -Seconds 2
+            }
             Remove-Item $cache -Recurse -Force -ErrorAction SilentlyContinue
             Get-ChildItem $env:APPDATA -Filter update.log -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force
             Remove-Item "$downloads\HavayaBeClick-*", 'D:\srv\ignore-range', 'D:\srv\access.log' -Force -ErrorAction SilentlyContinue
           }
           function Install-9001 {
-            $p = Start-Process 'D:\srv\desktop\HavayaBeClick-Setup-0.1.9001.exe' -ArgumentList '/S' -Wait -PassThru
-            "install 9001 exit $($p.ExitCode); installer.exe = $((Get-Item "$cache\installer.exe" -ErrorAction SilentlyContinue).Length)"
+            for ($try = 1; $try -le 3; $try++) {
+              $p = Start-Process 'D:\srv\desktop\HavayaBeClick-Setup-0.1.9001.exe' -ArgumentList '/S' -Wait -PassThru
+              $len = (Get-Item "$cache\installer.exe" -ErrorAction SilentlyContinue).Length
+              "install 9001 (try $try) exit $($p.ExitCode); app = $(Find-App); installer.exe = $len"
+              if ($p.ExitCode -eq 0 -and (Find-App) -and $len -gt 0) { return }
+              Start-Sleep -Seconds 5
+            }
           }
           function Run-Update($label) {
             $exe = Find-App
@@ -128,14 +139,14 @@ jobs:
           # 2. installer.exe missing (the NSIS self-copy failed), the installer the user ran is in Downloads.
           Reset-All; Install-9001
           Copy-Item 'D:\srv\desktop\HavayaBeClick-Setup-0.1.9001.exe' "$downloads\HavayaBeClick-Setup-0.1.9001 (1).exe"
-          Remove-Item "$cache\installer.exe" -Force
+          Remove-Item "$cache\installer.exe" -Force -ErrorAction SilentlyContinue
           $p = Run-Update 'downloads'; Kill-App; Show 'downloads'
           Expect 'downloads' 'משווה מול .*Downloads'
           Expect 'downloads' 'הפרשי'
 
           # 3. installer.exe missing and no copy anywhere: full download, with the reason.
           Reset-All; Install-9001
-          Remove-Item "$cache\installer.exe" -Force
+          Remove-Item "$cache\installer.exe" -Force -ErrorAction SilentlyContinue
           $p = Run-Update 'none'; Kill-App; Show 'none'
           Expect 'none' 'no-installer'
 
