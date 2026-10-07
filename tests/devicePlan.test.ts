@@ -10,7 +10,9 @@ import {
   attemptKey,
   checkedAgoText,
   deliveryStatusText,
+  deviceLockShown,
   formatDeviceId,
+  lockStatusText,
   nextDeliveryAction,
   planDelivery,
   type DeliveryContext,
@@ -270,5 +272,34 @@ describe('נוסחים', () => {
     expect(checkedAgoText(now - 7 * 60_000, now)).toBe('נבדק לפני 7 דקות');
     expect(checkedAgoText(now - 60 * 60_000, now)).toBe('נבדק לפני שעה');
     expect(checkedAgoText(now - 3 * 60 * 60_000, now)).toBe('נבדק לפני 3 שעות');
+  });
+});
+
+describe('השבתת התוכנה — מתי מוצג מסך הנעילה', () => {
+  it('★ בלי השבתה — לעולם לא', () => {
+    for (const playing of [false, true]) {
+      for (const editing of [false, true]) {
+        expect(deviceLockShown({ blocked: false, playing, editing })).toBe(false);
+      }
+    }
+  });
+
+  it('★ מושבת — במקום כל מסך, אבל לא באמצע משחק, עורך או בניית משחק חדש', () => {
+    expect(deviceLockShown({ blocked: true, playing: false, editing: false })).toBe(true);
+    expect(deviceLockShown({ blocked: true, playing: true, editing: false })).toBe(false);
+    expect(deviceLockShown({ blocked: true, playing: false, editing: true })).toBe(false);
+  });
+
+  it('שורת המצב במסך הנעילה', () => {
+    const now = 10_000_000;
+    expect(lockStatusText({ state: 'ok', syncing: true, checkedAt: now }, now)).toBe('בודק מול המערכת…');
+    expect(lockStatusText({ state: 'starting', syncing: false, checkedAt: null }, now)).toBe('בודק מול המערכת…');
+    expect(lockStatusText({ state: 'ok', syncing: false, checkedAt: now - 3 * 60_000 }, now)).toBe('נבדק לפני 3 דקות');
+    expect(lockStatusText({ state: 'offline', syncing: false, checkedAt: null }, now)).toBe(
+      'אין חיבור לאינטרנט. התוכנה תיבדק שוב כשהמחשב יתחבר',
+    );
+    expect(lockStatusText({ state: 'error', syncing: false, checkedAt: now - 60_000 }, now)).toBe(
+      'הבדיקה מול המערכת לא הצליחה, ננסה שוב · נבדק לפני דקה',
+    );
   });
 });

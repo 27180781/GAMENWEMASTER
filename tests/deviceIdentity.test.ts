@@ -21,6 +21,7 @@ type Device = {
   createdAt: number;
   permissions: Permissions;
   permissionsAt: number;
+  blocked: boolean;
 };
 type Random = { randomInt: (min: number, max: number) => number; randomBytes: (n: number) => Buffer };
 const identity = require('../electron/deviceIdentity.cjs') as {
@@ -28,6 +29,7 @@ const identity = require('../electron/deviceIdentity.cjs') as {
   devicePath: (userData: string) => string;
   cleanName: (name: unknown) => string | null;
   readPermissions: (raw: unknown) => Permissions;
+  readBlocked: (serverDevice: unknown, sentId: string) => boolean;
   readDevice: (userData: string) => Device | null;
   loadDevice: (userData: string, rand?: Random) => Device;
   regenerateDevice: (userData: string, device: Device, rand?: Random) => Device;
@@ -179,5 +181,65 @@ describe('תשובת השרת', () => {
     const raw = JSON.parse(readFileSync(identity.devicePath(dir), 'utf8'));
     expect(raw.secret).toBe(d.secret);
     expect(raw.name).toBe('אולם 1');
+  });
+});
+
+describe('השבתת התוכנה — פתוחה תמיד, נעולה רק בהשבתה מפורשת', () => {
+  it('★ מחשב חדש, קובץ מגרסה ישנה בלי השדה, וקובץ פגום — פתוחים', () => {
+    expect(identity.loadDevice(dir).blocked).toBe(false);
+    const old: Record<string, unknown> = { ...identity.loadDevice(dir) };
+    delete old.blocked;
+    writeFileSync(identity.devicePath(dir), JSON.stringify(old)); // device.json מגרסה שלפני ההשבתה
+    expect(identity.loadDevice(dir).blocked).toBe(false);
+    writeFileSync(identity.devicePath(dir), '{"id":"48217730","secret":"oops","blocked":true}');
+    expect(identity.loadDevice(dir, fixedRandom(12345678)).blocked).toBe(false);
+  });
+
+  it('★ השבתה מפורשת למספר של המחשב — נשמרת, ונשארת גם בפתיחה הבאה בלי רשת', () => {
+    const d = identity.loadDevice(dir);
+    const next = identity.applyServerAnswer(dir, d.id, null, { id: d.id, name: 'אולם 1', blocked: true });
+    expect(next.blocked).toBe(true);
+    expect(identity.readDevice(dir)?.blocked).toBe(true);
+    expect(identity.loadDevice(dir).blocked).toBe(true);
+    expect(JSON.parse(readFileSync(identity.devicePath(dir), 'utf8')).blocked).toBe(true);
+  });
+
+  it('★ ביטול: תשובה מוצלחת שאינה אומרת "מושבת" (גם שרת ישן בלי השדה) — פתוח שוב', () => {
+    const d = identity.loadDevice(dir);
+    identity.applyServerAnswer(dir, d.id, null, { id: d.id, blocked: true });
+    expect(identity.applyServerAnswer(dir, d.id, null, { id: d.id, blocked: false }).blocked).toBe(false);
+    identity.applyServerAnswer(dir, d.id, null, { id: d.id, blocked: true });
+    expect(identity.applyServerAnswer(dir, d.id, null, { id: d.id, name: 'אולם 1' }).blocked).toBe(false);
+  });
+
+  it('★ רק true מפורש על אותו מספר נועל', () => {
+    expect(identity.readBlocked({ id: '48217730', blocked: true }, '48217730')).toBe(true);
+    expect(identity.readBlocked({ id: '48217730', blocked: 'true' }, '48217730')).toBe(false);
+    expect(identity.readBlocked({ id: '48217730', blocked: 1 }, '48217730')).toBe(false);
+    expect(identity.readBlocked({ blocked: true }, '48217730')).toBe(false); // בלי מספר
+    expect(identity.readBlocked({ id: '11111111', blocked: true }, '48217730')).toBe(false); // מספר אחר
+    expect(identity.readBlocked(null, '48217730')).toBe(false);
+    expect(identity.readBlocked('blocked', '48217730')).toBe(false);
+  });
+
+  it('★ מספר שהוגרל מחדש (409) הוא מחשב חדש — פתוח', () => {
+    const d = identity.loadDevice(dir, fixedRandom(11111111));
+    const locked = identity.applyServerAnswer(dir, d.id, null, { id: d.id, blocked: true });
+    expect(locked.blocked).toBe(true);
+    const next = identity.regenerateDevice(dir, locked, fixedRandom(22222222));
+    expect(next.blocked).toBe(false);
+    expect(identity.loadDevice(dir).blocked).toBe(false);
+  });
+
+  it('תשובה למספר שכבר הוחלף אינה נועלת', () => {
+    const d = identity.loadDevice(dir, fixedRandom(11111111));
+    identity.regenerateDevice(dir, d, fixedRandom(22222222));
+    expect(identity.applyServerAnswer(dir, d.id, null, { id: d.id, blocked: true }).blocked).toBe(false);
+  });
+
+  it('שם שהוקלד כאן אינו נוגע בהשבתה', () => {
+    const d = identity.loadDevice(dir);
+    identity.applyServerAnswer(dir, d.id, null, { id: d.id, blocked: true });
+    expect(identity.setPendingName(dir, 'אולם 2').blocked).toBe(true);
   });
 });

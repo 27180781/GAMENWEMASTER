@@ -875,6 +875,8 @@ export interface DeviceInfo {
   /** המערכת כבר מכירה את המחשב. */
   registered: boolean;
   permissions: DevicePermissions;
+  /** המנהל השבית את התוכנה במחשב הזה (כמו DeviceState.blocked). */
+  blocked: boolean;
 }
 
 /**
@@ -888,6 +890,12 @@ export interface DeviceState {
   state: 'off' | 'starting' | 'ok' | 'offline' | 'busy' | 'unavailable' | 'error';
   syncing: boolean;
   permissions: DevicePermissions;
+  /**
+   * «השבתת התוכנה»: המנהל השבית את התוכנה במחשב הזה, והמחשב קיבל את זה בבדיקה
+   * מוצלחת. נשמר במחשב ולכן תקף גם בלי רשת; נפתח רק בבדיקה מוצלחת שאומרת
+   * אחרת. בכל מקרה אחר — false, והתוכנה פתוחה.
+   */
+  blocked: boolean;
   device: DeviceInfo | null;
   games: DeviceGame[];
   checkedAt: number | null;

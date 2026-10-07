@@ -10,7 +10,7 @@
  * - פתיחה אוטומטית (כמו קוד שהוקלד) רק בפתיחת התוכנה, לפני שהמפעיל בחר
  *   משהו בעצמו — ופעם אחת בלבד. אחר כך: הודעה עם כפתור.
  */
-import type { DeviceGame, LibraryGame } from './clickerBridge.ts';
+import type { DeviceGame, DeviceState, LibraryGame } from './clickerBridge.ts';
 
 /** כמה פעמים בכל הפעלה מנסים להוריד את אותה גרסה לפני שמוותרים (עד "נסו שוב"). */
 export const MAX_ATTEMPTS = 2;
@@ -173,4 +173,28 @@ export function checkedAgoText(checkedAt: number | null, now: number): string {
   if (minutes < 60) return `נבדק לפני ${minutes} דקות`;
   const hours = Math.floor(minutes / 60);
   return hours === 1 ? 'נבדק לפני שעה' : `נבדק לפני ${hours} שעות`;
+}
+
+/**
+ * «השבתת התוכנה» (DeviceState.blocked): מסך הנעילה מחליף כל מסך, חוץ ממה
+ * שאסור לקטוע — משחק שרץ או מתחיל (הספירה לאחור), עורך פתוח ובניית משחק חדש.
+ * הם ממשיכים, והנעילה מופיעה כשהם נסגרים. ההשבתה עצמה מגיעה רק מתשובה מפורשת
+ * של המערכת למחשב הזה; בלעדיה התוכנה תמיד פתוחה.
+ */
+export function deviceLockShown(s: { blocked: boolean; playing: boolean; editing: boolean }): boolean {
+  return s.blocked && !s.playing && !s.editing;
+}
+
+/** שורת המצב במסך הנעילה: מתי נבדק, או למה לא. */
+export function lockStatusText(s: Pick<DeviceState, 'state' | 'syncing' | 'checkedAt'>, now: number): string {
+  if (s.syncing || s.state === 'starting') return 'בודק מול המערכת…';
+  const ago = checkedAgoText(s.checkedAt, now);
+  switch (s.state) {
+    case 'ok':
+      return ago;
+    case 'offline':
+      return 'אין חיבור לאינטרנט. התוכנה תיבדק שוב כשהמחשב יתחבר';
+    default:
+      return `הבדיקה מול המערכת לא הצליחה, ננסה שוב${ago ? ` · ${ago}` : ''}`;
+  }
 }
