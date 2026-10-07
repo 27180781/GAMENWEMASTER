@@ -1,0 +1,22 @@
+name: tmp windows tests
+on:
+  push:
+    branches: [claude/game-visual-styles-nudqla]
+    paths: ['.github/workflows/tmp-win-tests.yml']
+jobs:
+  test:
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - shell: pwsh
+        run: |
+          $ErrorActionPreference='Continue'
+          npm ci
+          npx vitest run 2>&1 | Select-Object -Last 8
+          Write-Output "RESULT: vitest exit $LASTEXITCODE"
+          npm run build 2>&1 | Select-Object -Last 3
+          Write-Output "RESULT: build exit $LASTEXITCODE"
+          exit 0
