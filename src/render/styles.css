@@ -2257,7 +2257,18 @@ body {
 .clicker-choice-emoji { font-size: 52px; line-height: 1; }
 .clicker-choice-title { font-size: 28px; font-weight: 800; color: #171a2b; }
 .clicker-choice-sub { font-size: 19px; line-height: 1.4; color: #4a4f63; }
-.clicker-intro-advanced { margin-top: 8px; }
+/* שורת הפעולות המשניות: סרטוני ההדרכה, הגדרות מתקדמות ומסך המנחה בשורה אחת,
+   והקישורים (משחק אחר / חדש / עריכה) בשורה משלהם מתחתיה. */
+.clicker-intro-advanced {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 14px 18px;
+}
+.clicker-intro-advanced .settings-host-link { margin-top: 0; }
+.clicker-intro-advanced .settings-secondary { flex-basis: 100%; }
 
 /* ---- מסך פתיחה אופליין (EXE) — טעינת ZIP בלבד ---- */
 .settings-screen.offline-open-screen {
@@ -6342,6 +6353,59 @@ body {
 }
 
 
+
+/* ---- כפתור סרטוני ההדרכה (מסך הפתיחה ו«איך משחקים?») ---- */
+/* בולט בכוונה: מי שצריך את הסרטונים עוד לא מכיר את המסך, ולא יחפש קישור קטן. */
+.guide-open {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  padding-block: 9px;
+  padding-inline: 12px 30px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #6c5ce7, #8b2fc9);
+  color: #fff;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  box-shadow: 0 10px 26px rgba(108, 92, 231, 0.38);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.guide-open:hover { transform: translateY(-2px); box-shadow: 0 14px 32px rgba(108, 92, 231, 0.5); }
+/* שלוש פעימות עדינות כשהמסך עולה — מושכות את העין, ואז נרגעות. */
+.guide-open::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: inherit;
+  border: 3px solid rgba(108, 92, 231, 0.6);
+  opacity: 0;
+  pointer-events: none;
+  animation: guide-open-pulse 2.2s ease-out 0.8s 3;
+}
+@keyframes guide-open-pulse {
+  from { opacity: 0.9; transform: scale(0.97); }
+  to { opacity: 0; transform: scale(1.1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .guide-open::after { animation: none; }
+}
+.guide-open-icon {
+  flex: 0 0 auto;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: grid;
+  place-items: center;
+  font-size: 28px;
+  line-height: 1;
+}
+.guide-open-text { display: flex; flex-direction: column; gap: 2px; }
+.guide-open-title { font-size: 25px; font-weight: 900; line-height: 1.15; }
+.guide-open-sub { font-size: 16px; font-weight: 600; opacity: 0.9; }
 
 /* ---- מדריך הווידאו (אופליין) ---- */
 /* גם כאן, כמו בעורך: מסך עבודה מחוץ לבמה, ולכן ממלא את החלון. */
