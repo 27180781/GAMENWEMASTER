@@ -23,6 +23,25 @@ interface GuideScreenProps {
   onClose: () => void;
 }
 
+/**
+ * הכפתור שפותח את סרטוני ההדרכה. בולט בכוונה: מי שצריך אותו הוא בדיוק מי
+ * שעוד לא מכיר את המסך, ולכן הוא לא יחפש קישור קטן בתחתית. אותו כפתור מופיע
+ * במסך הפתיחה של התוכנה ובמסך «איך משחקים?».
+ */
+export function GuideButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" className="guide-open" onClick={onClick}>
+      <span className="guide-open-icon" aria-hidden="true">
+        🎬
+      </span>
+      <span className="guide-open-text">
+        <span className="guide-open-title">סרטוני הדרכה</span>
+        <span className="guide-open-sub">איך מפעילים את התוכנה, צעד אחר צעד</span>
+      </span>
+    </button>
+  );
+}
+
 export function GuideScreen({ onClose }: GuideScreenProps) {
   const [chapters, setChapters] = useState<GuideChapter[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -68,7 +87,7 @@ export function GuideScreen({ onClose }: GuideScreenProps) {
   return (
     <div className="screen settings-screen guide-screen" dir="rtl">
       <header className="guide-bar">
-        <h1 className="guide-title">🎬 מדריך שימוש</h1>
+        <h1 className="guide-title">🎬 סרטוני הדרכה</h1>
         <span className="guide-spacer" />
         <button type="button" className="guide-close" onClick={onClose}>
           ✕ סגירה

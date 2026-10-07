@@ -18,6 +18,7 @@ import {
   type SealConfig,
 } from '../app/clickerBridge.ts';
 import { MediaCachePanel } from './MediaCachePanel.tsx';
+import { GuideButton } from './GuideScreen.tsx';
 
 interface SettingsScreenProps {
   game: GameFile;
@@ -523,9 +524,12 @@ export function SettingsScreen({
     </button>
   );
 
+  // סרטוני ההדרכה — כפתור בולט ולא עוד קישור בשורה התחתונה (מסך פתיחה בלבד).
+  const guideButton = mode === 'start' && onOpenGuide ? <GuideButton onClick={onOpenGuide} /> : null;
+
   // "טען משחק אחר" (EXE) — מוצג רק במסך הפתיחה, כשיש אפשרות לשכוח את המשחק השמור.
   const pickAnotherLink =
-    mode === 'start' && (onPickAnother || onEditGame || onNewGame || onOpenGuide) ? (
+    mode === 'start' && (onPickAnother || onEditGame || onNewGame) ? (
       <div className="settings-secondary">
         {onPickAnother && (
           <button className="settings-pick-another" onClick={onPickAnother}>
@@ -550,11 +554,6 @@ export function SettingsScreen({
             {...(editLocked !== undefined ? { title: editLocked } : {})}
           >
             {editLocked !== undefined ? '🔒' : '✏️'} עריכת המשחק
-          </button>
-        )}
-        {onOpenGuide && (
-          <button className="settings-pick-another" onClick={onOpenGuide}>
-            🎬 מדריך שימוש
           </button>
         )}
       </div>
@@ -637,6 +636,7 @@ export function SettingsScreen({
             </div>
 
             <div className="clicker-intro-advanced">
+              {guideButton}
               {advancedButton}
               {hostScreenLink}
               {pickAnotherLink}
@@ -727,6 +727,7 @@ export function SettingsScreen({
         </p>
         {columns}
         {actionButtons}
+        {guideButton}
         {pickAnotherLink}
       </div>
     </div>
