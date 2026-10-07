@@ -16,4 +16,9 @@ node /app/tools/refresh-desktop-assets.mjs /usr/share/nginx/html/desktop &
 # נוגעת באתר ובעדכוני ה-EXE.
 ( while true; do node /app/server/live-relay.mjs || true; sleep 1; done ) &
 
+# שער ההורדה של הגרסה הניידת וכלי החתימה (server/download-gate.mjs). גם הוא
+# בלולאה. כשהוא למטה הקבצים האלה לא יורדים (nginx עונה 500), וכל השאר — האתר,
+# המתקין והעדכונים — ממשיך כרגיל. כלי חתימה שלא קיבל בסיס חדש חותם על מה שיש לו.
+( while true; do node /app/server/download-gate.mjs || true; sleep 1; done ) &
+
 exec nginx -g 'daemon off;'

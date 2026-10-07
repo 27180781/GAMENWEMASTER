@@ -55,6 +55,58 @@
       }
       .btn.seal:hover { box-shadow: 0 8px 28px rgba(192, 132, 252, 0.25); }
       .btn .small { display: block; font-size: 14px; font-weight: 500; opacity: 0.75; margin-top: 4px; }
+      .btn.locked { opacity: 0.4; cursor: not-allowed; }
+      .btn.locked:hover { transform: none; box-shadow: none; }
+      .btn .lock-note { display: block; font-size: 13px; font-weight: 700; margin-top: 6px; }
+      .btn:not(.locked) .lock-note { display: none; }
+      .unlock {
+        width: 100%;
+        max-width: 420px;
+        margin-top: 8px;
+        padding: 14px 16px;
+        border: 1px dashed rgba(255, 255, 255, 0.2);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.03);
+      }
+      .unlock label { display: block; font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+      .unlock-row { display: flex; gap: 8px; }
+      /* width: 0 — בלעדיו רוחב ברירת המחדל של שדה קלט (~290px) דוחף את הכרטיס אל
+         מעבר לרוחב של טלפון; flex ממלא את השורה ממילא. */
+      .unlock input {
+        flex: 1;
+        width: 0;
+        min-width: 0;
+        font: inherit;
+        font-size: 18px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        background: rgba(0, 0, 0, 0.35);
+        color: #fff;
+        text-align: center;
+        letter-spacing: 0.15em;
+        direction: ltr;
+      }
+      .unlock input::placeholder { letter-spacing: normal; }
+      .unlock input:focus { outline: 2px solid #facc15; outline-offset: 1px; }
+      .unlock button {
+        font: inherit;
+        font-size: 17px;
+        font-weight: 800;
+        padding: 10px 20px;
+        border: 0;
+        border-radius: 10px;
+        background: #facc15;
+        color: #111;
+        cursor: pointer;
+      }
+      .unlock button:disabled { opacity: 0.6; cursor: wait; }
+      .unlock-msg { font-size: 15px; }
+      .unlock-msg:not(:empty) { margin-top: 8px; }
+      .unlock-msg.bad { color: #fca5a5; }
+      .unlock-msg.good { color: #86efac; }
+      .unlock.done label, .unlock.done .unlock-row { display: none; }
+      .unlock.done .unlock-msg { margin-top: 0; }
       .note { margin-top: 28px; font-size: 15px; opacity: 0.6; line-height: 1.7; text-align: right; }
       .note strong { opacity: 0.9; }
       code { background: rgba(255, 255, 255, 0.1); padding: 2px 6px; border-radius: 5px; }
@@ -101,19 +153,46 @@
           <span class="small">מתקין + קיצור דרך · מתעדכן לבד, בלי להתקין שוב</span>
           <span class="file" id="setup-file" hidden></span>
         </a>
+
+        <!-- הגרסה הניידת היא גם כלי החתימה, ולכן נפתחת רק עם קוד: השרת בודק אותו
+             (server/download-gate.mjs), ובלעדיו גם קישור ישיר לקבצים עונה 403. -->
+        <form class="unlock" id="unlock" novalidate>
+          <label for="unlock-code">🔒 הגרסה הניידת וכלי החתימה נפתחים עם קוד גישה</label>
+          <div class="unlock-row">
+            <input
+              id="unlock-code"
+              type="password"
+              inputmode="numeric"
+              autocomplete="off"
+              maxlength="64"
+              placeholder="קוד גישה"
+              aria-describedby="unlock-msg"
+            />
+            <button type="submit" id="unlock-btn">פתיחה</button>
+          </div>
+          <p class="unlock-msg" id="unlock-msg" role="status" aria-live="polite"></p>
+        </form>
         <a
-          class="btn secondary"
-          href="/desktop/TriviaEngine-Portable.exe"
+          class="btn secondary locked"
+          data-href="/desktop/TriviaEngine-Portable.exe"
+          role="link"
+          tabindex="0"
+          aria-disabled="true"
         >
           גרסה ניידת (בלי התקנה)
           <span class="small">קובץ בודד שרץ ישירות</span>
+          <span class="lock-note">🔒 נפתח אחרי הקוד</span>
         </a>
         <a
-          class="btn seal"
-          href="/desktop/SealEXE.exe"
+          class="btn seal locked"
+          data-href="/desktop/SealEXE.exe"
+          role="link"
+          tabindex="0"
+          aria-disabled="true"
         >
           🔏 חתום EXE
           <span class="small">כלי שסוגר קובץ ZIP של משחק לקובץ EXE בודד</span>
+          <span class="lock-note">🔒 נפתח אחרי הקוד</span>
         </a>
       </div>
 
@@ -157,6 +236,90 @@
       </div>
     </div>
     <script>
+      // הגרסה הניידת וכלי החתימה: הכפתורים מקבלים קישור רק אחרי שהשרת אישר את
+      // הקוד. השרת שומר לדפדפן עוגייה לשעה, ובלעדיה nginx מחזיר 403 גם לקישור
+      // ישיר, כך שהבדיקה כאן היא תצוגה בלבד.
+      (() => {
+        const form = document.getElementById('unlock');
+        const input = document.getElementById('unlock-code');
+        const button = document.getElementById('unlock-btn');
+        const msg = document.getElementById('unlock-msg');
+        const links = [...document.querySelectorAll('a[data-href]')];
+        const say = (text, tone) => {
+          msg.textContent = text;
+          msg.className = tone ? `unlock-msg ${tone}` : 'unlock-msg';
+        };
+        const timeOf = (ms) =>
+          new Date(ms).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jerusalem' });
+        const minutes = (sec) => {
+          const m = Math.max(1, Math.ceil(Number(sec) / 60) || 1);
+          return m === 1 ? 'דקה' : `${m} דקות`;
+        };
+        const open = (until) => {
+          for (const a of links) {
+            a.href = a.dataset.href;
+            a.classList.remove('locked');
+            a.removeAttribute('aria-disabled');
+          }
+          form.classList.add('done');
+          say(typeof until === 'number' ? `✓ נפתח. אפשר להוריד מהדפדפן הזה עד ${timeOf(until)}` : '✓ נפתח', 'good');
+        };
+        for (const a of links) {
+          const hint = (e) => {
+            if (!a.classList.contains('locked')) return;
+            e.preventDefault();
+            input.focus();
+            say('מקלידים את הקוד ולוחצים «פתיחה»');
+          };
+          a.addEventListener('click', hint);
+          a.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') hint(e);
+          });
+        }
+        const failed = () => say('לא הצלחנו לבדוק את הקוד כרגע. נסו שוב בעוד רגע', 'bad');
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const code = input.value.replace(/\s+/g, '');
+          if (code === '') {
+            input.focus();
+            return;
+          }
+          button.disabled = true;
+          say('בודק…');
+          try {
+            const res = await fetch('/download/unlock', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ code }),
+              cache: 'no-store',
+            });
+            const body = await res.json().catch(() => ({}));
+            if (res.ok && body.ok === true) {
+              input.value = '';
+              open(body.until);
+            } else if (res.status === 401) {
+              say('הקוד לא נכון', 'bad');
+              input.select();
+            } else if (res.status === 429) {
+              say(`יותר מדי ניסיונות. אפשר לנסות שוב בעוד ${minutes(body.retryAfter ?? 60)}`, 'bad');
+            } else {
+              failed();
+            }
+          } catch {
+            failed();
+          } finally {
+            button.disabled = false;
+          }
+        });
+        // דפדפן שכבר הקליד את הקוד בשעה האחרונה — פתוח מיד.
+        fetch('/download/unlock', { cache: 'no-store' })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((state) => {
+            if (state?.unlocked === true) open(state.until);
+          })
+          .catch(() => {});
+      })();
+
       // הגרסה העדכנית, שם המתקין בהורדה (עם מספר הגרסה) ו«מה חדש» — מתוך
       // מה שהשרת מגיש ב-/desktop/ (tools/fetch-desktop-assets.mjs). בלי הקבצים
       // האלה העמוד נשאר כמו שהוא, עם הקישורים בשמות הקבועים.

@@ -44,5 +44,8 @@ COPY server/live-relay.mjs /app/server/
 # כרגיל (ומריץ את סקריפטי ה-init שלה), ואז מפעיל את ה-CMD הזה במקום nginx.
 COPY docker-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+# שער ההורדה של הגרסה הניידת וכלי החתימה (קוד גישה) — nginx שואל אותו בכל
+# בקשה לקבצים האלה. הקובץ json הוא גיבוב הקוד בלבד.
+COPY server/download-gate.mjs server/download-gate.json /app/server/
 EXPOSE 80
 CMD ["/entrypoint.sh"]
