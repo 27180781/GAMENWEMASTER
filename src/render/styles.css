@@ -4289,6 +4289,7 @@ body {
 
 .roster-import-btn,
 .roster-capture-btn,
+.roster-reassign-btn,
 .roster-clear-btn {
   flex: 1 1 auto;
   padding: 9px 12px;
@@ -4303,6 +4304,7 @@ body {
 
 .roster-import-btn:hover,
 .roster-capture-btn:hover,
+.roster-reassign-btn:hover,
 .roster-clear-btn:hover { background: rgba(255, 255, 255, 0.18); }
 
 .roster-clear-btn { flex: 0 0 auto; font-weight: 600; opacity: 0.8; }

@@ -98,7 +98,9 @@ gameWindow.postMessage({ type: 'trivia-refresh', game: updatedGameJson }, '*');
    ```json
    "users": "{\"0501234567\":{\"name\":\"דנה\",\"groupName\":\"אדומים\",\"participantId\":\"<uuid>\"}}"
    ```
-   `participantId` (אופציונלי) הוא מזהה המשתתף בבונה. המיזוג הוא הוספה/עדכון
+   `participantId` (אופציונלי) הוא מזהה המשתתף בבונה. `pressed: true`
+   (אופציונלי) אומר שהמספר נשמר בבונה מלחיצה בתוכנה ולא שונה שם מאז, ולכן
+   «שיוך מחדש» מאפס אותו (ראו למטה). המיזוג הוא הוספה/עדכון
    (upsert לפי מספר; קטגוריה/קבוצות לפי שם), ועריכות ידניות של המפעיל נשמרות.
    מספר שהיה ב-`users` בטעינה הקודמת ונעלם ממנו יוצא מהמרשם; שמות שהמפעיל
    הקליד בעצמו נשארים.
@@ -129,7 +131,8 @@ gameWindow.postMessage({ type: 'trivia-refresh', game: updatedGameJson }, '*');
   (`syncRosterWithFile` ב-`src/app/roster.ts`) + `setGame`;
   `refetchGame`: משיכה חוזרת מ-`?game=` עם `no-store`.
 - `src/app/clickerSave.ts` + `src/app/useClickerSave.ts` — שמירת מספרי השלטים
-  שנקלטו בלחיצה בבונה (ראו «שמות בלי מספר שלט» למטה).
+  שנקלטו בלחיצה בבונה (ראו «שמות בלי מספר שלט» למטה); `src/app/clickerRelease.ts`
+  — המחיקות של «שיוך מחדש» (`reassignRoster` ב-`roster.ts`).
 - `src/app/GameHost.tsx` — effect הרענון החם: `engine.updateGame` + טעינת
   המרשם המעודכן.
 - `src/engine/gameEngine.ts` — `updateGame`: החלפת תוכן עם שימור מלא של
@@ -153,10 +156,15 @@ gameWindow.postMessage({ type: 'trivia-refresh', game: updatedGameJson }, '*');
 
   ```
   POST {baseUrl}/save-clicker-numbers
-  { "gameId": "<uuid>", "assignments": [{ "participantId": "<uuid>", "clickerId": "7" }] }
+  { "gameId": "<uuid>",
+    "assignments": [{ "participantId": "<uuid>", "clickerId": "7" }],
+    "releases":    [{ "participantId": "<uuid>", "clickerId": "7" }] }   // אופציונלי
 
-  200 { "ok": true, "results": [{ "participantId", "clickerId", "status" }] }
-      status: saved | already | has_number | taken | unknown | invalid
+  200 { "ok": true,
+        "results":  [{ "participantId", "clickerId", "status" }],
+        "released": [{ "participantId", "clickerId", "status" }] }
+      results.status:  saved | already | has_number | taken | unknown | invalid
+      released.status: released | already | kept | unknown | invalid
   403 { "error": "no_license" }      — אין למשחק רישיון קליקרים בתוקף
   404 { "error": "game_not_found" }  — המשחק נמחק
   400 { "error": "invalid_request" }
@@ -168,7 +176,22 @@ gameWindow.postMessage({ type: 'trivia-refresh', game: updatedGameJson }, '*');
   ואז כל 10 דקות, ומיד כשהרשת חוזרת (`online`). התשובות נשמרות ב-localStorage
   (`trivia-clicker-saved:<gameId>`), כך שמחשב בלי אינטרנט או תוכנה שנסגרה
   ממשיכים מאותה נקודה. המצב מוצג בשורה במרשם.
-- **אחרי השמירה** המשתתף עובר בבונה מ-`pendingUsers` ל-`users` עם המספר ועם
-  אותו `participantId`. זה לא מוחק דבר מהמרשם, ולא משנה את מפתח הגיבוי בדיסק
-  (`diskBackupKey` לפי מזהי המשתתפים), כך שמחשב שמוריד את הגרסה החדשה ממשיך
-  גם אירוע שנקטע באמצע.
+- **אחרי השמירה** המשתתף עובר בבונה מ-`pendingUsers` ל-`users` עם המספר, עם
+  אותו `participantId` ועם `pressed: true`. זה לא מוחק דבר מהמרשם, ולא משנה את
+  מפתח הגיבוי בדיסק (`diskBackupKey` לפי מזהי המשתתפים), כך שמחשב שמוריד את
+  הגרסה החדשה ממשיך גם אירוע שנקטע באמצע.
+- **«🔄 שיוך מחדש»** (ליד כפתור הקליטה, כשיש שיוכים שנעשו בתוכנה): כל שם שקיבל
+  שלט בתוכנה (בלחיצה, מהתור, או מספר שנשמר בבונה מלחיצה) חוזר לראש התור לפי
+  הסדר, לפני השמות שעוד חיכו. השלטים שלהם, וגם שלטים שנלחצו בלי שם, יורדים
+  מהרשימה, והקליטה נדלקת: הלחיצה הבאה תופסת את השם הראשון. שמות עם מספר
+  שהוקלד (בתוכנה או בבונה) או שיובא מאקסל עם מספרים לא משתנים. על מחשב שני
+  הסדר הוא לפי מספרי השלטים, כי זה הסדר שבו `users` מגיע.
+- **מחיקה בבונה:** מספרים של משתתפים מהבונה שהתאפסו נשלחים ב-`releases`. השרת
+  מטפל בהם לפני `assignments` ומוחק מספר רק כל עוד הוא עדיין המספר שנשמר
+  מהלחיצה (`released`; כבר בלי מספר = `already`). מספר ששונה בבונה מאז נשאר
+  (`kept`) וחוזר בטעינה הבאה. התוכנה שולחת קודם בקשה עם המחיקות בלבד
+  (`assignments: []`), ורק כשנענו את השיוכים החדשים, כך שגם אותו שלט לאותו שם
+  נשמר מחדש. שרת ישן עונה 400 על בקשה בלי שיוכים, וזה נחשב «לנסות שוב». עד
+  שהקובץ עצמו מראה את המחיקה, הזוגות האלה מוסתרים מ-`users` ומצטרפים לתור
+  (`trivia-clicker-release:<gameId>` ב-localStorage), אחרת טעינה של קובץ ישן
+  הייתה מחזירה אותם.

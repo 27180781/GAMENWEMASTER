@@ -25,7 +25,20 @@ import {
   type SendOutcome,
   type SettledMap,
 } from '../src/app/clickerSave.ts';
-import { EMPTY_ROSTER, type GamePendingUser, type Player, type RosterData } from '../src/app/roster.ts';
+import {
+  addReleases,
+  releaseKey,
+  type ReleaseMap,
+  type ReleaseOutcome,
+  type ReleaseStatus,
+} from '../src/app/clickerRelease.ts';
+import {
+  EMPTY_ROSTER,
+  type GamePendingUser,
+  type Player,
+  type ReleasedClicker,
+  type RosterData,
+} from '../src/app/roster.ts';
 
 function rosterOf(players: Player[]): RosterData {
   return { ...EMPTY_ROSTER, players };
@@ -273,7 +286,7 @@ describe('ClickerSaver', () => {
     const state = { roster: rosterOf(players), settled: {} as SettledMap };
     const send = vi.fn(async (batch: ClickerAssignment[]) => answer(batch));
     const saver = new ClickerSaver({
-      pending: pendingUsers,
+      readPending: () => pendingUsers,
       readRoster: () => state.roster,
       readSettled: () => state.settled,
       writeSettled: (s) => {
@@ -449,8 +462,153 @@ describe('ClickerSaver', () => {
   });
 });
 
+describe('ClickerSaver — מחיקות של «שיוך מחדש»', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** כמו setup למעלה, עם מחיקות ממתינות ושרת מדומה לשתי הבקשות. */
+  function setupWithReleases(
+    players: Player[],
+    releases: ReleasedClicker[],
+    answerRelease: (batch: ReleasedClicker[]) => ReleaseOutcome | Promise<ReleaseOutcome>,
+    settled: SettledMap = {},
+  ) {
+    const state = { roster: rosterOf(players), settled, releases: addReleases({}, releases) as ReleaseMap };
+    const order: string[] = [];
+    const send = vi.fn(async (batch: ClickerAssignment[]): Promise<SendOutcome> => {
+      order.push('save');
+      return {
+        kind: 'answered',
+        settled: Object.fromEntries(batch.map((a) => [a.participantId, { clickerId: a.clickerId, status: 'saved' }])),
+      };
+    });
+    const sendReleases = vi.fn(async (batch: ReleasedClicker[]) => {
+      order.push('release');
+      return answerRelease(batch);
+    });
+    const saver = new ClickerSaver({
+      readPending: () => pending,
+      readRoster: () => state.roster,
+      readSettled: () => state.settled,
+      writeSettled: (next) => {
+        state.settled = next;
+      },
+      send,
+      readReleases: () => state.releases,
+      writeReleases: (map) => {
+        state.releases = map;
+      },
+      sendReleases,
+    });
+    return { state, send, sendReleases, saver, order };
+  }
+
+  const answerAll =
+    (status: ReleaseStatus) =>
+    (batch: ReleasedClicker[]): ReleaseOutcome => ({
+      kind: 'answered',
+      answers: batch.map((e) => ({ ...e, status })),
+    });
+
+  it('קודם המחיקות, ורק אחריהן השיוכים החדשים — גם כשזה אותו שלט שנשמר קודם', async () => {
+    // אבי היה על 7, «שיוך מחדש», ונלחץ שוב 7 לאבי: התשובה הישנה נשכחת עם המחיקה
+    const { state, send, sendReleases, saver, order } = setupWithReleases(
+      [{ id: '7', name: 'אבי', participantId: 'p-avi' }],
+      [{ participantId: 'p-avi', clickerId: '7' }],
+      answerAll('released'),
+      { 'p-avi': { clickerId: '7', status: 'saved' } },
+    );
+    expect(saver.view().releases).toEqual({ releasing: 1, kept: 0, noLicense: 0 });
+    saver.nudge(0);
+    // השיוכים יוצאים מיד אחרי המחיקות, לא אחרי ההמתנה הרגילה של 1.5 שנ׳
+    // (טיימר של 0 שנקבע בתוך טיימר מדומה נורה אחרי מילישנייה).
+    await vi.advanceTimersByTimeAsync(10);
+    expect(order).toEqual(['release', 'save']);
+    expect(sendReleases.mock.calls[0]![0]).toEqual([{ participantId: 'p-avi', clickerId: '7' }]);
+    expect(send.mock.calls[0]![0]).toEqual([{ participantId: 'p-avi', clickerId: '7' }]);
+    expect(state.releases[releaseKey('p-avi', '7')]?.status).toBe('released');
+    expect(state.settled['p-avi']).toEqual({ clickerId: '7', status: 'saved' });
+    expect(saver.view()).toMatchObject({ saved: 1, waiting: 0, releases: { releasing: 0 } });
+  });
+
+  it('מחיקה שנכשלה (אין רשת, שרת ישן) עוצרת גם את השיוכים, וננסה שוב לפי הסדר', async () => {
+    let online = false;
+    const { send, sendReleases, saver } = setupWithReleases(
+      [{ id: '8', name: 'דנה', participantId: 'p-dana' }],
+      [{ participantId: 'p-avi', clickerId: '8' }],
+      (batch) => (online ? answerAll('released')(batch) : { kind: 'retry', reason: 'HTTP 400' }),
+    );
+    saver.nudge(0);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sendReleases).toHaveBeenCalledTimes(1);
+    expect(send).not.toHaveBeenCalled();
+    expect(saver.view()).toMatchObject({ failing: true, waiting: 1, releases: { releasing: 1 } });
+    online = true;
+    await vi.advanceTimersByTimeAsync(RETRY_DELAYS_MS[0]);
+    await vi.advanceTimersByTimeAsync(10);
+    expect(sendReleases).toHaveBeenCalledTimes(2);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(saver.view()).toMatchObject({ failing: false, saved: 1, releases: { releasing: 0 } });
+  });
+
+  it('kept ו-no_license נרשמים ולא נשלחים שוב; התשובה הקודמת על המשתתף נשארת', async () => {
+    const { state, sendReleases, saver } = setupWithReleases(
+      [],
+      [
+        { participantId: 'p-avi', clickerId: '7' },
+        { participantId: 'p-dana', clickerId: '8' },
+      ],
+      (batch) => ({
+        kind: 'answered',
+        answers: batch.map((e) => ({ ...e, status: e.participantId === 'p-avi' ? 'kept' : 'no_license' })),
+      }),
+      { 'p-avi': { clickerId: '7', status: 'saved' } },
+    );
+    saver.nudge(0);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(sendReleases).toHaveBeenCalledTimes(1);
+    expect(saver.view().releases).toEqual({ releasing: 0, kept: 1, noLicense: 1 });
+    expect(state.settled['p-avi']).toEqual({ clickerId: '7', status: 'saved' });
+  });
+
+  it('תשובה על מחיקה שכבר לא ממתינה לא דורסת את מה שנרשם בינתיים', async () => {
+    let finish: (() => void) | null = null;
+    const { state, saver } = setupWithReleases([], [{ participantId: 'p-avi', clickerId: '7' }], (batch) =>
+      new Promise<ReleaseOutcome>((resolve) => {
+        finish = () => resolve(answerAll('released')(batch));
+      }),
+    );
+    saver.nudge(0);
+    await vi.advanceTimersByTimeAsync(0);
+    // בזמן שהבקשה בדרך — טעינת קובץ ניקתה את הרשומה
+    state.releases = {};
+    finish!();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(state.releases).toEqual({});
+  });
+
+  it('בלי מחיקות שמורות — בדיוק כמו קודם', async () => {
+    const { order, saver } = setupWithReleases([{ id: '7', name: 'אבי', participantId: 'p-avi' }], [], answerAll('released'));
+    saver.nudge(0);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(order).toEqual(['save']);
+  });
+});
+
 describe('clickerSaveLines', () => {
-  const base: ClickerSaveView = { saved: 0, waiting: 0, rejected: 0, noLicense: false, sending: false, failing: false };
+  const base: ClickerSaveView = {
+    saved: 0,
+    waiting: 0,
+    rejected: 0,
+    noLicense: false,
+    sending: false,
+    failing: false,
+    releases: { releasing: 0, kept: 0, noLicense: 0 },
+  };
 
   it('אין מה להציג', () => {
     expect(clickerSaveLines(null)).toEqual([]);
@@ -477,5 +635,16 @@ describe('clickerSaveLines', () => {
   it('אין רישיון — נוסח משלו', () => {
     const lines = clickerSaveLines({ ...base, rejected: 2, noLicense: true });
     expect(lines).toEqual([{ tone: 'warn', text: expect.stringContaining('אין למשחק רישיון קליקרים בתוקף') }]);
+  });
+
+  it('«שיוך מחדש»: מחיקה ממתינה קודמת לשמירה, ומה שהבונה השאיר מוסבר', () => {
+    const lines = clickerSaveLines({ ...base, waiting: 2, releases: { releasing: 3, kept: 1, noLicense: 0 } });
+    expect(lines.map((l) => l.tone)).toEqual(['wait', 'warn', 'wait']);
+    expect(lines[0]!.text).toBe('⏳ מוחק במערכת 3 מספרי שלטים מהשיוך הקודם…');
+    expect(lines[1]!.text).toContain('מספר שלט אחד מהשיוך הקודם לא נמחק במערכת');
+    const offline = clickerSaveLines({ ...base, failing: true, releases: { releasing: 1, kept: 0, noLicense: 0 } });
+    expect(offline[0]!.text).toContain('אין חיבור');
+    const noLicense = clickerSaveLines({ ...base, releases: { releasing: 0, kept: 0, noLicense: 2 } });
+    expect(noLicense).toEqual([{ tone: 'warn', text: expect.stringContaining('אין למשחק רישיון קליקרים בתוקף') }]);
   });
 });

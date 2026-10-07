@@ -82,8 +82,8 @@ describe('mergePendingUsers', () => {
     const res = captureRemote(r, '245', CAT);
     expect(res.name).toBe('יוסי');
     expect(res.roster.players).toEqual([
-      { id: '103', name: 'דנה', participantId: 'p-dana' },
-      { id: '245', name: 'יוסי', participantId: 'p-yosi' },
+      { id: '103', name: 'דנה', participantId: 'p-dana', pressed: { group: '' } },
+      { id: '245', name: 'יוסי', participantId: 'p-yosi', pressed: { group: 'כחולים', category: CAT } },
     ]);
     expect(playerGroupNames(res.roster, '245')).toEqual(['כחולים']);
     expect(res.roster.pendingNames).toEqual([]);
@@ -94,7 +94,7 @@ describe('mergePendingUsers', () => {
     r = captureRemote(r, '103', CAT).roster; // דנה
     const again = mergePendingUsers(r, [DANA, YOSI, RINA], CAT);
     expect(again.pendingNames.map((n) => n.name)).toEqual(['יוסי', 'רינה']);
-    expect(again.players).toEqual([{ id: '103', name: 'דנה', participantId: 'p-dana' }]);
+    expect(again.players).toEqual([{ id: '103', name: 'דנה', participantId: 'p-dana', pressed: { group: '' } }]);
     expect(mergePendingUsers(again, [DANA, YOSI, RINA], CAT)).toEqual(again);
   });
 
@@ -190,7 +190,7 @@ describe('syncRosterWithFile', () => {
     const users = JSON.stringify({ '103': { remoteId: '103', name: 'דנה', participantId: 'p-dana' } });
     const res = syncRosterWithFile(local, file([YOSI], users), source('{}'), false);
     const r = res!.roster;
-    expect(r.players).toEqual([{ id: '103', name: 'דנה', participantId: 'p-dana' }]);
+    expect(r.players).toEqual([{ id: '103', name: 'דנה', participantId: 'p-dana', pressed: { group: '' } }]);
     expect(r.pendingNames.map((n) => n.name)).toEqual(['יוסי', 'מוקלד']);
     expect(r.categories.some((c) => c.id === 'cat-local')).toBe(true);
     expect(res?.source.remoteIds).toEqual(['103']);
@@ -287,7 +287,9 @@ describe('syncRosterWithFile', () => {
     local = captureRemote(local, '245', CAT).roster;
     local = captureRemote(local, '500', CAT).roster; // בלי שם
     const carried = carryPendingBindings(local, [YOSI]);
-    expect(carried.players).toEqual([{ id: '245', name: 'יוסי', participantId: 'p-yosi' }]);
+    expect(carried.players).toEqual([
+      { id: '245', name: 'יוסי', participantId: 'p-yosi', pressed: { group: 'כחולים', category: CAT } },
+    ]);
     expect(carried.categories.map((c) => c.groups.map((g) => g.name))).toEqual([['כחולים']]);
     expect(carryPendingBindings(local, [])).toEqual(EMPTY_ROSTER);
   });
@@ -351,7 +353,7 @@ describe('normalizeRoster', () => {
     let r = mergePendingUsers(EMPTY_ROSTER, [DANA, YOSI], CAT);
     r = captureRemote(r, '103', CAT).roster;
     const restored = normalizeRoster(JSON.parse(JSON.stringify(r)));
-    expect(restored.players[0]).toEqual({ id: '103', name: 'דנה', participantId: 'p-dana' });
+    expect(restored.players[0]).toEqual({ id: '103', name: 'דנה', participantId: 'p-dana', pressed: { group: '' } });
     expect(restored.pendingNames[0]?.participantId).toBe('p-yosi');
   });
 });
