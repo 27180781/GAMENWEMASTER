@@ -78,6 +78,7 @@ function input(engine: GameEngine, over: Partial<LiveHostInput> = {}): LiveHostI
     sound: SILENCE,
     cues: [],
     revealThumb: null,
+    video: null,
     ...over,
   };
 }

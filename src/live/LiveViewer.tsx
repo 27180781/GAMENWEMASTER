@@ -9,6 +9,7 @@
  * מה שיש לצופה בלבד: הפעלת צליל (דפדפנים לא מנגנים קול בלי נגיעה של
  * המשתמש — עד אז סרטונים מתנגנים מושתקים), מסך מלא, ולמי שכותב את שמו —
  * שלט הצבעה ליד המסך (VotePad.tsx), שעונה דרך שרת ההצבעות בדיוק כמו טלפון.
+ * כשהמנחה משדר וידאו (תוספת בתשלום, video/) — חלון עם המצלמה והקול שלו.
  */
 
 import {
@@ -55,6 +56,8 @@ import { mirrorSoundActions } from './soundTrack.ts';
 import { LiveSubscriber, type ViewerConnection, type ViewerUpdate } from './subscriber.ts';
 import { isViewToken, liveRelayBase } from './token.ts';
 import type { LiveSnapshot, LiveTimer } from './types.ts';
+import { HostVideoTile, useHostVideoReceiver } from './video/HostVideoTile.tsx';
+import { setHostVideoSound } from './video/hostVideoElement.ts';
 import './liveViewer.css';
 
 const SOUND_CHANNELS: readonly SoundChannel[] = [
@@ -198,15 +201,12 @@ function ValidLiveViewer({ token, voteServerUrl }: { token: string; voteServerUr
     toLocal: (t) => t,
   });
 
+  const relayBase = useMemo(() => liveRelayBase(), []);
   useEffect(() => {
-    const subscriber = new LiveSubscriber({
-      relayBase: liveRelayBase(),
-      viewToken: token,
-      onUpdate: setUpdate,
-    });
+    const subscriber = new LiveSubscriber({ relayBase, viewToken: token, onUpdate: setUpdate });
     subscriber.start();
     return () => subscriber.stop();
-  }, [token]);
+  }, [relayBase, token]);
 
   useEffect(() => {
     document.title = 'מסך צפייה · חוויה בקליק';
@@ -255,7 +255,7 @@ function ValidLiveViewer({ token, voteServerUrl }: { token: string; voteServerUr
         onWatch={cancelAsk}
       />
     ) : null;
-  const extraControl =
+  const playButton =
     room !== null && player.phase === 'watch' ? (
       <button
         type="button"
@@ -266,6 +266,44 @@ function ValidLiveViewer({ token, voteServerUrl }: { token: string; voteServerUr
         🙋 להצבעה
       </button>
     ) : null;
+
+  // וידאו המנחה: מתחברים רק כשהמנחה משדר ורק כל עוד הצופה לא הסתיר אותו.
+  const hostVideo = snap?.video ?? null;
+  const [videoHidden, setVideoHidden] = useState(false);
+  const receiver = useHostVideoReceiver(
+    relayBase,
+    token,
+    hostVideo === null || videoHidden ? null : hostVideo.gen,
+  );
+  const video =
+    hostVideo !== null && !videoHidden && receiver.phase !== 'unavailable'
+      ? (soundOn: boolean) => (
+          <HostVideoTile
+            receiver={receiver}
+            video={hostVideo}
+            soundOn={soundOn}
+            onHide={() => setVideoHidden(true)}
+          />
+        )
+      : null;
+  const videoButton =
+    hostVideo !== null && videoHidden ? (
+      <button
+        type="button"
+        className="live-btn"
+        onClick={() => setVideoHidden(false)}
+        title="הצגת הווידאו של המנחה"
+      >
+        🎥 המנחה
+      </button>
+    ) : null;
+  const extraControl =
+    playButton === null && videoButton === null ? null : (
+      <>
+        {videoButton}
+        {playButton}
+      </>
+    );
 
   return (
     <RenderGuard
@@ -282,6 +320,7 @@ function ValidLiveViewer({ token, voteServerUrl }: { token: string; voteServerUr
         soundSource={snap}
         toLocal={update.toLocal}
         pad={pad}
+        video={video}
         overlay={overlay}
         extraControl={extraControl}
       >
@@ -302,7 +341,8 @@ function ValidLiveViewer({ token, voteServerUrl }: { token: string; voteServerUr
 /**
  * מה שמסביב למסך: הפעלת צליל, מסך מלא והודעת חיבור. הכפתורים נעלמים אחרי
  * כמה שניות בלי תנועה, וחוזרים בנגיעה — כדי שלא יסתירו את המשחק. עם שלט
- * הצבעה (`pad`) המסך מתכווץ ומפנה לו מקום: בצד, או מתחת בטלפון לאורך.
+ * הצבעה (`pad`) או וידאו של המנחה (`video`) המסך מתכווץ ומפנה להם עמודה: בצד,
+ * או מתחת בטלפון לאורך.
  */
 function ViewerChrome({
   connection,
@@ -310,6 +350,7 @@ function ViewerChrome({
   soundSource,
   toLocal,
   pad = null,
+  video = null,
   overlay = null,
   extraControl = null,
   children,
@@ -319,6 +360,8 @@ function ViewerChrome({
   soundSource: LiveSnapshot | null;
   toLocal: (hostTime: number) => number;
   pad?: ReactNode;
+  /** חלון הווידאו של המנחה — לפי מצב הצליל. */
+  video?: ((soundOn: boolean) => ReactNode) | null;
   overlay?: ReactNode;
   extraControl?: ReactNode;
   children: (soundOn: boolean) => ReactNode;
@@ -359,6 +402,8 @@ function ViewerChrome({
   );
 
   const toggleSound = () => {
+    // הקול של המנחה הולך עם שאר הצליל, ונפתח בתוך הלחיצה (hostVideoElement.ts).
+    setHostVideoSound(!soundOn);
     if (soundOn) {
       audioRef.current?.stopAll();
       setSoundOn(false);
@@ -408,11 +453,11 @@ function ViewerChrome({
   };
 
   const notice = connectionNotice(connection, hasSnapshot);
-  const hasPad = pad !== null;
-  // עם שלט הכפתורים יושבים מתחתיו, תמיד גלויים — ולא על המסך, שקטן אז.
+  const hasSide = pad !== null || video !== null;
+  // עם עמודה בצד הכפתורים יושבים בה, תמיד גלויים — ולא על המסך, שקטן אז.
   const controls = (
     <div
-      className={`live-controls${hasPad ? ' live-controls--docked' : ''}${controlsShown || !soundOn || hasPad ? ' is-shown' : ''}`}
+      className={`live-controls${hasSide ? ' live-controls--docked' : ''}${controlsShown || !soundOn || hasSide ? ' is-shown' : ''}`}
       dir="rtl"
     >
       <button
@@ -437,7 +482,9 @@ function ViewerChrome({
     </div>
   );
   return (
-    <div className={`live-viewer${hasPad ? ' has-pad' : ''}`}>
+    <div
+      className={`live-viewer${hasSide ? ' has-side' : ''}${video !== null ? ' has-video' : ''}`}
+    >
       <div className="live-screen-area">
         {children(soundOn)}
         {notice !== null && (
@@ -445,15 +492,16 @@ function ViewerChrome({
             {notice}
           </div>
         )}
-        {!hasPad && controls}
-        {!hasPad && (
+        {!hasSide && controls}
+        {!hasSide && (
           <div className="live-rotate-hint" dir="rtl">
             סובבו את הטלפון לרוחב למסך גדול יותר
           </div>
         )}
       </div>
-      {hasPad && (
-        <div className="live-side">
+      {hasSide && (
+        <div className={`live-side${pad === null ? ' live-side--video' : ''}`}>
+          {video?.(soundOn)}
           {pad}
           {controls}
         </div>

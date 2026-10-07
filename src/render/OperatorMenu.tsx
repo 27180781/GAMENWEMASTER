@@ -9,6 +9,8 @@
  */
 
 import { questionLabel, type GameEngine, type GameState } from '../engine/index.ts';
+import { HostVideoPanel } from '../live/video/HostVideoControls.tsx';
+import type { HostVideoHandle } from '../live/video/useHostVideo.ts';
 
 interface OperatorMenuProps {
   engine: GameEngine;
@@ -21,6 +23,8 @@ interface OperatorMenuProps {
   onNarrationMutedChange?: (muted: boolean) => void;
   narrationVolume?: number;
   onNarrationVolumeChange?: (volume: number) => void;
+  /** וידאו המנחה במסך הצפייה — רק כשהרישיון כולל אותו (ראו src/live/video). */
+  hostVideo?: HostVideoHandle;
   /** תיאור מקור ההצבעות הפעיל — לתצוגה בלבד. */
   voteSource: string;
   hostVoterId?: string;
@@ -46,6 +50,7 @@ export function OperatorMenu({
   onNarrationMutedChange,
   narrationVolume = 1,
   onNarrationVolumeChange,
+  hostVideo,
   voteSource,
   hostVoterId = '',
   onShowReceiver,
@@ -132,6 +137,7 @@ export function OperatorMenu({
               </label>
             </>
           )}
+          {hostVideo && <HostVideoPanel video={hostVideo} />}
           <p className="operator-status">
             מקור הצבעות: {voteSource}
             {hostVoterId !== '' && ` · שלט מנחה: ${hostVoterId}`}
