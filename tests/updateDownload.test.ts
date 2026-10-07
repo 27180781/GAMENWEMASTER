@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { createRequire } from 'node:module';
 import { createHash, randomBytes } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const require = createRequire(import.meta.url);
 type RangeResult = { ok: true; bytes: number } | { ok: false; error: string; retryable: boolean; status?: number };
@@ -52,6 +52,35 @@ const mod = require('../electron/updateDownload.cjs') as {
   };
   FULL_REASON: Record<string, string>;
 };
+
+/**
+ * כמו ב-Windows: ftruncate על ידית שנפתחה להוספה ('a') נכשל ב-EPERM. בלינוקס הוא
+ * מצליח, ולכן קיצור דרך ידית כזאת עבר כאן ונפל רק בבניית ה-EXE (7.10.2026). קיצור
+ * לפי נתיב (truncateSync, שפותח 'r+') מותר, כמו ב-Windows.
+ */
+const fsCjs = require('node:fs') as typeof import('node:fs');
+const appendFds = new Set<number>();
+beforeEach(() => {
+  const { openSync, closeSync, ftruncateSync } = fsCjs;
+  vi.spyOn(fsCjs, 'openSync').mockImplementation((file, flags, mode) => {
+    const fd = openSync(file, flags, mode);
+    if (flags === 'a') appendFds.add(fd);
+    else appendFds.delete(fd);
+    return fd;
+  });
+  vi.spyOn(fsCjs, 'closeSync').mockImplementation((fd) => {
+    appendFds.delete(fd);
+    closeSync(fd);
+  });
+  vi.spyOn(fsCjs, 'ftruncateSync').mockImplementation((fd, len) => {
+    if (appendFds.has(fd)) throw Object.assign(new Error('EPERM: operation not permitted, ftruncate'), { code: 'EPERM', syscall: 'ftruncate' });
+    ftruncateSync(fd, len);
+  });
+});
+afterEach(() => {
+  vi.restoreAllMocks();
+  appendFds.clear();
+});
 
 const BLOCK = 64 * 1024;
 const sha512 = (b: Buffer) => createHash('sha512').update(b).digest('base64');

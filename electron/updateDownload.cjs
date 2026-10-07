@@ -213,7 +213,18 @@ async function downloadUpdate(args) {
   }
   fs.truncateSync(part, bytes);
 
-  const fd = fs.openSync(part, 'a');
+  let fd = fs.openSync(part, 'a');
+  /**
+   * מקצר את הקובץ החדש ל-n בתים. ב-Windows אי אפשר לקצר דרך ידית שנפתחה להוספה
+   * (ftruncate על 'a' נותן EPERM), ולכן סוגרים, מקצרים לפי הנתיב ופותחים מחדש.
+   * @param {number} n
+   */
+  const truncatePart = (n) => {
+    fs.closeSync(fd);
+    fd = -1;
+    fs.truncateSync(part, n);
+    fd = fs.openSync(part, 'a');
+  };
   /** @type {number | null} */
   let oldFd = null;
   let restartFull = false;
@@ -226,7 +237,7 @@ async function downloadUpdate(args) {
         if (oldFd === null) oldFd = fs.openSync(/** @type {string} */ (oldFile), 'r');
         // העתקה מקומית מהירה — עושים אותה מההתחלה גם אם חלקה כבר נכתב
         if (already > 0) {
-          fs.ftruncateSync(fd, opStart);
+          truncatePart(opStart);
           bytes = opStart;
         }
         const buf = Buffer.alloc(Math.min(COPY_CHUNK, length));
@@ -263,7 +274,7 @@ async function downloadUpdate(args) {
             break;
           }
           // הורדה מלאה שהתחילה לפני ניתוק: מתחילים אותה מבית 0, שם הקובץ כולו הוא מה שביקשנו.
-          fs.ftruncateSync(fd, 0);
+          truncatePart(0);
           bytes = 0;
           transferred = 0;
           save();
@@ -282,7 +293,7 @@ async function downloadUpdate(args) {
       report();
     }
   } finally {
-    fs.closeSync(fd);
+    if (fd !== -1) fs.closeSync(fd);
     if (oldFd !== null) fs.closeSync(oldFd);
   }
   if (restartFull) {
