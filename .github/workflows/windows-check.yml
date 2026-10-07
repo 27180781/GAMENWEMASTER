@@ -1,0 +1,39 @@
+# זמני — בדיקת «השבתת התוכנה» על Windows לפני המיזוג. יוסר לפני ה-PR.
+name: windows-check (temporary)
+on:
+  push:
+    branches: [claude/runner-disable-switch-6uedgg]
+    paths: ['.github/workflows/windows-check.yml']
+jobs:
+  check:
+    runs-on: windows-latest
+    continue-on-error: true
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: unit tests
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          npm ci 2>&1 | Select-Object -Last 5
+          $ci = $LASTEXITCODE
+          npm test 2>&1 | Select-Object -Last 60
+          $t = $LASTEXITCODE
+          Write-Output "RESULT: npm-ci=$ci npm-test=$t"
+          exit 0
+      - name: device e2e (real Electron on Windows)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          npm run build 2>&1 | Select-Object -Last 5
+          $b = $LASTEXITCODE
+          # ב-Windows תיקיית הנתונים היא %APPDATA%\trivia-engine (לא XDG_CONFIG_HOME); ב-runner היא ריקה.
+          (Get-Content -Raw tools/device-e2e.mjs) -replace "path.join\(config, 'trivia-engine'\)", "path.join(process.env.APPDATA, 'trivia-engine')" | Set-Content -Encoding utf8 tools/device-e2e-win.mjs
+          Select-String -Path tools/device-e2e-win.mjs -Pattern 'const dataDir'
+          node tools/device-e2e-win.mjs "$env:RUNNER_TEMP\device-e2e" 2>&1
+          $e = $LASTEXITCODE
+          Write-Output "RESULT: build=$b e2e=$e"
+          exit 0
