@@ -19,9 +19,17 @@
  * תסיים להתפרסם. רק אחרי כל הסבבים הבנייה נופלת. (כך נכשלה הפריסה ב-14.9.2026:
  * שלושה ניסיונות בתוך 15 שניות, כולם בתוך חלון ההחלפה.)
  *
+ * ריפו פרטי: כשהריפו אינו ציבורי, הכתובת הציבורית של המהדורה עונה 404, וקובצי
+ * המהדורה נקראים רק דרך ה-API של GitHub עם מפתח. GITHUB_RELEASES_TOKEN מפעיל את
+ * המסלול הזה (מפתח fine-grained עם Contents: Read-only על הריפו בלבד). בלי המפתח
+ * נשארת הכתובת הציבורית — כך אפשר להוסיף את המפתח לפני שהריפו נעשה פרטי, ושום
+ * דבר לא נשבר באמצע.
+ *
  * שימוש: node tools/fetch-desktop-assets.mjs <תיקיית-יעד>
  * משתני סביבה:
  *   DESKTOP_SOURCE_URL          — מקור הקבצים (ברירת מחדל: המהדורה היציבה ב-GitHub)
+ *   GITHUB_RELEASES_TOKEN       — מפתח GitHub לקריאת המהדורה דרך ה-API (חובה כשהריפו
+ *                                 פרטי; מתעלמים ממנו כשהוגדר DESKTOP_SOURCE_URL)
  *   DESKTOP_ASSETS              — '0' כדי לדלג (בנייה מקומית מהירה בלי 200MB הורדות)
  *   DESKTOP_FETCH_ATTEMPTS      — כמה סבבים מלאים לנסות (ברירת מחדל 8)
  *   DESKTOP_FETCH_WAIT_SECONDS  — המתנה בין סבבים (ברירת מחדל 45 → ‎~5 דקות סה"כ)
@@ -33,9 +41,12 @@ import { gunzipSync } from 'node:zlib';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+const RELEASE_REPO = '27180781/GAMENWEMASTER';
+const RELEASE_TAG = 'desktop-latest';
+
 export const SOURCE =
   process.env.DESKTOP_SOURCE_URL ??
-  'https://github.com/27180781/GAMENWEMASTER/releases/download/desktop-latest';
+  `https://github.com/${RELEASE_REPO}/releases/download/${RELEASE_TAG}`;
 
 /** גודל מינימלי סביר ל-EXE של Electron — שומר מפני "הורדה" של דף שגיאה. */
 const MIN_EXE_BYTES = 40 * 1024 * 1024;
@@ -54,6 +65,56 @@ function envInt(name, fallback) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
+ * מקור קובצי המהדורה: `request(name)` מחזיר את התשובה (Response) לקובץ בשם הזה,
+ * ו-`label` אומר מאיפה — ליומן ול-index.json (בלי המפתח).
+ *
+ * ציבורי — `${SOURCE}/<name>`. עם מפתח — רשימת הקבצים של המהדורה נקראת פעם אחת
+ * לכל מקור (כלומר לכל סבב: build-desktop מחליף קבצים, ומזהה של קובץ שהוחלף
+ * מפסיק לעבוד), וכל קובץ יורד לפי המזהה שלו. קובץ שאינו ברשימה = 404, כמו
+ * בכתובת הציבורית.
+ */
+export function openSource(env = process.env) {
+  const token = (env.GITHUB_RELEASES_TOKEN ?? '').trim();
+  if (token === '' || env.DESKTOP_SOURCE_URL !== undefined) {
+    const base = env.DESKTOP_SOURCE_URL ?? SOURCE;
+    return { label: base, request: (name) => fetch(`${base}/${name}`, { redirect: 'follow' }) };
+  }
+  const api = `https://api.github.com/repos/${RELEASE_REPO}`;
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    'X-GitHub-Api-Version': '2022-11-28',
+    'User-Agent': 'gamenwemaster-desktop-assets',
+  };
+  /** @type {Map<string, string> | null} שם קובץ → כתובת ה-API שלו */
+  let assets = null;
+  return {
+    label: `${api}/releases/tags/${RELEASE_TAG}`,
+    async request(name) {
+      if (assets === null) {
+        const res = await fetch(`${api}/releases/tags/${RELEASE_TAG}`, {
+          headers: { ...headers, Accept: 'application/vnd.github+json' },
+        });
+        if (!res.ok) return res;
+        const release = await res.json();
+        assets = new Map((release.assets ?? []).map((a) => [a.name, a.url]));
+      }
+      const url = assets.get(name);
+      if (url === undefined) return new Response(null, { status: 404 });
+      // ה-API מפנה לכתובת חתומה באחסון של GitHub. המפתח לא עובר לשם: הוא היה
+      // יוצא מ-GitHub, והאחסון דוחה בקשה שנושאת הרשאה שנייה.
+      const res = await fetch(url, {
+        headers: { ...headers, Accept: 'application/octet-stream' },
+        redirect: 'manual',
+      });
+      const location = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
+      if (location === null) return res;
+      await res.body?.cancel();
+      return fetch(location, { redirect: 'follow' });
+    },
+  };
+}
+
+/**
  * שלושת השדות ש-electron-updater קורא מ-latest.yml. מופרד כדי שגם הרענון
  * יוכל לקרוא את הגרסה בלי לחזור על ניתוח הפורמט — וכדי שיהיה ניתן לבדיקה.
  */
@@ -68,14 +129,14 @@ export function parseFeed(text) {
 }
 
 /**
- * הורדה עם כמה ניסיונות — כשל רשתי חולף לא אמור להפיל בנייה שלמה.
- * `baseMs` הוא בסיס ההשהיה (2·base, 4·base, …); ניתן לקיצור בבדיקות.
+ * הורדה של קובץ מהמהדורה עם כמה ניסיונות — כשל רשתי חולף לא אמור להפיל בנייה
+ * שלמה. `baseMs` הוא בסיס ההשהיה (2·base, 4·base, …); ניתן לקיצור בבדיקות.
  */
-export async function fetchWithRetry(url, tries = 4, baseMs = 1000) {
+export async function fetchWithRetry(source, name, tries = 4, baseMs = 1000) {
   let lastErr;
   for (let i = 1; i <= tries; i += 1) {
     try {
-      const res = await fetch(url, { redirect: 'follow' });
+      const res = await source.request(name);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return Buffer.from(await res.arrayBuffer());
     } catch (err) {
@@ -87,7 +148,7 @@ export async function fetchWithRetry(url, tries = 4, baseMs = 1000) {
       }
     }
   }
-  throw new Error(`הורדה נכשלה: ${url} — ${lastErr?.message ?? 'לא ידוע'}`);
+  throw new Error(`הורדה נכשלה: ${name} מ-${source.label} — ${lastErr?.message ?? 'לא ידוע'}`);
 }
 
 const sha512b64 = (buf) => createHash('sha512').update(buf).digest('base64');
@@ -125,10 +186,10 @@ export function previousBlockmapNames(version, count) {
 }
 
 /** הורדה אופציונלית: 404 = אין (מיד), כישלון אחר = ניסיון אחד נוסף ואז null. */
-async function fetchOptional(url, baseMs) {
+async function fetchOptional(source, name, baseMs) {
   for (let i = 1; i <= 2; i += 1) {
     try {
-      const res = await fetch(url, { redirect: 'follow' });
+      const res = await source.request(name);
       if (res.status === 404) return null;
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return Buffer.from(await res.arrayBuffer());
@@ -146,10 +207,10 @@ async function fetchOptional(url, baseMs) {
  * במהדורה נשמר; מה שחסר (נבנה לפני שהמפות התחילו להתפרסם, או מספר בנייה
  * שדולג) פשוט נעדר.
  */
-async function fetchPreviousBlockmaps(outDir, version, count, baseMs) {
+async function fetchPreviousBlockmaps(source, outDir, version, count, baseMs) {
   const found = [];
   for (const name of previousBlockmapNames(version, count)) {
-    const buf = await fetchOptional(`${SOURCE}/${name}`, baseMs);
+    const buf = await fetchOptional(source, name, baseMs);
     if (buf === null) continue;
     try {
       assertBlockmap(buf, name);
@@ -219,11 +280,12 @@ async function fetchOnce(
   { retryBaseMs = 1000, minExeBytes = MIN_EXE_BYTES, previousBlockmaps = PREVIOUS_BLOCKMAPS } = {},
 ) {
   mkdirSync(outDir, { recursive: true });
+  const source = openSource();
 
   // ‎latest.yml‎ הוא מקור האמת: הוא קובע איזה קובץ התקנה ה-updater יבקש,
   // ומה ה-sha512 שלו. לכן קוראים אותו קודם ומורידים בדיוק את מה שהוא מציין.
-  console.log(`מוריד latest.yml מ-${SOURCE}`);
-  const feed = (await fetchWithRetry(`${SOURCE}/latest.yml`, 4, retryBaseMs)).toString('utf8');
+  console.log(`מוריד latest.yml מ-${source.label}`);
+  const feed = (await fetchWithRetry(source, 'latest.yml', 4, retryBaseMs)).toString('utf8');
   const { version, installer, sha512: wantHash } = parseFeed(feed);
   console.log(`גרסה ${version} · מתקין ${installer}`);
   writeFileSync(join(outDir, 'latest.yml'), feed);
@@ -231,7 +293,7 @@ async function fetchOnce(
   // (1) המתקין — זה מה שהעדכון האוטומטי מוריד. מאמתים מול ה-sha512 שבפיד:
   // קובץ שלא תואם יידחה על ידי electron-updater אצל הלקוח, ועדיף לגלות כאן.
   console.log(`מוריד ${installer} …`);
-  const setup = await fetchWithRetry(`${SOURCE}/${installer}`, 4, retryBaseMs);
+  const setup = await fetchWithRetry(source, installer, 4, retryBaseMs);
   const gotHash = sha512b64(setup);
   if (gotHash !== wantHash) {
     throw new Error(`sha512 של ${installer} אינו תואם ל-latest.yml — הקובץ פגום או המהדורה באמצע עדכון`);
@@ -246,16 +308,16 @@ async function fetchOnce(
   // עדכון חוזר להורדה מלאה של ‎~100MB. חובה, כמו המתקין עצמו.
   const blockmap = `${installer}.blockmap`;
   console.log(`מוריד ${blockmap} …`);
-  const map = await fetchWithRetry(`${SOURCE}/${blockmap}`, 4, retryBaseMs);
+  const map = await fetchWithRetry(source, blockmap, 4, retryBaseMs);
   assertBlockmap(map, blockmap);
   writeFileSync(join(outDir, blockmap), map);
   console.log(`  ✓ ${(map.length / 1024).toFixed(0)}KB`);
 
   // (1ג) המפות של הגרסאות הקודמות — best-effort.
-  const previous = await fetchPreviousBlockmaps(outDir, version, previousBlockmaps, retryBaseMs);
+  const previous = await fetchPreviousBlockmaps(source, outDir, version, previousBlockmaps, retryBaseMs);
 
   // (1ד) «מה חדש» לעמוד ההורדה — best-effort.
-  const notes = await fetchOptional(`${SOURCE}/changelog.json`, retryBaseMs);
+  const notes = await fetchOptional(source, 'changelog.json', retryBaseMs);
   const changelog = notes !== null && parseChangelog(notes) !== null ? 'changelog.json' : null;
   if (changelog !== null) writeFileSync(join(outDir, changelog), notes);
   console.log(changelog !== null ? '  ✓ changelog.json' : '  · אין changelog.json במהדורה');
@@ -263,7 +325,7 @@ async function fetchOnce(
   // (2) הקובץ הנייד — להורדה ישירה, וגם הבסיס שכלי החתימה מוריד.
   const portable = `HavayaBeClick-${version}.exe`;
   console.log(`מוריד ${portable} …`);
-  const exe = await fetchWithRetry(`${SOURCE}/${portable}`, 4, retryBaseMs);
+  const exe = await fetchWithRetry(source, portable, 4, retryBaseMs);
   if (exe.length < minExeBytes) throw new Error(`${portable} קטן מדי (${exe.length})`);
   writeFileSync(join(outDir, portable), exe);
   console.log(`  ✓ ${(exe.length / 1048576).toFixed(0)}MB`);
@@ -286,7 +348,7 @@ async function fetchOnce(
   writeFileSync(
     join(outDir, 'index.json'),
     `${JSON.stringify(
-      { version, installer, blockmap, previousBlockmaps: previous, portable, changelog, source: SOURCE, builtAt: new Date().toISOString() },
+      { version, installer, blockmap, previousBlockmaps: previous, portable, changelog, source: source.label, builtAt: new Date().toISOString() },
       null,
       2,
     )}\n`,
