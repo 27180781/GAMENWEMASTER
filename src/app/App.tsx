@@ -221,6 +221,7 @@ function UpdateBadge({ status }: { status: UpdateStatus }) {
     return (
       <div className="update-badge">
         ⬇ מוריד עדכון… {pct}%{downloadSizeText(status)}
+        {fullDownloadText(status)}
       </div>
     );
   }
@@ -228,6 +229,7 @@ function UpdateBadge({ status }: { status: UpdateStatus }) {
     return (
       <div className="update-badge update-badge--warn">
         ⏸ הורדת העדכון נעצרה{downloadSizeText(status)} — תימשך מאותה נקודה כשהרשת תחזור
+        {fullDownloadText(status)}
       </div>
     );
   }
@@ -246,6 +248,27 @@ export function downloadSizeText(status: UpdateStatus): string {
   return ` (${mb(status.transferred ?? 0)} מתוך ${mb(status.total)}MB)`;
 }
 
+/** למה העדכון יורד במלואו — לפי הקודים של FULL_REASON ב-electron/updateDownload.cjs. */
+const FULL_DOWNLOAD_REASONS: Record<string, string> = {
+  'no-installer': 'המתקין של הגרסה המותקנת לא נמצא במחשב',
+  'installer-mismatch': 'המתקין שנמצא במחשב אינו של הגרסה המותקנת',
+  'no-old-map': 'אין בשרת פרטים על הגרסה המותקנת',
+  'no-new-map': 'השרת לא מסר את פרטי הגרסה החדשה',
+  'plan-invalid': 'חישוב השינויים נכשל',
+  'bad-differential': 'העדכון החלקי לא נבנה נכון',
+  'range-blocked': 'הרשת או האנטי-וירוס לא מאפשרים להוריד רק חלק מקובץ',
+};
+
+/**
+ * " · הורדה מלאה: <למה>" — רק כשהעדכון יורד במלואו. הורדה מלאה של 110MB במקום
+ * 1.5MB נראתה עד 7.10.2026 רק כמספר, בלי שום דרך לדעת מה גרם לה.
+ */
+export function fullDownloadText(status: UpdateStatus): string {
+  if (status.differential !== false) return '';
+  const why = status.fullReason ? FULL_DOWNLOAD_REASONS[status.fullReason] : undefined;
+  return why ? ` · הורדה מלאה: ${why}` : ' · הורדה מלאה';
+}
+
 /** נוסח מצב העדכון לשורת הגרסה. מופרד כדי שיהיה ניתן לבדיקת יחידה. */
 export function updateStatusText(status: UpdateStatus | null): string {
   if (status === null) return 'בודק עדכון…';
@@ -255,9 +278,9 @@ export function updateStatusText(status: UpdateStatus | null): string {
     case 'current':
       return '✅ מעודכן';
     case 'downloading':
-      return `⬇ מוריד עדכון… ${status.percent ?? 0}%${downloadSizeText(status)}`;
+      return `⬇ מוריד עדכון… ${status.percent ?? 0}%${downloadSizeText(status)}${fullDownloadText(status)}`;
     case 'paused':
-      return `⏸ הורדת העדכון נעצרה${downloadSizeText(status)} — תימשך כשהרשת תחזור`;
+      return `⏸ הורדת העדכון נעצרה${downloadSizeText(status)} — תימשך כשהרשת תחזור${fullDownloadText(status)}`;
     case 'ready':
       return `✅ גרסה ${status.version ?? 'חדשה'} תותקן בסגירת התוכנה`;
     case 'sealer':

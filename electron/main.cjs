@@ -25,7 +25,7 @@ const { remoteErrorMessage } = require('./remoteErrors.cjs');
 const { hasZipEndRecord, tailLength } = require('./zipIntegrity.cjs');
 const { downloadGameDirect } = require('./remoteGame.cjs');
 const { downloadToFile, downloadRange } = require('./netDownload.cjs');
-const { downloadUpdate, parseBlockMap, oldBlockMapUrl, pickOldBlockMap } = require('./updateDownload.cjs');
+const { downloadUpdate, parseBlockMap, oldBlockMapUrl, installerCandidates, pickOldInstaller } = require('./updateDownload.cjs');
 const {
   writeEncryptedMedia,
   readEncryptedMediaRange,
@@ -243,8 +243,41 @@ const UPDATE_RETRY_MS = 2 * 60 * 1000;
 let updateDownloadRunning = false;
 /** @type {NodeJS.Timeout | null} */
 let updateRetryTimer = null;
-/** ההתקדמות האחרונה שדווחה — מוצגת גם כשההורדה נעצרה. */
+/**
+ * ההתקדמות האחרונה שדווחה — מוצגת גם כשההורדה נעצרה.
+ * @type {{ transferred: number, total: number, differential?: boolean, fullReason?: string | null }}
+ */
 let lastUpdateProgress = { transferred: 0, total: 0 };
+const UPDATE_LOG_MAX = 256 * 1024;
+
+/**
+ * יומן העדכונים במחשב (userData/update.log): מה הותקן, מה הורד, ולמה הורדה מלאה.
+ * electron-updater ו-console.log אינם נכתבים לשום קובץ בתוכנה המותקנת, ולכן בלי
+ * היומן הזה אין דרך לדעת בדיעבד מה קרה במחשב של לקוח. נחתך כשהוא גדל.
+ * @param {string} msg
+ */
+function updateLog(msg) {
+  console.log(msg);
+  try {
+    const file = path.join(app.getPath('userData'), 'update.log');
+    if (fileSizeOrZero(file) > UPDATE_LOG_MAX) {
+      const tail = fs.readFileSync(file, 'utf8').slice(-UPDATE_LOG_MAX / 2);
+      fs.writeFileSync(file, tail.slice(tail.indexOf('\n') + 1));
+    }
+    fs.appendFileSync(file, `${new Date().toISOString()} ${msg}\n`);
+  } catch {
+    /* היומן אינו חיוני */
+  }
+}
+
+/** תיקיית משתמש (הורדות), או null כשאין. @param {'downloads'} name */
+function userFolder(name) {
+  try {
+    return app.getPath(name);
+  } catch {
+    return null;
+  }
+}
 
 /** GET קטן (מפת בלוקים): Buffer, או null על 404/כשל — המשמעות היא "בלי הפרש". */
 function fetchSmall(url) {
@@ -338,45 +371,66 @@ async function downloadUpdateResumable(info) {
     const helper = await /** @type {any} */ (u).getOrCreateDownloadHelper();
     const pendingDir = String(helper.cacheDirForPendingUpdate);
     const cacheDir = String(helper.cacheDir);
-    const oldFile = path.join(cacheDir, 'installer.exe');
-    // המפה של installer.exe. קודם זו שבשרת לגרסה המותקנת; current.blockmap שבמטמון רק כגיבוי
-    // (גרסה ישנה מ-12 בניות), כי הוא מתאר את מה ש*הורד* אחרון ולא בהכרח את מה שהותקן:
-    // electron-updater מעתיק אותו בסיום הורדה, והסרת התוכנה אינה מוחקת את המטמון. כך
-    // התקנה נקייה של 189 מעל מטמון שהשאירה 151 הורידה את 190 במלואו (5.10.2026).
-    const serverOldMap = parseBlockMap(await fetchSmall(oldBlockMapUrl(newUrl, version, app.getVersion())));
+    const installed = app.getVersion();
+    updateLog(`[update] ${installed} → ${version}: ${fileName}`);
+    // המפה של הגרסה המותקנת מהשרת קודמת; current.blockmap שבמטמון רק כגיבוי (גרסה ישנה
+    // מ-12 בניות), כי הוא מתאר את מה ש*הורד* אחרון ולא בהכרח את מה שהותקן: electron-updater
+    // מעתיק אותו בסיום הורדה, והסרת התוכנה אינה מוחקת את המטמון. כך התקנה נקייה של 189
+    // מעל מטמון שהשאירה 151 הורידה את 190 במלואו (5.10.2026).
+    const serverOldMap = parseBlockMap(await fetchSmall(oldBlockMapUrl(newUrl, version, installed)));
     const cachedOldMap = parseBlockMap(readFileOrNull(path.join(cacheDir, 'current.blockmap')));
-    const oldBlockMap = pickOldBlockMap([serverOldMap, cachedOldMap], fileSizeOrZero(oldFile));
-    if (oldBlockMap === null) console.log('[update] אין מפת בלוקים שתואמת למתקין שבמטמון — הורדה מלאה');
+    // המתקין להשוואה: installer.exe שבמטמון (NSIS מעתיק את עצמו לשם בכל התקנה), ואם
+    // ההעתקה הזאת לא קרתה — עותק אחר שבמחשב (installerCandidates). בלי אף אחד, כל עדכון
+    // יורד במלואו (110MB), וכך קרה במחשב של לקוח ב-7.10.2026.
+    const installers = installerCandidates({
+      cacheDir,
+      pendingDir,
+      installerName: fileName.split(version).join(installed),
+      targetName: fileName,
+      // לא שולחן העבודה: הוא מסונכרן לרוב ל-OneDrive, וקריאה מקובץ שנשאר רק בענן
+      // מורידה אותו כולו — בדיוק מה שמנסים לחסוך.
+      folders: [userFolder('downloads')].filter((d) => d !== null),
+    });
+    const picked = pickOldInstaller({ installers, maps: [serverOldMap, cachedOldMap], sizeOf: fileSizeOrZero });
+    updateLog(
+      `[update] מפות: שרת ${serverOldMap === null ? 'אין' : 'יש'}, מטמון ${cachedOldMap === null ? 'אין' : 'יש'}; מתקינים: ${
+        picked.sizes.map((x) => `${x.file}=${x.size}`).join(', ') || '—'
+      }`,
+    );
+    if (picked.oldFile !== null) updateLog(`[update] משווה מול ${picked.oldFile}`);
     const newBlockMap = parseBlockMap(await fetchSmall(`${newUrl}.blockmap`));
+    if (newBlockMap === null) updateLog('[update] אין מפת בלוקים לגרסה החדשה');
     const res = await downloadUpdate({
       pendingDir,
       fileName,
       sha512: String(fileInfo?.sha512 ?? info.sha512 ?? ''),
       size: Number(fileInfo?.size) || 0,
       newUrl,
-      oldFile,
-      oldBlockMap,
+      oldFile: picked.oldFile,
+      oldBlockMap: picked.oldBlockMap,
       newBlockMap,
+      reason: picked.reason,
       fetchRange: (url, start, end, sink) => downloadRange(net, url, start, end, sink),
       onProgress: (p) => {
-        lastUpdateProgress = { transferred: p.transferred, total: p.total };
-        pushUpdateState({ state: 'downloading', version, percent: p.percent, transferred: p.transferred, total: p.total });
+        lastUpdateProgress = { transferred: p.transferred, total: p.total, differential: p.differential, fullReason: p.reason };
+        pushUpdateState({ state: 'downloading', version, percent: p.percent, ...lastUpdateProgress });
       },
-      log: (msg) => console.log(msg),
+      log: updateLog,
     });
     if (res.ok) {
       await u.downloadUpdate(); // מוצא את הקובץ המוכן — בלי הורדה
       return;
     }
-    console.warn('[update] ההורדה נעצרה:', res.error);
+    updateLog(`[update] ההורדה נעצרה: ${res.error}`);
     if (res.retryable) {
       pushUpdateState({ state: 'paused', version, ...lastUpdateProgress });
       scheduleUpdateRetry();
       return;
     }
+    updateLog('[update] עוברים להורדה של electron-updater');
     await u.downloadUpdate(); // ההורדה הרגילה של electron-updater
   } catch (err) {
-    console.warn('[update] הורדת העדכון נכשלה:', /** @type {Error} */ (err).message);
+    updateLog(`[update] הורדת העדכון נכשלה: ${/** @type {Error} */ (err).message}`);
     pushUpdateState({ state: 'paused', version, ...lastUpdateProgress });
     scheduleUpdateRetry();
   } finally {
