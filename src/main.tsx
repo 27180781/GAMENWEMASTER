@@ -8,6 +8,11 @@ import { VOTE_SERVER_URL } from './app/socketAdapter.ts';
 import { parseAppParams } from './app/urlParams.ts';
 import './render/styles.css';
 import './render/themes.css';
+import './render/themes/neon.css';
+import './render/themes/gala.css';
+import './render/themes/comic.css';
+import './render/themes/chalk.css';
+import './render/themes/led.css';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('אלמנט root לא נמצא');

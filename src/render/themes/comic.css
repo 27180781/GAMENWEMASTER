@@ -1,0 +1,276 @@
+/* ערכת נושא 'comic' — ראו כללי הברזל בראש src/render/themes.css. */
+
+/*
+ * קומיקס — חוברת קומיקס לילדים ולמשפחות: קווי מתאר שחורים עבים, צל שחור קשיח
+ * מוסט, גופן מעוגל וידידותי, רשת נקודות (halftone), פיצוץ «POW» על התשובה
+ * הנכונה, ובמת גיבוי צהובה עם קרני שמש ונקודות.
+ *
+ * הכול מראה בלבד: קו המתאר העבה הוא border-color + box-shadow inset (בלי
+ * border-width חדש), הצל הקשיח הוא box-shadow חיצוני, הנקודות והפיצוץ הם
+ * pseudo-elements בתוך הקופסה הקיימת (z-index:-1 בתוך isolation, כך שהם נצבעים
+ * מעל המילוי ומתחת לטקסט). שום כרטיס אינו מסובב או מוזז.
+ *
+ * הגופן: Fredoka (עברית: Hafontia, OFL) — עגול וכבד, 300–700.
+ */
+
+@font-face {
+  font-family: 'VT Fredoka';
+  src: url('../fonts/fredoka-hebrew.woff2') format('woff2');
+  font-weight: 300 700;
+  font-display: swap;
+  ascent-override: 92%;
+  descent-override: 26%;
+  line-gap-override: 0%;
+  unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F;
+}
+@font-face {
+  font-family: 'VT Fredoka';
+  src: url('../fonts/fredoka-latin.woff2') format('woff2');
+  font-weight: 300 700;
+  font-display: swap;
+  ascent-override: 92%;
+  descent-override: 26%;
+  line-gap-override: 0%;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@keyframes vt-comic-pow {
+  0% { transform: translateY(-50%) scale(0) rotate(-40deg); opacity: 0; }
+  60% { transform: translateY(-50%) scale(1.18) rotate(8deg); opacity: 1; }
+  100% { transform: translateY(-50%) scale(1) rotate(0deg); opacity: 1; }
+}
+@keyframes vt-comic-wobble {
+  0%, 100% { transform: translateY(-50%) rotate(-6deg) scale(1); }
+  50% { transform: translateY(-50%) rotate(6deg) scale(1.06); }
+}
+@keyframes vt-comic-dots {
+  0%, 100% { background-position: 0 0, 0 0, 0 0, 0 0; }
+  50% { background-position: 0 0, 14px 10px, 0 0, 0 0; }
+}
+
+/* ---- גופן ---- */
+.game-root[data-visual-theme='comic'] :is(
+  .screen, .q-screen, .leaders-overlay, .raffle-overlay, .votes-overlay, .gs-overlay,
+  .bet-overlay, .sl-overlay, .join-banner, .gconn-screen
+) {
+  font-family: 'VT Fredoka', 'Kanuba', 'Heebo', sans-serif;
+  font-synthesis: none;
+}
+
+/* ---- תיבות בצבע המשחק: דיו שחור עבה, צל קשיח מוסט, ברק עליון קטן ---- */
+.game-root[data-visual-theme='comic'] :is(
+  .q-question, .q-card, .q-title-pill, .subject-text, .function-card, .lobby-join-dial,
+  .lobby-join-code, .q-count-num, .q-count-track, .q-score-drop, .q-survey-legend-item,
+  .q-board-name, .bet-summary-chip
+) {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0) 38%);
+  border-color: #111;
+  box-shadow:
+    inset 0 0 0 4px #111,
+    inset 0 7px 0 4px rgba(255, 255, 255, 0.22),
+    7px 8px 0 #111;
+}
+.game-root[data-visual-theme='comic'] :is(.q-question, .subject-text, .function-card) {
+  position: relative;
+  isolation: isolate;
+  border-radius: 30px;
+  box-shadow:
+    inset 0 0 0 5px #111,
+    inset 0 9px 0 5px rgba(255, 255, 255, 0.22),
+    10px 12px 0 #111;
+}
+.game-root[data-visual-theme='comic'] :is(.q-card, .lobby-join-dial, .lobby-join-code, .q-title-pill) {
+  border-radius: 22px;
+}
+/* קו המתאר של התשובה: הגבול הקיים (3px) נצבע שחור + 2px inset — יחד 5px של דיו */
+.game-root[data-visual-theme='comic'] .q-card {
+  isolation: isolate;
+  box-shadow:
+    inset 0 0 0 2px #111,
+    inset 0 6px 0 2px rgba(255, 255, 255, 0.2),
+    7px 8px 0 #111;
+}
+
+/* רשת נקודות בפינות השאלה ושקופית הנושא — מתחת לטקסט, נמוגה לפני המרכז */
+.game-root[data-visual-theme='comic'] :is(.q-question, .subject-text, .function-card)::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  z-index: -1;
+  border-radius: inherit;
+  background-image: radial-gradient(circle, rgba(0, 0, 0, 0.2) 28%, transparent 31%);
+  background-size: 13px 13px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 95% at 50% 50%, transparent 62%, #000 100%);
+  mask-image: radial-gradient(ellipse 75% 95% at 50% 50%, transparent 62%, #000 100%);
+  pointer-events: none;
+}
+.game-root[data-visual-theme='comic'] .q-answers:not(.q-answers--images) .q-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background-image: radial-gradient(circle, rgba(0, 0, 0, 0.18) 28%, transparent 31%);
+  background-size: 11px 11px;
+  -webkit-mask-image: linear-gradient(90deg, #000, transparent 22%, transparent 78%, #000);
+  mask-image: linear-gradient(90deg, #000, transparent 22%, transparent 78%, #000);
+  pointer-events: none;
+}
+
+/* המטבע: עיגול עם דיו שחור וצל קשיח */
+.game-root[data-visual-theme='comic'] .q-coin {
+  border-color: #111;
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.35), 3px 4px 0 #111;
+}
+.game-root[data-visual-theme='comic'] .q-card--correct .q-coin {
+  box-shadow: 0 0 0 3px #ffe14d, 3px 4px 0 3px #111;
+}
+
+/* התשובה הנכונה: הצבעים מתחלפים (styles.css), מסגרת צהובה-שחורה ופיצוץ POW */
+.game-root[data-visual-theme='comic'] .q-card--correct {
+  border-color: #111;
+  box-shadow:
+    inset 0 0 0 2px #111,
+    inset 0 0 0 7px #ffe14d,
+    inset 0 0 0 9px #111,
+    9px 10px 0 #111,
+    0 0 0 4px #ffe14d,
+    0 0 30px rgba(255, 225, 77, 0.75);
+}
+.game-root[data-visual-theme='comic'] .q-answers:not(.q-answers--images) .q-card--correct::before {
+  -webkit-mask-image: none;
+  mask-image: none;
+  background-image:
+    repeating-conic-gradient(from 0deg at 8% 50%, rgba(255, 225, 77, 0.28) 0deg 7deg, transparent 7deg 18deg);
+  background-size: auto;
+  inset: 9px;
+}
+/* הפיצוץ עצמו — בקצה הכרטיס (מול המטבע), ננעץ בריפוד הקיים ונחתך בשולי הכרטיס */
+.game-root[data-visual-theme='comic'] .q-answers:not(.q-answers--images) .q-card--correct::after {
+  content: '!';
+  position: absolute;
+  top: 50%;
+  inset-inline-end: 12px;
+  z-index: -1;
+  width: 78px;
+  height: 78px;
+  display: grid;
+  place-items: center;
+  font-family: 'VT Fredoka', 'Kanuba', sans-serif;
+  font-weight: 700;
+  font-size: 36px;
+  line-height: 1;
+  color: #111;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='50,3 59,27 81,10 74,35 97,31 79,50 97,69 74,65 81,90 59,73 50,97 41,73 19,90 26,65 3,69 21,50 3,31 26,35 19,10 41,27' fill='%23ffe14d' stroke='%23111' stroke-width='5' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  transform: translateY(-50%);
+  animation: vt-comic-pow 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both, vt-comic-wobble 1.8s ease-in-out 0.5s infinite;
+  pointer-events: none;
+}
+.game-root[data-visual-theme='comic'] .q-card--dim { opacity: 0.74; }
+
+/* תשובות-כתמונה: מסגרת דיו וצל קשיח; הנכונה — טבעת צהובה-שחורה */
+.game-root[data-visual-theme='comic'] .q-answers--images .q-card {
+  border-color: #111;
+  box-shadow: 7px 8px 0 #111;
+}
+.game-root[data-visual-theme='comic'] .q-answers--images .q-card--correct {
+  border-color: #111;
+  box-shadow: inset 0 0 0 5px #ffe14d, inset 0 0 0 7px #111, 0 0 0 5px #ffe14d, 9px 10px 0 5px #111;
+}
+
+/* הלוגו והטיימרים */
+.game-root[data-visual-theme='comic'] .q-logo {
+  border-color: #111;
+  box-shadow: 0 0 0 2px #111, 5px 6px 0 #111;
+}
+.game-root[data-visual-theme='comic'] .q-count-fill {
+  background-image: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.28) 0 10px, transparent 10px 20px);
+}
+
+/* ---- לוחות כהים: «לילה של קומיקס» — כחול דיו עם נקודות, דיו שחור וקו צהוב ---- */
+.game-root[data-visual-theme='comic'] :is(
+  .votes-panel, .gs-panel, .bet-panel, .raffle-box, .sl-side
+) {
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.07) 26%, transparent 29%) 0 0 / 14px 14px,
+    linear-gradient(180deg, #2a2f6e, #161a44);
+  border-color: #111;
+  border-radius: 26px;
+  box-shadow:
+    inset 0 0 0 3px #111,
+    inset 0 0 0 7px #ffe14d,
+    inset 0 0 0 9px #111,
+    12px 14px 0 #111;
+}
+.game-root[data-visual-theme='comic'] :is(
+  .leader-card:not(.leader-card--top), .score-cell, .group-list li, .gs-card:not(.gs-card--lead),
+  .votes-col:not(.votes-col--correct), .bet-row, .sl-result, .lobby-count, .q-answered-pill, .q-live
+) {
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.06) 26%, transparent 29%) 0 0 / 10px 10px,
+    linear-gradient(180deg, rgba(42, 47, 110, 0.94), rgba(22, 26, 68, 0.94));
+  border-color: #111;
+}
+.game-root[data-visual-theme='comic'] :is(.leader-card, .score-cell, .gs-card, .votes-col, .bet-col, .sl-result) {
+  border-color: #111;
+  border-radius: 16px;
+  box-shadow: inset 0 0 0 2px #111, 5px 6px 0 #111;
+}
+.game-root[data-visual-theme='comic'] :is(.raffle-title, .bet-title) {
+  color: #ffe14d;
+  text-shadow: 3px 3px 0 #111;
+}
+
+/* ---- בועות שמות המצביעים ---- */
+.game-root[data-visual-theme='comic'] .q-flyer--bubble .q-flyer-nm {
+  border-color: #111;
+  box-shadow: inset 0 0 0 2px #111, 4px 5px 0 #111;
+}
+.game-root[data-visual-theme='comic'] .q-flyer--bubble .q-flyer-nm::before {
+  box-shadow: -2px 2px 0 0 #111;
+}
+.game-root[data-visual-theme='comic'] .q-flyer-av {
+  border-color: #111;
+  box-shadow: 3px 4px 0 #111;
+}
+
+/* טקסט חופשי לבן על הרקע: קו מתאר דיו + צל קשיח, קריא גם על הבמה הצהובה */
+.game-root[data-visual-theme='comic'] :is(
+  .q-flyer:not(.q-flyer--bubble) .q-flyer-nm, .podium-name, .podium-score, .raffle-name,
+  .slide-counter
+) {
+  text-shadow:
+    0 0 2px #111, 0 0 3px #111, 2px 2px 0 #111, -1px -1px 0 #111, 1px -1px 0 #111, -1px 1px 0 #111,
+    4px 5px 0 #111;
+}
+
+/* ---- במת הגיבוי (כשאין מדיה): צהוב קומיקס, קרני שמש ונקודות ---- */
+.game-root[data-visual-theme='comic'] :is(.slide-screen, .leaders-overlay, .sl-overlay) {
+  background:
+    radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(120, 60, 0, 0.38) 100%),
+    radial-gradient(circle, rgba(214, 72, 0, 0.22) 30%, transparent 33%),
+    repeating-conic-gradient(from 0deg at 50% 46%, #ffd53d 0deg 9deg, #ffe680 9deg 18deg),
+    #ffd53d;
+  background-size: 100% 100%, 18px 18px, 100% 100%, 100% 100%;
+  animation: vt-comic-dots 12s ease-in-out infinite;
+}
+.game-root[data-visual-theme='comic'] .sl-board {
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.06) 26%, transparent 29%) 0 0 / 16px 16px,
+    linear-gradient(160deg, #2e3478, #161a44);
+  border-color: #111;
+  box-shadow: inset 0 0 0 3px #ffe14d, inset 0 0 0 5px #111, 12px 14px 0 #111;
+}
+.game-root[data-visual-theme='comic'] .sl-cell { box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.55); }
+/* צבעי הסולם/הנחש/הסיום נשארים */
+.game-root[data-visual-theme='comic'] .sl-cell:not(.sl-cell--ladder, .sl-cell--snake, .sl-cell--end) {
+  border-color: rgba(17, 17, 17, 0.9);
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-root[data-visual-theme='comic'] :is(.slide-screen, .leaders-overlay, .sl-overlay),
+  .game-root[data-visual-theme='comic'] .q-card--correct::after {
+    animation: none;
+  }
+}
