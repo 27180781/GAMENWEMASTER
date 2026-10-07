@@ -11,6 +11,11 @@ import { COLOR_PRESETS } from './mockData.ts';
 import { SCREENS } from './screens.tsx';
 import '../render/styles.css';
 import '../render/themes.css';
+import '../render/themes/neon.css';
+import '../render/themes/gala.css';
+import '../render/themes/comic.css';
+import '../render/themes/chalk.css';
+import '../render/themes/led.css';
 import './gallery.css';
 
 const params = readParams(window.location.search);
