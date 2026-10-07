@@ -208,6 +208,9 @@ export interface UpdateStatus {
   /** בהורדה: כמה בייטים ירדו ומהו סך ההורדה. בעדכון הפרשי הסך קטן בהרבה מהמתקין המלא. */
   transferred?: number;
   total?: number;
+  /** בהורדה: false = הקובץ כולו יורד ולא רק השינויים, ו-fullReason אומר למה (FULL_REASON ב-updateDownload.cjs). */
+  differential?: boolean;
+  fullReason?: string | null;
   /** למצב unsupported: למה אין עדכון אוטומטי לקובץ הזה. */
   reason?: 'sealed' | 'portable' | 'dev';
 }
