@@ -1,0 +1,150 @@
+/* וידאו המנחה אצל המסך הראשי (HostVideoControls.tsx) — בקואורדינטות הבמה
+   (1920×1080), כמו שאר התפריטים של המנחה. */
+
+/* ---- הסקציה בתפריט המפעיל ---- */
+
+.host-video-panel {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.host-video-panel h3 {
+  margin-bottom: 10px;
+  font-size: 20px;
+}
+
+.host-video-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.host-video-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.host-video-status {
+  font-size: 18px;
+}
+
+.host-video-status.is-error {
+  color: #fca5a5;
+}
+
+.host-video-hint {
+  font-size: 16px;
+  color: #fde68a;
+}
+
+.host-video-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.operator-menu .host-video-start {
+  background: #1d4ed8;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.operator-menu .host-video-panel button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.host-video-devices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 16px;
+}
+
+.host-video-device select {
+  max-width: 280px;
+  padding: 4px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  background: #0b0e1a;
+  color: #fff;
+  font: inherit;
+  font-size: 16px;
+}
+
+.host-video-preview {
+  flex: none;
+  width: 240px;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  background: #000;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+/* ---- התג בפינת המסך הראשי (ליד נורית החיבור) ---- */
+
+.host-video-chip {
+  position: absolute;
+  bottom: 10px;
+  inset-inline-start: 44px;
+  z-index: 46;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 18px;
+  opacity: 0.85;
+  transition: opacity 0.15s ease;
+}
+
+.host-video-chip.is-off {
+  opacity: 0.45;
+}
+
+.host-video-chip:hover {
+  opacity: 1;
+}
+
+.host-video-chip button {
+  min-width: 34px;
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.host-video-chip button:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.host-video-chip button.is-muted {
+  background: rgba(220, 38, 38, 0.75);
+}
+
+.host-video-chip button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.host-video-chip-state {
+  padding: 0 8px;
+  font-weight: 700;
+  white-space: nowrap;
+}

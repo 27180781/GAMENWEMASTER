@@ -17,6 +17,7 @@ import {
   type LiveHostInput,
 } from '../src/live/snapshot.ts';
 import { SILENCE } from '../src/live/soundTrack.ts';
+import type { LiveVideo } from '../src/live/video/api.ts';
 import type { RailPlayer } from '../src/render/QuestionSlide.tsx';
 import { fourAnswers, makeGame, makeSnapshot, rawSlide } from './helpers.ts';
 
@@ -107,6 +108,7 @@ function input(engine: GameEngine, over: Partial<LiveHostInput> = {}): LiveHostI
     sound: SILENCE,
     cues: [],
     revealThumb: null,
+    video: null,
     ...over,
   };
 }
@@ -270,6 +272,19 @@ describe('מצב המסך למסך הצפייה', () => {
     const snap = new LiveSnapshotBuilder().build(input(engine));
     expect('narration' in snap.game.setting).toBe(false);
     expect(snap.game.setting.mainColor).toBe(engine.getGame().setting.mainColor);
+  });
+
+  it('וידאו המנחה: הדגל ברישיון לא יוצא לצופים; השידור — רק מזהה ומצב', () => {
+    const game = liveGame();
+    game.setting.hostVideo = true;
+    const engine = new GameEngine(game);
+    const builder = new LiveSnapshotBuilder();
+    const off = builder.build(input(engine));
+    expect('hostVideo' in off.game.setting).toBe(false);
+    expect(off.video).toBeNull();
+    const video = { gen: 'g1', cam: true, mic: false, extra: 'x' } as unknown as LiveVideo;
+    const on = builder.build(input(engine, { video }));
+    expect(on.video).toEqual({ gen: 'g1', cam: true, mic: false });
   });
 
   it('טיימר: עוגן חדש רק כשהספירה של הצופה הייתה סוטה', () => {
