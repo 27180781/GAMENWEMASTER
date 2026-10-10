@@ -88,6 +88,7 @@ import { decodeSlideMedia } from './mediaDecode.ts';
 import { extractHostVote } from './hostRemote.ts';
 import { autoSkipDelayMs } from './autoSkip.ts';
 import { completedQuestionCount, shouldShowLeaderboard } from './leaderboardSchedule.ts';
+import { questionSoundCovered, replayQuestionSound } from './questionSound.ts';
 import {
   assignGroupByNumber,
   captureRemote,
@@ -1094,7 +1095,11 @@ export function GameHost({
         // הצגת השאלה מיד עם הכניסה לשקופית הצבעה — בלי "מסך רקע ריק" ולחיצה ראשונה.
         // (אם מתנגנת מדיית פתיחה חוסמת, השאלה מוצגת אחרי סיומה כרגיל.)
         setReveal({ questionShown: true, answersShown: 0, revealCorrect: false });
-        audio.play('showQuestion', soundsRef.current.showQuestionMediaSound.src);
+        // מאחורי מסך הפתיחה או טבלת המובילים הצליל היה נבלע — הוא מתנגן כשהכיסוי
+        // יורד (ראו questionSound.ts).
+        if (!questionSoundCovered(stageRef.current, leadersOverlayRef.current)) {
+          audio.play('showQuestion', soundsRef.current.showQuestionMediaSound.src);
+        }
       }
     } else {
       setReveal(NO_REVEAL);
@@ -2443,6 +2448,34 @@ export function GameHost({
     audio.play('winnersList', sounds.winnersListMediaSound.src);
     return () => audio.stop('winnersList');
   }, [leadersOverlay, audio, sounds]);
+
+  // כיסוי עם צליל משלו ירד (מסך הפתיחה, טבלת המובילים, מסכי הסיום) — צליל
+  // הצגת השאלה, אם השאלה עלתה מאחוריו ועדיין במצב "רק עלתה". בלי זה שאלה 1
+  // והשאלה שאחרי טבלת המובילים האוטומטית עלו בלי הצליל (ראו questionSound.ts).
+  // צליל הכיסוי נעצר ב-cleanup של האפקטים שלמעלה, ו-React מריץ את כל ה-cleanup
+  // של קומיט לפני האפקטים שלו — כך שהצליל כאן לא נעצר מיד אחרי שהתחיל.
+  const questionCovered = questionSoundCovered(stage, leadersOverlay);
+  const questionCoveredRef = useRef(questionCovered);
+  useEffect(() => {
+    const wasCovered = questionCoveredRef.current;
+    questionCoveredRef.current = questionCovered;
+    const st = engine.getState();
+    const r = revealRef.current;
+    const replay = replayQuestionSound({
+      wasCovered,
+      covered: questionCovered,
+      slideChanged: revealSlide !== st.currentSlideId,
+      view: {
+        votable: isVotableSlide(engine.getCurrentSlide()),
+        phase: st.phase,
+        activeMedia: st.activeMedia,
+        questionShown: r.questionShown,
+        answersShown: r.answersShown,
+        revealCorrect: r.revealCorrect,
+      },
+    });
+    if (replay) audio.play('showQuestion', soundsRef.current.showQuestionMediaSound.src);
+  }, [questionCovered, revealSlide, engine, audio]);
 
   // -------------------------------------------------------------------------
   // "סולמות וחבלים קבוצתי": בסיום חשיפת התשובה מחשבים את הסבב (אחוז הצלחה לכל
