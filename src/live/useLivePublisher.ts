@@ -9,7 +9,7 @@
  * שום כשל כאן לא נוגע במשחק: אין חיבור — המשחק ממשיך כרגיל, והשידור מנסה שוב.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { AudioManager } from '../app/AudioManager.ts';
 import { imageRevealBlurFor, imageRevealOf } from '../engine/imageReveal.ts';
 import { LivePublisher, type PublisherStatus } from './publisher.ts';
@@ -55,7 +55,10 @@ export function useLivePublisher({
 
   const active = enabled && gameId.trim() !== '' && roomId.trim() !== '';
 
-  useEffect(() => {
+  // useLayoutEffect ולא useEffect: מוזיקת מסך הפתיחה מתחילה באפקט של GameHost
+  // כבר בקומיט הראשון, ואפקט רגיל כאן היה מחבר את המאזין אחריו — כך הצופים
+  // לא שמעו אותה אף פעם. אפקט layout רץ לפני כל האפקטים הרגילים של הקומיט.
+  useLayoutEffect(() => {
     if (!active) return undefined;
     let cancelled = false;
     let publisher: LivePublisher | null = null;
