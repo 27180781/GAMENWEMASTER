@@ -87,7 +87,7 @@ import {
 import { decodeSlideMedia } from './mediaDecode.ts';
 import { extractHostVote } from './hostRemote.ts';
 import { autoSkipDelayMs } from './autoSkip.ts';
-import { completedQuestionCount, shouldShowLeaderboard } from './leaderboardSchedule.ts';
+import { autoLeaderboardStep, completedQuestionCount } from './leaderboardSchedule.ts';
 import { questionSoundCovered, replayQuestionSound } from './questionSound.ts';
 import {
   assignGroupByNumber,
@@ -1160,6 +1160,8 @@ export function GameHost({
   const pausedAccumMsRef = useRef(0);
   /** true = הטיימר קופא כרגע בגלל שכבה חוסמת (ולא עצירה ידנית) — לְהַפְשָׁרָה בסגירה. */
   const overlayFrozeRef = useRef(false);
+  /** האם שכבה חוסמת פתוחה (overlayActive) — לקוד שרץ מחוץ לרינדור. */
+  const overlayActiveRef = useRef(false);
   /** ‎Date.now()‎ של פתיחת חלון ההצבעה הנוכחי (0 = אין חלון פתוח). */
   const votingOpenedAtRef = useRef(0);
   const lastHostAnswerRef = useRef<number | null>(null);
@@ -1277,11 +1279,23 @@ export function GameHost({
     const openedAt = Date.now();
     deadlineRef.current = openedAt + total * 1000;
     votingOpenedAtRef.current = openedAt;
-    pausedRemainingMsRef.current = null;
-    pausedRef.current = false;
     pausedAccumMsRef.current = 0;
-    setTimer({ remaining: total, total, paused: false, elapsedMs: 0, sampledAt: openedAt });
-    audio.play('timer', soundsRef.current.timerMediaSound.src, { loop: true });
+    if (overlayActiveRef.current) {
+      // ההצבעה נפתחה כששכבה חוסמת כבר על המסך (תפריט המפעיל, «קדימה» מהשלט
+      // מתחת להגרלה...): מתחילה קפואה ובלי צליל, כמו הצבעה שהשכבה נפתחה מעליה,
+      // ונפתחת כשהשכבה יורדת (אפקט ההקפאה למטה). אחרת הספירה רצה מתחת לשכבה,
+      // וצליל הטיימר קוטע את מוזיקת הטבלה.
+      pausedRemainingMsRef.current = total * 1000;
+      pausedRef.current = true;
+      pauseStartedAtRef.current = openedAt;
+      overlayFrozeRef.current = true;
+      setTimer({ remaining: total, total, paused: true, elapsedMs: 0, sampledAt: openedAt });
+    } else {
+      pausedRemainingMsRef.current = null;
+      pausedRef.current = false;
+      setTimer({ remaining: total, total, paused: false, elapsedMs: 0, sampledAt: openedAt });
+      audio.play('timer', soundsRef.current.timerMediaSound.src, { loop: true });
+    }
 
     const interval = window.setInterval(() => {
       if (pausedRef.current) return;
@@ -1336,6 +1350,14 @@ export function GameHost({
   /** עצירת/המשך הטיימר וההצבעה (פקודה 6). */
   const togglePause = useCallback(() => {
     if (engine.getState().phase !== 'voting') return;
+    if (overlayActiveRef.current && pausedRemainingMsRef.current !== null) {
+      // שכבה חוסמת פתוחה והטיימר כבר עצור מתחתיה: 6 לא מפעיל אותו (הוא היה
+      // רץ מתחת לשכבה, וצלילו קוטע את מוזיקת הטבלה). הוא רק קובע מה יקרה כשהיא
+      // תיסגר: עצירה של המנחה (נשאר עצור) או ההקפאה של השכבה (ממשיך לבד).
+      overlayFrozeRef.current = !overlayFrozeRef.current;
+      setTimer((t) => (t ? { ...t, elapsedMs: votingElapsedMs(), sampledAt: Date.now() } : t));
+      return;
+    }
     if (pausedRemainingMsRef.current === null) {
       pausedRemainingMsRef.current = Math.max(0, deadlineRef.current - Date.now());
       pausedRef.current = true;
@@ -1613,14 +1635,12 @@ export function GameHost({
         case 2:
           goBack();
           break;
-        case 3: {
-          // מחיאות כפיים: אם הוגדר קובץ ב-genericMediaSound שבגייסון — מנגנים אותו;
-          // אחרת נופלים למחיאות מסונתזות (WebAudio) כברירת מחדל.
-          const applause = soundsRef.current.genericMediaSound.src;
-          if (applause !== null && applause.trim() !== '') audio.play('generic', applause);
-          else audio.playApplause();
+        case 3:
+          // מחיאות כפיים: הקובץ שהוגדר ב-genericMediaSound שבגייסון, ובלעדיו
+          // מחיאות מסונתזות (WebAudio). מה שמתנגן (הטיימר, מוזיקת הפתיחה או
+          // הטבלה) רק מושהה וממשיך כשהן נגמרות — ראו AudioManager.playApplause.
+          audio.playApplause(soundsRef.current.genericMediaSound.src);
           break;
-        }
         case 4:
           // בשלב חשיפת התשובה (results) עם נתוני קבוצות — פותח/סוגר את מסך דירוג
           // הקבוצות; אחרת (בזמן טיימר ההצבעה) נשאר קיצור להוספת 10 שניות.
@@ -1998,9 +2018,11 @@ export function GameHost({
   // מדיה חוסמת (openMedia/endMedia) מתנגנת עם הקול שלה דרך הנגן — היא בלעדית,
   // ולכן עוצרת כל סאונד-ערוץ שמתנגן (בדיוק כמו שסאונד חדש עוצר את הקודמים).
   // בלי זה, סאונד ערוץ (למשל חשיפת תשובה) יכול להתערבב עם וידאו הסיום.
+  // מתחת לטבלת המובילים המדיה ממתינה (MediaPauseContext), ולכן מוזיקת הטבלה
+  // נשארת. העצירה קורית כשהטבלה יורדת והמדיה באמת מתחילה.
   useEffect(() => {
-    if (stage === 'playing' && state.activeMedia !== null) audio.stopAll();
-  }, [stage, state.activeMedia, audio]);
+    if (stage === 'playing' && state.activeMedia !== null && !leadersOverlay) audio.stopAll();
+  }, [stage, state.activeMedia, leadersOverlay, audio]);
 
   // סוף המשחק במנוע → מסך זוכים
   useEffect(() => {
@@ -2099,6 +2121,7 @@ export function GameHost({
     captureOn || // קליטת שלטים — המשחק ממתין, לא מתקדם מאחורי הגב
     lobbyOverlay || // מסך התחברות (X) — הטיימר קופא, וממשיכים ברווח
     menuOpen;
+  overlayActiveRef.current = overlayActive;
 
   // -------------------------------------------------------------------------
   // הבמאי של הקריינות (ENGINE-narration.md): אפקט אחד שאוסף את מה שמוצג על
@@ -2204,8 +2227,15 @@ export function GameHost({
       questionShown: reveal.questionShown,
       answersShown: reveal.answersShown,
       revealCorrect: reveal.revealCorrect,
+      // «עצור» רק כשהמנחה עצר. ההקפאה של שכבה חוסמת אינה עצירה מבחינת הקריין:
+      // היא מגיעה קומיט אחד אחרי השכבה, והייתה קוטעת את המשפט על השכבה
+      // (מובילים, הגרלה) ואומרת «ממשיכים» בסגירה בלי שנאמר שעוצרים.
       timer: timer
-        ? { remaining: timer.remaining, total: timer.total, paused: timer.paused }
+        ? {
+            remaining: timer.remaining,
+            total: timer.total,
+            paused: timer.paused && !overlayFrozeRef.current,
+          }
         : null,
       overlay: narrationOverlay,
       leaders: leaderRows.map((w) => w.score),
@@ -2418,36 +2448,70 @@ export function GameHost({
 
   // סיום סרטון/יוטיוב חוסם — מעבר אוטומטי רק אם autoT.media.video.playToEnd דלוק.
   // (מחובר ל-onEnded של הנגן דרך SlideView; אם כבוי — הסרטון נשאר עד לחיצה.)
+  // מדיה עוצרת מתחת לשכבה חוסמת, אבל אם בכל זאת נגמרה מתחתיה (מרוץ ברגע
+  // הפתיחה, או יוטיוב שלא קיבל את פקודת העצירה) — המעבר ממתין שהשכבה תרד.
+  // בלי זה הסוף סגר את טבלת המובילים, או קידם את המשחק מתחת לתפריט.
+  const mediaEndedUnderCoverRef = useRef<string | null>(null);
   const onBlockingMediaEnded = useCallback(() => {
-    if (autoTRef.current.media.video.playToEnd) advanceRef.current();
-  }, []);
+    if (!autoTRef.current.media.video.playToEnd) return;
+    if (overlayActiveRef.current) {
+      const st = engine.getState();
+      mediaEndedUnderCoverRef.current = `${st.currentSlideId}:${st.activeMedia ?? ''}`;
+      return;
+    }
+    advanceRef.current();
+  }, [engine]);
+  useEffect(() => {
+    const ended = mediaEndedUnderCoverRef.current;
+    if (overlayActive || ended === null) return;
+    mediaEndedUnderCoverRef.current = null;
+    // רק אם עדיין באותה מדיה (המנחה לא עבר הלאה בינתיים)
+    if (
+      stage === 'playing' &&
+      state.activeMedia !== null &&
+      ended === `${state.currentSlideId}:${state.activeMedia}`
+    )
+      advanceRef.current();
+  }, [overlayActive, stage, state.currentSlideId, state.activeMedia]);
 
   // -------------------------------------------------------------------------
   // סאונד לפי מצב (SPEC סעיף 9): התחברות / מנצחים / רשימת זוכים / מובילים
   // -------------------------------------------------------------------------
 
+  // התלות היא בקובץ עצמו ולא באובייקט הסאונדים: עדכון של המשחק בזמן שהוא רץ
+  // (Shift+R, עדכון שנשלח למנוע) יוצר אובייקט חדש, וזה היה מתחיל את המוזיקה
+  // מההתחלה — גם אצל הצופים. קובץ שבאמת השתנה עדיין מתחלף.
+  const stageSoundSrc =
+    stage === 'opening'
+      ? sounds.playersConnectingMediaSound.src
+      : stage === 'winners'
+        ? sounds.winnersMediaSound.src
+        : stage === 'scoreboard'
+          ? sounds.winnersListMediaSound.src
+          : null;
   useEffect(() => {
     if (stage === 'opening') {
-      audio.play('playersConnecting', sounds.playersConnectingMediaSound.src, { loop: true });
+      audio.play('playersConnecting', stageSoundSrc, { loop: true });
       return () => audio.stop('playersConnecting');
     }
     if (stage === 'winners') {
-      audio.play('winners', sounds.winnersMediaSound.src);
+      audio.play('winners', stageSoundSrc);
       return () => audio.stop('winners');
     }
     if (stage === 'scoreboard') {
-      audio.play('winnersList', sounds.winnersListMediaSound.src);
+      audio.play('winnersList', stageSoundSrc);
       return () => audio.stop('winnersList');
     }
     return undefined;
-  }, [stage, audio, sounds]);
+  }, [stage, audio, stageSoundSrc]);
 
   // מסך מובילים באמצע המשחק (פקודה 1) — סאונד רשימת הזוכים
+  const leadersSoundSrc = sounds.winnersListMediaSound.src;
   useEffect(() => {
     if (!leadersOverlay) return;
-    audio.play('winnersList', sounds.winnersListMediaSound.src);
+    audio.play('winnersList', leadersSoundSrc);
     return () => audio.stop('winnersList');
-  }, [leadersOverlay, audio, sounds]);
+  }, [leadersOverlay, audio, leadersSoundSrc]);
 
   // כיסוי עם צליל משלו ירד (מסך הפתיחה, טבלת המובילים, מסכי הסיום) — צליל
   // הצגת השאלה, אם השאלה עלתה מאחוריו ועדיין במצב "רק עלתה". בלי זה שאלה 1
@@ -2474,7 +2538,10 @@ export function GameHost({
         revealCorrect: r.revealCorrect,
       },
     });
-    if (replay) audio.play('showQuestion', soundsRef.current.showQuestionMediaSound.src);
+    // בלי קובץ לצליל השאלה אין מה לנגן — ו-play ריק היה עוצר כל מה שמתנגן,
+    // למשל מחיאות כפיים שהתחילו מתחת לטבלה.
+    const src = soundsRef.current.showQuestionMediaSound.src;
+    if (replay && src !== null && src.trim() !== '') audio.play('showQuestion', src);
   }, [questionCovered, revealSlide, engine, audio]);
 
   // -------------------------------------------------------------------------
@@ -2531,18 +2598,20 @@ export function GameHost({
 
   // טבלת מובילים אוטומטית (setting.showWinnersListAfter) — פעם בכל N שאלות
   // שהושלמו קופצת אוטומטית שכבת המובילים (המנחה סוגר אותה ברווח/0 וממשיך).
-  // ה-ref מונע הצגה חוזרת לאותה כמות שאלות (ולא קופץ על שקופיות לא-מצביעות).
+  // ה-ref הוא הספירה הגבוהה ביותר שכבר טופלה, כך שהטבלה לא נפתחת שוב אחרי
+  // חזרה (ראו autoLeaderboardStep) ולא קופצת על שקופיות לא-מצביעות.
   useEffect(() => {
     if (stage !== 'playing' || state.phase === 'ended') return;
     const completed = completedQuestionCount(engine.getGame(), state.slidesCompleted);
-    if (completed === autoLeadersShownAtRef.current) return; // אין שאלה חדשה שהושלמה
-    if (shouldShowLeaderboard(completed, engine.getGame().setting.showWinnersListAfter)) {
-      autoLeadersShownAtRef.current = completed;
+    const step = autoLeaderboardStep(
+      autoLeadersShownAtRef.current,
+      completed,
+      engine.getGame().setting.showWinnersListAfter,
+    );
+    autoLeadersShownAtRef.current = step.handled;
+    if (step.show) {
       setLeadersOverlay(true);
       debugLog('game', `טבלת מובילים אוטומטית אחרי ${completed} שאלות`);
-    } else {
-      // מעדכנים את המונה גם בלי הצגה, כדי שספירה עתידית תשווה מול הכמות הנוכחית
-      autoLeadersShownAtRef.current = completed;
     }
   }, [state.slidesCompleted, state.phase, stage, engine]);
 

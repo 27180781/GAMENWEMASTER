@@ -100,13 +100,21 @@ export function MediaPlayer({ src, onEnded, asBackground = false, className }: M
     else if (el instanceof HTMLAudioElement) el.muted = forceMuted;
   }, [forceMuted, asBackground, loadSrc]);
 
-  // מסך הצפייה: מי שנכנס באמצע סרטון קופץ לנקודה שבה המסך הראשי נמצא.
+  // מסך הצפייה: מי שנכנס באמצע סרטון קופץ לנקודה שבה המסך הראשי נמצא. אחרי
+  // עצירה מתחת לשכבה ההתחלה זזה (mediaClock.ts), וצופה שכבר נמצא באותה נקודה
+  // לא קופץ שוב.
   useEffect(() => {
     const el = elRef.current;
     if (!el || asBackground || startedAt === null) return undefined;
     const seek = () => {
       const offset = (Date.now() - startedAt) / 1000;
-      if (offset > 1.5 && Number.isFinite(el.duration) && offset < el.duration - 0.5) el.currentTime = offset;
+      if (
+        Math.abs(offset - el.currentTime) > 1.5 &&
+        offset >= 0 &&
+        Number.isFinite(el.duration) &&
+        offset < el.duration - 0.5
+      )
+        el.currentTime = offset;
     };
     if (el.readyState >= 1) {
       seek();
@@ -139,11 +147,17 @@ export function MediaPlayer({ src, onEnded, asBackground = false, className }: M
   }, [loadSrc, kind]);
 
   // עצירה/המשך לפי השכבה החוסמת — ממשיכים בדיוק מאותה נקודה.
+  // מדיה של השקופית (לא רקע) שעלתה מתחת לשכבה ועוד לא התחילה (autoplay) נעצרת
+  // גם היא: בלי זה היא התחילה לנגן עם קול מתחת לטבלת המובילים, ונגמרה לפני
+  // שראו אותה. pause() מבטל את ה-autoplay, והיא מתחילה מהפריים הראשון כשהשכבה
+  // יורדת. רקע לא: הוא מושתק, והרקע של השכבה עצמה (למשל של טבלת המובילים)
+  // עולה יחד איתה ונמצא גם הוא בתוך ההקשר.
   useEffect(() => {
     const el = elRef.current;
     if (!el) return;
     if (pausedByOverlay) {
-      if (!el.paused && !el.ended) {
+      const waitingToStart = el.paused && el.autoplay && !asBackground;
+      if (!el.ended && (!el.paused || waitingToStart)) {
         overlayPausedRef.current = true;
         el.pause();
       }
@@ -153,7 +167,7 @@ export function MediaPlayer({ src, onEnded, asBackground = false, className }: M
         /* חסימת autoplay — נשאר עצור, המנחה ימשיך ידנית */
       });
     }
-  }, [pausedByOverlay, loadSrc]);
+  }, [pausedByOverlay, loadSrc, asBackground]);
 
   /** עיגול הטעינה שמוצג מעל המדיה בזמן המתנה לנתונים (לא על רקע — מכער). */
   const spinner =
@@ -222,6 +236,8 @@ export function MediaPlayer({ src, onEnded, asBackground = false, className }: M
         <YouTubeEmbed
           src={src}
           className={className}
+          // רקע ממשיך לרוץ מתחת לשכבות, כמו קודם (גם הרקע של השכבה עצמה).
+          pauseUnderCover={!asBackground}
           // ברקע לא מסירים את הסרטון על שתיקת הנגן — ראו youtubeHandshake.ts.
           {...(asBackground ? {} : { onFailed: () => setFailed(true) })}
           {...(onEnded && !asBackground ? { onEnded } : {})}
@@ -257,15 +273,42 @@ function YouTubeEmbed({
   onEnded,
   onFailed,
   className,
+  pauseUnderCover,
 }: {
   src: string;
   onEnded?: (() => void) | undefined;
   /** הנגן לא ענה — ראו ALIVE_TIMEOUT_MS ב-youtubeHandshake.ts. */
   onFailed?: (() => void) | undefined;
   className?: string | undefined;
+  /** נעצר מתחת לשכבה חוסמת (מדיה של השקופית, לא רקע). */
+  pauseUnderCover: boolean;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const endedRef = useRef(false);
+  /** פקודה לנגן דרך ה-postMessage שלו (enablejsapi=1). */
+  const command = useCallback((func: string) => {
+    iframeRef.current?.contentWindow?.postMessage(
+      JSON.stringify({ event: 'command', func, args: [] }),
+      '*',
+    );
+  }, []);
+  // שכבה חוסמת (טבלה, תפריט, הגדרות...): נעצר מתחתיה וממשיך כשהיא יורדת, כמו
+  // וידאו רגיל. עד עכשיו יוטיוב המשיך לרוץ עם קול מתחת לכל השכבות.
+  const pausedByOverlay = useContext(MediaPauseContext) && pauseUnderCover;
+  const coverRef = useRef(pausedByOverlay);
+  coverRef.current = pausedByOverlay;
+  /** האם *אנחנו* עצרנו — רק אז ממשיכים כשהשכבה יורדת (לא סרטון שנגמר). */
+  const coverPausedRef = useRef(false);
+  useEffect(() => {
+    if (pausedByOverlay) {
+      if (endedRef.current) return;
+      coverPausedRef.current = true;
+      command('pauseVideo');
+    } else if (coverPausedRef.current) {
+      coverPausedRef.current = false;
+      if (!endedRef.current) command('playVideo');
+    }
+  }, [pausedByOverlay, src, command]);
   // מסך הצפייה: מושתק עד שהצופה מפעיל צליל. הפרמטר נקבע פעם אחת (שינוי שלו
   // היה טוען את הסרטון מחדש); שינוי אחר כך עובר כפקודה לנגן.
   const forceMuted = useContext(MediaMutedContext);
@@ -274,11 +317,8 @@ function YouTubeEmbed({
   useEffect(() => {
     if (lastMutedRef.current === forceMuted) return;
     lastMutedRef.current = forceMuted;
-    iframeRef.current?.contentWindow?.postMessage(
-      JSON.stringify({ event: 'command', func: forceMuted ? 'mute' : 'unMute', args: [] }),
-      '*',
-    );
-  }, [forceMuted]);
+    command(forceMuted ? 'mute' : 'unMute');
+  }, [forceMuted, command]);
   /**
    * הקריאות החוזרות נשמרות ב-ref ואינן ב-deps של האפקט. בלי זה כל רינדור
    * מחדש (למשל חיווי הטעינה) היה יוצר פונקציה חדשה, האפקט היה רץ שוב, וטיימר
@@ -325,6 +365,12 @@ function YouTubeEmbed({
             endedRef.current = true;
             endedCb.current?.();
           }
+          // הנגן התחיל (או טוען כדי להתחיל) בזמן ששכבה פתוחה: פקודת העצירה
+          // נשלחה לפני שהיה מוכן, או שהסרטון עלה כבר מתחת לשכבה (autoplay).
+          if ((playerState === 1 || playerState === 3) && coverRef.current && !endedRef.current) {
+            coverPausedRef.current = true;
+            command('pauseVideo');
+          }
         }
       } catch {
         // הודעה לא-JSON — לא שלנו
@@ -341,7 +387,7 @@ function YouTubeEmbed({
       iframe.removeEventListener('load', handshake.sendNow);
       handshake.dispose();
     };
-  }, [src]);
+  }, [src, command]);
 
   // ‎youtube.com/watch‎ מסרב להיות ממוסגר (X-Frame-Options), ולכן כל צורה של
   // קישור מומרת ל-‎/embed/<id>‎. בלי זה המסך הראה ריבוע אפור עם סמל עמוד שבור.

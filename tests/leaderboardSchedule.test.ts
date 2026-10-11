@@ -3,7 +3,11 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { completedQuestionCount, shouldShowLeaderboard } from '../src/app/leaderboardSchedule.ts';
+import {
+  autoLeaderboardStep,
+  completedQuestionCount,
+  shouldShowLeaderboard,
+} from '../src/app/leaderboardSchedule.ts';
 import { fourAnswers, makeGame, rawSlide } from './helpers.ts';
 
 // משחק: 3 שאלות (trivia) + שקופית טקסט (subject, לא מצביעה) באמצע
@@ -54,5 +58,30 @@ describe('shouldShowLeaderboard', () => {
   it('showAfter=1 — מציג אחרי כל שאלה', () => {
     expect(shouldShowLeaderboard(1, 1)).toBe(true);
     expect(shouldShowLeaderboard(2, 1)).toBe(true);
+  });
+});
+
+describe('autoLeaderboardStep', () => {
+  it('נפתחת בכל כפולה של N, פעם אחת', () => {
+    expect(autoLeaderboardStep(1, 2, 2)).toEqual({ handled: 2, show: true });
+    expect(autoLeaderboardStep(2, 3, 2)).toEqual({ handled: 3, show: false });
+    expect(autoLeaderboardStep(3, 4, 2)).toEqual({ handled: 4, show: true });
+  });
+
+  it('חזרה אחורה ואז קדימה לא פותחת שוב את הטבלה שכבר הוצגה', () => {
+    // בשאלה 4 (3 הושלמו) Backspace מחזיר לשאלה 3 — הספירה יורדת ל-2
+    expect(autoLeaderboardStep(3, 2, 2)).toEqual({ handled: 3, show: false });
+    // ושוב קדימה — 3 הושלמו, כבר טופל
+    expect(autoLeaderboardStep(3, 3, 2)).toEqual({ handled: 3, show: false });
+    // השאלה הבאה שמושלמת לראשונה — 4, נקודת טבלה חדשה
+    expect(autoLeaderboardStep(3, 4, 2)).toEqual({ handled: 4, show: true });
+  });
+
+  it('מכובה — מתקדמת בלי להציג', () => {
+    expect(autoLeaderboardStep(0, 5, null)).toEqual({ handled: 5, show: false });
+  });
+
+  it('התחלה מחדש (handled = 0) מציגה שוב מההתחלה', () => {
+    expect(autoLeaderboardStep(0, 2, 2)).toEqual({ handled: 2, show: true });
   });
 });
