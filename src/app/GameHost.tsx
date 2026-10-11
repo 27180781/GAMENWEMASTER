@@ -1213,6 +1213,14 @@ export function GameHost({
   // (leading + trailing), כדי שהמון גדול לא יגרום לסופת רינדור.
   // -------------------------------------------------------------------------
   const pendingVoteRef = useRef<VoteSnapshot | null>(null);
+  /**
+   * ה-snapshot האחרון שהגיע בזמן שההצבעה עצורה (6 או שכבה חוסמת). בעצירה
+   * ההצבעות לא נקלטות, אבל גם לא נזרקות: הוא נקלט כשממשיכים או כשסוגרים את
+   * ההצבעה (releaseHeldVotes). ה-snapshot מצטבר, ולכן מספיק האחרון. בלי זה
+   * הצבעות שנשלחו בעצירה נספרו רק אם מישהו הצביע אחריהן — שרת ההצבעות שולח
+   * snapshot רק כשמישהו מצביע — ומי שענה אחרון בעצירה לא קיבל ניקוד.
+   */
+  const heldVoteRef = useRef<VoteSnapshot | null>(null);
   const voteFlushTimerRef = useRef<number | null>(null);
   /** האטת רישום ההצבעות ללוג — לכל היותר פעם ב-500ms, שלא יציף. */
   const lastVoteLogRef = useRef(0);
@@ -1276,6 +1284,17 @@ export function GameHost({
   const scheduleVoteFlushRef = useRef(scheduleVoteFlush);
   scheduleVoteFlushRef.current = scheduleVoteFlush;
 
+  /** ההצבעות שהגיעו בזמן העצירה (heldVoteRef) נקלטות עכשיו. */
+  const releaseHeldVotes = useCallback(() => {
+    const held = heldVoteRef.current;
+    heldVoteRef.current = null;
+    if (held === null) return;
+    // snapshot חדש יותר כבר ממתין — הוא מצטבר, ולכן מכיל גם את אלה
+    if (pendingVoteRef.current !== null && pendingVoteRef.current.seq > held.seq) return;
+    pendingVoteRef.current = held;
+    scheduleVoteFlushRef.current();
+  }, []);
+
   // ניקוי טיימר ה-throttle בעזיבת הקומפוננטה
   useEffect(
     () => () => {
@@ -1297,8 +1316,10 @@ export function GameHost({
         voteFlushTimerRef.current = null;
       }
       pendingVoteRef.current = null;
+      heldVoteRef.current = null;
       return;
     }
+    heldVoteRef.current = null; // חלון הצבעה חדש
     // קוראים את השקופית והסאונדים דרך המנוע/ref (ולא כתלות ישירה) — כדי שרענון
     // תוכן חם (updateGame, שמחליף את זהות האובייקטים) באמצע הצבעה לא יריץ מחדש
     // את ה-effect ויאפס את הטיימר לזמן מלא.
@@ -1400,8 +1421,9 @@ export function GameHost({
       pausedRef.current = false;
       audio.play('timer', sounds.timerMediaSound.src, { loop: true });
       setTimer((t) => (t ? { ...t, paused: false, elapsedMs: votingElapsedMs(), sampledAt: Date.now() } : t));
+      releaseHeldVotes();
     }
-  }, [engine, audio, sounds, votingElapsedMs]);
+  }, [engine, audio, sounds, votingElapsedMs, releaseHeldVotes]);
 
   // -------------------------------------------------------------------------
   // זרימת השלבים: קדימה (רווח / 0) ואחורה (2)
@@ -1450,6 +1472,7 @@ export function GameHost({
     if (current.phase === 'voting') {
       // עצירת הטיימר וסגירת ההצבעה (אם לא נגמר כבר לבד) — בלי חשיפה: זו קורית
       // בלחיצה הבאה (שלב results), אחיד לכל סוגי השקופיות.
+      releaseHeldVotes(); // נסגרת בזמן עצירה — ההצבעות שהגיעו בה נספרות
       flushVotesRef.current(); // ההצבעות האחרונות שהצטברו נספרות לפני הסגירה
       engine.dispatch({ type: 'ADVANCE', at: now });
       return;
@@ -1482,7 +1505,7 @@ export function GameHost({
 
     // showing של שקופית מדיה/טקסט: מדיית פתיחה → השקופית הבאה
     engine.dispatch({ type: 'ADVANCE', at: now });
-  }, [engine, audio, sounds]);
+  }, [engine, audio, sounds, releaseHeldVotes]);
 
   /**
    * כניסה מחדש לשקופית במצב "כל התשובות חשופות, טיימר טרם הופעל" — בלי
@@ -1920,8 +1943,6 @@ export function GameHost({
         if (snapshot.voters) applyGroupPressesRef.current(connectCat, snapshot.voters);
         return;
       }
-      // בזמן עצירה (פקודה 6) אין קליטת הצבעות
-      if (pausedRef.current) return;
       // שקופית המוגבלת לקבוצה: הקשות של מי שאינו בקבוצה המורשית נזרקות כאן —
       // לפני המנוע — ולכן אינן נספרות, אינן מזכות בניקוד ואינן מופיעות בפירוט.
       // הניקוד הקיים שלהם לא משתנה; הם פשוט מדלגים על השאלה. (הסינון אחרי
@@ -1929,6 +1950,12 @@ export function GameHost({
       const restrictTo = slideGroupRestriction(engine.getCurrentSlide(), engine.getGame().setting.gameType);
       if (restrictTo !== null) {
         snapshot = restrictSnapshotToGroup(snapshot, rosterRef.current, restrictTo);
+      }
+      // בזמן עצירה (6 או שכבה חוסמת) ההצבעות לא נקלטות עד שממשיכים או סוגרים
+      // (heldVoteRef)
+      if (pausedRef.current) {
+        heldVoteRef.current = snapshot;
+        return;
       }
       // צובר את ה-snapshot המצטבר; העדכון למנוע/UI מוגבל בקצב (leading+trailing)
       pendingVoteRef.current = snapshot;
@@ -2373,9 +2400,10 @@ export function GameHost({
         pausedRef.current = false;
         audio.play('timer', soundsRef.current.timerMediaSound.src, { loop: true });
         setTimer((t) => (t ? { ...t, paused: false, elapsedMs: votingElapsedMs(), sampledAt: Date.now() } : t));
+        releaseHeldVotes();
       }
     }
-  }, [overlayActive, engine, audio, votingElapsedMs]);
+  }, [overlayActive, engine, audio, votingElapsedMs, releaseHeldVotes]);
 
   useEffect(() => {
     if (stage !== 'playing' || state.activeMedia !== null || overlayActive) return;

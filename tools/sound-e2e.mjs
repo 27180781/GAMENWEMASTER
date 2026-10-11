@@ -14,8 +14,8 @@
  *
  * כל תרחיש בונה משחק קטן משלו, עם קובץ WAV אחר לכל ערוץ צליל (q-sound.wav,
  * timer.wav…) — כך היומן אומר מה מתנגן לפי שם הקובץ. שרת מקומי מגיש אותו יחד
- * עם dist, שרת גיבוי מדומה (‎?backupUrl=‎) וממסר מסך הצפייה
- * (server/live-relay.mjs). סרטון הבדיקה נוצר בדפדפן בתחילת הריצה
+ * עם dist, שרת גיבוי מדומה (‎?backupUrl=‎), ממסר מסך הצפייה
+ * (server/live-relay.mjs) ושרת הצבעות מדומה. סרטון הבדיקה נוצר בדפדפן בתחילת הריצה
  * (MediaRecorder), כך שאין קובצי מדיה בריפו ושום דבר לא יוצא לרשת.
  *
  * כלל שנבדק בכל צעד: AudioManager מנגן ערוץ אחד בכל רגע — שני צלילים יחד הם כישלון.
@@ -34,6 +34,9 @@
  *   cover-backgrounds    הרקעים של מסך הפתיחה, של הטבלה ושל תצוגת המנצחים (W) ממשיכים לנגן.
  *   timer-under-leaders  טבלה בזמן הצבעה עוצרת את הטיימר ואת צלילו; 6 מתחתיה רק קובע
  *                        אם הוא ימשיך כשהיא נסגרת.
+ *   votes-during-pause   הצבעות מטלפונים (שרת הצבעות מדומה) שנשלחות בזמן עצירה (6)
+ *                        או מתחת לטבלה נקלטות כשממשיכים או כשסוגרים, גם כשאף אחד
+ *                        לא מצביע אחריהן.
  *   back-after-leaders   חזרה (Backspace) לשקופית שאחריה נפתחה טבלה אוטומטית לא פותחת
  *                        אותה שוב.
  *   refresh-lobby        רענון קובץ המשחק (Shift+R) לא מתחיל מחדש את מוזיקת הפתיחה.
@@ -73,6 +76,7 @@ import { tmpdir } from 'node:os';
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
+import { Server as SocketServer } from 'socket.io';
 import { startRelay, viewTokenFor } from '../server/live-relay.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -323,6 +327,36 @@ const server = createServer((req, res) => {
   serveFile(req, res, file);
 });
 
+/**
+ * שרת הצבעות מדומה (socket.io, הפרוטוקול של SocketVoteAdapter): המשחק מצטרף
+ * לחדר שלו (join/room), ו-vote() שולח לחדר הקשה של טלפון, כאילו שחקן לחץ.
+ */
+async function startVoteServer() {
+  const http = createServer();
+  const io = new SocketServer(http, { transports: ['websocket'] });
+  io.on('connection', (socket) => {
+    socket.on('join/room', (data) => {
+      const room = String(data?.gameId ?? '');
+      void socket.join(room);
+      socket.emit('room/joined', { gameId: room });
+    });
+  });
+  await new Promise((r) => http.listen(0, '127.0.0.1', r));
+  return {
+    url: `http://127.0.0.1:${http.address().port}`,
+    /** טלפון מצביע: מספר הטלפון והתשובה (answer.id). */
+    vote(room, phone, answer) {
+      io.to(String(room)).emit('voting', {
+        gameId: String(room),
+        phone,
+        vote: answer,
+        playerName: `שחקן ${phone.slice(-2)}`,
+      });
+    },
+    close: () => new Promise((r) => io.close(() => r())),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // הדפדפן: רישום הצלילים בכל דף, וסרטון הבדיקה
 // ---------------------------------------------------------------------------
@@ -408,6 +442,12 @@ function readScreen() {
     answers: document.querySelectorAll('.q-card:not(.reveal-hidden)').length,
     correct: document.querySelectorAll('.q-card--correct').length,
     timer: q('.q-count-num')?.textContent?.trim() ?? null,
+    /** «ענו» בשקופית: כמה הצבעות המנוע קלט. */
+    answered: Number(q('.q-answered-num')?.textContent ?? 0),
+    /** הניקוד בכל כרטיס של טבלת המובילים. */
+    leaderScores: [...document.querySelectorAll('.leader-card .leader-score')].map((el) =>
+      parseInt(el.textContent ?? '', 10),
+    ),
     dialogs: [...document.querySelectorAll('.license-modal h2')].map((h) => h.textContent.trim()),
   };
 }
@@ -544,8 +584,9 @@ function makeTester(scenario, context, result) {
      * טוען את המשחק ולוחץ «התחל משחק». license: 'ack' — סוגר את אזהרת
      * הרישיון (משחק בלי קוד חדר); 'leave' — משאיר אותה. backup: הגיבוי ש-GET
      * יחזיר (מפעיל את שרת הגיבוי המדומה). relayBase: ממסר מסך הצפייה.
+     * voteServer: שרת ההצבעות המדומה (startVoteServer), למשחק עם קוד חדר.
      */
-    async open(spec, { license = 'ack', backup, relayBase } = {}) {
+    async open(spec, { license = 'ack', backup, relayBase, voteServer } = {}) {
       if (spec.slides.some((s) => s.open || s.video) || spec.backgrounds) await ensureClip();
       const game = gameFile(scenario.name, spec);
       mkdirSync(join(FX, scenario.name), { recursive: true });
@@ -555,9 +596,9 @@ function makeTester(scenario, context, result) {
       const phones = spec.room !== undefined;
       if (phones) {
         // משחק עם קוד חדר מתחבר לשרת ההצבעות, משדר לממסר ומגבה — הכול לכתובות
-        // מקומיות, כדי ששום דבר לא יגיע לשרתים האמיתיים. שרת ההצבעות בכתובת
-        // מתה: אין הצבעות, והמשחק עצמו רץ כרגיל.
-        query.set('voteServer', 'http://127.0.0.1:9');
+        // מקומיות, כדי ששום דבר לא יגיע לשרתים האמיתיים. בלי voteServer שרת
+        // ההצבעות בכתובת מתה: אין הצבעות, והמשחק עצמו רץ כרגיל.
+        query.set('voteServer', voteServer ?? 'http://127.0.0.1:9');
         query.set('liveRelay', relayBase ?? 'http://127.0.0.1:9/live');
       } else {
         query.set('demo', '1');
@@ -1053,6 +1094,92 @@ const SCENARIOS = [
     },
   },
   {
+    name: 'votes-during-pause',
+    title: 'הצבעות שנשלחות בזמן עצירה (6) או מתחת לטבלה נספרות',
+    async run(t) {
+      const votes = await startVoteServer();
+      try {
+        const room = 5150;
+        await t.open(
+          { room, slides: [Q({ time: 8 }), Q({ time: 30 }), Q({ time: 30 }), Q()] },
+          { voteServer: votes.url },
+        );
+        const LIVE = 700; // ההקשה עוברת דרך שרת ההצבעות
+        const vote =
+          (...pairs) =>
+          async () => {
+            for (const [phone, answer] of pairs) votes.vote(room, phone, answer);
+          };
+        const answered = (n) => (s) => s.answered === n || `ענו ${s.answered} במקום ${n}`;
+        const scored = (n) => (s) => {
+          const got = s.leaderScores.filter((score) => score > 0).length;
+          return got === n || `בטבלה ${got} עם ניקוד במקום ${n} (${s.leaderScores.join(', ')})`;
+        };
+        const closed = (s) => s.timer === null || `הטיימר ${s.timer} עדיין מוצג`;
+
+        // שאלה 1: אחד עונה לפני העצירה, שניים בזמנה, ואף אחד אחריה; הטיימר נגמר לבד
+        await t.step('שאלה 1', t.space());
+        await t.step('התשובות', t.space(3));
+        await t.step('הצבעה (8 שניות)', t.space(), { sound: ['timer.wav'] });
+        await t.step('טלפון 1 עונה נכון', vote(['0500000001', 1]), { check: answered(1) }, LIVE);
+        await t.step('6 — עצירה', t.key('6'), {
+          sound: [],
+          check: (s) => s.timer === '⏸' || `הטיימר ${s.timer ?? 'לא מוצג'} במקום עצור`,
+        });
+        await t.step(
+          'טלפונים 2 (נכון) ו-3 (לא נכון) עונים בזמן העצירה',
+          vote(['0500000002', 1], ['0500000003', 2]),
+          { sound: [] },
+          LIVE,
+        );
+        await t.step('6 — ממשיכים, ואף אחד לא עונה אחרי: שלוש ההצבעות נקלטות', t.key('6'), {
+          sound: ['timer.wav'],
+          check: answered(3),
+        });
+        await t.step('הטיימר נגמר', t.wait(8500), {
+          sound: [],
+          check: (s) => [closed(s), answered(3)(s)],
+        });
+        await t.step('חשיפה', t.space());
+        await t.step('טבלה (1): שני מי שענו נכון', t.key('1'), { check: scored(2) }, 600);
+        await t.step('סגירת הטבלה', t.key('1'));
+
+        // שאלה 2: שניים עונים בזמן העצירה, והמנחה סוגר את ההצבעה כשהיא עדיין עצורה
+        await t.step('שאלה 2', t.space());
+        await t.step('התשובות', t.space(3));
+        await t.step('הצבעה', t.space(), { sound: ['timer.wav'] });
+        await t.step('6 — עצירה', t.key('6'), { sound: [] });
+        await t.step(
+          'טלפונים 2 ו-4 עונים נכון בזמן העצירה',
+          vote(['0500000002', 1], ['0500000004', 1]),
+          {},
+          LIVE,
+        );
+        await t.step('סגירת ההצבעה (רווח) בזמן העצירה: שתי ההצבעות נקלטות', t.space(), {
+          check: (s) => [closed(s), answered(2)(s)],
+        });
+        await t.step('חשיפה', t.space());
+        await t.step('טבלה (1): שלושה עם ניקוד', t.key('1'), { check: scored(3) }, 600);
+        await t.step('סגירת הטבלה', t.key('1'));
+
+        // שאלה 3: אחד עונה מתחת לטבלה שנפתחה בזמן ההצבעה, ואף אחד אחריו
+        await t.step('שאלה 3', t.space());
+        await t.step('התשובות', t.space(3));
+        await t.step('הצבעה', t.space(), { sound: ['timer.wav'] });
+        await t.step('טבלה (1) בזמן ההצבעה', t.key('1'), { sound: ['winnerslist.wav'] }, 600);
+        await t.step('טלפון 3 עונה נכון מתחת לטבלה', vote(['0500000003', 1]), {}, LIVE);
+        await t.step('הטבלה נסגרה, ואף אחד לא עונה אחרי: ההצבעה נקלטת', t.key('1'), {
+          sound: ['timer.wav'],
+          check: answered(1),
+        });
+        await t.step('סגירה וחשיפה', t.space(2), { check: answered(1) });
+        await t.step('טבלה (1): ארבעה עם ניקוד', t.key('1'), { check: scored(4) }, 600);
+      } finally {
+        await votes.close();
+      }
+    },
+  },
+  {
     name: 'back-after-leaders',
     title: 'חזרה לשקופית שאחריה נפתחה טבלה אוטומטית',
     async run(t) {
@@ -1509,6 +1636,7 @@ function screenText(s) {
     s.scoreboard && 'ניקוד',
     s.dialogs.length > 0 && s.dialogs.join('/'),
     s.timer !== null && `טיימר ${s.timer}`,
+    s.answered > 0 && `ענו ${s.answered}`,
     s.correct > 0 && 'נכונה מסומנת',
   ].filter(Boolean);
   const media = s.media
