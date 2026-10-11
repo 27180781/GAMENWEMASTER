@@ -2083,18 +2083,6 @@ export function GameHost({
     return () => window.clearInterval(interval);
   }, [stage, syntheticCrowd, crowdConfig.voterCount, addConnected]);
 
-  // automaticSkip: מעבר אוטומטי אחרי X שניות כשאין מדיה פעילה
-  useEffect(() => {
-    if (stage !== 'playing') return;
-    const delay = autoSkipDelayMs(slide, state.phase, state.activeMedia !== null);
-    if (delay === null) return;
-    const timeout = window.setTimeout(
-      () => engine.dispatch({ type: 'ADVANCE', at: Date.now() }),
-      delay,
-    );
-    return () => window.clearTimeout(timeout);
-  }, [stage, state.phase, state.activeMedia, state.currentSlideId, engine, slide]);
-
   // -------------------------------------------------------------------------
   // מעברים אוטומטיים (autoTransition) — מבצע אוטומטית את השלב הבא לפי הדגלים:
   // הצגת השאלה+תשובות · פתיחת הטיימר · חשיפת התשובה הנכונה · מעבר לשקופית הבאה.
@@ -2410,6 +2398,42 @@ export function GameHost({
     }, delayMs);
     return () => window.clearTimeout(timeout);
   }, [stage, state.phase, state.currentSlideId, state.activeMedia, state.betOutcomes, reveal, autoT, overlayActive, engine, audio, sounds, narrationActive, narrationSpeaking]);
+
+  // מעבר אוטומטי של השקופית (setting.automaticSkip, ראו autoSkip.ts): X שניות
+  // אחרי שהשקופית סיימה את תפקידה — בשאלה, מחשיפת התשובה — ולא מתחת לשכבה
+  // חוסמת או באמצע משפט של הקריין. המעבר הוא הלחיצה הבאה של המנחה, ולכן
+  // שאלה שהכריעה הימור מציגה קודם את תוצאות ההימור, כמו ברווח.
+  useEffect(() => {
+    if (stage !== 'playing') return;
+    const delay = autoSkipDelayMs(slide, state.phase, {
+      mediaPlaying: state.activeMedia !== null,
+      answerRevealed: reveal.revealCorrect,
+      covered: overlayActive,
+      narratorSpeaking: narrationActive && narrationSpeaking,
+    });
+    if (delay === null) return;
+    const slideId = state.currentSlideId;
+    const phase = state.phase;
+    const timeout = window.setTimeout(() => {
+      // המנחה (או «השקופית הבאה» של המעברים האוטומטיים) כבר קידם באותו רגע.
+      const now = engine.getState();
+      if (now.currentSlideId !== slideId || now.phase !== phase || now.activeMedia !== null) return;
+      debugLog('auto', 'מעבר אוטומטי של השקופית (automaticSkip)', { delay });
+      advanceRef.current();
+    }, delay);
+    return () => window.clearTimeout(timeout);
+  }, [
+    stage,
+    state.phase,
+    state.activeMedia,
+    state.currentSlideId,
+    slide,
+    reveal.revealCorrect,
+    overlayActive,
+    narrationActive,
+    narrationSpeaking,
+    engine,
+  ]);
 
   // במעבר אוטומטי — מסך תוצאות ההימור נסגר לבד אחרי זמן קריאה (ההשהיה של
   // "השקופית הבאה" ועוד שתי שניות), ואז האפקט שלמעלה ממשיך לשקופית הבאה.
