@@ -2222,6 +2222,19 @@ body {
 .clicker-intro-title { font-size: 46px; font-weight: 900; margin: 0; }
 .clicker-intro-lead { font-size: 28px; margin: 0; text-align: center; color: #3a3f52; }
 .clicker-intro-lead strong { color: #171a2b; }
+/* קובץ משחק שאינו כפי שהמערכת חתמה עליו — רק מצב דמה (SettingsScreen demoOnly) */
+.clicker-intro-locked {
+  margin: 0;
+  max-width: 900px;
+  padding: 16px 26px;
+  border-radius: 22px;
+  border: 2px solid #f1c4cd;
+  background: #fdf2f4;
+  color: #8f1d32;
+  font-size: 21px;
+  line-height: 1.45;
+  text-align: center;
+}
 .clicker-intro-actions {
   display: flex;
   gap: 34px;

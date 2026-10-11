@@ -61,6 +61,7 @@ import {
   canStreamMedia,
   desktopMediaClear,
   desktopLoadSavedGame,
+  desktopCheckGameSignature,
   canUseDevice,
   onDeviceState,
   deviceSyncNow,
@@ -77,6 +78,7 @@ import {
   type GateStatus,
   type DeviceState,
   type DeviceDownloadProgress,
+  type GameSignatureInfo,
 } from './clickerBridge.ts';
 import { applyReleases, loadReleases, pruneReleases, saveReleases } from './clickerRelease.ts';
 import { loadSettled } from './clickerSave.ts';
@@ -405,6 +407,14 @@ export function App() {
   const desktopApp = isDesktopApp();
   /** הגדרות משחק מוטבע ("סגור") ב-EXE — או null אם ה-EXE גנרי. */
   const [sealConfig, setSealConfig] = useState<SealConfig | null>(null);
+  /**
+   * קובץ המשחק שעל המסך אינו כפי שהמערכת חתמה עליו (electron/gameSignature.cjs),
+   * ולכן הוא רץ עם שחקני דמה בלבד: 'changed' — שונה אחרי שנחתם; 'unsigned' —
+   * בלי חתימה והמתג «לחייב חתימה» דולק. null = כרגיל, גם בדפדפן ובכל תקלה בבדיקה.
+   */
+  const [signatureLock, setSignatureLock] = useState<'changed' | 'unsigned' | null>(null);
+  const applySignature = (signature: GameSignatureInfo | null | undefined) =>
+    setSignatureLock(signature?.demoOnly === true ? (signature.why ?? 'changed') : null);
   /** עקיפת כתובת הגיבוי דרך ‎?backupUrl=‎ (לבדיקות מול שרת מקומי), או null. */
   const backupUrlOverride = useMemo(() => {
     const value = new URLSearchParams(window.location.search).get('backupUrl');
@@ -695,6 +705,7 @@ export function App() {
           setSealConfig(saved.config);
           applySeal(res.game, saved.config);
         }
+        applySignature(saved.signature);
         setCurrentLocal(saved.local === true);
         setCurrentCode(saved.code ?? null);
         applyLoadedZip(res);
@@ -794,6 +805,7 @@ export function App() {
     try {
       revokeZip(); // עוזבים אופליין (אם היה) — משחררים את ה-Blob URLs שלו
       setOffline(false); // בחירת fixture / העלאת JSON — משחק אונליין
+      setSignatureLock(null);
       setCurrentCode(null);
       setMediaIssues([]);
       setMediaAlertDismissed(false);
@@ -837,8 +849,17 @@ export function App() {
     // ב-EXE — המדיה נזרמת מהדיסק (‏trivia-media://) במקום Blob בזיכרון, כדי
     // שהזיכרון יישאר נמוך גם למשחקים כבדי-וידאו. בדפדפן — נופל חזרה ל-Blob.
     loadGameFromZip(buffer, { stream: desktopApp })
-      .then((res) => {
-        applySeal(res.game, seal);
+      .then(async (res) => {
+        // החתימה נבדקת ב-main על data.json כפי שהוא ב-ZIP. במשחק סגור חוזרת גם
+        // התצורה, מצומצמת לתנאים החתומים.
+        const signature = res.rawJson !== undefined ? await desktopCheckGameSignature(res.rawJson) : null;
+        let bounded = seal;
+        if (seal !== undefined && signature?.config !== undefined) {
+          bounded = signature.config;
+          setSealConfig(bounded);
+        }
+        applySeal(res.game, bounded);
+        applySignature(signature);
         setCurrentLocal(false); // קובץ ZIP מהדיסק — הרישיון שלו מהמערכת
         setCurrentCode(null); // ואינו מהספרייה
         applyLoadedZip(res);
@@ -870,6 +891,7 @@ export function App() {
     }
     try {
       const res = loadGameFromExtracted(saved);
+      applySignature(saved.signature);
       setCurrentLocal(saved.local === true);
       setCurrentCode(saved.code ?? null);
       applyLoadedZip(res);
@@ -932,6 +954,7 @@ export function App() {
     zipRevokeRef.current?.();
     zipRevokeRef.current = null;
     setOffline(false);
+    setSignatureLock(null);
     setCurrentLocal(false);
     setCurrentCode(null);
     setGame(null);
@@ -1331,6 +1354,11 @@ export function App() {
   const deviceNumber = deviceState?.device?.id ? formatDeviceId(deviceState.device.id) : null;
   const lockText = (what: string) =>
     `${what} במחשב הזה דורשת אישור מהמנהל במערכת יצירת המשחקים${deviceNumber !== null ? ` (מספר המחשב: ${deviceNumber})` : ''}`;
+  /** למה המשחק שעל המסך רץ עם שחקני דמה בלבד (signatureLock), ומה עושים. */
+  const signatureLockText = (why: 'changed' | 'unsigned') =>
+    sealConfig !== null
+      ? 'קובץ המשחק שבתוכנה הזו שונה אחרי שנוצר, ולכן הוא נפתח במצב דמה בלבד. כדי לשחק עם שלטים או טלפונים, צרו את קובץ ה-EXE מחדש במערכת יצירת המשחקים.'
+      : `${why === 'changed' ? 'קובץ המשחק שונה אחרי שהורד מהמערכת' : 'לקובץ המשחק אין חתימה של המערכת'}, ולכן הוא נפתח במצב דמה בלבד. כדי לשחק עם שלטים או טלפונים, הורידו את המשחק מחדש עם הקוד שלו.${deviceNumber !== null ? ` (מספר המחשב: ${deviceNumber})` : ''}`;
   const createLocked = deviceOn && devicePerms?.createGame !== true;
   const editLocked = deviceOn && !(devicePerms?.editGame === true || (currentLocal && devicePerms?.createGame === true));
   const showDevicePanel =
@@ -1401,6 +1429,7 @@ export function App() {
           clickerSave={clickerSave.view}
           onRosterChange={clickerSave.nudge}
           onReleaseClickers={clickerSave.release}
+          demoOnly={signatureLock !== null}
         />
         {/* בזמן משחק — עיגול זעיר בפינה, לא פס מלא שמכער את המסך */}
         {!mediaPreload.done && <MediaLoadDot {...mediaPreload} />}
@@ -1457,6 +1486,7 @@ export function App() {
           offline={offline}
           qrAvailable={!offline && (pendingGame.room ?? '') !== ''}
           {...(sealConfig !== null ? { sealConfig } : {})}
+          {...(signatureLock !== null ? { demoOnly: signatureLockText(signatureLock) } : {})}
           {...(desktopApp && sealConfig === null ? { onPickAnother: () => guard('החלפת המשחק', pickAnotherGame) } : {})}
           {...(desktopApp && sealConfig === null && canCreateGame() ? { onNewGame: openNewGame } : {})}
           {...(createLocked ? { newGameLocked: lockText('בניית משחק חדש') } : {})}

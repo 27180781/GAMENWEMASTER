@@ -8,12 +8,19 @@
  * הרשת מוזרקת (post), כדי שהלוגיקה תיבדק בלי Electron — ראו
  * tests/deviceSync.test.ts. מה עושים עם התשובה מחליט ה-renderer
  * (src/app/devicePlan.ts), כי רק הוא יודע מה מוצג עכשיו על המסך.
+ *
+ * באותה בדיקה עוברים גם קובצי המשחק שאין להם חתימה (gameSignature.cjs): כמה
+ * כאלה במחשב (`unsignedGames`, שהמנהל רואה), ואילו מהם לחתום (`sign`). החתימות
+ * חוזרות ב-`signatures`, ואת המתג «לחייב חתימה» התשובה שומרת במחשב.
  */
 const identity = require('./deviceIdentity.cjs');
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CODE = /^[A-Za-z0-9_-]{1,32}$/;
+const CONTENT = /^[0-9a-f]{64}$/;
 const MAX_GAMES = 200;
+/** השרת מחזיר לכל היותר MAX_SIGN; השאר נזרק. */
+const MAX_SIGNATURES = 20;
 const DEFAULT_POLL_SECONDS = 600;
 
 /**
@@ -34,8 +41,16 @@ const DEFAULT_POLL_SECONDS = 600;
  *   blocked: boolean,
  * }} PublicDevice
  * @typedef {{ status: number, body: unknown }} PostResult
+ * @typedef {import('./gameSignature.cjs').SignResult} SignResult
  * @typedef {(
- *   | { state: 'ok', device: PublicDevice, games: DeviceGame[], pollSeconds: number, blockChanged: boolean }
+ *   | {
+ *       state: 'ok',
+ *       device: PublicDevice,
+ *       games: DeviceGame[],
+ *       pollSeconds: number,
+ *       blockChanged: boolean,
+ *       signatures: SignResult[],
+ *     }
  *   | { state: 'offline' | 'busy' | 'unavailable' | 'error', device: PublicDevice, error?: string }
  * )} SyncResult
  * blockChanged: ההשבתה השתנתה בתשובה הזו, ולכן מה שהמחשב דיווח בבקשה כבר אינו
@@ -108,6 +123,31 @@ function cleanGames(raw) {
   return out;
 }
 
+/**
+ * החתימות שחזרו לקבצים שנשלחו לחתימה, אחרי סינון. מה נשמר מהן מחליט
+ * gameSignature.applySignatures, שבודק כל אחת מול המפתחות שבתוכנה.
+ * @param {unknown} raw
+ * @returns {SignResult[]}
+ */
+function cleanSignatures(raw) {
+  if (!Array.isArray(raw)) return [];
+  /** @type {SignResult[]} */
+  const out = [];
+  for (const item of raw.slice(0, MAX_SIGNATURES)) {
+    if (item === null || typeof item !== 'object') continue;
+    const r = /** @type {Record<string, unknown>} */ (item);
+    if (typeof r.gameId !== 'string' || !UUID.test(r.gameId)) continue;
+    if (typeof r.content !== 'string' || !CONTENT.test(r.content)) continue;
+    const base = { gameId: r.gameId.toLowerCase(), content: r.content };
+    if (r.signature !== null && typeof r.signature === 'object' && !Array.isArray(r.signature)) {
+      out.push({ ...base, signature: /** @type {Record<string, unknown>} */ (r.signature) });
+    } else if (typeof r.reason === 'string') {
+      out.push({ ...base, reason: r.reason.slice(0, 40) });
+    }
+  }
+  return out;
+}
+
 /** @param {unknown} v */
 function pollSeconds(v) {
   const n = Number(v);
@@ -119,15 +159,19 @@ function pollSeconds(v) {
  *   userData: string,
  *   post: (body: Record<string, unknown>) => Promise<PostResult>,
  *   have: { gameId: string, version: string | null }[],
+ *   unsignedGames?: number | null,
+ *   sign?: import('./gameSignature.cjs').SignRequest[],
  *   appVersion?: string,
  *   hostname?: string,
  *   platform?: string,
  *   rand?: import('./deviceIdentity.cjs').Random,
  * }} deps
+ * unsignedGames / sign: מ-gameSignature.surveyFiles. חסרים — לא נשלחים (גרסה
+ * בלי מפתחות מוטבעים, שבה כל קובץ נראה "בלי חתימה").
  * @returns {Promise<SyncResult>}
  */
 async function syncDevice(deps) {
-  const { userData, post, have, appVersion, hostname, platform, rand } = deps;
+  const { userData, post, have, unsignedGames, sign, appVersion, hostname, platform, rand } = deps;
   let conflicts = 0;
   for (;;) {
     const device = identity.loadDevice(userData, rand);
@@ -147,13 +191,15 @@ async function syncDevice(deps) {
         blocked: device.blocked,
         // השם נשלח רק כשהוקלד כאן; בלעדיו השרת שומר את השם שלו.
         ...(typeof sentPending === 'string' ? { name: sentPending } : {}),
+        ...(typeof unsignedGames === 'number' ? { unsignedGames } : {}),
+        ...(Array.isArray(sign) && sign.length > 0 ? { sign } : {}),
       });
     } catch (err) {
       return { state: 'offline', device: publicDevice(device), error: /** @type {Error} */ (err).message };
     }
     const body = /** @type {Record<string, unknown> | null} */ (res.body !== null && typeof res.body === 'object' ? res.body : null);
     if (res.status === 200 && body?.ok === true) {
-      const updated = identity.applyServerAnswer(userData, device.id, sentPending, body.device);
+      const updated = identity.applyServerAnswer(userData, device.id, sentPending, body.device, body.requireSignedGames);
       return {
         state: 'ok',
         device: publicDevice(updated),
@@ -161,6 +207,7 @@ async function syncDevice(deps) {
         games: updated.blocked ? [] : cleanGames(body.games),
         pollSeconds: pollSeconds(body.pollSeconds),
         blockChanged: updated.blocked !== device.blocked,
+        signatures: cleanSignatures(body.signatures),
       };
     }
     if (res.status === 409 && conflicts === 0) {
@@ -177,4 +224,4 @@ async function syncDevice(deps) {
   }
 }
 
-module.exports = { syncDevice, haveFromLibrary, cleanGames, publicDevice, DEFAULT_POLL_SECONDS };
+module.exports = { syncDevice, haveFromLibrary, cleanGames, cleanSignatures, publicDevice, DEFAULT_POLL_SECONDS };

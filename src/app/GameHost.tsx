@@ -229,6 +229,11 @@ interface GameHostProps {
   onReleaseClickers?: (entries: ReleasedClicker[]) => void;
   /** המרשם השתנה — כדי ששיוך חדש של שלט לשם מהבונה יישלח לבונה. */
   onRosterChange?: () => void;
+  /**
+   * קובץ המשחק אינו כפי שהמערכת חתמה עליו (electron/gameSignature.cjs): שחקני
+   * דמה בלבד, מה שלא יהיה בהגדרות. מסך "איך משחקים?" כבר מציע רק דמה — זה גיבוי.
+   */
+  demoOnly?: boolean;
 }
 
 export function GameHost({
@@ -242,6 +247,7 @@ export function GameHost({
   clickerSave = null,
   onReleaseClickers,
   onRosterChange,
+  demoOnly = false,
 }: GameHostProps) {
   // המנוע נוצר פעם אחת; רענון תוכן מתבצע דרך engine.updateGame בלי remount,
   // כדי לשמר את מהלך המשחק (ניקוד/מיקום). ראו useEffect על שינוי game למטה.
@@ -257,8 +263,9 @@ export function GameHost({
   // שבו useClicker תמיד false — נשאר בדיוק כפי שהיה.
   const clickersAvailable = offline && isDesktopClicker();
   const phonesAvailable = hasRoom;
-  const useClicker = !settings.crowdEnabled && settings.voteClickers && clickersAvailable;
-  const useSocket = !settings.crowdEnabled && settings.votePhones && phonesAvailable;
+  const crowdEnabled = demoOnly || settings.crowdEnabled;
+  const useClicker = !crowdEnabled && settings.voteClickers && clickersAvailable;
+  const useSocket = !crowdEnabled && settings.votePhones && phonesAvailable;
   const isComposite = useClicker && useSocket; // שני המקורות יחד → מיזוג
   // באנר הצטרפות (חיוג + קוד): כשהטלפונים הם מקור הצבעות פעיל (גם ב-EXE סגור
   // עם קוד חדר). בדמו אין הזמנה לחייג. אזהרת רישיון: אין כלל מקור הצבעות.
@@ -517,7 +524,7 @@ export function GameHost({
    * שלא ירוץ שום טיימר חדש במהלך המשחק עצמו.
    */
   const [lobbyElapsedMs, setLobbyElapsedMs] = useState(0);
-  const syntheticCrowd = settings.crowdEnabled;
+  const syntheticCrowd = crowdEnabled;
   /** מסך מובילים באמצע משחק (פקודת מנחה 1) — שכבה מעל, המשחק ממשיך מתחת. */
   const [leadersOverlay, setLeadersOverlay] = useState(false);
   const leadersOverlayRef = useRef(false);
@@ -3307,7 +3314,7 @@ export function GameHost({
         {settingsOpen && (
           <SettingsScreen
             game={game}
-            initial={settings}
+            initial={demoOnly ? { ...settings, crowdEnabled: true } : settings}
             mode="ingame"
             allowDemo={allowDemo}
             offline={offline}

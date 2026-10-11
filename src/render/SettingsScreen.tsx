@@ -58,6 +58,11 @@ interface SettingsScreenProps {
   onOpenGuide?: () => void;
   /** משחק מוטבע ("סגור") ב-EXE — מגביל את מקורות ההצבעה שמותר לבחור. */
   sealConfig?: SealConfig;
+  /**
+   * קובץ המשחק אינו כפי שהמערכת חתמה עליו (electron/gameSignature.cjs): במסך
+   * "איך משחקים?" נשאר רק מצב דמה, עם ההסבר הזה.
+   */
+  demoOnly?: string;
 }
 
 export function SettingsScreen({
@@ -78,6 +83,7 @@ export function SettingsScreen({
   onOpenGuide,
   sealConfig,
   sources,
+  demoOnly,
 }: SettingsScreenProps) {
   // אונליין-דמו (‎?demo=1‎, לא אופליין): הקהל המדומה תמיד פעיל. אופליין: תלוי
   // בהקשר — ב-EXE עם קליקרים (RF317) הקהל כבוי (מקור ההצבעות הוא הקליקרים);
@@ -92,10 +98,12 @@ export function SettingsScreen({
   // מסך בחירת מקור ההצבעה מוצג ב-EXE (אופליין) לפני התחלת המשחק.
   const clickerCapable = offline && isDesktopClicker();
   // אילו כרטיסים להציג — במשחק מוטבע ("סגור") מוגבל לפי כלי החותמת.
-  // ובמשחק שנבנה במחשב — לפי הרישיון שנקבע לו.
-  const canPickClickers = (sealConfig?.allowClickers ?? true) && (sources?.clickers ?? true);
+  // ובמשחק שנבנה במחשב — לפי הרישיון שנקבע לו. קובץ שאינו כפי שהמערכת חתמה
+  // עליו — רק דמה.
+  const realSources = demoOnly === undefined;
+  const canPickClickers = realSources && (sealConfig?.allowClickers ?? true) && (sources?.clickers ?? true);
   const canPickPhones =
-    (game.room ?? '') !== '' && (sealConfig?.allowPhones ?? true) && (sources?.phones ?? true);
+    realSources && (game.room ?? '') !== '' && (sealConfig?.allowPhones ?? true) && (sources?.phones ?? true);
   const [voterCount, setVoterCount] = useState(initial.voterCount);
   const [intervalMs, setIntervalMs] = useState(initial.intervalMs);
   const [hostVoterId, setHostVoterId] = useState(initial.hostVoterId);
@@ -595,6 +603,11 @@ export function SettingsScreen({
             <p className="clicker-intro-lead">
               המשחק <strong>{game.name}</strong> מוכן. בחרו כיצד להצביע:
             </p>
+            {demoOnly !== undefined && (
+              <p className="clicker-intro-locked" role="alert">
+                🔒 {demoOnly}
+              </p>
+            )}
 
             <div className="clicker-intro-actions">
               {canPickClickers && (
