@@ -112,6 +112,14 @@ export interface GameState {
   votesBySlide: Record<number, Record<string, number>>;
   /** id-ים של שקופיות שהושלמו (עברנו מהן הלאה). */
   slidesCompleted: number[];
+  /**
+   * מונה הכניסות לשקופית: עולה בכל כניסה (הבאה, חזרה, קפיצה, התחלה מחדש), גם
+   * כשנכנסים שוב לאותה שקופית. ה-host מאפס לפיו את שלבי החשיפה: לפי המזהה
+   * לבדו, כניסה חוזרת לאותה שקופית (חזרה בשאלה הראשונה, בחירה בשקופית הנוכחית)
+   * השאירה את החשיפה הקודמת, כולל התשובה הנכונה מסומנת בזמן ההצבעה.
+   * לא נשמר בגיבוי.
+   */
+  slideEntry: number;
   /** slideId → voterId של הזוכה ב-firstClicker. */
   firstClickWinners: Record<number, string>;
   /**

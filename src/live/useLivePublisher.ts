@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { AudioManager } from '../app/AudioManager.ts';
 import { imageRevealBlurFor, imageRevealOf } from '../engine/imageReveal.ts';
+import { NO_MEDIA, nextMediaClock, type MediaClock } from './mediaClock.ts';
 import { LivePublisher, type PublisherStatus } from './publisher.ts';
 import { RevealThumbs } from './revealThumb.ts';
 import { LiveSnapshotBuilder, type LiveHostInput } from './snapshot.ts';
@@ -49,7 +50,7 @@ export function useLivePublisher({
   frameRef.current = frame;
   const publisherRef = useRef<LivePublisher | null>(null);
   const scoresPageRef = useRef(0);
-  const mediaRef = useRef<{ key: string | null; at: number | null }>({ key: null, at: null });
+  const mediaRef = useRef<MediaClock>(NO_MEDIA);
   const [status, setStatus] = useState<PublisherStatus | null>(null);
   const [viewUrl, setViewUrl] = useState<string | null>(null);
 
@@ -126,14 +127,15 @@ export function useLivePublisher({
   }, [active, gameId, roomId, audio]);
 
   // מתי התחילה המדיה החוסמת הנוכחית — כדי שצופה שנכנס באמצע יקפוץ לאותה נקודה.
+  // הזמן שבו עמדה מתחת לשכבה חוסמת לא נספר (mediaClock.ts).
   const mediaKey =
     frame.state.activeMedia === null
       ? null
       : `${frame.state.currentSlideId}:${frame.state.activeMedia}`;
+  const mediaHeld = frame.paused;
   useEffect(() => {
-    if (mediaRef.current.key === mediaKey) return;
-    mediaRef.current = { key: mediaKey, at: mediaKey === null ? null : Date.now() };
-  }, [mediaKey]);
+    mediaRef.current = nextMediaClock(mediaRef.current, mediaKey, mediaHeld, Date.now());
+  }, [mediaKey, mediaHeld]);
 
   // כל רינדור של המסך הראשי — אולי משהו השתנה. הבנייה עצמה מוגבלת בקצב.
   useEffect(() => {
