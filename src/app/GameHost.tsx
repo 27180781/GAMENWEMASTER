@@ -590,6 +590,11 @@ export function GameHost({
    * צרכן לזהות את חוסר ההתאמה ולדלג על הקומיט הזה — ראו הבמאי של הקריינות.
    */
   const [revealSlide, setRevealSlide] = useState<number | null>(null);
+  /**
+   * לאיזו כניסה לשקופית שייך `reveal` (GameState.slideEntry) — אותו רעיון,
+   * גם כשנכנסים שוב לאותה שקופית ומזהה השקופית לא משתנה.
+   */
+  const [revealEntry, setRevealEntry] = useState<number | null>(null);
   /** מצב שליחת שקופית "פונקציה" ל-API (לתצוגה על המסך). */
   const [functionStatus, setFunctionStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   /** טקסט נלווה לשקופית פונקציה (למשל "הוסרו 12 שחקנים"). */
@@ -727,7 +732,10 @@ export function GameHost({
   revealRef.current = reveal;
   /** תצוגה מקדימה של מסך המנצחים (מקש W): השלב לחזור אליו, או null אם לא פעיל. */
   const winnersPreviewRef = useRef<HostStage | null>(null);
-  /** הרצה מהירה (מקש N): דגל שמורה ל-effect איפוס-השקופית לחשוף אותה במלואה. */
+  /**
+   * דגל שמורה ל-effect איפוס-השקופית לחשוף אותה במלואה (שאלה + כל התשובות,
+   * בלי צליל) במקום לאפס: הרצה מהירה (מקש N), וחזרה להצבעה (reenterAtAnswers).
+   */
   const fastRevealRef = useRef(false);
 
   // -------------------------------------------------------------------------
@@ -763,6 +771,15 @@ export function GameHost({
   const [resumePrompt, setResumePrompt] = useState<BackupData | null>(null);
   /** בדיקת הגיבוי בטעינה עדיין רצה — מציג חיווי "בודק אם יש משחק שמור…". */
   const [backupChecking, setBackupChecking] = useState(false);
+  /**
+   * חלון פתיחה שמחכה לתשובה: «נמצא משחק פעיל» או אזהרת הרישיון. כל עוד הוא
+   * על המסך המשחק לא מקבל פקודות — לא מהמקלדת, לא משלט המנחה ולא ממסך
+   * המנחה. בלי זה רווח התחיל את המשחק מאחוריו (מוזיקת הפתיחה נעצרה וצליל
+   * השאלה הראשונה התנגן), ו«המשך מהנקודה» החזיר אותו אחר כך.
+   */
+  const startupModal = resumePrompt !== null || (showLicenseWarning && !licenseAck);
+  const startupModalRef = useRef(startupModal);
+  startupModalRef.current = startupModal;
   const startedAtRef = useRef<number>(Date.now());
   const saveTimerRef = useRef<number | null>(null);
   const gameEndedRef = useRef(false);
@@ -1074,8 +1091,11 @@ export function GameHost({
     };
   }, [stage, state.currentSlideId, engine]);
 
-  // איפוס שלבי חשיפה + מסילת המצטרפים + זיהוי הקשת שלט המנחה, במעבר שקופית.
-  // בהרצה מהירה (מקש N) חושפים את השקופית הבאה במלואה במקום לאפס.
+  // איפוס שלבי חשיפה + מסילת המצטרפים + זיהוי הקשת שלט המנחה, בכל כניסה
+  // לשקופית — גם כניסה חוזרת לאותה שקופית (slideEntry), למשל חזרה בשאלה
+  // הראשונה או בחירה בשקופית הנוכחית: היא מתחילה נקייה, עם צליל השאלה ובלי
+  // התשובה הנכונה מסומנת. בהרצה מהירה (מקש N) ובחזרה להצבעה חושפים את
+  // השקופית במלואה במקום לאפס.
   useEffect(() => {
     const s = engine.getCurrentSlide();
     if (fastRevealRef.current) {
@@ -1107,11 +1127,12 @@ export function GameHost({
     // באותה מנת עדכון — כך ש-`reveal` ו-`revealSlide` תמיד מתארים יחד את אותה
     // שקופית, וצרכן שרץ בקומיט הקודם (עם מזהה חדש וחשיפה ישנה) יזהה ויחכה.
     setRevealSlide(state.currentSlideId);
+    setRevealEntry(state.slideEntry);
     setAnswerers([]);
     setCorrectAnswerers([]);
     lastHostAnswerRef.current = null;
     setBetOverlay(false);
-  }, [state.currentSlideId, engine, audio]);
+  }, [state.currentSlideId, state.slideEntry, engine, audio]);
 
   // תוצאות ההימור מוצגות פעם אחת לכל סגירה: יציאה משלב התוצאות (חזרה להצבעה,
   // שקופית אחרת) מאפסת את הזיכרון, כך שהכרעה מחדש תוצג שוב.
@@ -1166,7 +1187,14 @@ export function GameHost({
   const votingOpenedAtRef = useRef(0);
   const lastHostAnswerRef = useRef<number | null>(null);
 
-  const votingActive = stage === 'playing' && state.phase === 'voting';
+  /**
+   * תצוגה מקדימה של מסך המנצחים (W) פתוחה. בזמן הצבעה היא שכבה חוסמת כמו
+   * טבלת המובילים: חלון ההצבעה נשאר פתוח והטיימר קופא, וכשחוזרים (W או 2) הוא
+   * ממשיך מאותה נקודה. בלי זה הטיימר התאפס לזמן המלא, וחלון ההצבעה נפתח מחדש
+   * בלי ההצבעות שכבר נשלחו. (ה-ref נכתב תמיד יחד עם setStage.)
+   */
+  const winnersPreview = stage !== 'playing' && winnersPreviewRef.current !== null;
+  const votingActive = (stage === 'playing' || winnersPreview) && state.phase === 'voting';
 
   /**
    * הזמן האפקטיבי שחלף מפתיחת ההצבעה (ms) — בלי משך העצירות, וקפוא בזמן עצירה.
@@ -1463,15 +1491,13 @@ export function GameHost({
   const reenterAtAnswers = useCallback(
     (slideId: number) => {
       const now = Date.now();
+      // ה-effect של הכניסה לשקופית רץ גם בכניסה חוזרת לאותה שקופית; הדגל אומר
+      // לו לחשוף את כל התשובות (בלי צליל השאלה) במקום לאפס.
+      fastRevealRef.current = true;
       engine.dispatch({ type: 'GOTO', slideId, at: now });
       if (engine.getState().activeMedia === 'open') {
         engine.dispatch({ type: 'MEDIA_ENDED', at: now });
       }
-      setReveal({
-        questionShown: true,
-        answersShown: engine.getCurrentSlide().question.answers.length,
-        revealCorrect: false,
-      });
     },
     [engine],
   );
@@ -1528,6 +1554,9 @@ export function GameHost({
         return;
       }
     }
+    // בשקופית הראשונה אין קודמת: BACK היה מתחיל אותה מחדש, והכניסה מציגה שוב
+    // את השאלה עם הצליל — «אחורה» שמקדם. יש לאן לחזור רק כשיש מדיית פתיחה.
+    if (current.currentSlideIndex === 0 && s.openMedia.src === '') return;
     engine.dispatch({ type: 'BACK', at: now });
   }, [engine, reenterAtAnswers]);
 
@@ -1540,7 +1569,10 @@ export function GameHost({
     const questions = engine.getGame().questions;
     const nextIndex = engine.getState().currentSlideIndex + 1;
     if (nextIndex >= questions.length) {
-      setStage('winners'); // אין שקופית הבאה — סיום
+      // אין שקופית הבאה — סיום, כמו בתפריט: טבלת המובילים נסגרת, אחרת הרווח
+      // הראשון במסך המנצחים סגר אותה מאחוריו במקום לחשוף מקום.
+      setLeadersOverlay(false);
+      setStage('winners');
       return;
     }
     const target = questions[nextIndex]!;
@@ -1566,6 +1598,22 @@ export function GameHost({
    * המנצחים חושף מקום ואז עובר לניקוד כל המשתתפים.
    */
   const advance = useCallback(() => {
+    const stage = stageRef.current;
+    // מסכי הסיום קודם: השכבות שלמטה מוצגות רק בזמן המשחק. שכבה שנשארה פתוחה
+    // מאחורי מסך המנצחים (W, «סיום משחק» בתפריט) נסגרה ברווח במקום שייחשף
+    // מקום, והרווח נראה כאילו לא עשה כלום.
+    if (stage === 'winners') {
+      // חשיפת המנצחים אחד-אחד; אחרי שכולם נחשפו — מעבר למסך ניקוד כל המשתתפים.
+      const podiumTotal = Math.min(engine.getWinners(engine.getGame().setting.multiWinners).length, 5);
+      if (winnersRevealedRef.current < podiumTotal) setWinnersRevealed((n) => n + 1);
+      else setStage('scoreboard');
+      return;
+    }
+    if (stage === 'scoreboard') {
+      // מסך הניקוד מדפדף לבד בלולאה; רווח/0 מדפדפים עמוד מיד (שליטה למנחה)
+      setScoresPageBump((n) => n + 1);
+      return;
+    }
     // מסך המובילים (מקש 1) פתוח מעל המשחק — קדימה מסיר אותו (כמו לחיצה
     // נוספת על 1) במקום לקדם את המשחק שמאחוריו.
     if (leadersOverlayRef.current) {
@@ -1596,18 +1644,8 @@ export function GameHost({
       audio.play('generic', soundsRef.current.genericMediaSound.src);
       return;
     }
-    const stage = stageRef.current;
     if (stage === 'opening') setStage('playing');
     else if (stage === 'playing') advanceStep();
-    else if (stage === 'winners') {
-      // חשיפת המנצחים אחד-אחד; אחרי שכולם נחשפו — מעבר למסך ניקוד כל המשתתפים.
-      const podiumTotal = Math.min(engine.getWinners(engine.getGame().setting.multiWinners).length, 5);
-      if (winnersRevealedRef.current < podiumTotal) setWinnersRevealed((n) => n + 1);
-      else setStage('scoreboard');
-    } else if (stage === 'scoreboard') {
-      // מסך הניקוד מדפדף לבד בלולאה; רווח/0 מדפדפים עמוד מיד (שליטה למנחה)
-      setScoresPageBump((n) => n + 1);
-    }
   }, [engine, advanceStep, audio]);
   const advanceRef = useRef(advance);
   advanceRef.current = advance;
@@ -1617,9 +1655,16 @@ export function GameHost({
     const stage = stageRef.current;
     if (stage === 'playing') stepBack();
     else if (stage === 'winners') {
-      // מבטלים חשיפת מנצח אחרון; כשאין חשופים — חזרה למשחק.
+      // מבטלים חשיפת מנצח אחרון. כשאין חשופים, בתצוגה המקדימה (W) חוזרים למשחק
+      // בדיוק כמו ב-W — כולל ניקוי הסימון, שבלעדיו סוף המשחק האמיתי לא נרשם
+      // (דוח, תוצאות, נעילת הגיבוי). במסך המנצחים האמיתי אין לאן לחזור: הסוף
+      // כבר נרשם, ומשחק שממשיך אחריו לא נשמר. (כשהמנוע עצמו בסוף, החזרה גם
+      // הקפיצה שוב את מסך המנצחים ואת המוזיקה שלו מההתחלה.)
       if (winnersRevealedRef.current > 0) setWinnersRevealed((n) => Math.max(0, n - 1));
-      else setStage('playing');
+      else if (winnersPreviewRef.current !== null) {
+        setStage(winnersPreviewRef.current);
+        winnersPreviewRef.current = null;
+      }
     } else if (stage === 'scoreboard') setStage('winners');
   }, [stepBack]);
 
@@ -1735,6 +1780,10 @@ export function GameHost({
 
   const onHostControl = useCallback(
     (msg: HostCommand) => {
+      // חלון פתיחה פתוח (startupModal) — פקודות המשחק ממתינות לתשובה עליו
+      const gameCommand =
+        msg.t === 'cmd' || msg.t === 'host' || msg.t === 'goto' || msg.t === 'connect';
+      if (gameCommand && startupModalRef.current) return;
       switch (msg.t) {
         case 'cmd':
           if (msg.cmd === 'advance') advanceRef.current();
@@ -1846,7 +1895,7 @@ export function GameHost({
           extraction.hostAnswer !== lastHostAnswerRef.current
         ) {
           lastHostAnswerRef.current = extraction.hostAnswer;
-          runHostCommandRef.current(extraction.hostAnswer);
+          if (!startupModalRef.current) runHostCommandRef.current(extraction.hostAnswer);
         }
       }
       // אכיפת מגבלת הרישיון: מסננים ל-N המשתתפים המורשים בלבד, ובונים מחדש את
@@ -1908,6 +1957,7 @@ export function GameHost({
         const n = Number(raw.vote);
         if (hostVoterIdRef.current !== '' && phone === hostVoterIdRef.current) {
           if (!Number.isInteger(n) || n < 0 || n > 6) return;
+          if (startupModalRef.current) return; // חלון פתיחה פתוח — ראו startupModal
           debugLog('command', `שלט מנחה (טלפון): מקש ${raw.vote}`, { stage: stageRef.current });
           runHostCommandRef.current(n);
           return;
@@ -2108,6 +2158,7 @@ export function GameHost({
     rosterOpen ||
     captureOn || // קליטת שלטים — המשחק ממתין, לא מתקדם מאחורי הגב
     lobbyOverlay || // מסך התחברות (X) — הטיימר קופא, וממשיכים ברווח
+    winnersPreview || // תצוגת המנצחים המקדימה (W) — ממשיכים ב-W או ב-2
     menuOpen;
   overlayActiveRef.current = overlayActive;
 
@@ -2145,8 +2196,12 @@ export function GameHost({
     // של השקופית הקודמת (האיפוס קורה ב-effect ומגיע קומיט אחד אחריו). לתת
     // לבמאי את הצמד הלא-מתאים היה מסמן את השאלה והתשובות כ"כבר נאמרו" ומבטל
     // מיד את המשפט שהתחיל — כלומר שקט מלא מהשקופית השנייה והלאה. מדלגים על
-    // הקומיט הזה ומבטלים את מה שמתנגן; הקומיט הבא כבר מתואם.
-    if (!narrationRevealMatches(revealSlide, state.currentSlideId)) {
+    // הקומיט הזה ומבטלים את מה שמתנגן; הקומיט הבא כבר מתואם. כך גם בכניסה
+    // חוזרת לאותה שקופית, שבה רק מונה הכניסות משתנה.
+    if (
+      !narrationRevealMatches(revealSlide, state.currentSlideId) ||
+      revealEntry !== state.slideEntry
+    ) {
       narration.cancel();
       return;
     }
@@ -2277,6 +2332,7 @@ export function GameHost({
     state,
     reveal,
     revealSlide,
+    revealEntry,
     timer,
     narrationOverlay,
     winnersRevealed,
@@ -2552,7 +2608,7 @@ export function GameHost({
     const replay = replayQuestionSound({
       wasCovered,
       covered: questionCovered,
-      slideChanged: revealSlide !== st.currentSlideId,
+      slideChanged: revealSlide !== st.currentSlideId || revealEntry !== st.slideEntry,
       view: {
         votable: isVotableSlide(engine.getCurrentSlide()),
         phase: st.phase,
@@ -2566,7 +2622,7 @@ export function GameHost({
     // למשל מחיאות כפיים שהתחילו מתחת לטבלה.
     const src = soundsRef.current.showQuestionMediaSound.src;
     if (replay && src !== null && src.trim() !== '') audio.play('showQuestion', src);
-  }, [questionCovered, revealSlide, engine, audio]);
+  }, [questionCovered, revealSlide, revealEntry, engine, audio]);
 
   // -------------------------------------------------------------------------
   // "סולמות וחבלים קבוצתי": בסיום חשיפת התשובה מחשבים את הסבב (אחוז הצלחה לכל
@@ -2681,6 +2737,9 @@ export function GameHost({
       // צירופים עם Ctrl/Cmd/Alt שייכים לדפדפן (Ctrl+R לרענון, DevTools וכו') —
       // לא חוטפים אותם כדי שלא נחסום פעולות דפדפן בזמן המשחק.
       if (event.ctrlKey || event.metaKey || event.altKey) return;
+      // חלון פתיחה פתוח (startupModal) — המקשים שייכים לו (Tab ו-Enter על
+      // הכפתורים שלו), ולא למשחק שמאחוריו.
+      if (startupModal) return;
       // מסך התחברות קבוצות פתוח — חוסם שליטת מקלדת במשחק; Escape סוגר אותו
       if (connectCategory !== null) {
         if (event.key === 'Escape') setConnectCategory(null);
@@ -2783,7 +2842,7 @@ export function GameHost({
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [stage, menuOpen, settingsOpen, rosterOpen, exitConfirm, captureOn, lobbyOverlay, showResetLobby, canExit, leadersOverlay, connectCategory, engine, advance, goBack, onRequestRefresh]);
+  }, [stage, menuOpen, settingsOpen, rosterOpen, exitConfirm, captureOn, lobbyOverlay, showResetLobby, canExit, leadersOverlay, connectCategory, startupModal, engine, advance, goBack, onRequestRefresh]);
 
   /** "התחלת המשחק מחדש" מתוך מסך ההגדרות — איפוס מלא וחזרה למסך הפתיחה. */
   const restartGame = useCallback(() => {
