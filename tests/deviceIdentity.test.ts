@@ -22,6 +22,7 @@ type Device = {
   permissions: Permissions;
   permissionsAt: number;
   blocked: boolean;
+  requireSigned: boolean;
 };
 type Random = { randomInt: (min: number, max: number) => number; randomBytes: (n: number) => Buffer };
 const identity = require('../electron/deviceIdentity.cjs') as {
@@ -34,7 +35,13 @@ const identity = require('../electron/deviceIdentity.cjs') as {
   loadDevice: (userData: string, rand?: Random) => Device;
   regenerateDevice: (userData: string, device: Device, rand?: Random) => Device;
   setPendingName: (userData: string, name: unknown) => Device;
-  applyServerAnswer: (userData: string, sentId: string, sentPending: string | null, serverDevice: unknown) => Device;
+  applyServerAnswer: (
+    userData: string,
+    sentId: string,
+    sentPending: string | null,
+    serverDevice: unknown,
+    requireSigned?: unknown,
+  ) => Device;
   formatDeviceId: (id: string) => string;
 };
 
@@ -241,5 +248,32 @@ describe('השבתת התוכנה — פתוחה תמיד, נעולה רק בה�
     const d = identity.loadDevice(dir);
     identity.applyServerAnswer(dir, d.id, null, { id: d.id, blocked: true });
     expect(identity.setPendingName(dir, 'אולם 2').blocked).toBe(true);
+  });
+});
+
+describe('המתג «לחייב חתימה על קובצי משחק»', () => {
+  it('★ מחשב חדש, קובץ מגרסה ישנה בלי השדה, וערך שאינו true — כבוי', () => {
+    expect(identity.loadDevice(dir).requireSigned).toBe(false);
+    const d: Record<string, unknown> = { ...identity.loadDevice(dir) };
+    delete d.requireSigned;
+    writeFileSync(identity.devicePath(dir), JSON.stringify(d));
+    expect(identity.readDevice(dir)?.requireSigned).toBe(false);
+    writeFileSync(identity.devicePath(dir), JSON.stringify({ ...d, requireSigned: 'true' }));
+    expect(identity.readDevice(dir)?.requireSigned).toBe(false);
+  });
+
+  it('★ נשמר מתשובה, ותשובה שאינה אומרת עליו דבר משאירה אותו כמו שהוא', () => {
+    const d = identity.loadDevice(dir);
+    expect(identity.applyServerAnswer(dir, d.id, null, {}, true).requireSigned).toBe(true);
+    expect(identity.readDevice(dir)?.requireSigned).toBe(true);
+    expect(identity.applyServerAnswer(dir, d.id, null, {}).requireSigned).toBe(true);
+    expect(identity.applyServerAnswer(dir, d.id, null, {}, 'false').requireSigned).toBe(true);
+    expect(identity.applyServerAnswer(dir, d.id, null, {}, false).requireSigned).toBe(false);
+  });
+
+  it('★ מספר שהוגרל מחדש שומר אותו — זה מתג של המערכת, לא של המחשב', () => {
+    const d = identity.loadDevice(dir, fixedRandom(11111111));
+    const on = identity.applyServerAnswer(dir, d.id, null, {}, true);
+    expect(identity.regenerateDevice(dir, on, fixedRandom(22222222)).requireSigned).toBe(true);
   });
 });

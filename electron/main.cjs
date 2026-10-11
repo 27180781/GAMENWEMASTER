@@ -19,6 +19,7 @@ const JSZip = require('jszip');
 const { createClickerServer, DEFAULT_PORT } = require('./clickerServer.cjs');
 const { readSealedFromFile, sealToFile } = require('./sealPayload.cjs');
 const { canAutoUpdate } = require('./updateGate.cjs');
+const { isDevRun, remoteOverride, testSigningKeys } = require('./runMode.cjs');
 const { findGameEntryName, mapStrings } = require('./gameZip.cjs');
 const { sameFile, replaceSelf, cleanupOldSelf } = require('./selfUpdate.cjs');
 const { remoteErrorMessage } = require('./remoteErrors.cjs');
@@ -32,6 +33,12 @@ const {
   encryptedMediaSize,
   isEncryptedMedia,
 } = require('./contentCrypto.cjs');
+
+/**
+ * הרצת פיתוח (`electron .` מתיקיית הקוד), ולא app.isPackaged לבדו: עותק של
+ * התוכנה בשם electron.exe הוא "לא ארוז" בעיני Electron (runMode.cjs).
+ */
+const DEV_RUN = isDevRun({ isPackaged: app.isPackaged, defaultApp: process.defaultApp });
 
 /**
  * רשת ביטחון להגירה: אם תיקיית היעד עדיין לא קיימת אבל קיימת תיקייה מהשמות
@@ -551,6 +558,9 @@ async function saveEditedGame(dataJson) {
     }
   });
 
+  // קובץ שנערך כאן כבר אינו מה שהמערכת חתמה עליו: בלי החתימה הוא נקרא "בלי
+  // חתימה" ולא "שונה" (gameSignature.cjs). העורך ממילא אינו מעביר אותה.
+  if (baked !== null && typeof baked === 'object') delete /** @type {Record<string, unknown>} */ (baked).signature;
   zip.file(entryName, JSON.stringify(baked));
   // כתיבה זמנית ואז החלפה — קריסה באמצע לא משאירה חבילה חתוכה.
   const tmp = `${zipPath}.saving`;
@@ -566,11 +576,14 @@ async function saveEditedGame(dataJson) {
 // טעינת משחק מהשרת לפי קוד (חלופה לטעינת ZIP מהדיסק)
 // ---------------------------------------------------------------------------
 
-/** ‏Edge Functions של מערכת יצירת המשחקים. מפתח ה-anon ציבורי מעצם הגדרתו. */
-const REMOTE_BASE_URL =
-  process.env.TRIVIA_REMOTE_URL || 'https://oousxptmdrrkybadikec.supabase.co/functions/v1';
+/**
+ * ‏Edge Functions של מערכת יצירת המשחקים. מפתח ה-anon ציבורי מעצם הגדרתו. שרת
+ * אחר דרך משתני סביבה — רק בהרצת פיתוח (runMode.cjs).
+ */
+const REMOTE_OVERRIDE = remoteOverride(DEV_RUN, process.env);
+const REMOTE_BASE_URL = REMOTE_OVERRIDE.url || 'https://oousxptmdrrkybadikec.supabase.co/functions/v1';
 const REMOTE_ANON_KEY =
-  process.env.TRIVIA_REMOTE_KEY ||
+  REMOTE_OVERRIDE.key ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9vdXN4cHRtZHJya3liYWRpa2VjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMDc3NzcsImV4cCI6MjA5Mjc4Mzc3N30.9Qb5TZeI-yn3ueuTXh6-XDoFA31FV7EvKGYMu_1QY8c';
 /** פסק-זמן על *שקט* בקו (לא על הגודל) — משחק עם וידאו יכול לקחת דקות. */
 const REMOTE_IDLE_MS = 45 * 1000;
@@ -1266,6 +1279,13 @@ function stopReceiver() {
 const lib = require('./gameLibrary.cjs');
 const gate = require('./gameGate.cjs');
 const localGame = require('./localGame.cjs');
+const gameSignature = require('./gameSignature.cjs');
+/**
+ * המפתחות שחתימות קובצי המשחק נבדקות מולם: המוטבעים, ובהרצת פיתוח גם מפתחות
+ * בדיקה (runMode.cjs, tools/signature-e2e.mjs).
+ */
+const SIGNING_KEYS = Object.freeze({ ...gameSignature.PUBLIC_KEYS, ...testSigningKeys(DEV_RUN, process.env) });
+const hasSigningKeys = () => Object.keys(SIGNING_KEYS).length > 0;
 const userData = () => app.getPath('userData');
 
 const lastGameZipPath = () => lib.lastGameZipPath(userData());
@@ -1630,7 +1650,7 @@ function createWindow() {
  * וחסימת ניווט/חלונות חיצוניים. בפיתוח לא מפריעים לעבודה.
  */
 function hardenWindow(win) {
-  if (!app.isPackaged) return;
+  if (DEV_RUN) return;
   win.webContents.on('context-menu', (e) => e.preventDefault());
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 }
@@ -1721,7 +1741,7 @@ const DEVICE_RETRY_MS = {
  */
 function deviceSyncEnabled() {
   if (sealedGame !== null || isSealerBuild()) return false;
-  return app.isPackaged || Boolean(process.env.TRIVIA_REMOTE_URL) || process.env.TRIVIA_DEVICE_SYNC === '1';
+  return !DEV_RUN || REMOTE_OVERRIDE.url !== null || process.env.TRIVIA_DEVICE_SYNC === '1';
 }
 
 /**
@@ -1732,11 +1752,77 @@ function deviceSyncEnabled() {
  */
 function devicePermissions() {
   if (sealedGame !== null || isSealerBuild()) return { ...deviceIdentity.NO_PERMISSIONS };
-  if (!deviceSyncEnabled()) return app.isPackaged ? { ...deviceIdentity.NO_PERMISSIONS } : { createGame: true, editGame: true };
+  if (!deviceSyncEnabled()) return DEV_RUN ? { createGame: true, editGame: true } : { ...deviceIdentity.NO_PERMISSIONS };
   try {
     return { ...deviceIdentity.loadDevice(userData()).permissions };
   } catch {
     return { ...deviceIdentity.NO_PERMISSIONS };
+  }
+}
+
+/**
+ * המתג «לחייב חתימה על קובצי משחק» כפי שהגיע בבדיקה האחרונה מול המערכת
+ * (deviceIdentity.cjs). רק בתוכנה הרגילה: EXE סגור וכלי החתימה אינם נבדקים מול
+ * המערכת ולעולם אינם מקבלים אותו, ומחשב שלא התחבר אף פעם — כבוי. בגרסה בלי
+ * מפתחות מוטבעים כל קובץ נראה "בלי חתימה", ולכן שם המתג לעולם אינו חל — אחרת
+ * מחשב שעוד לא התעדכן היה ננעל על כל משחק. קריאה בלבד: לא יוצרת זהות למחשב.
+ */
+function requireSignedGames() {
+  if (!deviceSyncEnabled() || !hasSigningKeys()) return false;
+  try {
+    return deviceIdentity.readDevice(userData())?.requireSigned === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * הבדיקה של קובץ משחק שנטען (gameSignature.cjs), ומה הוא רשאי לעשות. רצה בכל
+ * טעינה, במחשב עצמו ובלי רשת, על הטקסט של data.json כפי שהוא בחבילה — המנוע
+ * מפענח את הקובץ בלי השדה signature. לעולם אינה זורקת: תקלה היא "כרגיל".
+ * @param {string} dataJson
+ */
+function checkLoadedGame(dataJson) {
+  /** @type {import('./gameSignature.cjs').GameCheck} */
+  let check;
+  try {
+    check = gameSignature.checkStored(JSON.parse(dataJson), { userData: userData(), keys: SIGNING_KEYS });
+  } catch (err) {
+    check = { state: 'error', reason: /** @type {Error} */ (err).message, content: null };
+  }
+  const perms = devicePermissions();
+  const policy = gameSignature.signaturePolicy(check, {
+    requireSigned: requireSignedGames(),
+    approved: perms.createGame || perms.editGame,
+    sealed: sealedGame !== null,
+  });
+  if (check.state === 'invalid' || check.state === 'error' || policy.demoOnly) {
+    console.warn('[signature] קובץ המשחק:', check.state, 'reason' in check ? check.reason : '', policy.demoOnly ? '— שחקני דמה בלבד' : '');
+  }
+  const config =
+    sealedGame !== null
+      ? gameSignature.boundSealConfig(/** @type {Record<string, unknown>} */ (sealedGame.config), gameSignature.sealTermsOf(check))
+      : null;
+  return { signature: { state: check.state, demoOnly: policy.demoOnly, why: policy.why }, config };
+}
+
+/**
+ * הקבצים שבמחשב, לפני הבדיקה מול המערכת (gameSignature.surveyFiles): כמה בלי
+ * חתימה תקינה, ואילו לשלוח לחתימה. null בגרסה בלי מפתחות מוטבעים — אז כל
+ * קובץ נראה "בלי חתימה", והמספר היה מטעה את המנהל. תקלה — null, והבדיקה
+ * ממשיכה בלעדיה.
+ * @param {ReturnType<typeof libraryList>} library
+ */
+function surveyGameFiles(library) {
+  if (!hasSigningKeys()) return null;
+  try {
+    const files = library.map((g) => ({ path: libraryZipPath(g.code), local: g.local, edited: g.editedAt > 0 }));
+    // משחק שנטען מקובץ ZIP בדיסק (ולא מהספרייה) — העותק שלו נשמר בצד.
+    if (lib.currentCode(userData()) === null) files.push({ path: lastGameZipPath(), local: false, edited: false });
+    return gameSignature.surveyFiles({ userData: userData(), files, readText: lib.readPackageText, keys: SIGNING_KEYS });
+  } catch (err) {
+    console.warn('[signature] סקירת קובצי המשחק נכשלה:', /** @type {Error} */ (err).message);
+    return null;
   }
 }
 
@@ -1855,14 +1941,26 @@ function runDeviceSync() {
     let next = DEVICE_RETRY_MS.error;
     try {
       lib.libraryBackfill(userData());
+      const library = libraryList();
+      const survey = surveyGameFiles(library);
       const res = await syncDevice({
         userData: userData(),
         post: postDevice,
-        have: haveFromLibrary(libraryList()),
+        have: haveFromLibrary(library),
+        ...(survey !== null ? { unsignedGames: survey.unsigned, sign: survey.sign } : {}),
         appVersion: app.getVersion(),
         hostname: require('node:os').hostname(),
         platform: process.platform,
       });
+      if (res.state === 'ok' && survey !== null && res.signatures.length > 0) {
+        const applied = gameSignature.applySignatures({
+          userData: userData(),
+          requested: survey.sign,
+          results: res.signatures,
+          keys: SIGNING_KEYS,
+        });
+        console.log('[signature] חתימות לקבצים ישנים:', `${applied.stored} נשמרו, ${applied.refused} סורבו`);
+      }
       if (res.state === 'ok') {
         if (res.blockChanged) console.log(res.device.blocked ? '[device] התוכנה הושבתה מהמערכת' : '[device] ההשבתה בוטלה');
         pushDeviceState({
@@ -2394,17 +2492,27 @@ app.whenReady().then(() => {
       } catch {
         /* אין מטא — שם ריק */
       }
-      if (config !== null) return { ...res, config, name };
+      // החתימה נבדקת כאן, על data.json כפי שהוא בחבילה; במשחק סגור התצורה
+      // שבסוף ה-EXE מצומצמת לתנאים החתומים.
+      const checked = checkLoadedGame(res.dataJson);
+      if (config !== null) return { ...res, config: checked.config ?? config, name, signature: checked.signature };
       // הקוד בספרייה — כך ה-renderer יודע איזה עותק על המסך (משחק שנשלח למחשב
       // מתעדכן רק כשהעותק שלו אינו מוצג).
       const code = lib.currentCode(userData());
-      const extra = code !== null ? { code } : {};
+      const extra = { ...(code !== null ? { code } : {}), signature: checked.signature };
       // משחק שנבנה במחשב — העורך מציג לו גם את הגדרת הרישיון.
       return lib.currentIsLocal(userData()) ? { ...res, ...extra, name, local: true } : { ...res, ...extra, name };
     } catch (err) {
       console.error('[game] טעינת משחק שמור נכשלה:', /** @type {Error} */ (err).message);
       return null;
     }
+  });
+  // החתימה של משחק שה-renderer טען בעצמו (קובץ ZIP מהדיסק, או המסלול האיטי
+  // של משחק סגור): אותה בדיקה כמו ב-game:loadSaved, על הטקסט של data.json.
+  ipcMain.handle('game:checkSignature', (_e, dataJson) => {
+    if (typeof dataJson !== 'string' || dataJson === '') return null;
+    const checked = checkLoadedGame(dataJson);
+    return checked.config !== null ? { ...checked.signature, config: checked.config } : checked.signature;
   });
   // ניקוי מדיה זמנית מהדיסק. מזהה ריק/חסר = כל המטמון. לעולם לא נוגע
   // בגיבויים (backups/) או בקבצי התוצאות (reports/) — הם בתיקיות נפרדות.
@@ -2494,7 +2602,7 @@ app.whenReady().then(() => {
   // כלי הפיתוח נפתחים רק בפיתוח: בגרסה הארוזה הם היו מאפשרים לכל אחד לראות
   // את כתובות המדיה ואת קוד האפליקציה ולשמור אותם. (ניתן להפעיל במודע דרך
   // משתנה הסביבה TRIVIA_DEVTOOLS=1 לצורך אבחון בשטח.)
-  if (!app.isPackaged || process.env.TRIVIA_DEVTOOLS === '1') {
+  if (DEV_RUN || process.env.TRIVIA_DEVTOOLS === '1') {
     globalShortcut.register('CommandOrControl+Shift+I', () => {
       mainWindow?.webContents.toggleDevTools();
     });

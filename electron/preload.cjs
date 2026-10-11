@@ -176,10 +176,17 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
   },
   /**
    * טעינת המשחק השמור ('last') או המוטבע ('sealed') ישירות מהדיסק ב-main:
-   * מחזיר { cacheKey, dataPath, dataJson, names, name, config? } — בלי בייטי ZIP.
+   * מחזיר { cacheKey, dataPath, dataJson, names, name, config?, signature } — בלי בייטי ZIP.
    */
   loadSavedGame(/** @type {'last'|'sealed'} */ source) {
     return ipcRenderer.invoke('game:loadSaved', source);
+  },
+  /**
+   * בדיקת החתימה של משחק שנטען כאן (קובץ ZIP מהדיסק): הטקסט של data.json →
+   * { state, demoOnly, why, config? }, או null.
+   */
+  checkGameSignature(/** @type {string} */ dataJson) {
+    return ipcRenderer.invoke('game:checkSignature', dataJson);
   },
   /** פתיחת חלון "מסך המנחה" הנפרד. */
   openHostWindow() {

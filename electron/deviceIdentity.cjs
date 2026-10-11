@@ -21,6 +21,11 @@
  * גם בלי רשת, עד תשובה מוצלחת שאינה אומרת זאת. מחשב חדש, קובץ ישן בלי השדה,
  * קובץ פגום, מספר שהוגרל מחדש, שרת ישן, תקלה או ניתוק — כולם פתוחים.
  *
+ * המתג «לחייב חתימה על קובצי משחק» (`requireSigned`, ראו gameSignature.cjs):
+ * הגדרה של המערכת ולא של המחשב, שמגיעה בכל תשובה מוצלחת ונשמרת כאן, ולכן
+ * תקפה גם בלי רשת. תשובה שאינה אומרת דבר עליו (שרת ישן, או שהשרת לא הצליח
+ * לקרוא אותו) משאירה את מה שנשמר. מחשב שלא התחבר אף פעם — כבוי.
+ *
  * הקובץ מקבל את תיקיית הנתונים כפרמטר ואינו נוגע ב-Electron — ראו
  * tests/deviceIdentity.test.ts.
  */
@@ -45,6 +50,7 @@ const NAME_MAX = 60;
  *   permissions: Permissions,
  *   permissionsAt: number,
  *   blocked: boolean,
+ *   requireSigned: boolean,
  * }} Device
  * @typedef {{ randomInt: (min: number, max: number) => number, randomBytes: (n: number) => Buffer }} Random
  */
@@ -93,6 +99,7 @@ function readDevice(userData) {
       permissionsAt: Number(d.permissionsAt) || 0,
       // רק true מפורש נועל — קובץ מגרסה ישנה (בלי השדה) פתוח.
       blocked: d.blocked === true,
+      requireSigned: d.requireSigned === true,
     };
   } catch {
     return null;
@@ -131,6 +138,7 @@ function loadDevice(userData, rand = crypto) {
     permissions: { ...NO_PERMISSIONS },
     permissionsAt: 0,
     blocked: false,
+    requireSigned: false,
   };
   saveDevice(userData, device);
   return device;
@@ -140,7 +148,8 @@ function loadDevice(userData, rand = crypto) {
  * המספר שייך למחשב אחר (409 מהשרת): הגרלה מחדש. קורה כשתיקיית הנתונים הועתקה
  * ממחשב אחר, או בהתנגשות מקרית ברישום הראשון. שם שהוקלד כאן ועוד לא נשלח
  * עובר הלאה; שם, אישורים והשבתה שהשרת כבר מכיר שייכים למחשב השני ואינם
- * מועתקים — מספר חדש הוא מחשב חדש, ופתוח.
+ * מועתקים — מספר חדש הוא מחשב חדש, ופתוח. המתג של החתימה הוא של המערכת
+ * ולא של המחשב, ועובר הלאה.
  * @param {string} userData
  * @param {Device} device
  * @param {Random} [rand]
@@ -157,6 +166,7 @@ function regenerateDevice(userData, device, rand = crypto) {
     permissions: { ...NO_PERMISSIONS },
     permissionsAt: 0,
     blocked: false,
+    requireSigned: device.requireSigned === true,
   };
   while (next.id === device.id) next = { ...next, ...newIdentity(rand) };
   saveDevice(userData, next);
@@ -197,9 +207,10 @@ function readBlocked(serverDevice, sentId) {
  * @param {string} sentId
  * @param {string | null} sentPending
  * @param {unknown} serverDevice
+ * @param {unknown} [requireSigned] המתג של החתימה מהתשובה; כל מה שאינו boolean — כמו שהיה
  * @returns {Device}
  */
-function applyServerAnswer(userData, sentId, sentPending, serverDevice) {
+function applyServerAnswer(userData, sentId, sentPending, serverDevice, requireSigned) {
   const device = loadDevice(userData);
   if (device.id !== sentId) return device;
   const answer = /** @type {{ name?: unknown, permissions?: unknown } | null} */ (serverDevice);
@@ -212,6 +223,7 @@ function applyServerAnswer(userData, sentId, sentPending, serverDevice) {
     permissions: readPermissions(answer?.permissions),
     permissionsAt: Date.now(),
     blocked: readBlocked(serverDevice, sentId),
+    requireSigned: typeof requireSigned === 'boolean' ? requireSigned : device.requireSigned,
   };
   saveDevice(userData, next);
   return next;

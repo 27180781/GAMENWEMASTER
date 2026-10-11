@@ -22,12 +22,14 @@ type PublicDevice = {
   blocked: boolean;
 };
 type PostResult = { status: number; body: unknown };
+type SignResult = { gameId: string; content: string; signature?: unknown; reason?: string };
 type SyncResult = {
   state: string;
   device: PublicDevice;
   games?: DeviceGame[];
   pollSeconds?: number;
   blockChanged?: boolean;
+  signatures?: SignResult[];
   error?: string;
 };
 type Random = { randomInt: (min: number, max: number) => number; randomBytes: (n: number) => Buffer };
@@ -36,6 +38,8 @@ const sync = require('../electron/deviceSync.cjs') as {
     userData: string;
     post: (body: Record<string, unknown>) => Promise<PostResult>;
     have: { gameId: string; version: string | null }[];
+    unsignedGames?: number | null;
+    sign?: { gameId: string; license: string; content: string }[];
     appVersion?: string;
     hostname?: string;
     platform?: string;
@@ -43,6 +47,7 @@ const sync = require('../electron/deviceSync.cjs') as {
   }) => Promise<SyncResult>;
   haveFromLibrary: (library: unknown[]) => { gameId: string; version: string | null }[];
   cleanGames: (raw: unknown) => DeviceGame[];
+  cleanSignatures: (raw: unknown) => SignResult[];
   publicDevice: (d: unknown) => PublicDevice;
   DEFAULT_POLL_SECONDS: number;
 };
@@ -50,7 +55,14 @@ const identity = require('../electron/deviceIdentity.cjs') as {
   loadDevice: (
     userData: string,
     rand?: Random,
-  ) => { id: string; secret: string; pendingName: string | null; permissions: Permissions; blocked: boolean };
+  ) => {
+    id: string;
+    secret: string;
+    pendingName: string | null;
+    permissions: Permissions;
+    blocked: boolean;
+    requireSigned: boolean;
+  };
   setPendingName: (userData: string, name: unknown) => unknown;
 };
 
@@ -245,6 +257,74 @@ describe('השבתת התוכנה מול השרת', () => {
       have: [],
     });
     expect(res.device.blocked).toBe(false);
+  });
+});
+
+describe('חתימה על קובצי משחק מול השרת', () => {
+  const C1 = 'a'.repeat(64);
+  const C2 = 'b'.repeat(64);
+  const L = '33333333-3333-4333-8333-333333333333';
+
+  it('★ הסקירה נשלחת רק כשיש מה לשלוח: הספירה, ובקשות חתימה', async () => {
+    const post = vi.fn(async (_b: Record<string, unknown>) => okAnswer());
+    await sync.syncDevice({ userData: dir, post, have: [] });
+    expect('unsignedGames' in post.mock.calls[0]![0]).toBe(false);
+    expect('sign' in post.mock.calls[0]![0]).toBe(false);
+    await sync.syncDevice({ userData: dir, post, have: [], unsignedGames: 0, sign: [] });
+    expect(post.mock.calls[1]![0].unsignedGames).toBe(0);
+    expect('sign' in post.mock.calls[1]![0]).toBe(false);
+    const sign = [{ gameId: A, license: L, content: C1 }];
+    await sync.syncDevice({ userData: dir, post, have: [], unsignedGames: 3, sign });
+    expect(post.mock.calls[2]![0]).toMatchObject({ unsignedGames: 3, sign });
+  });
+
+  it('★ המתג נשמר מהתשובה, ונשאר כשהתשובה אינה אומרת עליו דבר או כשהבדיקה נכשלה', async () => {
+    expect(identity.loadDevice(dir).requireSigned).toBe(false);
+    await sync.syncDevice({ userData: dir, post: async () => okAnswer({ requireSignedGames: true }), have: [] });
+    expect(identity.loadDevice(dir).requireSigned).toBe(true);
+    await sync.syncDevice({ userData: dir, post: async () => okAnswer(), have: [] });
+    await sync.syncDevice({ userData: dir, post: async () => okAnswer({ requireSignedGames: 'false' }), have: [] });
+    await sync.syncDevice({ userData: dir, post: async () => ({ status: 500, body: { requireSignedGames: false } }), have: [] });
+    expect(identity.loadDevice(dir).requireSigned).toBe(true);
+    await sync.syncDevice({ userData: dir, post: async () => okAnswer({ requireSignedGames: false }), have: [] });
+    expect(identity.loadDevice(dir).requireSigned).toBe(false);
+  });
+
+  it('★ החתימות שחזרו מגיעות לתוצאה אחרי סינון', async () => {
+    const signature = { v: 1, kid: 'k', payload: '{}', sig: 'x' };
+    const res = await sync.syncDevice({
+      userData: dir,
+      post: async () =>
+        okAnswer({
+          signatures: [
+            { gameId: A.toUpperCase(), content: C1, signature },
+            { gameId: B, content: C2, reason: 'changed' },
+          ],
+        }),
+      have: [],
+    });
+    expect(res.signatures).toEqual([
+      { gameId: A, content: C1, signature },
+      { gameId: B, content: C2, reason: 'changed' },
+    ]);
+    expect((await sync.syncDevice({ userData: dir, post: async () => okAnswer(), have: [] })).signatures).toEqual([]);
+  });
+
+  it('cleanSignatures זורקת מזהה, hash או חתימה פגומים', () => {
+    expect(
+      sync.cleanSignatures([
+        { gameId: 'nope', content: C1, signature: {} },
+        { gameId: A, content: 'C1', signature: {} },
+        { gameId: A, content: C1.toUpperCase(), signature: {} },
+        { gameId: A, content: C1, signature: [] },
+        { gameId: A, content: C1, signature: null },
+        { gameId: A, content: C1, reason: 'x'.repeat(100) },
+        null,
+        'x',
+      ]),
+    ).toEqual([{ gameId: A, content: C1, reason: 'x'.repeat(40) }]);
+    expect(sync.cleanSignatures({ signatures: [] })).toEqual([]);
+    expect(sync.cleanSignatures(Array.from({ length: 50 }, () => ({ gameId: A, content: C1, reason: 'changed' })))).toHaveLength(20);
   });
 });
 
