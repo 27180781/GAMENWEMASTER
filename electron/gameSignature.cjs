@@ -67,7 +67,10 @@ const UNSIGNED_KEYS = Object.freeze(['signature', 'metadata', 'users', 'pendingU
  * חתימה", בדיוק כמו בגרסה ישנה.
  * @type {Readonly<Record<string, string>>}
  */
-const PUBLIC_KEYS = Object.freeze({});
+const PUBLIC_KEYS = Object.freeze({
+  // המפתח הראשון, שהוגרל במסד ב-2026-10-11 (offline_signing_keys).
+  a4047b835871cda9: 'FNxsbUo9VeMRnsiTCB8MgvT_fa-APpkAvYIHtE9CoB0',
+});
 
 /** קובץ שהמערכת סירבה לחתום (השתנה מאז, אין רישיון) — לא שואלים שוב לפני שעבר שבוע. */
 const REFUSAL_RETRY_MS = 7 * 24 * 60 * 60 * 1000;
