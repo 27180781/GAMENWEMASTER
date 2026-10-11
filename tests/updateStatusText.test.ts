@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { downloadSizeText, updateStatusText } from '../src/app/App.tsx';
+import { downloadSizeText, fullDownloadText, updateStatusText } from '../src/app/App.tsx';
 
 describe('updateStatusText', () => {
   it('לפני שהגיע דיווח — "בודק"', () => {
@@ -31,6 +31,21 @@ describe('updateStatusText', () => {
     // בלי סך הורדה ידוע — אין סוגריים ריקים
     expect(downloadSizeText({ state: 'downloading', percent: 5 })).toBe('');
     expect(downloadSizeText({ state: 'downloading', percent: 5, total: 0 })).toBe('');
+  });
+
+  it('★ הורדה מלאה — נאמר למה, כדי שאפשר יהיה לדעת מה במחשב הזה מונע עדכון חלקי', () => {
+    const full = { state: 'downloading' as const, percent: 3, transferred: 3 * 1048576, total: 110 * 1048576, differential: false, fullReason: 'no-installer' };
+    expect(updateStatusText(full)).toContain('3 מתוך 110MB');
+    expect(updateStatusText(full)).toContain('הורדה מלאה: המתקין של הגרסה המותקנת לא נמצא במחשב');
+    expect(fullDownloadText({ ...full, fullReason: 'range-blocked' })).toContain('לא מאפשרים להוריד רק חלק');
+    // קוד שלא מוכר (תוכנה חדשה יותר מהממשק) — עדיין "הורדה מלאה", בלי טקסט שבור
+    expect(fullDownloadText({ ...full, fullReason: 'something-new' })).toBe(' · הורדה מלאה');
+    // הפרשי, או דיווח ישן בלי השדה — שום תוספת
+    expect(fullDownloadText({ ...full, differential: true, fullReason: null })).toBe('');
+    expect(fullDownloadText({ state: 'downloading', percent: 3 })).toBe('');
+    expect(updateStatusText({ state: 'paused', transferred: 1, total: 110 * 1048576, differential: false, fullReason: 'no-old-map' })).toContain(
+      'אין בשרת פרטים על הגרסה המותקנת',
+    );
   });
 
   it('★ נעצר — נאמר שמה שירד נשמר ושההמשך אוטומטי, עם כמה כבר ירד', () => {

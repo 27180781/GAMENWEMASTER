@@ -23,6 +23,8 @@ export async function enterClickerGame(g) {
   const { page } = g;
   await page.waitForSelector('.clicker-intro-screen', { timeout: 15000 });
   await g.click('button:has(.clicker-choice-title:text-is("שחק עם שלטים"))', { after: 1200 });
+  // הטבעת נשארת במקום שבו היה הכרטיס — בלי זה היא ריחפה באמצע הלובי כל הפרק.
+  await g.pointOff();
   await receiverOnline(page);
   await page.waitForSelector('.lobby-screen', { timeout: 15000 });
   await page.waitForTimeout(1200);

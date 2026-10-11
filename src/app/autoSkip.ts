@@ -7,14 +7,35 @@
  * לעבור בשקט. הלוגיקה טהורה — בלי React, בלי טיימרים.
  *
  * מתי כן מדלגים:
- *   • השקופית סיימה את תפקידה — `results` (התשובה כבר נחשפה), או `showing`
- *     בשקופית שאין בה הצבעה כלל (טקסט/מדיה/פונקציה).
+ *   • השקופית סיימה את תפקידה — `results` אחרי שהתשובה הנכונה (או הפילוח)
+ *     נחשפה, או `showing` בשקופית שאין בה הצבעה כלל (טקסט/מדיה/פונקציה).
+ *     בשלב `results` החשיפה היא לחיצה נפרדת של המנחה, ולכן הספירה מתחילה
+ *     ממנה. קודם היא התחילה בסגירת ההצבעה, והשקופית יכלה להתחלף לפני שהחדר
+ *     ראה את התשובה, או לקטוע את צליל החשיפה.
  * מתי לא:
  *   • `voting` — שם הטיימר של השאלה אחראי לסיום, ולא הדילוג.
  *   • כשמתנגנת מדיה (`activeMedia`) — אסור לקטוע סרטון באמצע.
+ *   • כששכבה חוסמת פתוחה (טבלת מובילים, פירוט הצבעות, תפריט…) — המשחק
+ *     ממתין מתחתיה, כמו המעברים האוטומטיים של המנוע, והספירה מתחילה מחדש
+ *     כשהיא נסגרת.
+ * ובזמן שהקריין מדבר — ממתינים לסוף המשפט, עם אותה תקרה כמו המעברים
+ * האוטומטיים (narrationWait.ts).
  */
 
 import { isVotableSlide, type GamePhase, type Slide } from '../engine/index.ts';
+import { narrationSafeDelayMs } from './narrationWait.ts';
+
+/** מה שמוצג עכשיו, מעבר לשקופית ולשלב. */
+export interface AutoSkipScreen {
+  /** מדיה חוסמת מתנגנת (activeMedia). */
+  mediaPlaying: boolean;
+  /** בשלב results: התשובה הנכונה (או הפילוח) כבר נחשפה. */
+  answerRevealed: boolean;
+  /** שכבה חוסמת פתוחה מעל השקופית. */
+  covered: boolean;
+  /** הקריין באמצע משפט. */
+  narratorSpeaking: boolean;
+}
 
 /**
  * ההשהיה במילישניות עד למעבר האוטומטי, או null כשאין לדלג.
@@ -25,12 +46,14 @@ import { isVotableSlide, type GamePhase, type Slide } from '../engine/index.ts';
 export function autoSkipDelayMs(
   slide: Slide,
   phase: GamePhase,
-  mediaPlaying: boolean,
+  screen: AutoSkipScreen,
 ): number | null {
-  if (mediaPlaying) return null;
+  if (screen.mediaPlaying || screen.covered) return null;
   const skip = slide.setting.automaticSkip;
   if (!skip.active) return null;
-  const waiting = phase === 'results' || (phase === 'showing' && !isVotableSlide(slide));
-  if (!waiting) return null;
-  return Math.max(1, skip.seconds) * 1000;
+  const done =
+    (phase === 'results' && screen.answerRevealed) ||
+    (phase === 'showing' && !isVotableSlide(slide));
+  if (!done) return null;
+  return narrationSafeDelayMs(Math.max(1, skip.seconds) * 1000, screen.narratorSpeaking);
 }

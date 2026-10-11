@@ -13,15 +13,33 @@ import { tmpdir } from 'node:os';
 const require = createRequire(import.meta.url);
 type Permissions = { createGame: boolean; editGame: boolean };
 type DeviceGame = { gameId: string; name: string; code: string | null; version: string | null; expiresAt: string | null; reason?: string };
-type PublicDevice = { id: string; name: string | null; pendingName: string | null; registered: boolean; permissions: Permissions };
+type PublicDevice = {
+  id: string;
+  name: string | null;
+  pendingName: string | null;
+  registered: boolean;
+  permissions: Permissions;
+  blocked: boolean;
+};
 type PostResult = { status: number; body: unknown };
-type SyncResult = { state: string; device: PublicDevice; games?: DeviceGame[]; pollSeconds?: number; error?: string };
+type SignResult = { gameId: string; content: string; signature?: unknown; reason?: string };
+type SyncResult = {
+  state: string;
+  device: PublicDevice;
+  games?: DeviceGame[];
+  pollSeconds?: number;
+  blockChanged?: boolean;
+  signatures?: SignResult[];
+  error?: string;
+};
 type Random = { randomInt: (min: number, max: number) => number; randomBytes: (n: number) => Buffer };
 const sync = require('../electron/deviceSync.cjs') as {
   syncDevice: (deps: {
     userData: string;
     post: (body: Record<string, unknown>) => Promise<PostResult>;
     have: { gameId: string; version: string | null }[];
+    unsignedGames?: number | null;
+    sign?: { gameId: string; license: string; content: string }[];
     appVersion?: string;
     hostname?: string;
     platform?: string;
@@ -29,11 +47,22 @@ const sync = require('../electron/deviceSync.cjs') as {
   }) => Promise<SyncResult>;
   haveFromLibrary: (library: unknown[]) => { gameId: string; version: string | null }[];
   cleanGames: (raw: unknown) => DeviceGame[];
+  cleanSignatures: (raw: unknown) => SignResult[];
   publicDevice: (d: unknown) => PublicDevice;
   DEFAULT_POLL_SECONDS: number;
 };
 const identity = require('../electron/deviceIdentity.cjs') as {
-  loadDevice: (userData: string, rand?: Random) => { id: string; secret: string; pendingName: string | null; permissions: Permissions };
+  loadDevice: (
+    userData: string,
+    rand?: Random,
+  ) => {
+    id: string;
+    secret: string;
+    pendingName: string | null;
+    permissions: Permissions;
+    blocked: boolean;
+    requireSigned: boolean;
+  };
   setPendingName: (userData: string, name: unknown) => unknown;
 };
 
@@ -143,6 +172,159 @@ describe('syncDevice', () => {
     expect(await at(5)).toBe(sync.DEFAULT_POLL_SECONDS);
     expect(await at(10 ** 9)).toBe(sync.DEFAULT_POLL_SECONDS);
     expect(await at('x')).toBe(sync.DEFAULT_POLL_SECONDS);
+  });
+});
+
+describe('השבתת התוכנה מול השרת', () => {
+  /** תשובה שמשביתה את המחשב שפנה (המספר שלו), עם משחקים שאסור שיגיעו להורדה. */
+  const blockedAnswer = (b: Record<string, unknown>) =>
+    okAnswer({ device: { id: b.deviceId, name: 'אולם 1', blocked: true }, pollSeconds: 60 });
+  const openAnswer = (b: Record<string, unknown>) => okAnswer({ device: { id: b.deviceId, name: 'אולם 1', blocked: false } });
+
+  it('★ מחשב חדש שולח שאינו נעול, ונשאר פתוח מול שרת שלא השבית אותו', async () => {
+    const post = vi.fn(async (b: Record<string, unknown>) => openAnswer(b));
+    const res = await sync.syncDevice({ userData: dir, post, have: [] });
+    expect(post.mock.calls[0]![0].blocked).toBe(false);
+    expect(res).toMatchObject({ state: 'ok', blockChanged: false });
+    expect(res.device.blocked).toBe(false);
+    expect(res.games).toHaveLength(1);
+  });
+
+  it('★ השבתה: נשמרת, בלי משחקים להורדה, ומדווחת בבדיקה הבאה', async () => {
+    const post = vi.fn(async (b: Record<string, unknown>) => blockedAnswer(b));
+    const first = await sync.syncDevice({ userData: dir, post, have: [] });
+    expect(first.device.blocked).toBe(true);
+    expect(first.games).toEqual([]); // גם כשהשרת שלח משחקים
+    expect(first.blockChanged).toBe(true);
+    expect(first.pollSeconds).toBe(60);
+    expect(identity.loadDevice(dir).blocked).toBe(true);
+    const second = await sync.syncDevice({ userData: dir, post, have: [] });
+    expect(post.mock.calls[1]![0].blocked).toBe(true); // המערכת רואה שהמחשב קיבל
+    expect(second.blockChanged).toBe(false);
+  });
+
+  it('★ מחשב מושבת נשאר נעול כשאין רשת, בעומס, מול שרת ישן ובתקלה', async () => {
+    await sync.syncDevice({ userData: dir, post: async (b) => blockedAnswer(b), have: [] });
+    const failures: (() => Promise<PostResult>)[] = [
+      async () => {
+        throw new Error('net::ERR_INTERNET_DISCONNECTED');
+      },
+      async () => ({ status: 429, body: null }),
+      async () => ({ status: 404, body: null }),
+      async () => ({ status: 500, body: { error: 'boom' } }),
+      async () => ({ status: 200, body: 'not json' }),
+      async () => ({ status: 200, body: { ok: false, device: { blocked: false } } }),
+    ];
+    for (const post of failures) {
+      const res = await sync.syncDevice({ userData: dir, post, have: [] });
+      expect(res.state).not.toBe('ok');
+      expect(res.device.blocked).toBe(true);
+    }
+    expect(identity.loadDevice(dir).blocked).toBe(true);
+  });
+
+  it('★ ולהפך: מחשב פתוח לעולם אינו ננעל מתקלה, מניתוק או משרת ישן', async () => {
+    await sync.syncDevice({ userData: dir, post: async (b) => openAnswer(b), have: [] });
+    const failures: (() => Promise<PostResult>)[] = [
+      async () => {
+        throw new Error('timeout');
+      },
+      async () => ({ status: 429, body: null }),
+      async () => ({ status: 404, body: null }),
+      async () => ({ status: 500, body: null }),
+      async () => ({ status: 403, body: { blocked: true } }),
+    ];
+    for (const post of failures) {
+      expect((await sync.syncDevice({ userData: dir, post, have: [] })).device.blocked).toBe(false);
+    }
+    // שרת ישן שעונה בלי השדה
+    expect((await sync.syncDevice({ userData: dir, post: async () => okAnswer(), have: [] })).device.blocked).toBe(false);
+  });
+
+  it('★ ביטול ההשבתה: התשובה המוצלחת הבאה פותחת, ומדווחת מיד', async () => {
+    await sync.syncDevice({ userData: dir, post: async (b) => blockedAnswer(b), have: [] });
+    const res = await sync.syncDevice({ userData: dir, post: async (b) => openAnswer(b), have: [] });
+    expect(res.device.blocked).toBe(false);
+    expect(res.blockChanged).toBe(true);
+    expect(res.games).toHaveLength(1); // המשחקים חוזרים
+    expect(identity.loadDevice(dir).blocked).toBe(false);
+  });
+
+  it('השבתה של מספר אחר (תשובה שאינה למחשב הזה) אינה נועלת', async () => {
+    const res = await sync.syncDevice({
+      userData: dir,
+      post: async () => okAnswer({ device: { id: '99999999', blocked: true } }),
+      have: [],
+    });
+    expect(res.device.blocked).toBe(false);
+  });
+});
+
+describe('חתימה על קובצי משחק מול השרת', () => {
+  const C1 = 'a'.repeat(64);
+  const C2 = 'b'.repeat(64);
+  const L = '33333333-3333-4333-8333-333333333333';
+
+  it('★ הסקירה נשלחת רק כשיש מה לשלוח: הספירה, ובקשות חתימה', async () => {
+    const post = vi.fn(async (_b: Record<string, unknown>) => okAnswer());
+    await sync.syncDevice({ userData: dir, post, have: [] });
+    expect('unsignedGames' in post.mock.calls[0]![0]).toBe(false);
+    expect('sign' in post.mock.calls[0]![0]).toBe(false);
+    await sync.syncDevice({ userData: dir, post, have: [], unsignedGames: 0, sign: [] });
+    expect(post.mock.calls[1]![0].unsignedGames).toBe(0);
+    expect('sign' in post.mock.calls[1]![0]).toBe(false);
+    const sign = [{ gameId: A, license: L, content: C1 }];
+    await sync.syncDevice({ userData: dir, post, have: [], unsignedGames: 3, sign });
+    expect(post.mock.calls[2]![0]).toMatchObject({ unsignedGames: 3, sign });
+  });
+
+  it('★ המתג נשמר מהתשובה, ונשאר כשהתשובה אינה אומרת עליו דבר או כשהבדיקה נכשלה', async () => {
+    expect(identity.loadDevice(dir).requireSigned).toBe(false);
+    await sync.syncDevice({ userData: dir, post: async () => okAnswer({ requireSignedGames: true }), have: [] });
+    expect(identity.loadDevice(dir).requireSigned).toBe(true);
+    await sync.syncDevice({ userData: dir, post: async () => okAnswer(), have: [] });
+    await sync.syncDevice({ userData: dir, post: async () => okAnswer({ requireSignedGames: 'false' }), have: [] });
+    await sync.syncDevice({ userData: dir, post: async () => ({ status: 500, body: { requireSignedGames: false } }), have: [] });
+    expect(identity.loadDevice(dir).requireSigned).toBe(true);
+    await sync.syncDevice({ userData: dir, post: async () => okAnswer({ requireSignedGames: false }), have: [] });
+    expect(identity.loadDevice(dir).requireSigned).toBe(false);
+  });
+
+  it('★ החתימות שחזרו מגיעות לתוצאה אחרי סינון', async () => {
+    const signature = { v: 1, kid: 'k', payload: '{}', sig: 'x' };
+    const res = await sync.syncDevice({
+      userData: dir,
+      post: async () =>
+        okAnswer({
+          signatures: [
+            { gameId: A.toUpperCase(), content: C1, signature },
+            { gameId: B, content: C2, reason: 'changed' },
+          ],
+        }),
+      have: [],
+    });
+    expect(res.signatures).toEqual([
+      { gameId: A, content: C1, signature },
+      { gameId: B, content: C2, reason: 'changed' },
+    ]);
+    expect((await sync.syncDevice({ userData: dir, post: async () => okAnswer(), have: [] })).signatures).toEqual([]);
+  });
+
+  it('cleanSignatures זורקת מזהה, hash או חתימה פגומים', () => {
+    expect(
+      sync.cleanSignatures([
+        { gameId: 'nope', content: C1, signature: {} },
+        { gameId: A, content: 'C1', signature: {} },
+        { gameId: A, content: C1.toUpperCase(), signature: {} },
+        { gameId: A, content: C1, signature: [] },
+        { gameId: A, content: C1, signature: null },
+        { gameId: A, content: C1, reason: 'x'.repeat(100) },
+        null,
+        'x',
+      ]),
+    ).toEqual([{ gameId: A, content: C1, reason: 'x'.repeat(40) }]);
+    expect(sync.cleanSignatures({ signatures: [] })).toEqual([]);
+    expect(sync.cleanSignatures(Array.from({ length: 50 }, () => ({ gameId: A, content: C1, reason: 'changed' })))).toHaveLength(20);
   });
 });
 

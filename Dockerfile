@@ -20,6 +20,11 @@ RUN npm run build
 # (ראו docker-entrypoint.sh).
 ARG DESKTOP_ASSETS=1
 ENV DESKTOP_ASSETS=$DESKTOP_ASSETS
+# כשהריפו פרטי המהדורה נקראת רק עם מפתח (ראו fetch-desktop-assets.mjs).
+# CapRover מעביר את משתני הסביבה של האפליקציה גם לבנייה, כ-build args, ולכן
+# אותו GITHUB_RELEASES_TOKEN שמוגדר באפליקציה (לרענון שרץ במכולה) מגיע לכאן.
+# ARG ולא ENV: הערך זמין רק לשלב הזה, ושלב ה-nginx למטה לא נושא אותו.
+ARG GITHUB_RELEASES_TOKEN=""
 RUN node tools/fetch-desktop-assets.mjs dist/desktop
 
 FROM nginx:1.27-alpine
@@ -45,5 +50,8 @@ COPY server/live-relay.mjs server/live-video.mjs /app/server/
 # כרגיל (ומריץ את סקריפטי ה-init שלה), ואז מפעיל את ה-CMD הזה במקום nginx.
 COPY docker-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+# שער ההורדה של הגרסה הניידת וכלי החתימה (קוד גישה) — nginx שואל אותו בכל
+# בקשה לקבצים האלה. הקובץ json הוא גיבוב הקוד בלבד.
+COPY server/download-gate.mjs server/download-gate.json /app/server/
 EXPOSE 80
 CMD ["/entrypoint.sh"]

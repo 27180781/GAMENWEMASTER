@@ -1,0 +1,33 @@
+# בדיקות ובנייה בכל דחיפה ל-main.
+#
+# עד אוקטובר 2026 עשה את זה deploy-pages.yml בדרך אגב: בדיקות, בנייה ופרסום
+# של דמו ל-GitHub Pages. הדמו הוסר כשהריפו עבר להיות פרטי (Pages בריפו פרטי
+# דורש מנוי בתשלום, והאתר החי ממילא רץ ב-CapRover), והבדיקות נשארו כאן.
+# build-desktop.yml מסנן לפי נתיבים ומסתמך על כך שכל שינוי אחר נבדק כאן.
+
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build

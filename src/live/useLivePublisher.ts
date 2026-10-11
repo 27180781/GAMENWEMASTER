@@ -9,9 +9,10 @@
  * שום כשל כאן לא נוגע במשחק: אין חיבור — המשחק ממשיך כרגיל, והשידור מנסה שוב.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { AudioManager } from '../app/AudioManager.ts';
 import { imageRevealBlurFor, imageRevealOf } from '../engine/imageReveal.ts';
+import { NO_MEDIA, nextMediaClock, type MediaClock } from './mediaClock.ts';
 import { LivePublisher, type PublisherStatus } from './publisher.ts';
 import { RevealThumbs } from './revealThumb.ts';
 import { LiveSnapshotBuilder, type LiveHostInput } from './snapshot.ts';
@@ -49,13 +50,16 @@ export function useLivePublisher({
   frameRef.current = frame;
   const publisherRef = useRef<LivePublisher | null>(null);
   const scoresPageRef = useRef(0);
-  const mediaRef = useRef<{ key: string | null; at: number | null }>({ key: null, at: null });
+  const mediaRef = useRef<MediaClock>(NO_MEDIA);
   const [status, setStatus] = useState<PublisherStatus | null>(null);
   const [viewUrl, setViewUrl] = useState<string | null>(null);
 
   const active = enabled && gameId.trim() !== '' && roomId.trim() !== '';
 
-  useEffect(() => {
+  // useLayoutEffect ולא useEffect: מוזיקת מסך הפתיחה מתחילה באפקט של GameHost
+  // כבר בקומיט הראשון, ואפקט רגיל כאן היה מחבר את המאזין אחריו — כך הצופים
+  // לא שמעו אותה אף פעם. אפקט layout רץ לפני כל האפקטים הרגילים של הקומיט.
+  useLayoutEffect(() => {
     if (!active) return undefined;
     let cancelled = false;
     let publisher: LivePublisher | null = null;
@@ -123,14 +127,15 @@ export function useLivePublisher({
   }, [active, gameId, roomId, audio]);
 
   // מתי התחילה המדיה החוסמת הנוכחית — כדי שצופה שנכנס באמצע יקפוץ לאותה נקודה.
+  // הזמן שבו עמדה מתחת לשכבה חוסמת לא נספר (mediaClock.ts).
   const mediaKey =
     frame.state.activeMedia === null
       ? null
       : `${frame.state.currentSlideId}:${frame.state.activeMedia}`;
+  const mediaHeld = frame.paused;
   useEffect(() => {
-    if (mediaRef.current.key === mediaKey) return;
-    mediaRef.current = { key: mediaKey, at: mediaKey === null ? null : Date.now() };
-  }, [mediaKey]);
+    mediaRef.current = nextMediaClock(mediaRef.current, mediaKey, mediaHeld, Date.now());
+  }, [mediaKey, mediaHeld]);
 
   // כל רינדור של המסך הראשי — אולי משהו השתנה. הבנייה עצמה מוגבלת בקצב.
   useEffect(() => {

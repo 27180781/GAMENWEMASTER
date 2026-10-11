@@ -15,6 +15,29 @@ export interface Player {
   /** המספר של הקליקר/הטלפון — זהה ל-voterId שמגיע בהצבעות. */
   id: string;
   name: string;
+  /**
+   * מזהה המשתתף בבונה, כשהשם הגיע מרשימת המשתתפים בלי מספר שלט (pendingUsers)
+   * ונקשר לשלט בלחיצה. כך יודעים שהשיוך הזה עדיין לא ידוע לבונה.
+   */
+  participantId?: string;
+  /**
+   * השיוך נעשה בתוכנה: השלט נקלט בלחיצה, או שהשם הגיע אליו מהתור. «שיוך מחדש»
+   * מחזיר לתור בדיוק את השמות האלה, עם הקבוצה שהגיעה איתם מהתור. גם מספר שנשמר
+   * בבונה מלחיצה מגיע מסומן (`pressed` ב-`users`). מספר שהוקלד כאן או בבונה,
+   * או שיובא מאקסל עם מספרים, אינו מסומן ואינו מתאפס.
+   */
+  pressed?: PressedFrom;
+}
+
+/** הקבוצה שהגיעה עם השם מהתור (group ריק = בלי קבוצה). */
+export interface PressedFrom {
+  group: string;
+  category?: string;
+}
+
+function samePressed(a: PressedFrom | undefined, b: PressedFrom | undefined): boolean {
+  if (a === undefined || b === undefined) return a === b;
+  return a.group === b.group && a.category === b.category;
 }
 
 export interface Group {
@@ -43,6 +66,11 @@ export interface PendingName {
    * קטגוריית ברירת המחדל במקום תחת הקטגוריה שממנה הגיע.
    */
   category?: string;
+  /**
+   * מזהה המשתתף בבונה — לשם שהגיע מקובץ המשחק (pendingUsers) ולא הוקלד כאן.
+   * שמות כאלה מסונכרנים מול הקובץ בכל טעינה (ראו mergePendingUsers).
+   */
+  participantId?: string;
 }
 
 export interface RosterData {
@@ -110,6 +138,15 @@ export function removePlayer(roster: RosterData, id: string): RosterData {
   const memberships = { ...roster.memberships };
   delete memberships[id];
   return { ...roster, players: roster.players.filter((p) => p.id !== id), memberships };
+}
+
+/** הסרת כמה שחקנים בבת אחת (ושיוכיהם לקבוצות). מספר שאינו ברשימה — מתעלמים. */
+export function removePlayers(roster: RosterData, ids: Iterable<string>): RosterData {
+  const drop = new Set(ids);
+  if (!roster.players.some((p) => drop.has(p.id))) return roster;
+  const memberships = { ...roster.memberships };
+  for (const id of drop) delete memberships[id];
+  return { ...roster, players: roster.players.filter((p) => !drop.has(p.id)), memberships };
 }
 
 // ---------------------------------------------------------------------------
@@ -314,11 +351,23 @@ export function reconcilePending(roster: RosterData, categoryName: string): Rost
   for (let i = 0; i < take; i += 1) {
     const player = waiting[i]!;
     const next = pending[i]!;
-    r = upsertPlayer(r, player.id, next.name);
-    if (next.group.trim() !== '') {
-      // הקטגוריה של השם עצמו קודמת — כך שם מקובץ "מחלקה" נשאר תחת "מחלקה"
-      // גם כשהלחיצה שתופסת אותו מגיעה הרבה אחרי הייבוא.
-      const ensured = ensureGroupByName(r, next.category ?? categoryName, next.group);
+    const grouped = next.group.trim() !== '';
+    // הקטגוריה של השם עצמו קודמת — כך שם מקובץ "מחלקה" נשאר תחת "מחלקה"
+    // גם כשהלחיצה שתופסת אותו מגיעה הרבה אחרי הייבוא.
+    const category = next.category ?? categoryName;
+    // השם הגיע מהבונה: השלט שתפס אותו נושא את המשתתף, כדי שטעינה הבאה של
+    // הקובץ לא תחזיר את השם לתור, וכדי שאפשר יהיה לדווח את המספר לבונה. שם
+    // שהוקלד כאן מנקה מזהה ששרד על השלט משם קודם.
+    const bound: Player = {
+      ...player,
+      name: next.name,
+      pressed: { group: next.group, ...(grouped ? { category } : {}) },
+    };
+    if (next.participantId !== undefined) bound.participantId = next.participantId;
+    else delete bound.participantId;
+    r = { ...r, players: r.players.map((p) => (p.id === player.id ? bound : p)) };
+    if (grouped) {
+      const ensured = ensureGroupByName(r, category, next.group);
       r = assignGroup(ensured.roster, player.id, ensured.categoryId, ensured.groupId);
     }
   }
@@ -352,7 +401,10 @@ export function captureRemote(
   if (existing !== undefined) {
     return { roster, id, name: existing.name, isNew: false };
   }
-  const withPlayer: RosterData = { ...roster, players: [...roster.players, { id, name: '' }] };
+  const withPlayer: RosterData = {
+    ...roster,
+    players: [...roster.players, { id, name: '', pressed: { group: '' } }],
+  };
   const next = reconcilePending(withPlayer, categoryName);
   const player = next.players.find((p) => p.id === id);
   return { roster: next, id, name: player?.name ?? '', isNew: true };
@@ -372,6 +424,7 @@ export function addPendingNames(
       name: n.name.trim(),
       group: n.group.trim(),
       ...(n.category !== undefined && n.category.trim() !== '' ? { category: n.category.trim() } : {}),
+      ...(n.participantId !== undefined && n.participantId !== '' ? { participantId: n.participantId } : {}),
     }))
     .filter((n) => n.name !== '');
   if (clean.length === 0) return roster;
@@ -389,6 +442,69 @@ export function clearPendingNames(roster: RosterData): RosterData {
   return roster.pendingNames.length === 0 ? roster : { ...roster, pendingNames: [] };
 }
 
+/** מספר שלט אמיתי (הריסיבר מדווח 1–9999) — רק מספר כזה נשמר בבונה מלחיצה. */
+const CLICKER_ID = /^[1-9][0-9]{0,3}$/;
+
+/** שיוך של משתתף מהבונה שבוטל ב«שיוך מחדש»: המשתתף, והשלט שהיה לו. */
+export interface ReleasedClicker {
+  participantId: string;
+  clickerId: string;
+}
+
+export interface ReassignResult {
+  roster: RosterData;
+  /** כמה שמות חזרו לתור. */
+  returned: number;
+  /** כמה שלטים ירדו מהרשימה (כולל שלטים שנלחצו ועוד לא קיבלו שם). */
+  cleared: number;
+  /** שיוכים של משתתפים מהבונה, כדי למחוק שם מספר שנשמר מלחיצה. */
+  released: ReleasedClicker[];
+}
+
+/**
+ * «שיוך מחדש»: מבטל את השיוכים שנעשו בתוכנה ומתחיל מההתחלה. כל שם שקיבל שלט
+ * בלחיצה או מהתור (`pressed`) חוזר לראש התור, לפי הסדר שבו נקשר, ולפני השמות
+ * שעוד חיכו. השלטים יורדים מהרשימה, וגם שלטים שנלחצו ועוד לא קיבלו שם, ולכן
+ * הלחיצה הבאה תופסת שוב את השם הראשון. שמות עם מספר שהוקלד (כאן או בבונה) או
+ * שיובא מאקסל עם מספרים נשארים כמו שהם.
+ *
+ * מה שנשמר בבונה מהשיוך הישן חוזר ב-`released`: מי שקורא לכאן שולח אותם לבונה
+ * (clickerSave.ts) ומסתיר אותם מהקובץ עד שהבונה יאשר (clickerRelease.ts), אחרת
+ * הטעינה הבאה של המשחק הייתה מחזירה את המספרים הישנים.
+ */
+export function reassignRoster(roster: RosterData): ReassignResult {
+  const reset = roster.players.filter((p) => p.pressed !== undefined || p.name.trim() === '');
+  if (reset.length === 0) return { roster, returned: 0, cleared: 0, released: [] };
+
+  const back: PendingName[] = [];
+  const backIds = new Set<string>();
+  const released: ReleasedClicker[] = [];
+  for (const p of reset) {
+    const participantId = p.participantId;
+    if (participantId !== undefined && CLICKER_ID.test(p.id)) released.push({ participantId, clickerId: p.id });
+    const name = p.name.trim();
+    if (name === '' || (participantId !== undefined && backIds.has(participantId))) continue;
+    const group = p.pressed?.group.trim() ?? '';
+    const category = p.pressed?.category;
+    back.push({
+      name,
+      group,
+      ...(group !== '' && category !== undefined ? { category } : {}),
+      ...(participantId !== undefined ? { participantId } : {}),
+    });
+    if (participantId !== undefined) backIds.add(participantId);
+  }
+
+  const waiting = roster.pendingNames.filter((n) => n.participantId === undefined || !backIds.has(n.participantId));
+  const without = removePlayers(roster, reset.map((p) => p.id));
+  return {
+    roster: { ...without, pendingNames: [...back, ...waiting] },
+    returned: back.length,
+    cleared: reset.length,
+    released,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // ייבוא שמות/קבוצות מקובץ המשחק (שדה users ב-JSON)
 // ---------------------------------------------------------------------------
@@ -398,11 +514,15 @@ export interface GameUser {
   remoteId: string;
   name: string;
   groupName: string;
+  /** מזהה המשתתף בבונה. חסר בקבצים ישנים ובמשחקים שלא נבנו בבונה. */
+  participantId?: string;
+  /** המספר נשמר בבונה מלחיצה בתוכנה ולא שונה שם מאז («שיוך מחדש» מאפס אותו). */
+  pressed?: true;
 }
 
 /**
  * פענוח שדה users מקובץ המשחק (מחרוזת JSON או אובייקט) לרשימת משתמשים.
- * מבנה: { "<remoteId>": { remoteId, name, groupName? }, ... }.
+ * מבנה: { "<remoteId>": { remoteId, name, groupName?, participantId?, pressed? }, ... }.
  */
 export function parseGameUsers(raw: unknown): GameUser[] {
   let obj: unknown = raw;
@@ -422,10 +542,13 @@ export function parseGameUsers(raw: unknown): GameUser[] {
     const v = value as Record<string, unknown>;
     const remoteId = String(v.remoteId ?? key).trim();
     if (remoteId === '') continue;
+    const participantId = typeof v.participantId === 'string' ? v.participantId.trim() : '';
     users.push({
       remoteId,
       name: String(v.name ?? '').trim(),
       groupName: String(v.groupName ?? '').trim(),
+      ...(participantId !== '' ? { participantId } : {}),
+      ...(v.pressed === true ? { pressed: true as const } : {}),
     });
   }
   return users;
@@ -435,10 +558,42 @@ export function parseGameUsers(raw: unknown): GameUser[] {
  * מיזוג משתמשי קובץ המשחק למרשם: השמות נכנסים ללשונית השמות, והשיוך לקבוצות
  * (שמגיע בלי קטגוריה) נכנס תחת קטגוריה אחת בשם categoryName — הקבוצות נוצרות
  * לפי groupName הייחודיים. אימיוטבילי ואידמפוטנטי (ריצה חוזרת = אותה תוצאה).
+ *
+ * מספר שמופיע בקובץ הוא של הבונה: השחקן במספר הזה מקבל את המשתתף שבקובץ, ואם
+ * נקשר כאן בלחיצה לשם אחר מהבונה, הקשר הזה נמחק (והשם חוזר לתור, ראו
+ * mergePendingUsers).
  */
 export function mergeGameUsers(roster: RosterData, users: GameUser[], categoryName: string): RosterData {
   let r = roster;
   for (const u of users) r = upsertPlayer(r, u.remoteId, u.name);
+
+  // המשתתף שבקובץ, וסימון «שיוך בלחיצה»: הסימון המקומי נשאר רק כל עוד המספר
+  // שייך באותו משתתף; אחרת קובע הקובץ (pressed = נשמר בבונה מלחיצה).
+  const userAt = new Map(users.map((u) => [u.remoteId, u]));
+  const players = r.players.map((p) => {
+    const u = userAt.get(p.id);
+    if (u === undefined) return p;
+    const participantId = u.participantId;
+    const sameBinding = participantId !== undefined && p.participantId === participantId;
+    const fromFile: PressedFrom | undefined =
+      u.pressed === true
+        ? { group: u.groupName, ...(u.groupName !== '' ? { category: categoryName } : {}) }
+        : undefined;
+    const pressed =
+      sameBinding && p.pressed !== undefined
+        ? p.pressed
+        : samePressed(p.pressed, fromFile)
+          ? p.pressed
+          : fromFile;
+    if (p.participantId === participantId && p.pressed === pressed) return p;
+    const next: Player = { ...p };
+    if (participantId === undefined) delete next.participantId;
+    else next.participantId = participantId;
+    if (pressed === undefined) delete next.pressed;
+    else next.pressed = pressed;
+    return next;
+  });
+  if (players.some((p, i) => p !== r.players[i])) r = { ...r, players };
 
   const grouped = users.filter((u) => u.groupName !== '');
   if (grouped.length === 0) return r;
@@ -467,6 +622,272 @@ export function mergeGameUsers(roster: RosterData, users: GameUser[], categoryNa
 }
 
 // ---------------------------------------------------------------------------
+// שמות שממתינים לשלט מקובץ המשחק (pendingUsers)
+// ---------------------------------------------------------------------------
+
+/**
+ * משתתף שהגיע מהבונה בלי מספר שלט (המבנה של `pendingUsers` אחרי נרמול). מוגדר
+ * כאן מבנית, כדי שהמרשם לא יהיה תלוי במנוע.
+ */
+export interface GamePendingUser {
+  /** מזהה המשתתף בבונה ('' אם חסר — אז השם מתנהג כמו שם שהוקלד כאן). */
+  id: string;
+  name: string;
+  groupName: string;
+}
+
+/**
+ * סנכרון השמות שממתינים לשלט בקובץ המשחק אל התור של הקליטה החכמה. הקובץ הוא
+ * מקור האמת לשמות האלה, והפעולה אידמפוטנטית (טעינה חוזרת = אותה תוצאה):
+ *
+ *   • שם שכבר נקשר לשלט במחשב הזה (שחקן עם אותו participantId) אינו חוזר לתור;
+ *     אם שמו שונה בבונה, השם של השחקן מתעדכן.
+ *   • שם שכבר בתור נשאר במקומו, והשם והקבוצה שלו מתעדכנים מהקובץ.
+ *   • שם שנמחק מהבונה יוצא מהתור, ושם חדש נוסף לסוף התור לפי סדר הקובץ.
+ *   • שמות שהוקלדו כאן (בלי participantId) נשארים כמו שהם.
+ *
+ * בסוף נקשרים שמות לשלטים שכבר נלחצו ועדיין בלי שם, כמו בכל הוספה לתור.
+ */
+export function mergePendingUsers(
+  roster: RosterData,
+  users: readonly GamePendingUser[],
+  categoryName: string,
+): RosterData {
+  const fromFile = new Map<string, GamePendingUser>();
+  for (const u of users) if (u.id !== '' && !fromFile.has(u.id)) fromFile.set(u.id, u);
+
+  const bound = new Set<string>();
+  const players = roster.players.map((p) => {
+    if (p.participantId === undefined) return p;
+    bound.add(p.participantId);
+    const u = fromFile.get(p.participantId);
+    return u !== undefined && u.name !== p.name ? { ...p, name: u.name } : p;
+  });
+
+  const entryOf = (u: GamePendingUser): PendingName => ({
+    name: u.name,
+    group: u.groupName,
+    ...(u.groupName !== '' ? { category: categoryName } : {}),
+    ...(u.id !== '' ? { participantId: u.id } : {}),
+  });
+
+  const queued = new Set<string>();
+  const kept: PendingName[] = [];
+  for (const n of roster.pendingNames) {
+    if (n.participantId === undefined) {
+      kept.push(n);
+      continue;
+    }
+    const u = fromFile.get(n.participantId);
+    if (u === undefined || bound.has(n.participantId) || queued.has(n.participantId)) continue;
+    queued.add(n.participantId);
+    kept.push(n.name === u.name && n.group === u.groupName ? n : entryOf(u));
+  }
+
+  const added: PendingName[] = [];
+  for (const u of users) {
+    if (u.id === '') {
+      // בלי מזהה אי אפשר לעקוב אחרי השם; מוסיפים אותו רק אם הוא לא כבר בתור
+      // או ברשימת השלטים, כדי שטעינה חוזרת לא תכפיל אותו.
+      const taken =
+        kept.some((n) => n.name === u.name) ||
+        added.some((n) => n.name === u.name) ||
+        players.some((p) => p.name.trim() === u.name);
+      if (!taken) added.push(entryOf(u));
+      continue;
+    }
+    if (bound.has(u.id) || queued.has(u.id)) continue;
+    queued.add(u.id);
+    added.push(entryOf(u));
+  }
+
+  return reconcilePending({ ...roster, players, pendingNames: [...kept, ...added] }, categoryName);
+}
+
+/**
+ * הבסיס לבנייה מחדש של המרשם כשרשימת `users` בקובץ השתנתה (rosterIsStale):
+ * מרשם ריק, חוץ משלטים שנקשרו כאן לשם מהבונה שעדיין ממתין בקובץ. השיוך שלהם
+ * ידוע רק למחשב הזה (הבונה עוד לא יודע את המספר), ובלעדיהם השם היה חוזר לתור,
+ * והשלט שכבר נמסר למישהו היה מקבל בלחיצה הבאה שם של מישהו אחר.
+ */
+export function carryPendingBindings(
+  roster: RosterData,
+  users: readonly GamePendingUser[],
+): RosterData {
+  const waiting = new Set(users.map((u) => u.id).filter((id) => id !== ''));
+  const players = roster.players.filter(
+    (p) => p.participantId !== undefined && waiting.has(p.participantId),
+  );
+  if (players.length === 0) return { ...EMPTY_ROSTER };
+  const ids = new Set(players.map((p) => p.id));
+  const memberships: RosterData['memberships'] = {};
+  for (const [playerId, byCat] of Object.entries(roster.memberships)) {
+    if (ids.has(playerId)) memberships[playerId] = { ...byCat };
+  }
+  const usedGroups = new Set<string>();
+  for (const byCat of Object.values(memberships)) {
+    for (const [catId, groupId] of Object.entries(byCat)) usedGroups.add(`${catId}/${groupId}`);
+  }
+  const categories = roster.categories
+    .map((c) => ({ ...c, groups: c.groups.filter((g) => usedGroups.has(`${c.id}/${g.id}`)) }))
+    .filter((c) => c.groups.length > 0);
+  return { players, categories, memberships, pendingNames: [] };
+}
+
+/**
+ * שחקנים שנקשרו כאן לשם מהבונה, והבונה כבר לא מחכה לשלט בשבילו: המשתתף קיבל
+ * בבונה מספר אחר, או נמחק. נבדק רק כשהקובץ נושא מזהי משתתפים (בקובץ ישן כל
+ * המשתתפים היו נראים "לא ממתינים"). מספר שמופיע בקובץ אינו מוסר כאן:
+ * mergeGameUsers נותן לו את המשתתף שבקובץ.
+ */
+export function dropStaleBindings(
+  roster: RosterData,
+  users: readonly GameUser[],
+  pending: readonly GamePendingUser[],
+): RosterData {
+  const waiting = new Set(pending.map((u) => u.id).filter((id) => id !== ''));
+  const known = new Set(users.map((u) => u.participantId).filter((id) => id !== undefined));
+  if (waiting.size === 0 && known.size === 0) return roster;
+  const inFile = new Set(users.map((u) => u.remoteId));
+  const stale = roster.players
+    .filter((p) => p.participantId !== undefined && !waiting.has(p.participantId) && !inFile.has(p.id))
+    .map((p) => p.id);
+  return stale.length === 0 ? roster : removePlayers(roster, stale);
+}
+
+/** מה שהמרשם צריך מקובץ המשחק. */
+export interface RosterSourceFile {
+  name: string;
+  users?: string;
+  pendingUsers: readonly GamePendingUser[];
+}
+
+/**
+ * ממה נבנה המרשם השמור בפעם הקודמת: המספרים שהגיעו אז ב-`users`, וטביעת האצבע
+ * של המחרוזת (המפתח הישן, כשהמספרים עוד לא נשמרו).
+ */
+export interface RosterSource {
+  /** null = לא ידוע (נשמר לפני שהמספרים נשמרו). */
+  fingerprint: string | null;
+  /** המספרים (remoteId) שהיו ב-`users`; null = לא ידוע (גרסה ישנה). */
+  remoteIds: string[] | null;
+}
+
+/**
+ * `users` בלי השדות participantId ו-pressed, כפי שהבונה שלח אותו לפני שהוסיף
+ * אותם. בזכותו קובץ שהשתנה רק בתוספת השדות לא נחשב לרשימה חדשה. null = אין
+ * מה להסיר.
+ */
+export function usersWithoutParticipantIds(raw: string): string | null {
+  let obj: unknown;
+  try {
+    obj = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) return null;
+  let changed = false;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+    if (value !== null && typeof value === 'object' && ('participantId' in value || 'pressed' in value)) {
+      const rest = { ...(value as Record<string, unknown>) };
+      delete rest.participantId;
+      delete rest.pressed;
+      out[key] = rest;
+      changed = true;
+    } else {
+      out[key] = value;
+    }
+  }
+  return changed ? JSON.stringify(out) : null;
+}
+
+/**
+ * מיזוג השמות והקבוצות מקובץ המשחק (`users` ו-`pendingUsers`) אל המרשם השמור.
+ * טהור: מקבל את המרשם המקומי ואת מה שנשמר על הקובץ הקודם, ומחזיר את המרשם החדש
+ * ואת מה לשמור. מחזיר null כשאין בקובץ שמות, אין במרשם שמות מהבונה, ואין מספרים
+ * מהקובץ הקודם — אז המרשם המקומי נשאר כמו שהוא.
+ *
+ * המרשם ממוזג ולעולם אינו מוחק סתם: שמות שהוקלדו כאן, קטגוריות ושיוכים לקבוצות
+ * נשמרים. נמחקים רק מספרים שהבונה הסיר (היו ב-`users` הקודם ואינם עכשיו),
+ * ושלטים שנקשרו כאן לשם שהבונה כבר נתן לו מספר אחר או מחק (dropStaleBindings).
+ * כך מספר שנשמר בבונה מהמחשב הזה (המשתתף עובר מ-`pendingUsers` ל-`users`) לא
+ * מוחק דבר.
+ *
+ * @param sealed משחק סגור (EXE חתום) — ראו rosterIsStale.
+ */
+export function syncRosterWithFile(
+  local: RosterData,
+  file: RosterSourceFile,
+  previous: RosterSource | null,
+  sealed: boolean,
+): { roster: RosterData; source: RosterSource } | null {
+  const users = parseGameUsers(file.users);
+  const pending = file.pendingUsers;
+  const fromBuilder =
+    local.pendingNames.some((n) => n.participantId !== undefined) ||
+    local.players.some((p) => p.participantId !== undefined);
+  const previousIds = previous?.remoteIds ?? null;
+  if (users.length === 0 && pending.length === 0 && !fromBuilder && (previousIds === null || previousIds.length === 0)) {
+    return null;
+  }
+
+  const categoryName = file.name.trim() !== '' ? file.name.trim() : 'קבוצות המשחק';
+  const rawUsers = String(file.users ?? '');
+  const fingerprint = fingerprintUsers(rawUsers);
+  const remoteIds = users.map((u) => u.remoteId);
+  let base = local;
+  if (previousIds !== null) {
+    const now = new Set(remoteIds);
+    base = removePlayers(base, previousIds.filter((id) => !now.has(id)));
+  } else if (users.length > 0) {
+    // נשמר רק טביעת אצבע (גרסה קודמת של התוכנה): מהדורה חדשה של אותו משחק
+    // (למשל EXE שנחתם מחדש עם מספרי שלטים אחרים) נבנית מחדש, כמו שהיה. קובץ
+    // שרק נוספו בו מזהי המשתתפים הוא אותה רשימה.
+    const previousFingerprint = previous?.fingerprint ?? null;
+    const stripped = usersWithoutParticipantIds(rawUsers);
+    const same = previousFingerprint !== null && stripped !== null && previousFingerprint === fingerprintUsers(stripped);
+    if (!same && rosterIsStale(previousFingerprint, fingerprint, sealed)) {
+      base = carryPendingBindings(local, pending);
+    }
+  }
+  base = mergeGameUsers(dropStaleBindings(base, users, pending), users, categoryName);
+  return { roster: mergePendingUsers(base, pending, categoryName), source: { fingerprint, remoteIds } };
+}
+
+/**
+ * טביעת אצבע של *מי* המשתתפים שהבונה שלח, לפי מזהה המשתתף: לא משתנה כשמספר
+ * שלט נשמר בבונה (המשתתף עובר מ-`pendingUsers` ל-`users`) או כששם מתוקן. null
+ * כשהקובץ לא נושא מזהי משתתפים (קובץ ישן, משחק שנבנה כאן).
+ */
+export function participantsFingerprint(file: {
+  users?: string;
+  pendingUsers: readonly GamePendingUser[];
+}): string | null {
+  const keys: string[] = [];
+  let identified = false;
+  for (const u of parseGameUsers(file.users)) {
+    if (u.participantId !== undefined) {
+      identified = true;
+      keys.push(`p:${u.participantId}`);
+    } else {
+      keys.push(`u:${u.remoteId}\u0001${u.name}`);
+    }
+  }
+  for (const u of file.pendingUsers) {
+    if (u.id !== '') {
+      identified = true;
+      keys.push(`p:${u.id}`);
+    } else {
+      keys.push(`q:${u.name}`);
+    }
+  }
+  if (!identified) return null;
+  keys.sort();
+  return fingerprintUsers(keys.join('\u0002'));
+}
+
+// ---------------------------------------------------------------------------
 // ולידציה + persistence
 // ---------------------------------------------------------------------------
 
@@ -475,10 +896,29 @@ export function normalizeRoster(raw: unknown): RosterData {
   if (raw === null || typeof raw !== 'object') return { ...EMPTY_ROSTER };
   const obj = raw as Record<string, unknown>;
 
+  const participantOf = (v: Record<string, unknown>) =>
+    typeof v.participantId === 'string' && v.participantId.trim() !== ''
+      ? { participantId: v.participantId.trim() }
+      : {};
+
+  const pressedOf = (v: Record<string, unknown>): { pressed?: PressedFrom } => {
+    const raw = v.pressed;
+    if (raw === null || typeof raw !== 'object') return {};
+    const from = raw as Record<string, unknown>;
+    const group = typeof from.group === 'string' ? from.group.trim() : '';
+    const category = typeof from.category === 'string' ? from.category.trim() : '';
+    return { pressed: { group, ...(group !== '' && category !== '' ? { category } : {}) } };
+  };
+
   const players: Player[] = Array.isArray(obj.players)
     ? obj.players
         .filter((p): p is Record<string, unknown> => p !== null && typeof p === 'object')
-        .map((p) => ({ id: String(p.id ?? '').trim(), name: String(p.name ?? '') }))
+        .map((p) => ({
+          id: String(p.id ?? '').trim(),
+          name: String(p.name ?? ''),
+          ...participantOf(p),
+          ...pressedOf(p),
+        }))
         .filter((p) => p.id !== '')
     : [];
 
@@ -517,6 +957,7 @@ export function normalizeRoster(raw: unknown): RosterData {
           ...(typeof p.category === 'string' && p.category.trim() !== ''
             ? { category: p.category.trim() }
             : {}),
+          ...participantOf(p),
         }))
         .filter((p) => p.name !== '')
     : [];
@@ -534,12 +975,22 @@ const STORAGE_PREFIX = 'trivia-roster:';
  */
 const SOURCE_PREFIX = 'trivia-roster-src:';
 
+/**
+ * המספרים שהגיעו ב-`users` בפעם הקודמת. מפתח נפרד, כדי שגרסה קודמת של התוכנה
+ * תמשיך לקרוא מהמפתח הישן טביעת אצבע בלבד, כמו שהיא מכירה.
+ */
+const SOURCE_IDS_PREFIX = 'trivia-roster-ids:';
+
 export function rosterStorageKey(gameId: string): string {
   return STORAGE_PREFIX + (gameId.trim() === '' ? 'default' : gameId);
 }
 
 export function rosterSourceKey(gameId: string): string {
   return SOURCE_PREFIX + (gameId.trim() === '' ? 'default' : gameId);
+}
+
+export function rosterSourceIdsKey(gameId: string): string {
+  return SOURCE_IDS_PREFIX + (gameId.trim() === '' ? 'default' : gameId);
 }
 
 /**
@@ -555,11 +1006,18 @@ export function fingerprintUsers(raw: string): string {
   return `${raw.length.toString(36)}.${h.toString(36)}`;
 }
 
-/** טביעת האצבע ששמורה למשחק, או null אם אין (משחק חדש / גרסה ישנה). */
-export function loadRosterSource(gameId: string): string | null {
+/** ממה נבנה המרשם השמור של המשחק, או null אם אין (משחק חדש). */
+export function loadRosterSource(gameId: string): RosterSource | null {
   if (typeof localStorage === 'undefined') return null;
   try {
-    return localStorage.getItem(rosterSourceKey(gameId));
+    const fingerprint = localStorage.getItem(rosterSourceKey(gameId));
+    let remoteIds: string[] | null = null;
+    const rawIds = localStorage.getItem(rosterSourceIdsKey(gameId));
+    if (rawIds !== null) {
+      const parsed: unknown = JSON.parse(rawIds);
+      if (Array.isArray(parsed)) remoteIds = parsed.filter((id): id is string => typeof id === 'string');
+    }
+    return fingerprint === null && remoteIds === null ? null : { fingerprint, remoteIds };
   } catch {
     return null;
   }
@@ -582,14 +1040,31 @@ export function rosterIsStale(
   return previous === null ? sealed : previous !== fingerprint;
 }
 
-/** שמירת טביעת האצבע שממנה נבנה המרשם הנוכחי. */
-export function saveRosterSource(gameId: string, fingerprint: string): void {
+/** שמירת מה שממנו נבנה המרשם הנוכחי. */
+export function saveRosterSource(gameId: string, source: RosterSource): void {
   if (typeof localStorage === 'undefined') return;
   try {
-    localStorage.setItem(rosterSourceKey(gameId), fingerprint);
+    if (source.fingerprint !== null) localStorage.setItem(rosterSourceKey(gameId), source.fingerprint);
+    if (source.remoteIds !== null) {
+      localStorage.setItem(rosterSourceIdsKey(gameId), JSON.stringify(source.remoteIds));
+    }
   } catch {
     /* מכסת אחסון חריגה — מתעלמים */
   }
+}
+
+/**
+ * «שיוך מחדש»: המספרים שבוטלו יוצאים מרשימת המספרים שהגיעו ב-`users` בפעם
+ * הקודמת. אחרת, כשהבונה ימחק אותם (או כשהם יוסתרו מהקובץ, clickerRelease.ts),
+ * המיזוג היה מוחק מהמרשם שלט שכבר נלחץ מחדש באותו מספר, לשם אחר.
+ */
+export function forgetRosterSourceIds(gameId: string, ids: readonly string[]): void {
+  if (ids.length === 0) return;
+  const source = loadRosterSource(gameId);
+  if (source === null || source.remoteIds === null) return;
+  const drop = new Set(ids);
+  const remoteIds = source.remoteIds.filter((id) => !drop.has(id));
+  if (remoteIds.length !== source.remoteIds.length) saveRosterSource(gameId, { ...source, remoteIds });
 }
 
 export function loadRoster(gameId: string): RosterData {

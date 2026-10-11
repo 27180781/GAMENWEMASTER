@@ -440,8 +440,13 @@ function ViewerChrome({
     for (const action of result.actions) {
       if (action.type === 'play')
         audio.play(channelOf(action.channel), action.src, { loop: action.loop });
-      else if (action.type === 'applause') audio.playApplause();
-      else if (action.type === 'cue') audio.playCue(action.kind);
+      else if (action.type === 'applause') {
+        // הצופה רק משקף: אם המסך הראשי ממשיך אחרי המחיאות את מה שהשהה, ההמשך
+        // מגיע אליו כצליל נפרד. בלי העצירה כאן הוא היה ממשיך גם מול מסך ראשי
+        // ישן, שאינו ממשיך כלום.
+        audio.stopAll();
+        audio.playApplause();
+      } else if (action.type === 'cue') audio.playCue(action.kind);
       else audio.stopAll();
     }
   }, [sound, cues, soundOn, toLocal]);

@@ -93,6 +93,8 @@ export class GameEngine {
   /** שינויי הניקוד מהימורים שהוכרעו בשקופית — voterId → delta; מקוזז בחזרה עליה. */
   private betDeltaBySlide: Record<number, Record<string, number>> = {};
   private saveSeq = 0;
+  /** כמה כניסות לשקופית היו עד עכשיו (GameState.slideEntry). */
+  private slideEntries = 0;
 
   constructor(game: GameFile, options: EngineOptions = {}) {
     this.game = game;
@@ -826,12 +828,14 @@ export class GameEngine {
     }
 
     this.voting = freshBookkeeping();
+    this.slideEntries += 1;
 
     const hasOpenMedia = slide.openMedia.src !== '';
     const next: GameState = {
       phase: 'showing',
       currentSlideId: slide.id,
       currentSlideIndex: index,
+      slideEntry: this.slideEntries,
       // מדיית הפתיחה מוצגת מיד עם הכניסה — אין מסך צבע ריק לפניה
       activeMedia: hasOpenMedia ? 'open' : null,
       openMediaPlayed: false,

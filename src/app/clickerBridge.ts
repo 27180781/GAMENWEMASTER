@@ -44,6 +44,17 @@ export interface SealConfig {
 }
 
 /**
+ * מה החתימה של קובץ המשחק אומרת (electron/gameSignature.cjs). demoOnly: שחקני
+ * דמה בלבד. why: 'changed' — הקובץ שונה אחרי שהמערכת חתמה עליו; 'unsigned' —
+ * אין לו חתימה והמתג «לחייב חתימה על קובצי משחק» דולק.
+ */
+export interface GameSignatureInfo {
+  state: 'valid' | 'invalid' | 'unsigned' | 'error';
+  demoOnly: boolean;
+  why: 'changed' | 'unsigned' | null;
+}
+
+/**
  * משחק שנטען ב-main ישירות מהדיסק: המדיה כבר חולצה למטמון, וה-renderer מקבל
  * רק את data.json (טקסט זעיר) ואת רשימת שמות הקבצים — בלי בייטי ה-ZIP.
  */
@@ -62,6 +73,8 @@ export interface SavedGamePayload {
   local?: boolean;
   /** הקוד של המשחק בספרייה (כשנטען ממנה) — כדי לדעת איזה משחק על המסך. */
   code?: string;
+  /** בדיקת החתימה, שרצה ב-main על data.json. במשחק סגור `config` כבר מצומצם לתנאים החתומים. */
+  signature?: GameSignatureInfo;
 }
 
 /** מצב חלון המשחק ב-EXE. בדפדפן אין כזה — ושם משתמשים ב-Fullscreen API. */
@@ -129,6 +142,8 @@ interface TriviaDesktop {
   mediaAddFile?: (name: string, bytes: Uint8Array) => Promise<string | null>;
   /** טעינת המשחק השמור/המוטבע ישירות מהדיסק ב-main (בלי בייטי ZIP בצינור). */
   loadSavedGame?: (source: 'last' | 'sealed') => Promise<SavedGamePayload | null>;
+  /** בדיקת החתימה של משחק שנטען כאן (הטקסט של data.json); במשחק סגור גם התצורה המצומצמת. */
+  checkGameSignature?: (dataJson: string) => Promise<(GameSignatureInfo & { config?: SealConfig }) | null>;
   /** מעבר לתצוגת מסכים מורחבת (Windows DisplaySwitch /extend). */
   extendDisplay?: () => void;
   /** מצב חלון המשחק ב-EXE (מסך מלא / ניתן למזעור). */
@@ -208,6 +223,9 @@ export interface UpdateStatus {
   /** בהורדה: כמה בייטים ירדו ומהו סך ההורדה. בעדכון הפרשי הסך קטן בהרבה מהמתקין המלא. */
   transferred?: number;
   total?: number;
+  /** בהורדה: false = הקובץ כולו יורד ולא רק השינויים, ו-fullReason אומר למה (FULL_REASON ב-updateDownload.cjs). */
+  differential?: boolean;
+  fullReason?: string | null;
   /** למצב unsupported: למה אין עדכון אוטומטי לקובץ הזה. */
   reason?: 'sealed' | 'portable' | 'dev';
 }
@@ -642,6 +660,22 @@ export async function desktopLoadSavedGame(
   }
 }
 
+/**
+ * בדיקת החתימה של משחק שנטען ב-renderer (קובץ ZIP מהדיסק, או המסלול האיטי של
+ * משחק סגור). null בדפדפן או בכשל — ואז המשחק כרגיל: תקלה לעולם אינה נועלת.
+ */
+export async function desktopCheckGameSignature(
+  dataJson: string,
+): Promise<(GameSignatureInfo & { config?: SealConfig }) | null> {
+  const fn = desktop()?.checkGameSignature;
+  if (typeof fn !== 'function') return null;
+  try {
+    return await fn(dataJson);
+  } catch {
+    return null;
+  }
+}
+
 /** האם ה-EXE יודע לשמור קובץ מדיה לדיסק (עריכה חיה של מדיה). */
 export function canAddMediaFile(): boolean {
   return typeof desktop()?.mediaAddFile === 'function';
@@ -872,6 +906,8 @@ export interface DeviceInfo {
   /** המערכת כבר מכירה את המחשב. */
   registered: boolean;
   permissions: DevicePermissions;
+  /** המנהל השבית את התוכנה במחשב הזה (כמו DeviceState.blocked). */
+  blocked: boolean;
 }
 
 /**
@@ -885,6 +921,12 @@ export interface DeviceState {
   state: 'off' | 'starting' | 'ok' | 'offline' | 'busy' | 'unavailable' | 'error';
   syncing: boolean;
   permissions: DevicePermissions;
+  /**
+   * «השבתת התוכנה»: המנהל השבית את התוכנה במחשב הזה, והמחשב קיבל את זה בבדיקה
+   * מוצלחת. נשמר במחשב ולכן תקף גם בלי רשת; נפתח רק בבדיקה מוצלחת שאומרת
+   * אחרת. בכל מקרה אחר — false, והתוכנה פתוחה.
+   */
+  blocked: boolean;
   device: DeviceInfo | null;
   games: DeviceGame[];
   checkedAt: number | null;

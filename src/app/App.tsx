@@ -18,6 +18,7 @@ import { themeRootProps } from '../render/theme.ts';
 import { GameHost } from './GameHost.tsx';
 import { prefetchBackup, resolveBackupConfig } from './backup.ts';
 import { useMediaPreload } from './useMediaPreload.ts';
+import { useClickerSave } from './useClickerSave.ts';
 import { MediaLoadBar, MediaLoadDot } from '../render/MediaLoadBar.tsx';
 import { StartupOverlay } from '../render/StartupOverlay.tsx';
 import { ErrorScreen } from '../render/ErrorScreen.tsx';
@@ -25,10 +26,11 @@ import { ClickerDiagnostic } from '../render/ClickerDiagnostic.tsx';
 import { FloatingWindowControls } from '../render/WindowControls.tsx';
 import { SealScreen } from '../render/SealScreen.tsx';
 import { GameEditor } from '../render/GameEditor.tsx';
-import { GuideScreen } from '../render/GuideScreen.tsx';
+import { GuideButton, GuideScreen } from '../render/GuideScreen.tsx';
 import { GateChange, GateSetup, GateUnlock } from '../render/GateDialog.tsx';
 import { NewGameDialog } from '../render/NewGameDialog.tsx';
 import { DeviceNotices, DevicePanel, type DeviceNotice } from '../render/DevicePanel.tsx';
+import { DeviceLockScreen } from '../render/DeviceLockScreen.tsx';
 import { licenseSources, type GameLicense } from './gameLicense.ts';
 import { newGameFile } from './newGame.ts';
 import {
@@ -59,6 +61,7 @@ import {
   canStreamMedia,
   desktopMediaClear,
   desktopLoadSavedGame,
+  desktopCheckGameSignature,
   canUseDevice,
   onDeviceState,
   deviceSyncNow,
@@ -66,6 +69,8 @@ import {
   deviceDownload,
   deviceCancel,
   onDeviceDownloadProgress,
+  canQuit,
+  desktopQuit,
   type SealConfig,
   type UpdateStatus,
   type DownloadProgress,
@@ -73,10 +78,14 @@ import {
   type GateStatus,
   type DeviceState,
   type DeviceDownloadProgress,
+  type GameSignatureInfo,
 } from './clickerBridge.ts';
+import { applyReleases, loadReleases, pruneReleases, saveReleases } from './clickerRelease.ts';
+import { loadSettled } from './clickerSave.ts';
 import {
   MAX_ATTEMPTS,
   attemptKey,
+  deviceLockShown,
   formatDeviceId,
   nextDeliveryAction,
   planDelivery,
@@ -87,15 +96,12 @@ import { collectMediaRefs, probeMediaRefs, type MediaIssue } from './mediaCheck.
 import { decodeInitialMedia } from './mediaDecode.ts';
 import { openPushChannel } from './pushChannel.ts';
 import {
-  EMPTY_ROSTER,
-  fingerprintUsers,
   loadRoster,
   loadRosterSource,
-  mergeGameUsers,
   parseGameUsers,
-  rosterIsStale,
   saveRoster,
   saveRosterSource,
+  syncRosterWithFile,
 } from './roster.ts';
 import { VOTE_SERVER_URL } from './socketAdapter.ts';
 import {
@@ -125,25 +131,31 @@ const RAW_FIXTURES: Record<string, unknown> = {
 };
 
 /**
- * מיזוג שמות/קבוצות משדה `users` של קובץ המשחק אל המרשם השמור (לפי id המשחק).
- * אידמפוטנטי (upsert לפי מספר; קטגוריה/קבוצות לפי שם) — בטוח להריץ גם בטעינה
- * וגם בכל רענון חם באמצע משחק.
+ * מיזוג שמות/קבוצות מקובץ המשחק (`users`, ושמות שממתינים לשלט ב-`pendingUsers`)
+ * אל המרשם השמור (לפי id המשחק). אידמפוטנטי — בטוח להריץ גם בטעינה וגם בכל
+ * רענון חם באמצע משחק. הכללים עצמם ב-syncRosterWithFile (roster.ts).
+ *
+ * שיוכים ישנים שבוטלו ב«שיוך מחדש» מוסתרים מהקובץ עד שהוא עצמו מראה שהבונה
+ * מחק אותם (clickerRelease.ts), אחרת הקובץ היה מחזיר אותם.
  */
 function mergeUsersIntoRoster(file: GameFile, opts: { sealed?: boolean } = {}): void {
-  const users = parseGameUsers(file.users);
-  if (users.length === 0) return;
-  const categoryName = file.name.trim() !== '' ? file.name.trim() : 'קבוצות המשחק';
-
-  // מהדורה חדשה של אותו משחק: אותו id, אבל רשימת משתתפים אחרת (למשל EXE שנחתם
-  // מחדש עם מספרי שלטים אחרים). המרשם ממוזג ולעולם אינו מוחק, ולכן בלי הבדיקה
-  // הזו המספרים הישנים היו נשארים לצד החדשים. כשהרשימה השתנתה — בונים מחדש.
-  const fingerprint = fingerprintUsers(String(file.users ?? ''));
-  const previous = loadRosterSource(file.id);
-  const stale = rosterIsStale(previous, fingerprint, opts.sealed === true);
-  const base = stale ? { ...EMPTY_ROSTER } : loadRoster(file.id);
-
-  saveRoster(file.id, mergeGameUsers(base, users, categoryName));
-  saveRosterSource(file.id, fingerprint);
+  const releases = loadReleases(file.id);
+  const result = syncRosterWithFile(
+    loadRoster(file.id),
+    applyReleases(file, releases),
+    loadRosterSource(file.id),
+    opts.sealed === true,
+  );
+  if (result !== null) {
+    saveRoster(file.id, result.roster);
+    saveRosterSource(file.id, result.source);
+  }
+  const settled = loadSettled(file.id);
+  const pruned = pruneReleases(releases, parseGameUsers(file.users), (participantId, clickerId) => {
+    const answer = settled[participantId];
+    return answer?.clickerId === clickerId && (answer.status === 'saved' || answer.status === 'already');
+  });
+  if (pruned !== releases) saveReleases(file.id, pruned);
 }
 
 function useHash(): string {
@@ -215,6 +227,7 @@ function UpdateBadge({ status }: { status: UpdateStatus }) {
     return (
       <div className="update-badge">
         ⬇ מוריד עדכון… {pct}%{downloadSizeText(status)}
+        {fullDownloadText(status)}
       </div>
     );
   }
@@ -222,6 +235,7 @@ function UpdateBadge({ status }: { status: UpdateStatus }) {
     return (
       <div className="update-badge update-badge--warn">
         ⏸ הורדת העדכון נעצרה{downloadSizeText(status)} — תימשך מאותה נקודה כשהרשת תחזור
+        {fullDownloadText(status)}
       </div>
     );
   }
@@ -240,6 +254,27 @@ export function downloadSizeText(status: UpdateStatus): string {
   return ` (${mb(status.transferred ?? 0)} מתוך ${mb(status.total)}MB)`;
 }
 
+/** למה העדכון יורד במלואו — לפי הקודים של FULL_REASON ב-electron/updateDownload.cjs. */
+const FULL_DOWNLOAD_REASONS: Record<string, string> = {
+  'no-installer': 'המתקין של הגרסה המותקנת לא נמצא במחשב',
+  'installer-mismatch': 'המתקין שנמצא במחשב אינו של הגרסה המותקנת',
+  'no-old-map': 'אין בשרת פרטים על הגרסה המותקנת',
+  'no-new-map': 'השרת לא מסר את פרטי הגרסה החדשה',
+  'plan-invalid': 'חישוב השינויים נכשל',
+  'bad-differential': 'העדכון החלקי לא נבנה נכון',
+  'range-blocked': 'הרשת או האנטי-וירוס לא מאפשרים להוריד רק חלק מקובץ',
+};
+
+/**
+ * " · הורדה מלאה: <למה>" — רק כשהעדכון יורד במלואו. הורדה מלאה של 110MB במקום
+ * 1.5MB נראתה עד 7.10.2026 רק כמספר, בלי שום דרך לדעת מה גרם לה.
+ */
+export function fullDownloadText(status: UpdateStatus): string {
+  if (status.differential !== false) return '';
+  const why = status.fullReason ? FULL_DOWNLOAD_REASONS[status.fullReason] : undefined;
+  return why ? ` · הורדה מלאה: ${why}` : ' · הורדה מלאה';
+}
+
 /** נוסח מצב העדכון לשורת הגרסה. מופרד כדי שיהיה ניתן לבדיקת יחידה. */
 export function updateStatusText(status: UpdateStatus | null): string {
   if (status === null) return 'בודק עדכון…';
@@ -249,9 +284,9 @@ export function updateStatusText(status: UpdateStatus | null): string {
     case 'current':
       return '✅ מעודכן';
     case 'downloading':
-      return `⬇ מוריד עדכון… ${status.percent ?? 0}%${downloadSizeText(status)}`;
+      return `⬇ מוריד עדכון… ${status.percent ?? 0}%${downloadSizeText(status)}${fullDownloadText(status)}`;
     case 'paused':
-      return `⏸ הורדת העדכון נעצרה${downloadSizeText(status)} — תימשך כשהרשת תחזור`;
+      return `⏸ הורדת העדכון נעצרה${downloadSizeText(status)} — תימשך כשהרשת תחזור${fullDownloadText(status)}`;
     case 'ready':
       return `✅ גרסה ${status.version ?? 'חדשה'} תותקן בסגירת התוכנה`;
     case 'sealer':
@@ -372,6 +407,14 @@ export function App() {
   const desktopApp = isDesktopApp();
   /** הגדרות משחק מוטבע ("סגור") ב-EXE — או null אם ה-EXE גנרי. */
   const [sealConfig, setSealConfig] = useState<SealConfig | null>(null);
+  /**
+   * קובץ המשחק שעל המסך אינו כפי שהמערכת חתמה עליו (electron/gameSignature.cjs),
+   * ולכן הוא רץ עם שחקני דמה בלבד: 'changed' — שונה אחרי שנחתם; 'unsigned' —
+   * בלי חתימה והמתג «לחייב חתימה» דולק. null = כרגיל, גם בדפדפן ובכל תקלה בבדיקה.
+   */
+  const [signatureLock, setSignatureLock] = useState<'changed' | 'unsigned' | null>(null);
+  const applySignature = (signature: GameSignatureInfo | null | undefined) =>
+    setSignatureLock(signature?.demoOnly === true ? (signature.why ?? 'changed') : null);
   /** עקיפת כתובת הגיבוי דרך ‎?backupUrl=‎ (לבדיקות מול שרת מקומי), או null. */
   const backupUrlOverride = useMemo(() => {
     const value = new URLSearchParams(window.location.search).get('backupUrl');
@@ -381,6 +424,8 @@ export function App() {
   /** משחק שנטען וממתין למסך ההגדרות (המסך הראשון תמיד). */
   const [pendingGame, setPendingGame] = useState<GameFile | null>(null);
   const [game, setGame] = useState<GameFile | null>(null);
+  /** מספרי שלטים שנקלטו בלחיצה לשמות מהבונה — נשמרים בבונה (clickerSave.ts). */
+  const clickerSave = useClickerSave(game ?? pendingGame, backupUrlOverride);
   /** האם המשחק נטען כמשחק אופליין (ZIP) — משפיע על באנר/רישיון במשחק. */
   const [offline, setOffline] = useState(false);
   /** בעיות מדיה שזוהו בטעינה (קישורים שבורים / נכסים חסרים). */
@@ -660,6 +705,7 @@ export function App() {
           setSealConfig(saved.config);
           applySeal(res.game, saved.config);
         }
+        applySignature(saved.signature);
         setCurrentLocal(saved.local === true);
         setCurrentCode(saved.code ?? null);
         applyLoadedZip(res);
@@ -759,6 +805,7 @@ export function App() {
     try {
       revokeZip(); // עוזבים אופליין (אם היה) — משחררים את ה-Blob URLs שלו
       setOffline(false); // בחירת fixture / העלאת JSON — משחק אונליין
+      setSignatureLock(null);
       setCurrentCode(null);
       setMediaIssues([]);
       setMediaAlertDismissed(false);
@@ -802,8 +849,17 @@ export function App() {
     // ב-EXE — המדיה נזרמת מהדיסק (‏trivia-media://) במקום Blob בזיכרון, כדי
     // שהזיכרון יישאר נמוך גם למשחקים כבדי-וידאו. בדפדפן — נופל חזרה ל-Blob.
     loadGameFromZip(buffer, { stream: desktopApp })
-      .then((res) => {
-        applySeal(res.game, seal);
+      .then(async (res) => {
+        // החתימה נבדקת ב-main על data.json כפי שהוא ב-ZIP. במשחק סגור חוזרת גם
+        // התצורה, מצומצמת לתנאים החתומים.
+        const signature = res.rawJson !== undefined ? await desktopCheckGameSignature(res.rawJson) : null;
+        let bounded = seal;
+        if (seal !== undefined && signature?.config !== undefined) {
+          bounded = signature.config;
+          setSealConfig(bounded);
+        }
+        applySeal(res.game, bounded);
+        applySignature(signature);
         setCurrentLocal(false); // קובץ ZIP מהדיסק — הרישיון שלו מהמערכת
         setCurrentCode(null); // ואינו מהספרייה
         applyLoadedZip(res);
@@ -835,6 +891,7 @@ export function App() {
     }
     try {
       const res = loadGameFromExtracted(saved);
+      applySignature(saved.signature);
       setCurrentLocal(saved.local === true);
       setCurrentCode(saved.code ?? null);
       applyLoadedZip(res);
@@ -897,6 +954,7 @@ export function App() {
     zipRevokeRef.current?.();
     zipRevokeRef.current = null;
     setOffline(false);
+    setSignatureLock(null);
     setCurrentLocal(false);
     setCurrentCode(null);
     setGame(null);
@@ -1195,6 +1253,8 @@ export function App() {
   // הצעד הבא: אחרי כל בדיקה, כל הורדה וכל שינוי במסך.
   useEffect(() => {
     if (!deviceOn || deviceState === null || deviceState.checkedAt === null) return;
+    // מחשב מושבת אינו מוריד ואינו פותח דבר (השרת ממילא לא שולח לו משחקים).
+    if (deviceState.blocked) return;
     if (libraryAt !== deviceState.checkedAt) return;
     const cycle = deviceState.checkedAt;
     const quiet = game === null && !starting && sealConfig === null && sealTool === false && !showSeal;
@@ -1248,6 +1308,19 @@ export function App() {
   useEffect(() => {
     if ((game !== null || starting) && deviceTask?.mode === 'background') deviceCancel();
   }, [game, starting, deviceTask]);
+
+  // «השבתת התוכנה»: רק אחרי שהמערכת אמרה במפורש שהמחשב הזה מושבת (נשמר במחשב,
+  // ולכן גם בלי רשת). משחק שרץ, עורך פתוח ובניית משחק חדש אינם נקטעים — מסך
+  // הנעילה מופיע כשהם נסגרים. הורדה של משחק שנשלח למחשב נעצרת.
+  const deviceBlocked = deviceOn && deviceState?.blocked === true;
+  const deviceLocked = deviceLockShown({
+    blocked: deviceBlocked,
+    playing: game !== null || starting,
+    editing: editorOpen || newGameOpen,
+  });
+  useEffect(() => {
+    if (deviceBlocked && deviceTask !== null) deviceCancel();
+  }, [deviceBlocked, deviceTask]);
   useEffect(() => {
     if (game !== null) setDeviceNotice(null);
   }, [game]);
@@ -1281,6 +1354,11 @@ export function App() {
   const deviceNumber = deviceState?.device?.id ? formatDeviceId(deviceState.device.id) : null;
   const lockText = (what: string) =>
     `${what} במחשב הזה דורשת אישור מהמנהל במערכת יצירת המשחקים${deviceNumber !== null ? ` (מספר המחשב: ${deviceNumber})` : ''}`;
+  /** למה המשחק שעל המסך רץ עם שחקני דמה בלבד (signatureLock), ומה עושים. */
+  const signatureLockText = (why: 'changed' | 'unsigned') =>
+    sealConfig !== null
+      ? 'קובץ המשחק שבתוכנה הזו שונה אחרי שנוצר, ולכן הוא נפתח במצב דמה בלבד. כדי לשחק עם שלטים או טלפונים, צרו את קובץ ה-EXE מחדש במערכת יצירת המשחקים.'
+      : `${why === 'changed' ? 'קובץ המשחק שונה אחרי שהורד מהמערכת' : 'לקובץ המשחק אין חתימה של המערכת'}, ולכן הוא נפתח במצב דמה בלבד. כדי לשחק עם שלטים או טלפונים, הורידו את המשחק מחדש עם הקוד שלו.${deviceNumber !== null ? ` (מספר המחשב: ${deviceNumber})` : ''}`;
   const createLocked = deviceOn && devicePerms?.createGame !== true;
   const editLocked = deviceOn && !(devicePerms?.editGame === true || (currentLocal && devicePerms?.createGame === true));
   const showDevicePanel =
@@ -1319,6 +1397,21 @@ export function App() {
     );
   }
 
+  if (deviceLocked && deviceState !== null) {
+    return (
+      <Shell>
+        <DeviceLockScreen
+          state={deviceState}
+          onRetry={() => void deviceSyncNow()}
+          onQuit={canQuit() ? desktopQuit : null}
+        >
+          {updateStatus !== null && <UpdateBadge status={updateStatus} />}
+          <VersionLine status={updateStatus} deviceId={deviceState.device?.id ?? null} />
+        </DeviceLockScreen>
+      </Shell>
+    );
+  }
+
   if (hash === '#debug') return <DebugApp />;
 
   if (game !== null) {
@@ -1333,6 +1426,10 @@ export function App() {
           voteServerUrl={params.voteServer ?? VOTE_SERVER_URL}
           offline={offline}
           onApplyGame={applyRawGame}
+          clickerSave={clickerSave.view}
+          onRosterChange={clickerSave.nudge}
+          onReleaseClickers={clickerSave.release}
+          demoOnly={signatureLock !== null}
         />
         {/* בזמן משחק — עיגול זעיר בפינה, לא פס מלא שמכער את המסך */}
         {!mediaPreload.done && <MediaLoadDot {...mediaPreload} />}
@@ -1389,6 +1486,7 @@ export function App() {
           offline={offline}
           qrAvailable={!offline && (pendingGame.room ?? '') !== ''}
           {...(sealConfig !== null ? { sealConfig } : {})}
+          {...(signatureLock !== null ? { demoOnly: signatureLockText(signatureLock) } : {})}
           {...(desktopApp && sealConfig === null ? { onPickAnother: () => guard('החלפת המשחק', pickAnotherGame) } : {})}
           {...(desktopApp && sealConfig === null && canCreateGame() ? { onNewGame: openNewGame } : {})}
           {...(createLocked ? { newGameLocked: lockText('בניית משחק חדש') } : {})}
@@ -1535,6 +1633,15 @@ export function App() {
     );
   }
 
+  // סרטוני ההדרכה גם לפני שנטען משחק: מי שפותח את התוכנה בפעם הראשונה מתחיל כאן.
+  if (desktopApp && guideOpen) {
+    return (
+      <Shell bare fullWindow>
+        <GuideScreen onClose={() => setGuideOpen(false)} />
+      </Shell>
+    );
+  }
+
   if (desktopApp) {
     return (
       <Shell>
@@ -1597,6 +1704,7 @@ export function App() {
               )}
               {/* נעול עד שהמנהל מאשר את המחשב — גם בלי רשת, לפי האישור האחרון שהתקבל. */}
               {canCreateGame() && createLocked && <p className="offline-open-lock">🔒 {lockText('בניית משחק חדש')}</p>}
+              <GuideButton onClick={() => setGuideOpen(true)} />
               {downloading !== null && <DownloadBar progress={downloading} />}
               {/* משחק שנשלח למחשב יורד ונפתח — כמו קוד שהוקלד */}
               {fgDevice !== null && (

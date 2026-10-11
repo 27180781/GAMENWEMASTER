@@ -35,6 +35,7 @@ const lib = require('../electron/gameLibrary.cjs') as {
   libraryBackfill: (dir: string) => number;
   libraryDedupe: (dir: string, gameId: string, keepCode: string) => string[];
   readPackageInfo: (zipPath: string) => { gameId: string | null; version: string | null } | null;
+  readPackageText: (zipPath: string) => string | null;
 };
 const { writeStoreZip } = require('../electron/zipStore.cjs') as {
   writeStoreZip: (out: string, entries: { path: string; data?: Buffer | string }[]) => Promise<number>;
@@ -119,6 +120,19 @@ describe('readPackageInfo / libraryBackfill — משחקים שהורדו לפנ
   it('קובץ שאינו ZIP — null', () => {
     writeFileSync(lib.libraryZipPath(dir, 'bad'), 'not a zip');
     expect(lib.readPackageInfo(lib.libraryZipPath(dir, 'bad'))).toBeNull();
+    expect(lib.readPackageText(lib.libraryZipPath(dir, 'bad'))).toBeNull();
+  });
+
+  it('★ readPackageText מחזיר את data.json בדיוק כפי שהוא בחבילה (עליו נבדקת החתימה)', async () => {
+    const text = JSON.stringify({ id: A, name: 'חידון', signature: { v: 1 } }, null, 2);
+    await writeStoreZip(lib.libraryZipPath(dir, '100'), [
+      { path: 'media/logo.png', data: Buffer.from([1, 2, 3]) },
+      { path: 'data.json', data: text },
+    ]);
+    expect(lib.readPackageText(lib.libraryZipPath(dir, '100'))).toBe(text);
+    await writeStoreZip(lib.libraryZipPath(dir, '200'), [{ path: 'media/logo.png', data: Buffer.from([1]) }]);
+    expect(lib.readPackageText(lib.libraryZipPath(dir, '200'))).toBeNull();
+    expect(lib.readPackageText(join(dir, 'missing.zip'))).toBeNull();
   });
 
   it('★ ההשלמה רושמת פעם אחת, ולא נוגעת במשחקים מקומיים', async () => {

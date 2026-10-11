@@ -35,6 +35,12 @@ export interface LoadedZipGame {
   missing: MediaIssue[];
   /** שקופיות פגומות שהושמטו בטעינה (ריק = הכול תקין). */
   dropped: DroppedSlide[];
+  /**
+   * הטקסט של data.json כפי שהוא ב-ZIP — לבדיקת החתימה (electron/gameSignature.cjs),
+   * כי המנוע מפענח את הקובץ בלי השדה signature. רק ב-loadGameFromZip; במסלול
+   * המהיר הבדיקה רצה ב-main.
+   */
+  rawJson?: string;
 }
 
 /** האם ה-src הוא נתיב יחסי לנכס בתוך ה-ZIP (ולא URL מוחלט / youtube / blob). */
@@ -106,10 +112,10 @@ function findDataEntry(entries: JSZip.JSZipObject[]): JSZip.JSZipObject {
 }
 
 /** קריאת data.json מהערך שנמצא, עם שגיאה ברורה על JSON פגום. */
-async function readDataJson(entry: JSZip.JSZipObject): Promise<unknown> {
+async function readDataJson(entry: JSZip.JSZipObject): Promise<{ data: unknown; rawJson: string }> {
   const rawJson = await entry.async('string');
   try {
-    return JSON.parse(rawJson) as unknown;
+    return { data: JSON.parse(rawJson) as unknown, rawJson };
   } catch (e) {
     throw new Error(`data.json אינו JSON תקין: ${(e as Error).message}`);
   }
@@ -126,7 +132,7 @@ export async function readZipGameFile(
   const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
   const zip = await JSZip.loadAsync(bytes);
   const entries = Object.values(zip.files).filter((f) => !f.dir);
-  return parseGameFileLenient(await readDataJson(findDataEntry(entries)));
+  return parseGameFileLenient((await readDataJson(findDataEntry(entries))).data);
 }
 
 /** בניית כתובת trivia-media:// לנתיב שחולץ (כל מקטע מקודד בנפרד). */
@@ -222,7 +228,8 @@ export async function loadGameFromZip(
   // איתור data.json (בכל עומק, ללא תלות ברישיות)
   const entries = Object.values(zip.files).filter((f) => !f.dir);
   const dataEntry = findDataEntry(entries);
-  const { game, dropped } = parseGameFileLenient(await readDataJson(dataEntry));
+  const { data, rawJson } = await readDataJson(dataEntry);
+  const { game, dropped } = parseGameFileLenient(data);
 
   // מיפוי נתיבים יחסיים → Blob URLs (עם cache לפי נתיב, ורישום סוג המדיה)
   const baseDir = dirOf(dataEntry.name);
@@ -282,6 +289,7 @@ export async function loadGameFromZip(
     },
     missing,
     dropped,
+    rawJson,
   };
 }
 

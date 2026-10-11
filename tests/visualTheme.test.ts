@@ -25,7 +25,7 @@ describe('setting.visualTheme', () => {
   });
 
   it('ערכה לא מוכרת (עדיין) ⇒ classic', () => {
-    expect(gameWithTheme('neon').setting.visualTheme).toBe('classic');
+    expect(gameWithTheme('disco').setting.visualTheme).toBe('classic');
   });
 
   it('ערך שאינו מחרוזת ⇒ classic, בלי לפסול את הקובץ', () => {
@@ -38,7 +38,13 @@ describe('setting.visualTheme', () => {
 });
 
 describe('themes.css', () => {
-  const css = readFileSync(new URL('../src/render/themes.css', import.meta.url), 'utf-8');
+  // שלוש הראשונות ב-themes.css, וכל ערכה מאוחרת יותר בקובץ משלה תחת src/render/themes/
+  const css = [
+    readFileSync(new URL('../src/render/themes.css', import.meta.url), 'utf-8'),
+    ...VISUAL_THEMES.filter((t) => !['classic', 'studio', 'glass', 'scroll'].includes(t)).map((t) =>
+      readFileSync(new URL(`../src/render/themes/${t}.css`, import.meta.url), 'utf-8'),
+    ),
+  ].join('\n');
 
   it.each(VISUAL_THEMES.filter((t) => t !== 'classic'))('לערכה %s יש כללים', (theme) => {
     // גרשיים בודדים או כפולים — שתי הצורות תקינות ב-CSS

@@ -224,20 +224,30 @@ function libraryMarkEdited(userData) {
 }
 
 /**
- * קריאת המשחק שבחבילה (id והגרסה מ-data.json) בלי לטעון אותה לזיכרון. null
- * כשאין data.json קריא.
- * @returns {{ gameId: string | null, version: string | null } | null}
+ * הטקסט של data.json שבחבילה, בלי לטעון את החבילה לזיכרון. null כשאין.
+ * @param {string} zipPath
+ * @returns {string | null}
  */
-function readPackageInfo(zipPath) {
+function readPackageText(zipPath) {
   const entries = readZipDirectory(zipPath);
   if (entries === null) return null;
   const name = findGameEntryName(entries.map((e) => e.name));
   const entry = name === null ? undefined : entries.find((e) => e.name === name);
   if (entry === undefined) return null;
   const buf = readZipEntry(zipPath, entry);
-  if (buf === null) return null;
+  return buf === null ? null : buf.toString('utf8');
+}
+
+/**
+ * קריאת המשחק שבחבילה (id והגרסה מ-data.json) בלי לטעון אותה לזיכרון. null
+ * כשאין data.json קריא.
+ * @returns {{ gameId: string | null, version: string | null } | null}
+ */
+function readPackageInfo(zipPath) {
+  const text = readPackageText(zipPath);
+  if (text === null) return null;
   try {
-    const data = JSON.parse(buf.toString('utf8'));
+    const data = JSON.parse(text);
     const id = typeof data?.id === 'string' ? data.id.toLowerCase() : null;
     const version = typeof data?.metadata?.version === 'string' ? data.metadata.version : null;
     return { gameId: id, version };
@@ -322,5 +332,6 @@ module.exports = {
   libraryMarkEdited,
   libraryBackfill,
   libraryDedupe,
+  readPackageText,
   readPackageInfo,
 };

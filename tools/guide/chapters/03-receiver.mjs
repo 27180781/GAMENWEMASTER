@@ -9,6 +9,7 @@
 import { openGuide } from '../harness.mjs';
 import { demoZipB64 } from '../demoGame.mjs';
 import { receiverOnline } from '../flow.mjs';
+import { ofTotal } from '../chapters.mjs';
 
 export const meta = {
   slug: '03-chibur-hareceiver',
@@ -34,7 +35,7 @@ export async function record() {
   const g = await openGuide({ ...meta, zipB64: await demoZipB64() });
   const { page } = g;
 
-  await g.card('חיבור הריסיבר', 'איך השלטים מגיעים לתוכנת המשחק', 'פרק 3 מתוך 6', 3800);
+  await g.card('חיבור הריסיבר', 'איך השלטים מגיעים לתוכנת המשחק', ofTotal(meta), 3800);
   await g.cardOff();
 
   await g.card(
@@ -69,17 +70,15 @@ export async function record() {
   await g.pointOff();
   await g.say('הפתרון: לפתוח את חלון הקליטה וללחוץ Connect.', 3800);
 
-  // הכפתור שפותח את חלון הקליטה
-  await page.keyboard.press('KeyM').catch(() => {});
-  await page.waitForTimeout(600);
-  const menu = await page.locator('.operator-clicker-btn').count();
-  if (menu > 0) {
-    await g.point('.operator-clicker-btn', { hold: 1600 });
-    await g.say('מתפריט המפעיל: "חלון קליטת שלטים" — שם נמצא כפתור Connect וטווח השלטים.');
-    await g.pointOff();
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(600);
-  }
+  // הכפתור שפותח את חלון הקליטה — בתפריט המפעיל (☰ בפינה התחתונה)
+  await g.point('.operator-menu-fab', { hold: 1200 });
+  await g.say('את חלון הקליטה פותחים מתפריט המפעיל — הכפתור ☰ בפינה.', 3800);
+  await g.click('.operator-menu-fab', { after: 1000 });
+  await g.point('.operator-clicker-btn', { hold: 1600 });
+  await g.say('"חלון קליטת שלטים" — שם נמצאים כפתור Connect וטווח השלטים.');
+  await g.pointOff();
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(700);
 
   // --- תקלה 2: הדונגל אינו מחובר ---
   await link(page, { software: true, dongle: 'not_connected' });

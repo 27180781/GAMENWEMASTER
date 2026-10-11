@@ -19,6 +19,7 @@ import {
   changePlayerId,
   clearPendingNames,
   groupCounts,
+  reassignRoster,
   removeCategory,
   removeGroup,
   removePendingName,
@@ -32,6 +33,7 @@ import {
 import { groupBonusOf, normalizeDelta } from '../engine/scoreAdjust.ts';
 import { importSheet, summaryText, type ImportMode } from '../app/rosterImport.ts';
 import { readSheetRows } from '../app/xlsxRead.ts';
+import { clickerSaveLines, type ClickerSaveView } from '../app/clickerSave.ts';
 
 interface RosterPanelProps {
   roster: RosterData;
@@ -42,6 +44,13 @@ interface RosterPanelProps {
   /** מצב "קליטה חכמה" פעיל — כל לחיצת שלט נקלטת לרשימה. */
   captureOn?: boolean;
   onToggleCapture?: (on: boolean) => void;
+  /**
+   * «שיוך מחדש» — מחזיר לתור את השמות שקיבלו שלט בתוכנה (reassignRoster). מי
+   * שמעביר אותו גם מוחק בבונה את השיוכים הישנים ומדליק את הקליטה.
+   */
+  onReassign?: () => void;
+  /** שמירת מספרי השלטים בבונה (לשמות שהגיעו מהבונה) — שורת מצב מתחת לקליטה. */
+  saveStatus?: ClickerSaveView | null;
   /**
    * תיקון ניקוד ידני. ארבעת השדות האלה מגיעים יחד, ורק כשיש משחק פעיל —
    * לפני תחילת משחק אין ניקוד לתקן, ואז הפקדים כלל אינם מוצגים.
@@ -120,6 +129,8 @@ export function RosterPanel({
   onOpenConnect,
   captureOn = false,
   onToggleCapture,
+  onReassign,
+  saveStatus = null,
   scores,
   groupBonus,
   onAdjustPlayer,
@@ -182,6 +193,37 @@ export function RosterPanel({
   };
 
   const waitingRemotes = roster.players.filter((p) => p.name.trim() === '').length;
+  /** שמות בתור שהגיעו מרשימת המשתתפים בבונה (בלי מספר שלט). */
+  const queuedFromBuilder = roster.pendingNames.filter((p) => p.participantId !== undefined).length;
+  /** יש שיוכים שנעשו כאן — «שיוך מחדש» יחזיר אותם לתור. */
+  const canReassign =
+    onReassign !== undefined && roster.players.some((p) => p.pressed !== undefined || p.name.trim() === '');
+
+  const confirmReassign = () => {
+    const preview = reassignRoster(roster);
+    if (preview.cleared === 0 || onReassign === undefined) return;
+    const unnamed = preview.cleared - preview.returned;
+    const lines = [
+      preview.returned === 0
+        ? 'השלטים שנלחצו יירדו מהרשימה, והלחיצה הבאה תקבל את השם הראשון בתור.'
+        : `${preview.returned === 1 ? 'שם אחד יחזור' : `${preview.returned} שמות יחזרו`} לתור לפי הסדר, והשלטים שכבר נלחצו יתנתקו מהם. הלחיצה הבאה תקבל את השם הראשון בתור.`,
+    ];
+    if (preview.returned > 0 && unnamed > 0) {
+      lines.push(`גם ${unnamed === 1 ? 'שלט אחד שנלחץ' : `${unnamed} שלטים שנלחצו`} בלי שם ${unnamed === 1 ? 'יירד' : 'יירדו'} מהרשימה.`);
+    }
+    if (preview.released.length > 0) {
+      lines.push('מספרים שנשמרו במערכת מהלחיצות יימחקו גם שם. מספרים שהוקלדו במערכת לא ישתנו.');
+    }
+    if (!window.confirm(`שיוך מחדש\n\n${lines.join('\n')}\n\nלהמשיך?`)) return;
+    onReassign();
+    setImportMsg({
+      ok: true,
+      text:
+        preview.returned === 0
+          ? '🔄 הרשימה נוקתה. לחצו על השלטים לפי הסדר.'
+          : `🔄 ${preview.returned === 1 ? 'שם אחד חזר' : `${preview.returned} שמות חזרו`} לתור. לחצו על השלטים לפי הסדר.`,
+    });
+  };
 
   const addPlayer = () => {
     if (newNum.trim() === '') return;
@@ -243,6 +285,18 @@ export function RosterPanel({
                 >
                   {captureOn ? '⏹ סיום קליטה' : '🎯 קליטת שלטים בלחיצה'}
                 </button>
+                {canReassign && (
+                  <button
+                    className="roster-reassign-btn"
+                    onClick={(e) => {
+                      e.currentTarget.blur();
+                      confirmReassign();
+                    }}
+                    title="מחזיר לתור את השמות שקיבלו שלט בלחיצה, כדי לשייך מההתחלה"
+                  >
+                    🔄 שיוך מחדש
+                  </button>
+                )}
               </div>
               <p className="roster-import-hint">
                 אקסל: מספר שלט · שם · קבוצה (אופציונלי). השורה הראשונה היא כותרת ואינה מיובאת —
@@ -255,6 +309,11 @@ export function RosterPanel({
                   {waitingRemotes > 0 ? ` · ${waitingRemotes} ממתינים לשם` : ''}
                 </div>
               )}
+              {clickerSaveLines(saveStatus).map((line, i) => (
+                <p key={`${i}-${line.tone}`} className={`roster-save-status roster-save-status--${line.tone}`}>
+                  {line.text}
+                </p>
+              ))}
 
               {(captureOn || roster.pendingNames.length > 0) && (
                 <div className="roster-pending">
@@ -282,6 +341,11 @@ export function RosterPanel({
                     אקסל של שם · קבוצה בלבד (בלי מספרי שלטים). השורה הראשונה כותרת. השמות
                     משתבצים לשלטים שכבר נלחצו לפי הסדר, והעודף ממתין ללחיצות הבאות.
                   </p>
+                  {queuedFromBuilder > 0 && (
+                    <p className="roster-import-hint roster-pending-source">
+                      📋 {queuedFromBuilder} מהשמות בתור הגיעו מרשימת המשתתפים במערכת
+                    </p>
+                  )}
                   <textarea
                     className="roster-names-draft"
                     placeholder={'או הקלדה — שם בכל שורה\nאפשר גם: שם, קבוצה'}

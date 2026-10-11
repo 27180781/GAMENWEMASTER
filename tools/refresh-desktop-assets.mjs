@@ -17,11 +17,12 @@
  *   DESKTOP_REFRESH_MINUTES — כל כמה דקות לבדוק (ברירת מחדל 10)
  *   DESKTOP_REFRESH_HOURS   — השם הישן, בשעות; נתמך רק כשהוגדר במפורש
  *   DESKTOP_SOURCE_URL      — מקור המהדורה (כמו בסקריפט המשיכה)
+ *   GITHUB_RELEASES_TOKEN   — מפתח לקריאת המהדורה כשהריפו פרטי (כמו בסקריפט המשיכה)
  */
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { fetchDesktopAssets, fetchWithRetry, parseFeed, SOURCE } from './fetch-desktop-assets.mjs';
+import { fetchDesktopAssets, fetchWithRetry, openSource, parseFeed } from './fetch-desktop-assets.mjs';
 
 const dir = process.argv[2] ?? '/usr/share/nginx/html/desktop';
 
@@ -100,7 +101,7 @@ function currentVersion() {
 }
 
 async function refreshOnce() {
-  const feed = (await fetchWithRetry(`${SOURCE}/latest.yml`)).toString('utf8');
+  const feed = (await fetchWithRetry(openSource(), 'latest.yml')).toString('utf8');
   const { version: latest } = parseFeed(feed);
   const served = currentVersion();
   if (!needsRefresh(served, latest)) {

@@ -56,6 +56,7 @@ export function mirrorEngine(snapshot: LiveSnapshot): EngineView {
     cloudinaryFolder: '',
     credit: null,
     users: '{}',
+    pendingUsers: [],
     room: null,
     baseUrl: '',
     cloudinaryAbsolutePathImage: '',

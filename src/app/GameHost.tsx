@@ -87,17 +87,21 @@ import {
 import { decodeSlideMedia } from './mediaDecode.ts';
 import { extractHostVote } from './hostRemote.ts';
 import { autoSkipDelayMs } from './autoSkip.ts';
-import { completedQuestionCount, shouldShowLeaderboard } from './leaderboardSchedule.ts';
+import { autoLeaderboardStep, completedQuestionCount } from './leaderboardSchedule.ts';
+import { questionSoundCovered, replayQuestionSound } from './questionSound.ts';
 import {
   assignGroupByNumber,
   captureRemote,
   categoryMemberTotal,
   displayName,
+  forgetRosterSourceIds,
   groupCounts,
   loadRoster,
   playerGroupNames,
+  reassignRoster,
   resetCategoryMemberships,
   saveRoster,
+  type ReleasedClicker,
   type RosterData,
 } from './roster.ts';
 import { selectPlayersToRemove } from './functionPlayers.ts';
@@ -137,7 +141,8 @@ import {
   type BackupData,
 } from './backup.ts';
 import { backupToSnapshot, buildBackupPayload, rosterFromBackup } from './backupState.ts';
-import { canDiskBackup, diskBackupKey, loadDiskBackup, saveDiskBackup } from './diskBackup.ts';
+import type { ClickerSaveView } from './clickerSave.ts';
+import { canDiskBackup, diskBackupKey, diskBackupKeys, loadDiskBackupAny, saveDiskBackup } from './diskBackup.ts';
 import { downloadGameReport, buildGameReportBytes, reportFilename } from './gameReport.ts';
 import { buildFunctionPayload, sendFunctionApi } from './functionApi.ts';
 import { useConnectionHealth } from './useConnectionHealth.ts';
@@ -220,6 +225,17 @@ interface GameHostProps {
   offline: boolean;
   /** החלת משחק מעודכן מעריכה חיה במסך המנחה (עובר פענוח סלחני ו-hot-swap). */
   onApplyGame?: (raw: unknown) => void;
+  /** שמירת מספרי השלטים בבונה (useClickerSave) — לשורת המצב במרשם. */
+  clickerSave?: ClickerSaveView | null;
+  /** «שיוך מחדש»: שיוכים ישנים של משתתפים מהבונה, למחיקה שם (useClickerSave). */
+  onReleaseClickers?: (entries: ReleasedClicker[]) => void;
+  /** המרשם השתנה — כדי ששיוך חדש של שלט לשם מהבונה יישלח לבונה. */
+  onRosterChange?: () => void;
+  /**
+   * קובץ המשחק אינו כפי שהמערכת חתמה עליו (electron/gameSignature.cjs): שחקני
+   * דמה בלבד, מה שלא יהיה בהגדרות. מסך "איך משחקים?" כבר מציע רק דמה — זה גיבוי.
+   */
+  demoOnly?: boolean;
 }
 
 export function GameHost({
@@ -230,6 +246,10 @@ export function GameHost({
   voteServerUrl,
   offline,
   onApplyGame,
+  clickerSave = null,
+  onReleaseClickers,
+  onRosterChange,
+  demoOnly = false,
 }: GameHostProps) {
   // המנוע נוצר פעם אחת; רענון תוכן מתבצע דרך engine.updateGame בלי remount,
   // כדי לשמר את מהלך המשחק (ניקוד/מיקום). ראו useEffect על שינוי game למטה.
@@ -245,8 +265,9 @@ export function GameHost({
   // שבו useClicker תמיד false — נשאר בדיוק כפי שהיה.
   const clickersAvailable = offline && isDesktopClicker();
   const phonesAvailable = hasRoom;
-  const useClicker = !settings.crowdEnabled && settings.voteClickers && clickersAvailable;
-  const useSocket = !settings.crowdEnabled && settings.votePhones && phonesAvailable;
+  const crowdEnabled = demoOnly || settings.crowdEnabled;
+  const useClicker = !crowdEnabled && settings.voteClickers && clickersAvailable;
+  const useSocket = !crowdEnabled && settings.votePhones && phonesAvailable;
   const isComposite = useClicker && useSocket; // שני המקורות יחד → מיזוג
   // באנר הצטרפות (חיוג + קוד): כשהטלפונים הם מקור הצבעות פעיל (גם ב-EXE סגור
   // עם קוד חדר). בדמו אין הזמנה לחייג. אזהרת רישיון: אין כלל מקור הצבעות.
@@ -353,6 +374,10 @@ export function GameHost({
   applyGroupPressesRef.current = applyGroupPresses;
   const rosterRef = useRef(roster);
   rosterRef.current = roster;
+  // כל שינוי במרשם (לחיצה, שמות שנוספו, רענון) — אולי נקשר שלט לשם מהבונה.
+  useEffect(() => {
+    onRosterChange?.();
+  }, [roster, onRosterChange]);
   /** איזו חוליה בשרשרת הקליקרים שבורה (null = הכול תקין). */
   const clickerLinkHint = useClickerLink();
 
@@ -390,6 +415,21 @@ export function GameHost({
   useEffect(() => {
     if (!captureOn) setCaptureFlash(null);
   }, [captureOn]);
+
+  /**
+   * «שיוך מחדש» (אחרי אישור בלשונית השמות): השמות שקיבלו שלט בתוכנה חוזרים
+   * לתור, השיוכים הישנים של משתתפים מהבונה נמחקים גם שם, והקליטה נדלקת כדי
+   * שהלחיצה הבאה תתפוס את השם הראשון.
+   */
+  const reassign = useCallback(() => {
+    const res = reassignRoster(rosterRef.current);
+    if (res.cleared === 0) return;
+    forgetRosterSourceIds(game.id, res.released.map((r) => r.clickerId));
+    updateRoster(res.roster);
+    if (res.released.length > 0) onReleaseClickers?.(res.released);
+    setCaptureFlash(null);
+    setCaptureOn(true);
+  }, [game.id, updateRoster, onReleaseClickers]);
   // אם הקטגוריה של מסך ההתחברות נמחקה — סוגרים אותו (אחרת המקשים נחסמים בלי מסך נראה)
   useEffect(() => {
     if (connectCategory !== null && !roster.categories.some((c) => c.id === connectCategory)) {
@@ -486,7 +526,7 @@ export function GameHost({
    * שלא ירוץ שום טיימר חדש במהלך המשחק עצמו.
    */
   const [lobbyElapsedMs, setLobbyElapsedMs] = useState(0);
-  const syntheticCrowd = settings.crowdEnabled;
+  const syntheticCrowd = crowdEnabled;
   /** מסך מובילים באמצע משחק (פקודת מנחה 1) — שכבה מעל, המשחק ממשיך מתחת. */
   const [leadersOverlay, setLeadersOverlay] = useState(false);
   const leadersOverlayRef = useRef(false);
@@ -559,6 +599,11 @@ export function GameHost({
    * צרכן לזהות את חוסר ההתאמה ולדלג על הקומיט הזה — ראו הבמאי של הקריינות.
    */
   const [revealSlide, setRevealSlide] = useState<number | null>(null);
+  /**
+   * לאיזו כניסה לשקופית שייך `reveal` (GameState.slideEntry) — אותו רעיון,
+   * גם כשנכנסים שוב לאותה שקופית ומזהה השקופית לא משתנה.
+   */
+  const [revealEntry, setRevealEntry] = useState<number | null>(null);
   /** מצב שליחת שקופית "פונקציה" ל-API (לתצוגה על המסך). */
   const [functionStatus, setFunctionStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   /** טקסט נלווה לשקופית פונקציה (למשל "הוסרו 12 שחקנים"). */
@@ -696,7 +741,10 @@ export function GameHost({
   revealRef.current = reveal;
   /** תצוגה מקדימה של מסך המנצחים (מקש W): השלב לחזור אליו, או null אם לא פעיל. */
   const winnersPreviewRef = useRef<HostStage | null>(null);
-  /** הרצה מהירה (מקש N): דגל שמורה ל-effect איפוס-השקופית לחשוף אותה במלואה. */
+  /**
+   * דגל שמורה ל-effect איפוס-השקופית לחשוף אותה במלואה (שאלה + כל התשובות,
+   * בלי צליל) במקום לאפס: הרצה מהירה (מקש N), וחזרה להצבעה (reenterAtAnswers).
+   */
   const fastRevealRef = useRef(false);
 
   // -------------------------------------------------------------------------
@@ -732,6 +780,15 @@ export function GameHost({
   const [resumePrompt, setResumePrompt] = useState<BackupData | null>(null);
   /** בדיקת הגיבוי בטעינה עדיין רצה — מציג חיווי "בודק אם יש משחק שמור…". */
   const [backupChecking, setBackupChecking] = useState(false);
+  /**
+   * חלון פתיחה שמחכה לתשובה: «נמצא משחק פעיל» או אזהרת הרישיון. כל עוד הוא
+   * על המסך המשחק לא מקבל פקודות — לא מהמקלדת, לא משלט המנחה ולא ממסך
+   * המנחה. בלי זה רווח התחיל את המשחק מאחוריו (מוזיקת הפתיחה נעצרה וצליל
+   * השאלה הראשונה התנגן), ו«המשך מהנקודה» החזיר אותו אחר כך.
+   */
+  const startupModal = resumePrompt !== null || (showLicenseWarning && !licenseAck);
+  const startupModalRef = useRef(startupModal);
+  startupModalRef.current = startupModal;
   const startedAtRef = useRef<number>(Date.now());
   const saveTimerRef = useRef<number | null>(null);
   const gameEndedRef = useRef(false);
@@ -756,9 +813,9 @@ export function GameHost({
   const saveBackupNowRef = useRef(saveBackupNow);
   saveBackupNowRef.current = saveBackupNow;
 
-  // מפתח גיבוי הדיסק — מחרוזת יציבה (id+שם), נגזרת מחוץ לאפקט כדי שהבדיקה לא
+  // מפתחות גיבוי הדיסק — מחרוזת יציבה (id+שם), נגזרת מחוץ לאפקט כדי שהבדיקה לא
   // תרוץ מחדש על כל רענון-תוכן של אותו משחק (זהות האובייקט משתנה, המפתח לא).
-  const diskKey = diskBackupKey(game);
+  const diskKeys = diskBackupKeys(game).join('\u0000');
 
   // טעינה: בדיקת גיבוי חי קיים למשחק (התאוששות מקריסה/רענון). getBackup מנצל
   // prefetch שכבר רץ במסך ההגדרות — כך שהתוצאה זמינה מיד עם הכניסה למשחק.
@@ -766,7 +823,7 @@ export function GameHost({
     if (backupCfg === null && !diskBackup) return;
     let cancelled = false;
     setBackupChecking(true);
-    const check = backupCfg !== null ? getBackup(backupCfg, game.id) : loadDiskBackup(diskKey);
+    const check = backupCfg !== null ? getBackup(backupCfg, game.id) : loadDiskBackupAny(diskKeys.split('\u0000'));
     void check
       .then((data) => {
         if (cancelled || data === null) return;
@@ -781,7 +838,7 @@ export function GameHost({
     return () => {
       cancelled = true;
     };
-  }, [backupCfg, diskBackup, game.id, diskKey]);
+  }, [backupCfg, diskBackup, game.id, diskKeys]);
 
   /** שחזור מגיבוי: הניקוד והמיקום למנוע, ומרשם מגיבוי אם אין מקומי. */
   const resumeFromBackup = useCallback(
@@ -1043,8 +1100,11 @@ export function GameHost({
     };
   }, [stage, state.currentSlideId, engine]);
 
-  // איפוס שלבי חשיפה + מסילת המצטרפים + זיהוי הקשת שלט המנחה, במעבר שקופית.
-  // בהרצה מהירה (מקש N) חושפים את השקופית הבאה במלואה במקום לאפס.
+  // איפוס שלבי חשיפה + מסילת המצטרפים + זיהוי הקשת שלט המנחה, בכל כניסה
+  // לשקופית — גם כניסה חוזרת לאותה שקופית (slideEntry), למשל חזרה בשאלה
+  // הראשונה או בחירה בשקופית הנוכחית: היא מתחילה נקייה, עם צליל השאלה ובלי
+  // התשובה הנכונה מסומנת. בהרצה מהירה (מקש N) ובחזרה להצבעה חושפים את
+  // השקופית במלואה במקום לאפס.
   useEffect(() => {
     const s = engine.getCurrentSlide();
     if (fastRevealRef.current) {
@@ -1064,7 +1124,11 @@ export function GameHost({
         // הצגת השאלה מיד עם הכניסה לשקופית הצבעה — בלי "מסך רקע ריק" ולחיצה ראשונה.
         // (אם מתנגנת מדיית פתיחה חוסמת, השאלה מוצגת אחרי סיומה כרגיל.)
         setReveal({ questionShown: true, answersShown: 0, revealCorrect: false });
-        audio.play('showQuestion', soundsRef.current.showQuestionMediaSound.src);
+        // מאחורי מסך הפתיחה או טבלת המובילים הצליל היה נבלע — הוא מתנגן כשהכיסוי
+        // יורד (ראו questionSound.ts).
+        if (!questionSoundCovered(stageRef.current, leadersOverlayRef.current)) {
+          audio.play('showQuestion', soundsRef.current.showQuestionMediaSound.src);
+        }
       }
     } else {
       setReveal(NO_REVEAL);
@@ -1072,11 +1136,12 @@ export function GameHost({
     // באותה מנת עדכון — כך ש-`reveal` ו-`revealSlide` תמיד מתארים יחד את אותה
     // שקופית, וצרכן שרץ בקומיט הקודם (עם מזהה חדש וחשיפה ישנה) יזהה ויחכה.
     setRevealSlide(state.currentSlideId);
+    setRevealEntry(state.slideEntry);
     setAnswerers([]);
     setCorrectAnswerers([]);
     lastHostAnswerRef.current = null;
     setBetOverlay(false);
-  }, [state.currentSlideId, engine, audio]);
+  }, [state.currentSlideId, state.slideEntry, engine, audio]);
 
   // תוצאות ההימור מוצגות פעם אחת לכל סגירה: יציאה משלב התוצאות (חזרה להצבעה,
   // שקופית אחרת) מאפסת את הזיכרון, כך שהכרעה מחדש תוצג שוב.
@@ -1125,11 +1190,20 @@ export function GameHost({
   const pausedAccumMsRef = useRef(0);
   /** true = הטיימר קופא כרגע בגלל שכבה חוסמת (ולא עצירה ידנית) — לְהַפְשָׁרָה בסגירה. */
   const overlayFrozeRef = useRef(false);
+  /** האם שכבה חוסמת פתוחה (overlayActive) — לקוד שרץ מחוץ לרינדור. */
+  const overlayActiveRef = useRef(false);
   /** ‎Date.now()‎ של פתיחת חלון ההצבעה הנוכחי (0 = אין חלון פתוח). */
   const votingOpenedAtRef = useRef(0);
   const lastHostAnswerRef = useRef<number | null>(null);
 
-  const votingActive = stage === 'playing' && state.phase === 'voting';
+  /**
+   * תצוגה מקדימה של מסך המנצחים (W) פתוחה. בזמן הצבעה היא שכבה חוסמת כמו
+   * טבלת המובילים: חלון ההצבעה נשאר פתוח והטיימר קופא, וכשחוזרים (W או 2) הוא
+   * ממשיך מאותה נקודה. בלי זה הטיימר התאפס לזמן המלא, וחלון ההצבעה נפתח מחדש
+   * בלי ההצבעות שכבר נשלחו. (ה-ref נכתב תמיד יחד עם setStage.)
+   */
+  const winnersPreview = stage !== 'playing' && winnersPreviewRef.current !== null;
+  const votingActive = (stage === 'playing' || winnersPreview) && state.phase === 'voting';
 
   /**
    * הזמן האפקטיבי שחלף מפתיחת ההצבעה (ms) — בלי משך העצירות, וקפוא בזמן עצירה.
@@ -1148,6 +1222,14 @@ export function GameHost({
   // (leading + trailing), כדי שהמון גדול לא יגרום לסופת רינדור.
   // -------------------------------------------------------------------------
   const pendingVoteRef = useRef<VoteSnapshot | null>(null);
+  /**
+   * ה-snapshot האחרון שהגיע בזמן שההצבעה עצורה (6 או שכבה חוסמת). בעצירה
+   * ההצבעות לא נקלטות, אבל גם לא נזרקות: הוא נקלט כשממשיכים או כשסוגרים את
+   * ההצבעה (releaseHeldVotes). ה-snapshot מצטבר, ולכן מספיק האחרון. בלי זה
+   * הצבעות שנשלחו בעצירה נספרו רק אם מישהו הצביע אחריהן — שרת ההצבעות שולח
+   * snapshot רק כשמישהו מצביע — ומי שענה אחרון בעצירה לא קיבל ניקוד.
+   */
+  const heldVoteRef = useRef<VoteSnapshot | null>(null);
   const voteFlushTimerRef = useRef<number | null>(null);
   /** האטת רישום ההצבעות ללוג — לכל היותר פעם ב-500ms, שלא יציף. */
   const lastVoteLogRef = useRef(0);
@@ -1211,6 +1293,17 @@ export function GameHost({
   const scheduleVoteFlushRef = useRef(scheduleVoteFlush);
   scheduleVoteFlushRef.current = scheduleVoteFlush;
 
+  /** ההצבעות שהגיעו בזמן העצירה (heldVoteRef) נקלטות עכשיו. */
+  const releaseHeldVotes = useCallback(() => {
+    const held = heldVoteRef.current;
+    heldVoteRef.current = null;
+    if (held === null) return;
+    // snapshot חדש יותר כבר ממתין — הוא מצטבר, ולכן מכיל גם את אלה
+    if (pendingVoteRef.current !== null && pendingVoteRef.current.seq > held.seq) return;
+    pendingVoteRef.current = held;
+    scheduleVoteFlushRef.current();
+  }, []);
+
   // ניקוי טיימר ה-throttle בעזיבת הקומפוננטה
   useEffect(
     () => () => {
@@ -1232,8 +1325,10 @@ export function GameHost({
         voteFlushTimerRef.current = null;
       }
       pendingVoteRef.current = null;
+      heldVoteRef.current = null;
       return;
     }
+    heldVoteRef.current = null; // חלון הצבעה חדש
     // קוראים את השקופית והסאונדים דרך המנוע/ref (ולא כתלות ישירה) — כדי שרענון
     // תוכן חם (updateGame, שמחליף את זהות האובייקטים) באמצע הצבעה לא יריץ מחדש
     // את ה-effect ויאפס את הטיימר לזמן מלא.
@@ -1242,11 +1337,23 @@ export function GameHost({
     const openedAt = Date.now();
     deadlineRef.current = openedAt + total * 1000;
     votingOpenedAtRef.current = openedAt;
-    pausedRemainingMsRef.current = null;
-    pausedRef.current = false;
     pausedAccumMsRef.current = 0;
-    setTimer({ remaining: total, total, paused: false, elapsedMs: 0, sampledAt: openedAt });
-    audio.play('timer', soundsRef.current.timerMediaSound.src, { loop: true });
+    if (overlayActiveRef.current) {
+      // ההצבעה נפתחה כששכבה חוסמת כבר על המסך (תפריט המפעיל, «קדימה» מהשלט
+      // מתחת להגרלה...): מתחילה קפואה ובלי צליל, כמו הצבעה שהשכבה נפתחה מעליה,
+      // ונפתחת כשהשכבה יורדת (אפקט ההקפאה למטה). אחרת הספירה רצה מתחת לשכבה,
+      // וצליל הטיימר קוטע את מוזיקת הטבלה.
+      pausedRemainingMsRef.current = total * 1000;
+      pausedRef.current = true;
+      pauseStartedAtRef.current = openedAt;
+      overlayFrozeRef.current = true;
+      setTimer({ remaining: total, total, paused: true, elapsedMs: 0, sampledAt: openedAt });
+    } else {
+      pausedRemainingMsRef.current = null;
+      pausedRef.current = false;
+      setTimer({ remaining: total, total, paused: false, elapsedMs: 0, sampledAt: openedAt });
+      audio.play('timer', soundsRef.current.timerMediaSound.src, { loop: true });
+    }
 
     const interval = window.setInterval(() => {
       if (pausedRef.current) return;
@@ -1301,6 +1408,14 @@ export function GameHost({
   /** עצירת/המשך הטיימר וההצבעה (פקודה 6). */
   const togglePause = useCallback(() => {
     if (engine.getState().phase !== 'voting') return;
+    if (overlayActiveRef.current && pausedRemainingMsRef.current !== null) {
+      // שכבה חוסמת פתוחה והטיימר כבר עצור מתחתיה: 6 לא מפעיל אותו (הוא היה
+      // רץ מתחת לשכבה, וצלילו קוטע את מוזיקת הטבלה). הוא רק קובע מה יקרה כשהיא
+      // תיסגר: עצירה של המנחה (נשאר עצור) או ההקפאה של השכבה (ממשיך לבד).
+      overlayFrozeRef.current = !overlayFrozeRef.current;
+      setTimer((t) => (t ? { ...t, elapsedMs: votingElapsedMs(), sampledAt: Date.now() } : t));
+      return;
+    }
     if (pausedRemainingMsRef.current === null) {
       pausedRemainingMsRef.current = Math.max(0, deadlineRef.current - Date.now());
       pausedRef.current = true;
@@ -1315,8 +1430,9 @@ export function GameHost({
       pausedRef.current = false;
       audio.play('timer', sounds.timerMediaSound.src, { loop: true });
       setTimer((t) => (t ? { ...t, paused: false, elapsedMs: votingElapsedMs(), sampledAt: Date.now() } : t));
+      releaseHeldVotes();
     }
-  }, [engine, audio, sounds, votingElapsedMs]);
+  }, [engine, audio, sounds, votingElapsedMs, releaseHeldVotes]);
 
   // -------------------------------------------------------------------------
   // זרימת השלבים: קדימה (רווח / 0) ואחורה (2)
@@ -1365,6 +1481,7 @@ export function GameHost({
     if (current.phase === 'voting') {
       // עצירת הטיימר וסגירת ההצבעה (אם לא נגמר כבר לבד) — בלי חשיפה: זו קורית
       // בלחיצה הבאה (שלב results), אחיד לכל סוגי השקופיות.
+      releaseHeldVotes(); // נסגרת בזמן עצירה — ההצבעות שהגיעו בה נספרות
       flushVotesRef.current(); // ההצבעות האחרונות שהצטברו נספרות לפני הסגירה
       engine.dispatch({ type: 'ADVANCE', at: now });
       return;
@@ -1397,7 +1514,7 @@ export function GameHost({
 
     // showing של שקופית מדיה/טקסט: מדיית פתיחה → השקופית הבאה
     engine.dispatch({ type: 'ADVANCE', at: now });
-  }, [engine, audio, sounds]);
+  }, [engine, audio, sounds, releaseHeldVotes]);
 
   /**
    * כניסה מחדש לשקופית במצב "כל התשובות חשופות, טיימר טרם הופעל" — בלי
@@ -1406,15 +1523,13 @@ export function GameHost({
   const reenterAtAnswers = useCallback(
     (slideId: number) => {
       const now = Date.now();
+      // ה-effect של הכניסה לשקופית רץ גם בכניסה חוזרת לאותה שקופית; הדגל אומר
+      // לו לחשוף את כל התשובות (בלי צליל השאלה) במקום לאפס.
+      fastRevealRef.current = true;
       engine.dispatch({ type: 'GOTO', slideId, at: now });
       if (engine.getState().activeMedia === 'open') {
         engine.dispatch({ type: 'MEDIA_ENDED', at: now });
       }
-      setReveal({
-        questionShown: true,
-        answersShown: engine.getCurrentSlide().question.answers.length,
-        revealCorrect: false,
-      });
     },
     [engine],
   );
@@ -1471,6 +1586,9 @@ export function GameHost({
         return;
       }
     }
+    // בשקופית הראשונה אין קודמת: BACK היה מתחיל אותה מחדש, והכניסה מציגה שוב
+    // את השאלה עם הצליל — «אחורה» שמקדם. יש לאן לחזור רק כשיש מדיית פתיחה.
+    if (current.currentSlideIndex === 0 && s.openMedia.src === '') return;
     engine.dispatch({ type: 'BACK', at: now });
   }, [engine, reenterAtAnswers]);
 
@@ -1483,7 +1601,10 @@ export function GameHost({
     const questions = engine.getGame().questions;
     const nextIndex = engine.getState().currentSlideIndex + 1;
     if (nextIndex >= questions.length) {
-      setStage('winners'); // אין שקופית הבאה — סיום
+      // אין שקופית הבאה — סיום, כמו בתפריט: טבלת המובילים נסגרת, אחרת הרווח
+      // הראשון במסך המנצחים סגר אותה מאחוריו במקום לחשוף מקום.
+      setLeadersOverlay(false);
+      setStage('winners');
       return;
     }
     const target = questions[nextIndex]!;
@@ -1509,6 +1630,22 @@ export function GameHost({
    * המנצחים חושף מקום ואז עובר לניקוד כל המשתתפים.
    */
   const advance = useCallback(() => {
+    const stage = stageRef.current;
+    // מסכי הסיום קודם: השכבות שלמטה מוצגות רק בזמן המשחק. שכבה שנשארה פתוחה
+    // מאחורי מסך המנצחים (W, «סיום משחק» בתפריט) נסגרה ברווח במקום שייחשף
+    // מקום, והרווח נראה כאילו לא עשה כלום.
+    if (stage === 'winners') {
+      // חשיפת המנצחים אחד-אחד; אחרי שכולם נחשפו — מעבר למסך ניקוד כל המשתתפים.
+      const podiumTotal = Math.min(engine.getWinners(engine.getGame().setting.multiWinners).length, 5);
+      if (winnersRevealedRef.current < podiumTotal) setWinnersRevealed((n) => n + 1);
+      else setStage('scoreboard');
+      return;
+    }
+    if (stage === 'scoreboard') {
+      // מסך הניקוד מדפדף לבד בלולאה; רווח/0 מדפדפים עמוד מיד (שליטה למנחה)
+      setScoresPageBump((n) => n + 1);
+      return;
+    }
     // מסך המובילים (מקש 1) פתוח מעל המשחק — קדימה מסיר אותו (כמו לחיצה
     // נוספת על 1) במקום לקדם את המשחק שמאחוריו.
     if (leadersOverlayRef.current) {
@@ -1539,18 +1676,8 @@ export function GameHost({
       audio.play('generic', soundsRef.current.genericMediaSound.src);
       return;
     }
-    const stage = stageRef.current;
     if (stage === 'opening') setStage('playing');
     else if (stage === 'playing') advanceStep();
-    else if (stage === 'winners') {
-      // חשיפת המנצחים אחד-אחד; אחרי שכולם נחשפו — מעבר למסך ניקוד כל המשתתפים.
-      const podiumTotal = Math.min(engine.getWinners(engine.getGame().setting.multiWinners).length, 5);
-      if (winnersRevealedRef.current < podiumTotal) setWinnersRevealed((n) => n + 1);
-      else setStage('scoreboard');
-    } else if (stage === 'scoreboard') {
-      // מסך הניקוד מדפדף לבד בלולאה; רווח/0 מדפדפים עמוד מיד (שליטה למנחה)
-      setScoresPageBump((n) => n + 1);
-    }
   }, [engine, advanceStep, audio]);
   const advanceRef = useRef(advance);
   advanceRef.current = advance;
@@ -1560,9 +1687,16 @@ export function GameHost({
     const stage = stageRef.current;
     if (stage === 'playing') stepBack();
     else if (stage === 'winners') {
-      // מבטלים חשיפת מנצח אחרון; כשאין חשופים — חזרה למשחק.
+      // מבטלים חשיפת מנצח אחרון. כשאין חשופים, בתצוגה המקדימה (W) חוזרים למשחק
+      // בדיוק כמו ב-W — כולל ניקוי הסימון, שבלעדיו סוף המשחק האמיתי לא נרשם
+      // (דוח, תוצאות, נעילת הגיבוי). במסך המנצחים האמיתי אין לאן לחזור: הסוף
+      // כבר נרשם, ומשחק שממשיך אחריו לא נשמר. (כשהמנוע עצמו בסוף, החזרה גם
+      // הקפיצה שוב את מסך המנצחים ואת המוזיקה שלו מההתחלה.)
       if (winnersRevealedRef.current > 0) setWinnersRevealed((n) => Math.max(0, n - 1));
-      else setStage('playing');
+      else if (winnersPreviewRef.current !== null) {
+        setStage(winnersPreviewRef.current);
+        winnersPreviewRef.current = null;
+      }
     } else if (stage === 'scoreboard') setStage('winners');
   }, [stepBack]);
 
@@ -1578,14 +1712,12 @@ export function GameHost({
         case 2:
           goBack();
           break;
-        case 3: {
-          // מחיאות כפיים: אם הוגדר קובץ ב-genericMediaSound שבגייסון — מנגנים אותו;
-          // אחרת נופלים למחיאות מסונתזות (WebAudio) כברירת מחדל.
-          const applause = soundsRef.current.genericMediaSound.src;
-          if (applause !== null && applause.trim() !== '') audio.play('generic', applause);
-          else audio.playApplause();
+        case 3:
+          // מחיאות כפיים: הקובץ שהוגדר ב-genericMediaSound שבגייסון, ובלעדיו
+          // מחיאות מסונתזות (WebAudio). מה שמתנגן (הטיימר, מוזיקת הפתיחה או
+          // הטבלה) רק מושהה וממשיך כשהן נגמרות — ראו AudioManager.playApplause.
+          audio.playApplause(soundsRef.current.genericMediaSound.src);
           break;
-        }
         case 4:
           // בשלב חשיפת התשובה (results) עם נתוני קבוצות — פותח/סוגר את מסך דירוג
           // הקבוצות; אחרת (בזמן טיימר ההצבעה) נשאר קיצור להוספת 10 שניות.
@@ -1680,6 +1812,10 @@ export function GameHost({
 
   const onHostControl = useCallback(
     (msg: HostCommand) => {
+      // חלון פתיחה פתוח (startupModal) — פקודות המשחק ממתינות לתשובה עליו
+      const gameCommand =
+        msg.t === 'cmd' || msg.t === 'host' || msg.t === 'goto' || msg.t === 'connect';
+      if (gameCommand && startupModalRef.current) return;
       switch (msg.t) {
         case 'cmd':
           if (msg.cmd === 'advance') advanceRef.current();
@@ -1791,7 +1927,7 @@ export function GameHost({
           extraction.hostAnswer !== lastHostAnswerRef.current
         ) {
           lastHostAnswerRef.current = extraction.hostAnswer;
-          runHostCommandRef.current(extraction.hostAnswer);
+          if (!startupModalRef.current) runHostCommandRef.current(extraction.hostAnswer);
         }
       }
       // אכיפת מגבלת הרישיון: מסננים ל-N המשתתפים המורשים בלבד, ובונים מחדש את
@@ -1816,8 +1952,6 @@ export function GameHost({
         if (snapshot.voters) applyGroupPressesRef.current(connectCat, snapshot.voters);
         return;
       }
-      // בזמן עצירה (פקודה 6) אין קליטת הצבעות
-      if (pausedRef.current) return;
       // שקופית המוגבלת לקבוצה: הקשות של מי שאינו בקבוצה המורשית נזרקות כאן —
       // לפני המנוע — ולכן אינן נספרות, אינן מזכות בניקוד ואינן מופיעות בפירוט.
       // הניקוד הקיים שלהם לא משתנה; הם פשוט מדלגים על השאלה. (הסינון אחרי
@@ -1825,6 +1959,12 @@ export function GameHost({
       const restrictTo = slideGroupRestriction(engine.getCurrentSlide(), engine.getGame().setting.gameType);
       if (restrictTo !== null) {
         snapshot = restrictSnapshotToGroup(snapshot, rosterRef.current, restrictTo);
+      }
+      // בזמן עצירה (6 או שכבה חוסמת) ההצבעות לא נקלטות עד שממשיכים או סוגרים
+      // (heldVoteRef)
+      if (pausedRef.current) {
+        heldVoteRef.current = snapshot;
+        return;
       }
       // צובר את ה-snapshot המצטבר; העדכון למנוע/UI מוגבל בקצב (leading+trailing)
       pendingVoteRef.current = snapshot;
@@ -1853,6 +1993,7 @@ export function GameHost({
         const n = Number(raw.vote);
         if (hostVoterIdRef.current !== '' && phone === hostVoterIdRef.current) {
           if (!Number.isInteger(n) || n < 0 || n > 6) return;
+          if (startupModalRef.current) return; // חלון פתיחה פתוח — ראו startupModal
           debugLog('command', `שלט מנחה (טלפון): מקש ${raw.vote}`, { stage: stageRef.current });
           runHostCommandRef.current(n);
           return;
@@ -1963,9 +2104,11 @@ export function GameHost({
   // מדיה חוסמת (openMedia/endMedia) מתנגנת עם הקול שלה דרך הנגן — היא בלעדית,
   // ולכן עוצרת כל סאונד-ערוץ שמתנגן (בדיוק כמו שסאונד חדש עוצר את הקודמים).
   // בלי זה, סאונד ערוץ (למשל חשיפת תשובה) יכול להתערבב עם וידאו הסיום.
+  // מתחת לטבלת המובילים המדיה ממתינה (MediaPauseContext), ולכן מוזיקת הטבלה
+  // נשארת. העצירה קורית כשהטבלה יורדת והמדיה באמת מתחילה.
   useEffect(() => {
-    if (stage === 'playing' && state.activeMedia !== null) audio.stopAll();
-  }, [stage, state.activeMedia, audio]);
+    if (stage === 'playing' && state.activeMedia !== null && !leadersOverlay) audio.stopAll();
+  }, [stage, state.activeMedia, leadersOverlay, audio]);
 
   // סוף המשחק במנוע → מסך זוכים
   useEffect(() => {
@@ -2026,18 +2169,6 @@ export function GameHost({
     return () => window.clearInterval(interval);
   }, [stage, syntheticCrowd, crowdConfig.voterCount, addConnected]);
 
-  // automaticSkip: מעבר אוטומטי אחרי X שניות כשאין מדיה פעילה
-  useEffect(() => {
-    if (stage !== 'playing') return;
-    const delay = autoSkipDelayMs(slide, state.phase, state.activeMedia !== null);
-    if (delay === null) return;
-    const timeout = window.setTimeout(
-      () => engine.dispatch({ type: 'ADVANCE', at: Date.now() }),
-      delay,
-    );
-    return () => window.clearTimeout(timeout);
-  }, [stage, state.phase, state.activeMedia, state.currentSlideId, engine, slide]);
-
   // -------------------------------------------------------------------------
   // מעברים אוטומטיים (autoTransition) — מבצע אוטומטית את השלב הבא לפי הדגלים:
   // הצגת השאלה+תשובות · פתיחת הטיימר · חשיפת התשובה הנכונה · מעבר לשקופית הבאה.
@@ -2063,7 +2194,9 @@ export function GameHost({
     rosterOpen ||
     captureOn || // קליטת שלטים — המשחק ממתין, לא מתקדם מאחורי הגב
     lobbyOverlay || // מסך התחברות (X) — הטיימר קופא, וממשיכים ברווח
+    winnersPreview || // תצוגת המנצחים המקדימה (W) — ממשיכים ב-W או ב-2
     menuOpen;
+  overlayActiveRef.current = overlayActive;
 
   // -------------------------------------------------------------------------
   // הבמאי של הקריינות (ENGINE-narration.md): אפקט אחד שאוסף את מה שמוצג על
@@ -2099,8 +2232,12 @@ export function GameHost({
     // של השקופית הקודמת (האיפוס קורה ב-effect ומגיע קומיט אחד אחריו). לתת
     // לבמאי את הצמד הלא-מתאים היה מסמן את השאלה והתשובות כ"כבר נאמרו" ומבטל
     // מיד את המשפט שהתחיל — כלומר שקט מלא מהשקופית השנייה והלאה. מדלגים על
-    // הקומיט הזה ומבטלים את מה שמתנגן; הקומיט הבא כבר מתואם.
-    if (!narrationRevealMatches(revealSlide, state.currentSlideId)) {
+    // הקומיט הזה ומבטלים את מה שמתנגן; הקומיט הבא כבר מתואם. כך גם בכניסה
+    // חוזרת לאותה שקופית, שבה רק מונה הכניסות משתנה.
+    if (
+      !narrationRevealMatches(revealSlide, state.currentSlideId) ||
+      revealEntry !== state.slideEntry
+    ) {
       narration.cancel();
       return;
     }
@@ -2169,8 +2306,15 @@ export function GameHost({
       questionShown: reveal.questionShown,
       answersShown: reveal.answersShown,
       revealCorrect: reveal.revealCorrect,
+      // «עצור» רק כשהמנחה עצר. ההקפאה של שכבה חוסמת אינה עצירה מבחינת הקריין:
+      // היא מגיעה קומיט אחד אחרי השכבה, והייתה קוטעת את המשפט על השכבה
+      // (מובילים, הגרלה) ואומרת «ממשיכים» בסגירה בלי שנאמר שעוצרים.
       timer: timer
-        ? { remaining: timer.remaining, total: timer.total, paused: timer.paused }
+        ? {
+            remaining: timer.remaining,
+            total: timer.total,
+            paused: timer.paused && !overlayFrozeRef.current,
+          }
         : null,
       overlay: narrationOverlay,
       leaders: leaderRows.map((w) => w.score),
@@ -2224,6 +2368,7 @@ export function GameHost({
     state,
     reveal,
     revealSlide,
+    revealEntry,
     timer,
     narrationOverlay,
     winnersRevealed,
@@ -2264,9 +2409,10 @@ export function GameHost({
         pausedRef.current = false;
         audio.play('timer', soundsRef.current.timerMediaSound.src, { loop: true });
         setTimer((t) => (t ? { ...t, paused: false, elapsedMs: votingElapsedMs(), sampledAt: Date.now() } : t));
+        releaseHeldVotes();
       }
     }
-  }, [overlayActive, engine, audio, votingElapsedMs]);
+  }, [overlayActive, engine, audio, votingElapsedMs, releaseHeldVotes]);
 
   useEffect(() => {
     if (stage !== 'playing' || state.activeMedia !== null || overlayActive) return;
@@ -2346,6 +2492,42 @@ export function GameHost({
     return () => window.clearTimeout(timeout);
   }, [stage, state.phase, state.currentSlideId, state.activeMedia, state.betOutcomes, reveal, autoT, overlayActive, engine, audio, sounds, narrationActive, narrationSpeaking]);
 
+  // מעבר אוטומטי של השקופית (setting.automaticSkip, ראו autoSkip.ts): X שניות
+  // אחרי שהשקופית סיימה את תפקידה — בשאלה, מחשיפת התשובה — ולא מתחת לשכבה
+  // חוסמת או באמצע משפט של הקריין. המעבר הוא הלחיצה הבאה של המנחה, ולכן
+  // שאלה שהכריעה הימור מציגה קודם את תוצאות ההימור, כמו ברווח.
+  useEffect(() => {
+    if (stage !== 'playing') return;
+    const delay = autoSkipDelayMs(slide, state.phase, {
+      mediaPlaying: state.activeMedia !== null,
+      answerRevealed: reveal.revealCorrect,
+      covered: overlayActive,
+      narratorSpeaking: narrationActive && narrationSpeaking,
+    });
+    if (delay === null) return;
+    const slideId = state.currentSlideId;
+    const phase = state.phase;
+    const timeout = window.setTimeout(() => {
+      // המנחה (או «השקופית הבאה» של המעברים האוטומטיים) כבר קידם באותו רגע.
+      const now = engine.getState();
+      if (now.currentSlideId !== slideId || now.phase !== phase || now.activeMedia !== null) return;
+      debugLog('auto', 'מעבר אוטומטי של השקופית (automaticSkip)', { delay });
+      advanceRef.current();
+    }, delay);
+    return () => window.clearTimeout(timeout);
+  }, [
+    stage,
+    state.phase,
+    state.activeMedia,
+    state.currentSlideId,
+    slide,
+    reveal.revealCorrect,
+    overlayActive,
+    narrationActive,
+    narrationSpeaking,
+    engine,
+  ]);
+
   // במעבר אוטומטי — מסך תוצאות ההימור נסגר לבד אחרי זמן קריאה (ההשהיה של
   // "השקופית הבאה" ועוד שתי שניות), ואז האפקט שלמעלה ממשיך לשקופית הבאה.
   // כמו שם, הזמן נספר רק אחרי שהקריין סיים ("תוצאות ההימור… ההימור הגדול של
@@ -2383,36 +2565,101 @@ export function GameHost({
 
   // סיום סרטון/יוטיוב חוסם — מעבר אוטומטי רק אם autoT.media.video.playToEnd דלוק.
   // (מחובר ל-onEnded של הנגן דרך SlideView; אם כבוי — הסרטון נשאר עד לחיצה.)
+  // מדיה עוצרת מתחת לשכבה חוסמת, אבל אם בכל זאת נגמרה מתחתיה (מרוץ ברגע
+  // הפתיחה, או יוטיוב שלא קיבל את פקודת העצירה) — המעבר ממתין שהשכבה תרד.
+  // בלי זה הסוף סגר את טבלת המובילים, או קידם את המשחק מתחת לתפריט.
+  const mediaEndedUnderCoverRef = useRef<string | null>(null);
   const onBlockingMediaEnded = useCallback(() => {
-    if (autoTRef.current.media.video.playToEnd) advanceRef.current();
-  }, []);
+    if (!autoTRef.current.media.video.playToEnd) return;
+    if (overlayActiveRef.current) {
+      const st = engine.getState();
+      mediaEndedUnderCoverRef.current = `${st.currentSlideId}:${st.activeMedia ?? ''}`;
+      return;
+    }
+    advanceRef.current();
+  }, [engine]);
+  useEffect(() => {
+    const ended = mediaEndedUnderCoverRef.current;
+    if (overlayActive || ended === null) return;
+    mediaEndedUnderCoverRef.current = null;
+    // רק אם עדיין באותה מדיה (המנחה לא עבר הלאה בינתיים)
+    if (
+      stage === 'playing' &&
+      state.activeMedia !== null &&
+      ended === `${state.currentSlideId}:${state.activeMedia}`
+    )
+      advanceRef.current();
+  }, [overlayActive, stage, state.currentSlideId, state.activeMedia]);
 
   // -------------------------------------------------------------------------
   // סאונד לפי מצב (SPEC סעיף 9): התחברות / מנצחים / רשימת זוכים / מובילים
   // -------------------------------------------------------------------------
 
+  // התלות היא בקובץ עצמו ולא באובייקט הסאונדים: עדכון של המשחק בזמן שהוא רץ
+  // (Shift+R, עדכון שנשלח למנוע) יוצר אובייקט חדש, וזה היה מתחיל את המוזיקה
+  // מההתחלה — גם אצל הצופים. קובץ שבאמת השתנה עדיין מתחלף.
+  const stageSoundSrc =
+    stage === 'opening'
+      ? sounds.playersConnectingMediaSound.src
+      : stage === 'winners'
+        ? sounds.winnersMediaSound.src
+        : stage === 'scoreboard'
+          ? sounds.winnersListMediaSound.src
+          : null;
   useEffect(() => {
     if (stage === 'opening') {
-      audio.play('playersConnecting', sounds.playersConnectingMediaSound.src, { loop: true });
+      audio.play('playersConnecting', stageSoundSrc, { loop: true });
       return () => audio.stop('playersConnecting');
     }
     if (stage === 'winners') {
-      audio.play('winners', sounds.winnersMediaSound.src);
+      audio.play('winners', stageSoundSrc);
       return () => audio.stop('winners');
     }
     if (stage === 'scoreboard') {
-      audio.play('winnersList', sounds.winnersListMediaSound.src);
+      audio.play('winnersList', stageSoundSrc);
       return () => audio.stop('winnersList');
     }
     return undefined;
-  }, [stage, audio, sounds]);
+  }, [stage, audio, stageSoundSrc]);
 
   // מסך מובילים באמצע המשחק (פקודה 1) — סאונד רשימת הזוכים
+  const leadersSoundSrc = sounds.winnersListMediaSound.src;
   useEffect(() => {
     if (!leadersOverlay) return;
-    audio.play('winnersList', sounds.winnersListMediaSound.src);
+    audio.play('winnersList', leadersSoundSrc);
     return () => audio.stop('winnersList');
-  }, [leadersOverlay, audio, sounds]);
+  }, [leadersOverlay, audio, leadersSoundSrc]);
+
+  // כיסוי עם צליל משלו ירד (מסך הפתיחה, טבלת המובילים, מסכי הסיום) — צליל
+  // הצגת השאלה, אם השאלה עלתה מאחוריו ועדיין במצב "רק עלתה". בלי זה שאלה 1
+  // והשאלה שאחרי טבלת המובילים האוטומטית עלו בלי הצליל (ראו questionSound.ts).
+  // צליל הכיסוי נעצר ב-cleanup של האפקטים שלמעלה, ו-React מריץ את כל ה-cleanup
+  // של קומיט לפני האפקטים שלו — כך שהצליל כאן לא נעצר מיד אחרי שהתחיל.
+  const questionCovered = questionSoundCovered(stage, leadersOverlay);
+  const questionCoveredRef = useRef(questionCovered);
+  useEffect(() => {
+    const wasCovered = questionCoveredRef.current;
+    questionCoveredRef.current = questionCovered;
+    const st = engine.getState();
+    const r = revealRef.current;
+    const replay = replayQuestionSound({
+      wasCovered,
+      covered: questionCovered,
+      slideChanged: revealSlide !== st.currentSlideId || revealEntry !== st.slideEntry,
+      view: {
+        votable: isVotableSlide(engine.getCurrentSlide()),
+        phase: st.phase,
+        activeMedia: st.activeMedia,
+        questionShown: r.questionShown,
+        answersShown: r.answersShown,
+        revealCorrect: r.revealCorrect,
+      },
+    });
+    // בלי קובץ לצליל השאלה אין מה לנגן — ו-play ריק היה עוצר כל מה שמתנגן,
+    // למשל מחיאות כפיים שהתחילו מתחת לטבלה.
+    const src = soundsRef.current.showQuestionMediaSound.src;
+    if (replay && src !== null && src.trim() !== '') audio.play('showQuestion', src);
+  }, [questionCovered, revealSlide, revealEntry, engine, audio]);
 
   // -------------------------------------------------------------------------
   // "סולמות וחבלים קבוצתי": בסיום חשיפת התשובה מחשבים את הסבב (אחוז הצלחה לכל
@@ -2468,18 +2715,20 @@ export function GameHost({
 
   // טבלת מובילים אוטומטית (setting.showWinnersListAfter) — פעם בכל N שאלות
   // שהושלמו קופצת אוטומטית שכבת המובילים (המנחה סוגר אותה ברווח/0 וממשיך).
-  // ה-ref מונע הצגה חוזרת לאותה כמות שאלות (ולא קופץ על שקופיות לא-מצביעות).
+  // ה-ref הוא הספירה הגבוהה ביותר שכבר טופלה, כך שהטבלה לא נפתחת שוב אחרי
+  // חזרה (ראו autoLeaderboardStep) ולא קופצת על שקופיות לא-מצביעות.
   useEffect(() => {
     if (stage !== 'playing' || state.phase === 'ended') return;
     const completed = completedQuestionCount(engine.getGame(), state.slidesCompleted);
-    if (completed === autoLeadersShownAtRef.current) return; // אין שאלה חדשה שהושלמה
-    if (shouldShowLeaderboard(completed, engine.getGame().setting.showWinnersListAfter)) {
-      autoLeadersShownAtRef.current = completed;
+    const step = autoLeaderboardStep(
+      autoLeadersShownAtRef.current,
+      completed,
+      engine.getGame().setting.showWinnersListAfter,
+    );
+    autoLeadersShownAtRef.current = step.handled;
+    if (step.show) {
       setLeadersOverlay(true);
       debugLog('game', `טבלת מובילים אוטומטית אחרי ${completed} שאלות`);
-    } else {
-      // מעדכנים את המונה גם בלי הצגה, כדי שספירה עתידית תשווה מול הכמות הנוכחית
-      autoLeadersShownAtRef.current = completed;
     }
   }, [state.slidesCompleted, state.phase, stage, engine]);
 
@@ -2525,6 +2774,9 @@ export function GameHost({
       // צירופים עם Ctrl/Cmd/Alt שייכים לדפדפן (Ctrl+R לרענון, DevTools וכו') —
       // לא חוטפים אותם כדי שלא נחסום פעולות דפדפן בזמן המשחק.
       if (event.ctrlKey || event.metaKey || event.altKey) return;
+      // חלון פתיחה פתוח (startupModal) — המקשים שייכים לו (Tab ו-Enter על
+      // הכפתורים שלו), ולא למשחק שמאחוריו.
+      if (startupModal) return;
       // מסך התחברות קבוצות פתוח — חוסם שליטת מקלדת במשחק; Escape סוגר אותו
       if (connectCategory !== null) {
         if (event.key === 'Escape') setConnectCategory(null);
@@ -2627,7 +2879,7 @@ export function GameHost({
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [stage, menuOpen, settingsOpen, rosterOpen, exitConfirm, captureOn, lobbyOverlay, showResetLobby, canExit, leadersOverlay, connectCategory, engine, advance, goBack, onRequestRefresh]);
+  }, [stage, menuOpen, settingsOpen, rosterOpen, exitConfirm, captureOn, lobbyOverlay, showResetLobby, canExit, leadersOverlay, connectCategory, startupModal, engine, advance, goBack, onRequestRefresh]);
 
   /** "התחלת המשחק מחדש" מתוך מסך ההגדרות — איפוס מלא וחזרה למסך הפתיחה. */
   const restartGame = useCallback(() => {
@@ -2962,6 +3214,8 @@ export function GameHost({
             onChange={updateRoster}
             captureOn={captureOn}
             onToggleCapture={setCaptureOn}
+            onReassign={reassign}
+            saveStatus={clickerSave}
             scores={state.scores}
             groupBonus={groupBonus}
             onAdjustPlayer={adjustPlayer}
@@ -3071,7 +3325,7 @@ export function GameHost({
         {settingsOpen && (
           <SettingsScreen
             game={game}
-            initial={settings}
+            initial={demoOnly ? { ...settings, crowdEnabled: true } : settings}
             mode="ingame"
             allowDemo={allowDemo}
             offline={offline}

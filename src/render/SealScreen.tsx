@@ -64,7 +64,11 @@ export function SealScreen({ onBack }: { onBack?: () => void }) {
       .then(async (buffer) => {
         const bytes = new Uint8Array(buffer);
         const { game, dropped } = await readZipGameFile(bytes);
-        const users = parseGameUsers(game.users);
+        // משתתפים בלי מספר שלט (pendingUsers) נספרים גם הם — הם יקבלו שלט בלחיצה.
+        const users = [
+          ...parseGameUsers(game.users),
+          ...game.pendingUsers.map((u) => ({ groupName: u.groupName })),
+        ];
         const jsonLimit = game.setting.limit.number ?? 0;
         setInfo({
           fileName: file.name,

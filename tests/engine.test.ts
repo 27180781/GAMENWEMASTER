@@ -414,6 +414,45 @@ describe('ניווט: BACK / GOTO', () => {
   });
 });
 
+describe('slideEntry — מונה הכניסות לשקופית', () => {
+  // ה-host מאפס את שלבי החשיפה לפי המונה. לפי מזהה השקופית לבדו, כניסה חוזרת
+  // לאותה שקופית השאירה את התשובה הנכונה מסומנת גם בהצבעה החדשה.
+  it('★ עולה גם בכניסה חוזרת לאותה שקופית: BACK בשקופית הראשונה, GOTO אליה, איפוס', () => {
+    const engine = votingEngine();
+    const first = engine.getState().slideEntry;
+    engine.dispatch({ type: 'VOTING_TIMEOUT' });
+    engine.dispatch({ type: 'BACK' }); // אין קודמת — אותה שקופית מההתחלה
+    expect(engine.getState()).toMatchObject({ currentSlideId: 1, phase: 'showing' });
+    expect(engine.getState().slideEntry).toBe(first + 1);
+    engine.dispatch({ type: 'GOTO', slideId: 1 });
+    expect(engine.getState().slideEntry).toBe(first + 2);
+    engine.reset();
+    expect(engine.getState().slideEntry).toBe(first + 3);
+  });
+
+  it('עולה במעבר לשקופית הבאה, ולא בשלבים שבתוך השקופית', () => {
+    const engine = new GameEngine(basicGame());
+    const first = engine.getState().slideEntry;
+    engine.dispatch({ type: 'ADVANCE', at: T0 }); // פתיחת הצבעה
+    engine.dispatch({ type: 'VOTE_SNAPSHOT', snapshot: makeSnapshot(1, 1, { a: 2 }), at: T0 + 1 });
+    engine.dispatch({ type: 'VOTING_TIMEOUT', at: T0 + 2 });
+    expect(engine.getState().slideEntry).toBe(first);
+    engine.dispatch({ type: 'ADVANCE', at: T0 + 3 }); // לשקופית 2
+    expect(engine.getState()).toMatchObject({ currentSlideId: 2, slideEntry: first + 1 });
+    engine.dispatch({ type: 'MEDIA_ENDED', at: T0 + 4 });
+    expect(engine.getState().slideEntry).toBe(first + 1);
+  });
+
+  it('שחזור מגיבוי ורענון תוכן שמשאיר את השקופית — לא נחשבים כניסה', () => {
+    const engine = votingEngine();
+    const before = engine.getState().slideEntry;
+    engine.restore(engine.serialize('T'));
+    expect(engine.getState().slideEntry).toBe(before);
+    engine.updateGame(basicGame());
+    expect(engine.getState().slideEntry).toBe(before);
+  });
+});
+
 describe('שקופיות subject ופקודות מערכת', () => {
   it('dynamic-image: המנוע חושף פקודה עם URL שבו {{GAMA_ID}} הוחלף ב-id של המשחק', () => {
     const game = makeGame([
