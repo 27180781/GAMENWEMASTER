@@ -34,8 +34,10 @@ export interface SettingsSection {
  * `narration` הוא אותו סיפור: מילון כתובות של קטעי שמע שמערכת יצירת המשחקים
  * מייצרת (ENGINE-narration.md). אין מה לערוך בו ביד, והשתקה/ווליום נמצאים
  * במקום הנכון — תפריט המפעיל (ESC).
+ *
+ * `hostVideo` (וידאו המנחה בחלון הצפייה) מגיע מהרישיון ואינו הגדרה של המשחק.
  */
-export const HIDDEN_SETTINGS = ['limit', 'narration'];
+export const HIDDEN_SETTINGS = ['limit', 'narration', 'hostVideo'];
 
 /**
  * הקבוצות, בסדר ובשמות של העורך המקוון. `titleThroughoutGame` ו-`logo` יושבים

@@ -547,6 +547,13 @@ export const globalSettingsSchema = z.object({
    */
   narration: narrationSettingSchema.optional().catch(undefined),
   /**
+   * וידאו וקול של המנחה בחלון הצפייה (LIVE-VIEW.md) — תוספת בתשלום לרישיון
+   * טלפונים. מערכת יצירת המשחקים שולחת `true` רק כשהרישיון הפעיל כולל אותה.
+   * כאן זה קובע רק אם המנחה רואה את הכפתורים: השרת בודק את אותו שדה בעצמו
+   * (server/live-video.mjs) לפני שהוא פותח שידור.
+   */
+  hostVideo: z.boolean().optional().catch(undefined),
+  /**
    * סוג המשחק. חסר/לא מוכר = 'classic' — המשחק הרגיל, בדיוק כפי שהיה. סוגים
    * נוספים מוסיפים שכבת חוויה מעל אותו מנוע שאלות (ראו gameTypeSettings).
    */

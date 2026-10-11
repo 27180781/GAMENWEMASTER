@@ -12,6 +12,7 @@
  *   POST /live/<W>/pub          שידור (כותרת x-live-key: P)
  *   GET  /live/<W>/events       זרם SSE לצופה
  *   GET  /live/<W>/poll?after=N המתנה ארוכה (עד 25 שניות) לשינוי שאחרי N
+ *   POST /live/<W>/video/…      וידאו וקול של המנחה (server/live-video.mjs)
  *   GET  /live/health           בדיקת חיים
  *
  * בלי תלויות — רק Node.
@@ -20,6 +21,7 @@
 import { createServer } from 'node:http';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
+import { createVideo } from './live-video.mjs';
 
 export const VIEW_PREFIX = 'trivia-live-view:v1:';
 const TOKEN_RE = /^[0-9a-f]{20}$/;
@@ -103,8 +105,10 @@ function readBody(req, limit) {
   });
 }
 
-export function createRelay({ now = () => Date.now(), limits = {} } = {}) {
+export function createRelay({ now = () => Date.now(), limits = {}, video = undefined } = {}) {
   const cfg = { ...DEFAULT_LIMITS, ...limits };
+  // וידאו המנחה: בלי מפתחות Cloudflare בסביבה הוא עונה "not-configured" ותו לא.
+  const media = video ?? createVideo({ now });
   /** @type {Map<string, any>} */
   const channels = new Map();
   let openConnections = 0;
@@ -386,6 +390,24 @@ export function createRelay({ now = () => Date.now(), limits = {} } = {}) {
     });
   }
 
+  /** ‎/live/<W>/video/<action>‎ — גוף JSON (גם בלי content-type, כמו sendBeacon). */
+  async function handleVideo(req, res, token, action) {
+    let body = {};
+    try {
+      const text = await readBody(req, media.config.bodyBytes);
+      if (text.trim() !== '') body = JSON.parse(text);
+    } catch (err) {
+      return sendJson(res, err?.status === 413 ? 413 : 400, {
+        error: err?.status === 413 ? 'too-large' : 'bad-json',
+      });
+    }
+    if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+      return sendJson(res, 400, { error: 'bad-json' });
+    }
+    const [status, reply] = await media.handle(req, token, action, body);
+    return sendJson(res, status, reply);
+  }
+
   async function handle(req, res) {
     try {
       const url = new URL(req.url ?? '/', 'http://relay.local');
@@ -403,9 +425,14 @@ export function createRelay({ now = () => Date.now(), limits = {} } = {}) {
           channels: channels.size,
           viewers,
           connections: openConnections,
+          video: media.stats(),
         });
       }
       const token = parts[1] ?? '';
+      if (parts.length === 4 && parts[2] === 'video' && TOKEN_RE.test(token)) {
+        if (req.method !== 'POST') return sendJson(res, 405, { error: 'method' });
+        return await handleVideo(req, res, token, parts[3]);
+      }
       if (parts.length !== 3 || !TOKEN_RE.test(token))
         return sendJson(res, 404, { error: 'not-found' });
       if (parts[2] === 'pub' && req.method === 'POST') return await handlePublish(req, res, token);
@@ -421,6 +448,7 @@ export function createRelay({ now = () => Date.now(), limits = {} } = {}) {
   /** דופק לצופים + ניקוי ערוצים נטושים. נקרא מטיימר. */
   function tick() {
     const at = now();
+    media.tick();
     for (const ch of channels.values()) {
       if (ch.sse.size > 0) {
         const beat = beatMessage(ch);
@@ -442,7 +470,7 @@ export function createRelay({ now = () => Date.now(), limits = {} } = {}) {
     channels.clear();
   }
 
-  return { handle, tick, close, channels, config: cfg };
+  return { handle, tick, close, channels, config: cfg, video: media };
 }
 
 export function startRelay({ port = 8787, host = '127.0.0.1', ...options } = {}) {

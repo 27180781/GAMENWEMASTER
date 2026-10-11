@@ -42,6 +42,7 @@ import {
   type LiveState,
   type LiveTimer,
 } from './types.ts';
+import type { LiveVideo } from './video/api.ts';
 
 /** פיקסל שקוף — במקום תמונה שעדיין אסור להראות, כדי שהפריסה לא תשתנה. */
 export const BLANK_IMAGE =
@@ -92,6 +93,8 @@ export interface LiveHostInput {
    * נסגרה (ראו revealThumb.ts). null = אין עדיין — נשלח פיקסל שקוף.
    */
   revealThumb: string | null;
+  /** וידאו המנחה בשידור (useHostVideo), או null. */
+  video: LiveVideo | null;
 }
 
 /**
@@ -118,7 +121,7 @@ function pickKnown<T extends object>(value: T, keys: readonly string[]): T {
 }
 
 const GLOBAL_SETTING_KEYS = Object.keys(globalSettingsSchema.shape).filter(
-  (key) => key !== 'narration',
+  (key) => key !== 'narration' && key !== 'hostVideo',
 );
 const SLIDE_SETTING_KEYS = Object.keys(slideSettingsSchema.shape);
 
@@ -481,6 +484,10 @@ export class LiveSnapshotBuilder {
       colors,
       sound: { ...input.sound },
       cues: input.cues.map((c) => ({ ...c })),
+      video:
+        input.video === null
+          ? null
+          : { gen: input.video.gen, cam: input.video.cam, mic: input.video.mic },
     };
   }
 }

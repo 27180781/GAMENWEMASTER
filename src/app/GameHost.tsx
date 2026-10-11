@@ -130,6 +130,8 @@ import {
 } from './controlChannel.ts';
 import { GroupConnectScreen } from '../render/GroupConnectScreen.tsx';
 import { useLivePublisher } from '../live/useLivePublisher.ts';
+import { HostVideoChip } from '../live/video/HostVideoControls.tsx';
+import { useHostVideo } from '../live/video/useHostVideo.ts';
 import {
   endGame,
   getBackup,
@@ -2917,6 +2919,13 @@ export function GameHost({
   // שפתח את קישור הצפייה — מה שמוצג כאן, בלי מה שמיועד למנחה בלבד.
   const connectCat =
     connectCategory === null ? undefined : roster.categories.find((c) => c.id === connectCategory);
+  // וידאו וקול של המנחה במסך הצפייה — תוספת בתשלום: רק כשהרישיון כולל אותה
+  // (‏setting.hostVideo מהבונה; השרת בודק שוב). ראו src/live/video.
+  const hostVideo = useHostVideo({
+    enabled: useSocket && setting.hostVideo === true,
+    gameId: game.id,
+    roomId,
+  });
   const live = useLivePublisher({
     enabled: useSocket,
     gameId: game.id,
@@ -2963,6 +2972,7 @@ export function GameHost({
       functionStatus,
       functionDetail,
       paused: overlayActive,
+      video: hostVideo.live,
     },
   });
 
@@ -3304,6 +3314,7 @@ export function GameHost({
             }
           />
         )}
+        {hostVideo.available && <HostVideoChip video={hostVideo} />}
         {syntheticCrowd && (
           <span className="demo-badge">
             דמו · {crowdConfig.voterCount.toLocaleString()} שחקנים
@@ -3341,6 +3352,7 @@ export function GameHost({
             onNarrationMutedChange={setNarrationMuted}
             narrationVolume={narrationVolume}
             onNarrationVolumeChange={setNarrationVolume}
+            {...(hostVideo.available ? { hostVideo } : {})}
             voteSource={voteSourceLabel}
             hostVoterId={hostVoterId}
             {...(canReportToDisk

@@ -19,6 +19,7 @@ import type { RailPlayer, RevealState } from '../render/QuestionSlide.tsx';
 import type { RaffleEntry } from '../render/RaffleOverlay.tsx';
 import type { BoardState } from '../app/snakesLadders.ts';
 import type { Category, Group } from '../app/roster.ts';
+import type { LiveVideo } from './video/api.ts';
 
 /** גרסת המבנה. מסך צפייה שמקבל גרסה אחרת מבקש מהצופה לרענן. */
 export const LIVE_SCHEMA = 1;
@@ -132,4 +133,9 @@ export interface LiveSnapshot {
   colors: Record<string, string>;
   sound: LiveSound;
   cues: LiveCue[];
+  /**
+   * וידאו המנחה (תוספת בתשלום, ראו video/): null — אין שידור. חסר אצל מסך
+   * ראשי בגרסה שקדמה לו, ולכן אופציונלי.
+   */
+  video?: LiveVideo | null;
 }
