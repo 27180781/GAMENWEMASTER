@@ -10,6 +10,8 @@
  * המשתמש — עד אז סרטונים מתנגנים מושתקים), מסך מלא, ולמי שכותב את שמו —
  * שלט הצבעה ליד המסך (VotePad.tsx), שעונה דרך שרת ההצבעות בדיוק כמו טלפון.
  * כשהמנחה משדר וידאו (תוספת בתשלום, video/) — חלון עם המצלמה והקול שלו.
+ * כשהמנחה פותח «במה» — כפתור להדלקת המצלמה של הצופה, ומי שהמנחה העלה לבמה
+ * מוצג ליד המסך (video/StageViewerViews.tsx).
  */
 
 import {
@@ -51,13 +53,22 @@ import type { TimerView } from '../render/TimerRing.tsx';
 import { VotesBreakdown } from '../render/VotesBreakdown.tsx';
 import { mirrorEngine } from './mirrorEngine.ts';
 import { JoinCard, VotePad } from './VotePad.tsx';
-import { joinFields, padRoom, postToVoteServer, savePlayerName } from './votePad.ts';
+import {
+  joinFields,
+  padRoom,
+  postToVoteServer,
+  readSavedPlayerName,
+  savePlayerName,
+} from './votePad.ts';
 import { mirrorSoundActions } from './soundTrack.ts';
 import { LiveSubscriber, type ViewerConnection, type ViewerUpdate } from './subscriber.ts';
 import { isViewToken, liveRelayBase } from './token.ts';
 import type { LiveSnapshot, LiveTimer } from './types.ts';
 import { HostVideoTile, useHostVideoReceiver } from './video/HostVideoTile.tsx';
 import { setHostVideoSound } from './video/hostVideoElement.ts';
+import { stageFromSnapshot, viewerLayer } from './video/stage.ts';
+import { StageCamBar, StageCamDialog, StageGrid } from './video/StageViewerViews.tsx';
+import { useStageCam, useStageReceiver, type StageKeys } from './video/useStage.ts';
 import './liveViewer.css';
 
 const SOUND_CHANNELS: readonly SoundChannel[] = [
@@ -297,9 +308,101 @@ function ValidLiveViewer({ token, voteServerUrl }: { token: string; voteServerUr
         🎥 המנחה
       </button>
     ) : null;
-  const extraControl =
-    playButton === null && videoButton === null ? null : (
+
+  // «במה»: כשהמנחה פותח אותה (מצב המסך) אפשר להדליק מצלמה, ומי שהמנחה העלה
+  // לבמה מוצג בעמודה. מתחברים רק למי שעל הבמה, ורק כל עוד הצופה לא הסתיר אותה.
+  const stage = stageFromSnapshot(hostVideo?.stage ?? null);
+  const stageOpen = stage !== null;
+  const stageEntries = stage?.ids ?? [];
+  const cam = useStageCam({ relayBase, viewToken: token, open: stageOpen });
+  const [stageHidden, setStageHidden] = useState(false);
+  const [camAsk, setCamAsk] = useState(false);
+  useEffect(() => {
+    if (!stageOpen) setStageHidden(false);
+  }, [stageOpen]);
+  const ownId = cam.state.id;
+  const stageKeys = useMemo<StageKeys>(
+    () => ({ relayBase, viewToken: token, publishKey: null }),
+    [relayBase, token],
+  );
+  const stageView = useStageReceiver({
+    keys: stageKeys,
+    // את עצמו הצופה רואה מהמצלמה שלו, לא דרך השרת.
+    ids: stageHidden ? [] : stageEntries.map((e) => e.id).filter((id) => id !== ownId),
+    version: String(stage?.v ?? 0),
+    layer: viewerLayer(stageEntries.length),
+    // שכל הצופים לא יתחברו מחדש באותו רגע כשהבמה משתנה.
+    jitterMs: 2500,
+  });
+  const stageGrid =
+    !stageHidden && stageEntries.length > 0 && stageView.phase !== 'unavailable' ? (
+      <StageGrid
+        entries={stageEntries}
+        view={stageView}
+        ownId={ownId}
+        ownStream={cam.state.stream}
+        onHide={() => setStageHidden(true)}
+      />
+    ) : null;
+  const camBar =
+    cam.state.phase === 'off' ? null : (
+      <StageCamBar
+        state={cam.state}
+        onStage={ownId !== null && stageEntries.some((e) => e.id === ownId)}
+        canRetry={stageOpen}
+        onStop={cam.stop}
+        onRetry={() => setCamAsk(true)}
+      />
+    );
+  const side =
+    stageGrid === null && camBar === null ? null : (
       <>
+        {stageGrid}
+        {camBar}
+      </>
+    );
+  const camButton =
+    stageOpen && cam.state.phase === 'off' ? (
+      <button
+        type="button"
+        className="live-btn live-btn--cam"
+        onClick={() => setCamAsk(true)}
+        title="הדלקת המצלמה שלכם: המנחה יראה אתכם ויוכל להעלות אתכם לבמה"
+      >
+        📷 מצלמה
+      </button>
+    ) : null;
+  const stageButton =
+    stageHidden && stageEntries.length > 0 ? (
+      <button
+        type="button"
+        className="live-btn"
+        onClick={() => setStageHidden(false)}
+        title="הצגת מי שעל הבמה"
+      >
+        👥 הבמה
+      </button>
+    ) : null;
+  const camDialog =
+    camAsk && stageOpen ? (
+      <StageCamDialog
+        initialName={player.phase === 'play' ? player.name : readSavedPlayerName()}
+        onStart={(name) => {
+          setCamAsk(false);
+          cam.start(name);
+        }}
+        onCancel={() => setCamAsk(false)}
+      />
+    ) : null;
+
+  const extraControl =
+    playButton === null &&
+    videoButton === null &&
+    camButton === null &&
+    stageButton === null ? null : (
+      <>
+        {camButton}
+        {stageButton}
         {videoButton}
         {playButton}
       </>
@@ -321,7 +424,8 @@ function ValidLiveViewer({ token, voteServerUrl }: { token: string; voteServerUr
         toLocal={update.toLocal}
         pad={pad}
         video={video}
-        overlay={overlay}
+        side={side}
+        overlay={overlay ?? camDialog}
         extraControl={extraControl}
       >
         {(soundOn) =>
@@ -351,6 +455,7 @@ function ViewerChrome({
   toLocal,
   pad = null,
   video = null,
+  side = null,
   overlay = null,
   extraControl = null,
   children,
@@ -362,6 +467,8 @@ function ViewerChrome({
   pad?: ReactNode;
   /** חלון הווידאו של המנחה — לפי מצב הצליל. */
   video?: ((soundOn: boolean) => ReactNode) | null;
+  /** «במה»: מי שעל הבמה והמצלמה של הצופה — בעמודה, מתחת לווידאו של המנחה. */
+  side?: ReactNode;
   overlay?: ReactNode;
   extraControl?: ReactNode;
   children: (soundOn: boolean) => ReactNode;
@@ -458,7 +565,7 @@ function ViewerChrome({
   };
 
   const notice = connectionNotice(connection, hasSnapshot);
-  const hasSide = pad !== null || video !== null;
+  const hasSide = pad !== null || video !== null || side !== null;
   // עם עמודה בצד הכפתורים יושבים בה, תמיד גלויים — ולא על המסך, שקטן אז.
   const controls = (
     <div
@@ -488,7 +595,7 @@ function ViewerChrome({
   );
   return (
     <div
-      className={`live-viewer${hasSide ? ' has-side' : ''}${video !== null ? ' has-video' : ''}`}
+      className={`live-viewer${hasSide ? ' has-side' : ''}${video !== null || side !== null ? ' has-video' : ''}`}
     >
       <div className="live-screen-area">
         {children(soundOn)}
@@ -507,6 +614,7 @@ function ViewerChrome({
       {hasSide && (
         <div className={`live-side${pad === null ? ' live-side--video' : ''}`}>
           {video?.(soundOn)}
+          {side}
           {pad}
           {controls}
         </div>

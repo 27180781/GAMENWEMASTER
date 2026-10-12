@@ -18,6 +18,7 @@
     "shots": "node tools/theme-shots.mjs",
     "e2e:device": "node tools/device-e2e.mjs",
     "e2e:video": "node tools/live-video-e2e.mjs",
+    "e2e:stage": "node tools/live-stage-e2e.mjs",
     "e2e:sound": "node tools/sound-e2e.mjs",
     "e2e:signature": "node tools/signature-e2e.mjs"
   },

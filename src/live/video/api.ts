@@ -12,12 +12,30 @@ export interface IceServer {
   credential?: string;
 }
 
+/** מצלמה של משתתף על הבמה: המזהה הציבורי שלה בשרת והשם שמתחתיה. */
+export interface StageEntry {
+  id: string;
+  name: string;
+}
+
+/**
+ * «במה» (stage.ts): מצלמות של משתתפים שהמנחה העלה. קיימת = פתוחה, ומשתתפים
+ * יכולים להדליק מצלמה; `ids` הם מי שעל הבמה, בסדר שהמנחה בחר.
+ */
+export interface VideoStage {
+  /** גרסת הבמה בשרת. מתחלפת כשמישהו עולה, יורד או מתחבר מחדש — והצופים מתחברים מחדש. */
+  v: number;
+  ids: StageEntry[];
+}
+
 /** מה שמסך הצפייה צריך לדעת על השידור — עובר במצב המסך (types.ts). */
 export interface LiveVideo {
   /** מזהה השידור. מתחלף כשהמנחה פותח שידור חדש — והצופים מתחברים מחדש. */
   gen: string;
   cam: boolean;
   mic: boolean;
+  /** «במה» פתוחה. חסר אצל מסך ראשי בלי התוספת, או בגרסה שלפניה. */
+  stage?: VideoStage | null;
 }
 
 export interface VideoReply {
@@ -61,6 +79,28 @@ export async function videoCall(
   } catch {
     return { status: 0, body: null };
   }
+}
+
+/**
+ * הודעה אחרונה לשרת (יציאה, כיבוי), גם כשהדף נסגר: sendBeacon, ואם הדפדפן
+ * סירב — fetch עם keepalive. לא מחכה לתשובה.
+ */
+export function videoBeacon(
+  fetchImpl: typeof fetch,
+  relayBase: string,
+  viewToken: string,
+  action: string,
+  body: Record<string, unknown>,
+  sendBeacon: ((url: string, body: string) => boolean) | null = null,
+): void {
+  const beacon =
+    sendBeacon ??
+    (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function'
+      ? (url: string, text: string) => navigator.sendBeacon(url, text)
+      : null);
+  if (beacon !== null && beacon(`${relayBase}/${viewToken}/video/${action}`, JSON.stringify(body)))
+    return;
+  void videoCall(fetchImpl, relayBase, viewToken, action, body, null, { keepalive: true });
 }
 
 export function errorOf(reply: VideoReply): string {

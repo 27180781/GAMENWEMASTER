@@ -554,6 +554,13 @@ export const globalSettingsSchema = z.object({
    */
   hostVideo: z.boolean().optional().catch(undefined),
   /**
+   * «במה» (LIVE-VIEW.md): משתתפים מדליקים מצלמה בקישור הצפייה, והמנחה מעלה עד 9
+   * מהם למסך של כולם. תוספת על וידאו המנחה; כמו `hostVideo`, מערכת יצירת
+   * המשחקים שולחת `true` רק כשהרישיון כולל אותה, והשרת בודק את אותו שדה בעצמו
+   * (server/live-stage.mjs).
+   */
+  hostVideoStage: z.boolean().optional().catch(undefined),
+  /**
    * סוג המשחק. חסר/לא מוכר = 'classic' — המשחק הרגיל, בדיוק כפי שהיה. סוגים
    * נוספים מוסיפים שכבת חוויה מעל אותו מנוע שאלות (ראו gameTypeSettings).
    */

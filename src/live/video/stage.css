@@ -1,0 +1,457 @@
+/* «במה»: מצלמות של משתתפים (stage.ts). חלון של מצלמה אחת (StageVideo.tsx)
+   בכל מקום, ומה שהמסך הראשי מציג (StageHostViews.tsx) בקואורדינטות הבמה
+   (1920×1080), כמו שאר התפריטים של המנחה. מה שבקישור הצפייה: liveViewer.css. */
+
+/* ---- חלון של מצלמה אחת: ממלא את ההורה (שמחזיק position ויחס 16:9) ---- */
+
+.stage-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #000;
+  /* בלי מעבר הדרגתי: בהחלפת חיבור הישן והחדש מתחלפים באותו רגע (StageVideo.tsx) */
+  opacity: 0;
+  pointer-events: none;
+}
+
+.stage-video.is-shown {
+  opacity: 1;
+}
+
+/* טלפון לאורך: התמונה כולה עם שוליים, ולא פס חתוך באמצע הפנים */
+.stage-video.is-portrait {
+  object-fit: contain;
+}
+
+/* המצלמה של המשתתף עצמו, כמו מראה */
+.stage-video.is-mirror {
+  transform: scaleX(-1);
+}
+
+/* ---- הסקציה בתפריט המפעיל ---- */
+
+.stage-panel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.stage-panel h3 {
+  font-size: 20px;
+}
+
+.stage-panel-status {
+  font-size: 18px;
+}
+
+.stage-panel-status.is-error {
+  color: #fca5a5;
+}
+
+.stage-panel-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.operator-menu .stage-go,
+.stage-manager .stage-go {
+  background: #15803d;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.operator-menu .stage-panel button:disabled,
+.stage-manager button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ---- חלון ניהול הבמה: מעל המסך, כמו תפריט המפעיל ---- */
+
+.stage-manager {
+  position: absolute;
+  inset: 0;
+  /* כמו תפריט המפעיל — הם לא פתוחים יחד */
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+}
+
+.stage-manager-panel {
+  width: 1560px;
+  max-height: 1000px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: hidden;
+  padding: 24px 28px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  background: #151a2e;
+  font-size: 20px;
+}
+
+.stage-manager button {
+  padding: 10px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  background: #26304f;
+  color: #fff;
+  font: inherit;
+  font-size: 19px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.stage-manager button:hover:not(:disabled) {
+  background: #34406a;
+}
+
+.stage-manager button.is-danger {
+  background: #b91c1c;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.stage-manager-header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 16px;
+}
+
+.stage-manager-header h2 {
+  font-size: 30px;
+}
+
+.stage-manager-count {
+  font-size: 19px;
+  opacity: 0.8;
+}
+
+.stage-manager-spacer {
+  flex: 1 1 auto;
+}
+
+.stage-manager-hint {
+  flex: none;
+  font-size: 17px;
+  line-height: 1.45;
+  opacity: 0.75;
+}
+
+.stage-manager-note {
+  flex: none;
+  font-size: 18px;
+  color: #fde68a;
+}
+
+.stage-manager-status {
+  font-size: 22px;
+}
+
+.stage-manager-status.is-error {
+  color: #fca5a5;
+}
+
+.stage-manager-closed {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 12px 0 8px;
+}
+
+/* מי על הבמה, בסדר של המנחה */
+.stage-manager-onstage {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+}
+
+.stage-manager-label {
+  font-weight: 700;
+}
+
+.stage-manager-empty {
+  opacity: 0.7;
+}
+
+.stage-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 300px;
+  padding: 4px 6px 4px 12px;
+  border: 1px solid rgba(74, 222, 128, 0.6);
+  border-radius: 999px;
+  background: rgba(74, 222, 128, 0.16);
+  font-size: 18px;
+}
+
+.stage-chip-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* המצלמה כבתה לרגע: נשאר בבחירה עד שתחזור (stage.ts, STAGE_GRACE_MS) */
+.stage-chip.is-missing {
+  border-color: rgba(250, 204, 21, 0.55);
+  background: rgba(250, 204, 21, 0.12);
+}
+
+.stage-manager .stage-chip button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.stage-manager .stage-manager-clear {
+  margin-inline-start: 8px;
+  padding: 6px 14px;
+  font-size: 17px;
+}
+
+/* המצלמות הדלוקות — הגלילה היחידה, בתוך החלון */
+.stage-manager-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 16px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-inline-end: 4px;
+}
+
+.stage-manager-grid-empty {
+  padding: 40px 0;
+  font-size: 22px;
+  text-align: center;
+  opacity: 0.75;
+}
+
+.stage-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: #0f1426;
+}
+
+.stage-card.is-on {
+  border-color: #4ade80;
+}
+
+.stage-card-video {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #000;
+}
+
+.stage-card-cover {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  opacity: 0.75;
+}
+
+.stage-manager .stage-card-peek {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: #111827;
+  opacity: 1;
+}
+
+.stage-card-badge {
+  position: absolute;
+  top: 8px;
+  inset-inline-start: 8px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: #16a34a;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.stage-card-name {
+  overflow: hidden;
+  padding: 8px 12px 0;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.stage-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 12px;
+}
+
+.stage-manager .stage-card-actions button {
+  padding: 6px 12px;
+  font-size: 17px;
+}
+
+.stage-card-ask {
+  font-weight: 700;
+  color: #fca5a5;
+}
+
+/* ---- חלונית הבמה הצפה: מי שעל הבמה, כמו שהצופים רואים ----
+   המידות כמו ב-stage.ts (STAGE_WINDOW_*), שהגרירה מחשבת לפיהן את גבולות הבמה. */
+
+.stage-window {
+  position: absolute;
+  /* כמו «המצלמה שלי»: מעל טבלת המובילים, מתחת לתפריט המפעיל ולחלונות */
+  z-index: 49;
+  overflow: hidden;
+  /* העובי הוא WINDOW_BORDER ב-StageHostViews.tsx */
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  border-radius: 12px;
+  background: #05070f;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+  color: #fff;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.stage-window.is-dragging {
+  cursor: grabbing;
+}
+
+.stage-window-grid {
+  position: absolute;
+  inset: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stage-window-tiles {
+  /* הרוחב מחושב (StageHostViews.tsx): לא להצטמק, אחרת השורה נשברת לשתיים */
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.stage-tile {
+  position: relative;
+  flex: none;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #111827;
+}
+
+.stage-tile-wait {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+  opacity: 0.6;
+}
+
+.stage-tile-name {
+  position: absolute;
+  bottom: 6px;
+  inset-inline-start: 6px;
+  max-width: calc(100% - 12px);
+  overflow: hidden;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  font-size: 16px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.stage-window-bar {
+  position: absolute;
+  top: 6px;
+  inset-inline-start: 6px;
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.stage-window:hover .stage-window-bar {
+  opacity: 1;
+}
+
+.stage-window-bar button {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font: inherit;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.stage-window-bar button:hover {
+  background: rgba(0, 0, 0, 0.9);
+}
+
+/* ממוזערת: כפתור אחד שאפשר גם לגרור, וגם לא מקבלת וידאו */
+.stage-window.is-compact {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border-color: rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.7);
+  box-shadow: none;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.stage-window.is-compact:hover {
+  opacity: 1;
+}
+
+.stage-window-pill {
+  overflow: hidden;
+  font-size: 18px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ---- הכפתור בתג הווידאו (HostVideoControls.tsx) ---- */
+
+.host-video-chip button.is-stage-open {
+  background: rgba(22, 163, 74, 0.75);
+}

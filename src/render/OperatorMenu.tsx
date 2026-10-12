@@ -10,7 +10,9 @@
 
 import { questionLabel, type GameEngine, type GameState } from '../engine/index.ts';
 import { HostVideoPanel } from '../live/video/HostVideoControls.tsx';
+import { StageMenuSection } from '../live/video/StageHostViews.tsx';
 import type { HostVideoHandle } from '../live/video/useHostVideo.ts';
+import type { StageHostHandle } from '../live/video/useStage.ts';
 
 interface OperatorMenuProps {
   engine: GameEngine;
@@ -25,6 +27,10 @@ interface OperatorMenuProps {
   onNarrationVolumeChange?: (volume: number) => void;
   /** וידאו המנחה במסך הצפייה — רק כשהרישיון כולל אותו (ראו src/live/video). */
   hostVideo?: HostVideoHandle;
+  /** «במה» — מצלמות המשתתפים, רק כשהרישיון כולל אותה (src/live/video/stage.ts). */
+  stage?: StageHostHandle;
+  /** פתיחת חלון ניהול הבמה במקום התפריט. */
+  onManageStage?: () => void;
   /** תיאור מקור ההצבעות הפעיל — לתצוגה בלבד. */
   voteSource: string;
   hostVoterId?: string;
@@ -51,6 +57,8 @@ export function OperatorMenu({
   narrationVolume = 1,
   onNarrationVolumeChange,
   hostVideo,
+  stage,
+  onManageStage,
   voteSource,
   hostVoterId = '',
   onShowReceiver,
@@ -138,6 +146,13 @@ export function OperatorMenu({
             </>
           )}
           {hostVideo && <HostVideoPanel video={hostVideo} />}
+          {stage && onManageStage && (
+            <StageMenuSection
+              stage={stage}
+              videoLive={hostVideo?.live != null}
+              onManage={onManageStage}
+            />
+          )}
           <p className="operator-status">
             מקור הצבעות: {voteSource}
             {hostVoterId !== '' && ` · שלט מנחה: ${hostVoterId}`}
