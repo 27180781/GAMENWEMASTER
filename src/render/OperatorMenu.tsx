@@ -42,6 +42,11 @@ interface OperatorMenuProps {
   onSaveReport?: () => void;
   /** חותמת הזמן של השמירה האחרונה — לחיווי "נשמר" בתפריט. */
   reportSavedAt?: number | null;
+  /**
+   * אונליין: הורדת קובץ התוצאות עכשיו. בסוף משחק שנשמר בשרת הוא כבר לא יורד
+   * מעצמו (ההורדה קפצה במקרן, מול הקהל), ולכן זו הדרך לקבל אותו בזמן המשחק.
+   */
+  onDownloadReport?: () => void;
   onEndGame: () => void;
   onClose: () => void;
 }
@@ -65,6 +70,7 @@ export function OperatorMenu({
   onOpenReports,
   onSaveReport,
   reportSavedAt = null,
+  onDownloadReport,
   onEndGame,
   onClose,
 }: OperatorMenuProps) {
@@ -106,6 +112,15 @@ export function OperatorMenu({
           {onOpenReports && (
             <button className="operator-clicker-btn" onClick={onOpenReports}>
               📊 פתח תיקיית תוצאות (אקסל)
+            </button>
+          )}
+          {onDownloadReport && (
+            <button
+              className="operator-clicker-btn"
+              title="ההורדה מופיעה בחלון הזה. כדי שהקהל לא יראה אותה, הורידו ממסך המנחה"
+              onClick={onDownloadReport}
+            >
+              📊 הורדת קובץ התוצאות (אקסל)
             </button>
           )}
           <label>

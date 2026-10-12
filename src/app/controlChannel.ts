@@ -54,6 +54,18 @@ export interface HostGameMessage {
   game: GameFile;
 }
 
+/**
+ * קובץ התוצאות (אקסל) כמו שהוא עכשיו, תשובה ל-{ t: 'report' }. ההורדה קורית
+ * בחלון של מסך המנחה, על מסך המחשב, ולא בחלון המשחק שעל המקרן.
+ */
+export interface HostReportMessage {
+  t: 'reportFile';
+  /** המזהה מהבקשה: רק מסך המנחה שביקש מוריד, גם כשפתוחים כמה. */
+  id: string;
+  name: string;
+  bytes: Uint8Array;
+}
+
 /** פקודות שמסך המנחה שולח לתצוגה. */
 export type HostCommand =
   | { t: 'hello' } // בקשה לתצוגה לפרסם מיד את מצבה הנוכחי
@@ -68,9 +80,10 @@ export type HostCommand =
    * שמבצעת — מסך הניהול רק מבקש. `target` מפריד בין ניקוד אישי לבונוס קבוצתי,
    * שהם שני דברים שונים לגמרי (ראו scoreAdjust.ts).
    */
-  | { t: 'score'; target: 'player' | 'group'; id: string; delta: number };
+  | { t: 'score'; target: 'player' | 'group'; id: string; delta: number }
+  | { t: 'report'; id: string }; // בקשה לקובץ התוצאות — התצוגה עונה ב-HostReportMessage
 
-export type ControlMessage = HostStateSnapshot | HostGameMessage | HostCommand;
+export type ControlMessage = HostStateSnapshot | HostGameMessage | HostReportMessage | HostCommand;
 
 export interface ControlChannel {
   post: (msg: ControlMessage) => void;

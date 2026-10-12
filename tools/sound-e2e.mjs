@@ -45,8 +45,9 @@
  *   refresh-lobby        רענון קובץ המשחק (Shift+R) לא מתחיל מחדש את מוזיקת הפתיחה.
  *   auto-skip            מעבר אוטומטי סופר מחשיפת התשובה, ולא מתחת לטבלה.
  *   winners-voting       W בזמן הצבעה: הטיימר מחכה, וממשיך מאותה נקודה (W או 2).
- *   winners-end          W ואז 2: סוף המשחק האמיתי עדיין נרשם (דוח, גיבוי), ו-2 במסך
- *                        המנצחים האמיתי לא עושה כלום.
+ *   winners-end          W ואז 2: סוף המשחק האמיתי עדיין נרשם (גיבוי), ו-2 במסך
+ *                        המנצחים האמיתי לא עושה כלום. קובץ התוצאות לא יורד מעצמו מול
+ *                        הקהל: הוא יורד ממסך המנחה (בחלון שלו) או מתפריט המפעיל.
  *   fast-forward-end     N בשקופית האחרונה מתחת לטבלה: הרווח הראשון חושף מנצח.
  *   going-back           2 בשאלה הראשונה לא מקדם, 2 בזמן הצבעה חוזר לתשובות בלי צליל,
  *                        ו-Backspace בשאלה הראשונה מתחיל אותה נקייה.
@@ -584,6 +585,8 @@ function makeTester(scenario, context, result) {
   let host = null;
   let viewer = null;
   const downloads = [];
+  /** הורדות בחלון מסך המנחה (קובץ התוצאות יורד שם ולא מול הקהל). */
+  const hostDownloads = [];
   const drain = (p) => p.evaluate(() => window.__soundLog.splice(0));
 
   const t = {
@@ -591,6 +594,7 @@ function makeTester(scenario, context, result) {
       return page;
     },
     downloads,
+    hostDownloads,
     /** מה שהמשחק של התרחיש שלח לשרת הגיבוי. */
     backupPosts: () => backupPosts.filter((p) => p.id === `sound-e2e-${scenario.name}`),
 
@@ -639,6 +643,7 @@ function makeTester(scenario, context, result) {
     async openHostConsole() {
       host = await context.newPage();
       host.on('pageerror', (e) => result.errors.push(`מסך המנחה: ${String(e)}`));
+      host.on('download', (d) => hostDownloads.push(d.suggestedFilename()));
       await host.goto(`${BASE}/?host=1`);
       await host.getByRole('button', { name: /קדימה/ }).waitFor({ timeout: 20000 });
       await sleep(500);
@@ -705,6 +710,8 @@ function makeTester(scenario, context, result) {
     },
     wait: (ms) => () => sleep(ms),
     click: (name) => () => page.getByRole('button', { name }).click({ timeout: 5000 }),
+    /** כפתור במסך המנחה לפי שמו. */
+    hostClick: (name) => () => host.getByRole('button', { name }).click({ timeout: 5000 }),
     /** «קדימה ▶» במסך המנחה. */
     forward:
       (times = 1) =>
@@ -1346,13 +1353,14 @@ const SCENARIOS = [
         await t.playToReveal(`שאלה ${n}`);
       }
       await t.step(
-        'סוף המשחק — מסך המנצחים, דוח, וסגירת הגיבוי',
+        'סוף המשחק — מסך המנצחים וסגירת הגיבוי, בלי הורדה מול הקהל',
         t.space(),
         {
           sound: ['winners.wav'],
           check: (s) => [
             s.winners || 'מסך המנצחים לא מוצג',
-            t.downloads.length === 1 || `דוח הסיום ירד ${t.downloads.length} פעמים`,
+            // התוצאות נשמרות בשרת, ולכן הקובץ לא יורד מעצמו בחלון שעל המקרן.
+            t.downloads.length === 0 || `קובץ התוצאות ירד ${t.downloads.length} פעמים מול הקהל`,
             t.backupPosts().some((p) => p.path === '/save-backup/game-over') ||
               'סוף המשחק לא נשלח לגיבוי',
           ],
@@ -1370,6 +1378,33 @@ const SCENARIOS = [
         800,
       );
       await t.step('רווח — חושף מנצח', t.space(), { check: (s) => s.podium > 0 || 'לא נחשף מנצח' });
+      await t.openHostConsole();
+      await t.step(
+        'מסך המנחה: «הורדת קובץ התוצאות» — יורד שם, לא בחלון המשחק',
+        t.hostClick(/הורדת קובץ התוצאות/),
+        {
+          quiet: true,
+          check: () => [
+            t.hostDownloads.length === 1 ||
+              `קובץ התוצאות ירד ${t.hostDownloads.length} פעמים במסך המנחה`,
+            t.downloads.length === 0 || 'קובץ התוצאות ירד גם בחלון המשחק',
+          ],
+        },
+        1500,
+      );
+      await t.step(
+        'תפריט המפעיל: «הורדת קובץ התוצאות»',
+        async () => {
+          await t.key('Escape')();
+          await sleep(300);
+          await t.click(/הורדת קובץ התוצאות/)();
+        },
+        {
+          quiet: true,
+          check: () => t.downloads.length === 1 || `קובץ התוצאות ירד ${t.downloads.length} פעמים`,
+        },
+        1500,
+      );
     },
   },
   {

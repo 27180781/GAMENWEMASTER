@@ -15,6 +15,7 @@ import {
 } from '../app/controlChannel.ts';
 import { canExtendDisplay, canOpenHostWindow, extendDisplay } from '../app/clickerBridge.ts';
 import { EMPTY_ROSTER, loadRoster, saveRoster, type RosterData } from '../app/roster.ts';
+import { downloadBlob } from '../app/xlsx.ts';
 import { RosterPanel } from './RosterPanel.tsx';
 import { SlideEditor } from './SlideEditor.tsx';
 
@@ -90,6 +91,9 @@ function SetupGuide({ onClose }: { onClose?: () => void }) {
   );
 }
 
+/** בלי תשובה מהמסך הראשי בתוך הזמן הזה (נסגר, או גרסה ישנה) — מוותרים ומסבירים. */
+const REPORT_TIMEOUT_MS = 15000;
+
 /** הפס «המסך הזה רק בשבילכם» נסגר פעם אחת לכל מחשב. */
 const SETUP_TIP_KEY = 'trivia.hostConsole.setupTipDismissed';
 
@@ -119,6 +123,13 @@ export function HostConsole() {
       // בלי אחסון (מצב פרטי) הפס פשוט יחזור בפעם הבאה.
     }
   };
+  /**
+   * קובץ התוצאות בדפדפן: המסך הראשי בונה אותו ושולח לכאן, וההורדה קורית בחלון
+   * הזה, על מסך המחשב. ב-EXE הוא נשמר מעצמו לתיקיית התוצאות, ולכן אין כפתור.
+   */
+  const [report, setReport] = useState<'idle' | 'busy' | 'done' | 'noAnswer'>('idle');
+  const reportIdRef = useRef<string | null>(null);
+  const reportTimerRef = useRef<number | null>(null);
   /** מסך התחברות לקבוצות פתוח בתצוגה (נפתח מכאן) — לחיווי + כפתור סגירה. */
   const [connectOpen, setConnectOpen] = useState(false);
   /** אין קשר עם המסך הראשי (אין פעימת-לב) — המצב המוצג עלול להיות ישן. */
@@ -132,6 +143,19 @@ export function HostConsole() {
     const ch = openControlChannel((msg) => {
       if (msg.t === 'game') {
         setEditGame(msg.game);
+        return;
+      }
+      if (msg.t === 'reportFile') {
+        if (msg.id !== reportIdRef.current) return; // בקשה של מסך מנחה אחר
+        reportIdRef.current = null;
+        if (reportTimerRef.current !== null) window.clearTimeout(reportTimerRef.current);
+        downloadBlob(
+          new Blob([msg.bytes], {
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          }),
+          msg.name,
+        );
+        setReport('done');
         return;
       }
       if (msg.t !== 'state') return;
@@ -157,6 +181,7 @@ export function HostConsole() {
     }, 2000);
     return () => {
       window.clearInterval(watch);
+      if (reportTimerRef.current !== null) window.clearTimeout(reportTimerRef.current);
       ch.close();
       chRef.current = null;
     };
@@ -182,6 +207,19 @@ export function HostConsole() {
     post({ t: 'score', target: 'player', id: voterId, delta });
   const adjustGroup = (groupId: string, delta: number) =>
     post({ t: 'score', target: 'group', id: groupId, delta });
+
+  const requestReport = () => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    reportIdRef.current = id;
+    setReport('busy');
+    if (reportTimerRef.current !== null) window.clearTimeout(reportTimerRef.current);
+    reportTimerRef.current = window.setTimeout(() => {
+      if (reportIdRef.current !== id) return;
+      reportIdRef.current = null;
+      setReport('noAnswer');
+    }, REPORT_TIMEOUT_MS);
+    post({ t: 'report', id });
+  };
 
   const applyGameEdit = (g: GameFile) => {
     setEditGame(g);
@@ -382,6 +420,20 @@ export function HostConsole() {
                   </li>
                 ))}
               </ol>
+              {!canOpenHostWindow() && (
+                <div className="hc-report">
+                  <button className="hc-btn" disabled={report === 'busy'} onClick={requestReport}>
+                    {report === 'busy' ? '⏳ מכין את הקובץ…' : '📊 הורדת קובץ התוצאות (אקסל)'}
+                  </button>
+                  <p className="hc-report-note" role={report === 'noAnswer' ? 'alert' : undefined}>
+                    {report === 'done'
+                      ? '✓ הקובץ ירד בחלון הזה.'
+                      : report === 'noAnswer'
+                        ? 'המסך הראשי לא ענה. רעננו את חלון המשחק ונסו שוב.'
+                        : 'הקובץ יורד בחלון הזה, על מסך המחשב, ולא במקרן.'}
+                  </p>
+                </div>
+              )}
             </div>
           </section>
         </div>
