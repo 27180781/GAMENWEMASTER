@@ -6700,6 +6700,7 @@ body {
 }
 .q-mode-pill--bet { background: #f5c518; color: #3a2c05; }
 .q-mode-pill--majority { background: rgba(255, 255, 255, 0.14); color: #fff; border: 1.5px solid rgba(255, 255, 255, 0.35); }
+.q-mode-pill--survey { background: #1fa5a0; color: #fff; }
 
 /* מונה הצבעות חי על כרטיס תשובה (setting.liveVoteCounts) */
 .q-live {

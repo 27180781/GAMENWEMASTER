@@ -444,6 +444,9 @@ export function QuestionSlide({
               </div>
             )}
             {title !== '' && <div className="q-title-pill">{title}</div>}
+            {/* סקר — עד 2026-10 רק אייקון עוגה קטן ליד השאלה הבדיל אותו משאלה רגילה,
+                ומשתתפים לא הבינו שאין כאן תשובה נכונה (משוב לקוח, 2026-10-11). */}
+            {isSurvey && <div className="q-mode-pill q-mode-pill--survey">📊 סקר · אין תשובה נכונה</div>}
             {majority && <div className="q-mode-pill q-mode-pill--majority">🗳 הרוב קובע את התשובה</div>}
             {betPill !== null && (
               <div className="q-mode-pill q-mode-pill--bet">
