@@ -7,7 +7,10 @@
  * שנוצר לפני הרחבת הבנק פשוט שקט יותר, ואינו נשבר.
  *
  * **אין כאן Math.random**: הבחירה נשענת על מונה לכל מצב שיושב בזיכרון הבמאי,
- * כדי שהבדיקות יהיו יציבות והבמאי יישאר פונקציה טהורה של (מצב, זיכרון).
+ * כדי שהבדיקות יהיו יציבות והבמאי יישאר פונקציה טהורה של (מצב, זיכרון). מצב
+ * שעוד לא נבחר בו דבר מתחיל מ-`start` — ה-host מגריל אותו פעם אחת לכל ריצה
+ * (`emptyNarrationMemory(seed)`), אחרת קריאה של «פעם אחת למשחק» (`amb_start_*`)
+ * הייתה תמיד הניסוח הראשון, והלובי היה פותח תמיד באותו סדר.
  */
 
 /** מונה סיבוב לכל מצב: מזהה המצב → האינדקס שממנו מתחילים בפעם הבאה. */
@@ -31,13 +34,14 @@ export function pickAmbience(
   variants: readonly string[],
   bank: Record<string, string>,
   rotation: AmbienceRotation,
+  start = 0,
 ): AmbiencePick {
   const count = variants.length;
   if (count === 0) return { key: null, rotation };
-  const stored = rotation[situation] ?? 0;
-  const start = ((stored % count) + count) % count;
+  const stored = rotation[situation] ?? start;
+  const first = ((stored % count) + count) % count;
   for (let step = 0; step < count; step += 1) {
-    const index = (start + step) % count;
+    const index = (first + step) % count;
     const key = variants[index]!;
     const url = bank[key];
     if (url !== undefined && url !== '') {
@@ -63,8 +67,8 @@ export const AMB_LOBBY = [
   'amb_lobby_7',
   'amb_lobby_nearly',
 ] as const;
-/** הלובי במשחק טלפונים: בלי «השלטים ביד?» (amb_lobby_4). */
-export const AMB_LOBBY_PHONES = AMB_LOBBY.filter((key) => key !== 'amb_lobby_4');
+/** הלובי כשאין שלטים בין מקורות ההצבעה: בלי «השלטים ביד?» (amb_lobby_4). */
+export const AMB_LOBBY_NO_CLICKERS = AMB_LOBBY.filter((key) => key !== 'amb_lobby_4');
 export const AMB_START = [
   'amb_start_1',
   'amb_start_2',
@@ -74,6 +78,8 @@ export const AMB_START = [
 ] as const;
 export const AMB_NEXT = ['amb_next_1', 'amb_next_2', 'amb_next_3'] as const;
 export const AMB_VOTING = ['amb_voting_1', 'amb_voting_2', 'amb_voting_3'] as const;
+/** בסקר אין «מי שבטוח» — אין במה להיות בטוח (amb_voting_3). */
+export const AMB_VOTING_POLL = AMB_VOTING.filter((key) => key !== 'amb_voting_3');
 export const AMB_ALL_CORRECT = ['amb_all_correct_1', 'amb_all_correct_2'] as const;
 export const AMB_NONE_CORRECT = ['amb_none_correct_1', 'amb_none_correct_2'] as const;
 export const AMB_RAFFLE = ['amb_raffle_1', 'amb_raffle_2'] as const;
@@ -95,6 +101,19 @@ export const LOBBY_INTERVAL_MS = 45_000;
 
 /** כל קריאה שלישית בלובי היא מספר המחוברים ולא ניסוח כללי. */
 export const LOBBY_COUNT_EVERY = 3;
+
+/**
+ * כל קריאה רביעית בלובי (שאינה מספר המחוברים) חוזרת על הוראות ההצבעה — בשביל
+ * מי שהגיע אחרי «ברוכים הבאים». בלובי של עשר דקות זה בערך פעמיים-שלוש.
+ */
+export const LOBBY_HOWTO_EVERY = 4;
+
+/**
+ * כמה זמן הלובי שותק אחרי «ברוכים הבאים» והוראות ההצבעה. כל משפט חדש קוטע את
+ * הקודם, וההוראות ארוכות: כשהאודיו נפתח רגע לפני תור הפטפוט, הקריאה הבאה
+ * הייתה חותכת אותן באמצע, והן אינן נאמרות שוב.
+ */
+export const LOBBY_AFTER_WELCOME_MS = 20_000;
 
 /**
  * "מהר!" — כמה שניות לפני סגירת ההצבעה. **שתיים**, כלשון החוזה

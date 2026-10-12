@@ -68,6 +68,14 @@ describe('pickAmbience', () => {
     expect(pickAmbience('sit', THREE, bankOf(THREE), { sit: -1 }).key).toBe('c');
   });
 
+  it('★ מצב חדש מתחיל מנקודת ההתחלה של הריצה, ומשם ממשיך בסיבוב', () => {
+    const first = pickAmbience('sit', THREE, bankOf(THREE), {}, 4);
+    expect(first.key).toBe('b');
+    expect(pickAmbience('sit', THREE, bankOf(THREE), first.rotation, 4).key).toBe('c');
+    // מצב שכבר נבחר בו ניסוח אינו מושפע מנקודת ההתחלה.
+    expect(pickAmbience('sit', THREE, bankOf(THREE), { sit: 0 }, 4).key).toBe('a');
+  });
+
   it('לכל מצב מונה משלו — מצבים אינם מזיזים זה את זה', () => {
     let rotation: AmbienceRotation = {};
     const first = pickAmbience('one', THREE, bankOf(THREE), rotation);

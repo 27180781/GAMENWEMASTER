@@ -21,7 +21,7 @@ import {
   AMB_CLOSE_RACE,
   AMB_CONGRATS,
   AMB_LOBBY,
-  AMB_LOBBY_PHONES,
+  AMB_LOBBY_NO_CLICKERS,
   AMB_MOST_CORRECT,
   AMB_NEXT,
   AMB_NONE_CORRECT,
@@ -29,8 +29,11 @@ import {
   CLOSE_RACE_RATIO,
   AMB_START,
   AMB_VOTING,
+  AMB_VOTING_POLL,
   HURRY_SECONDS,
+  LOBBY_AFTER_WELCOME_MS,
   LOBBY_COUNT_EVERY,
+  LOBBY_HOWTO_EVERY,
   LOBBY_INTERVAL_MS,
   pickAmbience,
   type AmbienceRotation,
@@ -90,11 +93,12 @@ export interface DisplayedState {
   slideId: number;
   slideType: string;
   /**
-   * איך המשתתפים מצביעים, לפי `setting.limit.type`: `"phones"` = טלפונים, כל
-   * ערך אחר = שלטים (כמו בשאר המנוע). קובע את הוראות ההצבעה בפתיחה ואת
-   * קריאות הלובי שמדברות על שלטים.
+   * מקורות ההצבעה הפעילים כרגע (useClicker / useSocket ב-GameHost) — ולא
+   * `setting.limit.type`: חבילת אופליין תמיד `"clickers"`, והמפעיל יכול להצביע
+   * בה גם בטלפונים. `none` = אין מקור אמיתי (קהל מדומה / דמו). קובע את הוראות
+   * ההצבעה בפתיחה ואת קריאת הלובי שמדברת על שלטים.
    */
-  voteMode: 'clickers' | 'phones';
+  voteMode: 'clickers' | 'phones' | 'both' | 'none';
   votable: boolean;
   /** מספר סידורי של השקופית בין שקופיות השאלה (1-based); 0 = אינה שאלה. */
   questionOrdinal: number;
@@ -184,6 +188,16 @@ export interface NarrationMemory {
   rotation: AmbienceRotation;
   /** כמה קריאות אווירה כבר נאמרו במסך ההתחברות. */
   lobbyLines: number;
+  /**
+   * נקודת ההתחלה של הסיבוב במצב שעוד לא נבחר בו ניסוח (ראו pickAmbience) —
+   * קבועה לכל הריצה, וה-host מגריל אותה.
+   */
+  seed: number;
+  /**
+   * שעון הלובי (`lobbyElapsedMs`) ברגע שנאמרו «ברוכים הבאים» / הוראות ההצבעה;
+   * null = עוד לא נאמרו. הפטפוט ממתין אחריהם LOBBY_AFTER_WELCOME_MS.
+   */
+  welcomeAt: number | null;
   /** השלב החיצוני בצעד הקודם — לזיהוי המעבר מסך פתיחה → משחק. */
   lastStage: NarrationStage | null;
   /** המעבר למשחק זוהה ו"מתחילים!" עדיין לא נאמר (למשל בגלל מדיה חוסמת). */
@@ -210,7 +224,8 @@ export interface NarrationDecision {
   memory: NarrationMemory;
 }
 
-export function emptyNarrationMemory(): NarrationMemory {
+/** `seed` — ראו NarrationMemory.seed (0 = הסדר שבקטלוג, כמו בבדיקות). */
+export function emptyNarrationMemory(seed = 0): NarrationMemory {
   return {
     visit: '',
     spoken: new Set<string>(),
@@ -221,6 +236,8 @@ export function emptyNarrationMemory(): NarrationMemory {
     lastPaused: false,
     rotation: {},
     lobbyLines: 0,
+    seed,
+    welcomeAt: null,
     lastStage: null,
     startPending: false,
     startLockedVisit: null,
@@ -319,6 +336,7 @@ function resolve(
   bank: Record<string, string>,
   situation: string,
   rotation: AmbienceRotation,
+  seed: number,
 ): ResolvedParts {
   const urls: string[] = [];
   let next = rotation;
@@ -327,13 +345,13 @@ function resolve(
       const url = bank[part];
       if (url !== undefined && url !== '') urls.push(url);
     } else if ('variants' in part) {
-      const pick = pickAmbience(situation, part.variants, bank, next);
+      const pick = pickAmbience(situation, part.variants, bank, next, seed);
       next = pick.rotation;
       if (pick.key !== null) urls.push(bank[pick.key]!);
     } else if ('pre' in part) {
       const head = bank[part.pre];
       if (head !== undefined && head !== '') {
-        const inner = resolve(part.tail, bank, situation, next);
+        const inner = resolve(part.tail, bank, situation, next, seed);
         next = inner.rotation;
         // כול-או-כלום לשני הכיוונים: פתיח חסר מפיל את הזנב, וזנב ריק (קטע
         // מספר שלא נוצר) מפיל את הפתיח — אחרת נשמע "ההפרש הוא" ושקט.
@@ -344,6 +362,14 @@ function resolve(
     }
   }
   return { urls, rotation: next };
+}
+
+/** הוראות ההצבעה לפי מקורות ההצבעה; null כשאין מקור אמיתי (דמו). */
+function howtoKey(mode: DisplayedState['voteMode']): string | null {
+  if (mode === 'clickers') return 'flow_howto_clickers';
+  if (mode === 'phones') return 'flow_howto_phones';
+  if (mode === 'both') return 'flow_howto_both';
+  return null;
 }
 
 /** הכרזת התשובה הנכונה (הטבלה ב-2.1, שורת "התשובה הנכונה נחשפה"). */
@@ -478,24 +504,26 @@ function candidates(s: DisplayedState, memory: NarrationMemory): NarrationEvent[
     if (s.overlay !== 'none') return events;
     events.push({ key: 'welcome', parts: ['flow_welcome'], global: true });
     // הוראות ההצבעה — פעם אחת למשחק, מיד אחרי "ברוכים הבאים" ובאותו צעד.
-    events.push({
-      key: 'howto',
-      parts: [s.voteMode === 'phones' ? 'flow_howto_phones' : 'flow_howto_clickers'],
-      global: true,
-    });
+    const howto = howtoKey(s.voteMode);
+    if (howto !== null) events.push({ key: 'howto', parts: [howto], global: true });
     // פטפוט הלובי: כל ~45 שניות, ובכל פעם שלישית מספר המחוברים במקום ניסוח
-    // כללי. לא מתנגן מעל מדיה חוסמת, ונפסק ברגע שהמשחק מתחיל (השלב כבר אינו
-    // 'opening').
+    // כללי; כל רביעית חוזרת על הוראות ההצבעה למי שהגיע מאוחר. לא מתנגן מעל
+    // מדיה חוסמת, ונפסק ברגע שהמשחק מתחיל (השלב כבר אינו 'opening').
     if (s.activeMedia === null) {
       const nth = memory.lobbyLines + 1;
       if (s.lobbyElapsedMs >= nth * LOBBY_INTERVAL_MS) {
         const counted = nth % LOBBY_COUNT_EVERY === 0 && s.connectedCount > 0;
+        const repeatHowto =
+          !counted && nth % LOBBY_HOWTO_EVERY === 0 && howto !== null && (s.bank[howto] ?? '') !== '';
+        const clickers = s.voteMode === 'clickers' || s.voteMode === 'both';
         events.push({
           key: `lobby:${memory.lobbyLines}`,
           situation: 'lobby',
           parts: counted
             ? [{ pre: 'amb_connected_pre', tail: participantsClipKeys(s.connectedCount) }]
-            : [{ variants: s.voteMode === 'phones' ? AMB_LOBBY_PHONES : AMB_LOBBY }],
+            : repeatHowto
+              ? [howto]
+              : [{ variants: clickers ? AMB_LOBBY : AMB_LOBBY_NO_CLICKERS }],
         });
       }
     }
@@ -706,6 +734,8 @@ export function narrationStep(s: DisplayedState, memory: NarrationMemory): Narra
     lastPaused: paused,
     rotation: memory.rotation,
     lobbyLines: memory.lobbyLines,
+    seed: memory.seed,
+    welcomeAt: memory.welcomeAt,
     lastStage: s.stage,
     // המעבר ממסך הפתיחה למשחק — נזכר עד ש"מתחילים!" באמת נאמר (פעם אחת למשחק).
     startPending: startPendingOf(s, memory),
@@ -751,6 +781,13 @@ export function narrationStep(s: DisplayedState, memory: NarrationMemory): Narra
     for (const event of candidates(s, memory)) {
       const seen = event.global === true ? global : spoken;
       if (seen.has(event.key)) continue;
+      // הפטפוט ממתין שההוראות שנאמרו בצעד קודם יסתיימו: משפט חדש היה קוטע אותן
+      // (ראו LOBBY_AFTER_WELCOME_MS). הקריאה אינה נצרכת — היא נאמרת בדגימה
+      // הבאה. באותו צעד אין קטיעה: הקריאה פשוט מצטרפת אחריהן לאותה רשימה.
+      if (event.key.startsWith('lobby:') && memory.welcomeAt !== null) {
+        const since = s.lobbyElapsedMs - memory.welcomeAt;
+        if (since >= 0 && since < LOBBY_AFTER_WELCOME_MS) continue;
+      }
       // אודיו נעול: אירוע חד-פעמי למשחק נדחה בלי להירשם (ראו audioUnlocked).
       if (event.global === true && !s.audioUnlocked) {
         if (event.key === 'ambStart') next.startLockedVisit = visit;
@@ -777,9 +814,16 @@ export function narrationStep(s: DisplayedState, memory: NarrationMemory): Narra
         next.startLockedVisit = null;
       }
       if (event.key === 'leaders') next.topId = s.leaderIds[0] ?? next.topId;
-      const resolved = resolve(event.parts, s.bank, event.situation ?? event.key, next.rotation);
+      const resolved = resolve(
+        event.parts,
+        s.bank,
+        event.situation ?? event.key,
+        next.rotation,
+        next.seed,
+      );
       next.rotation = resolved.rotation;
       if (resolved.urls.length === 0) continue; // אין ולו קטע אחד — מדלגים בשקט
+      if (event.key === 'welcome' || event.key === 'howto') next.welcomeAt = s.lobbyElapsedMs;
       clips.push(...resolved.urls);
       events.push(event.key);
     }
@@ -837,7 +881,14 @@ export function narrationStep(s: DisplayedState, memory: NarrationMemory): Narra
       s.timer!.remaining > HURRY_SECONDS
     ) {
       next.ambVoting = true;
-      const pick = pickAmbience('ambVoting', AMB_VOTING, s.bank, next.rotation);
+      const poll = s.slideType === 'survey';
+      const pick = pickAmbience(
+        poll ? 'ambVotingPoll' : 'ambVoting',
+        poll ? AMB_VOTING_POLL : AMB_VOTING,
+        s.bank,
+        next.rotation,
+        next.seed,
+      );
       next.rotation = pick.rotation;
       if (pick.key !== null) {
         clips.push(s.bank[pick.key]!);
