@@ -5801,6 +5801,15 @@ body {
 .settings-host-link:hover {
   background: rgba(123, 140, 255, 0.12);
 }
+/* הדפדפן חסם את חלון מסך המנחה */
+.settings-host-blocked {
+  margin: 8px auto 0;
+  max-width: 520px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #ffd9a8;
+}
+.settings-host-blocked a { color: #ffd23f; font-weight: 700; }
 
 /* ---- מסך המנחה: טאבים + מדריך מסכים + עורך שקופיות ---- */
 .hc-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -5862,6 +5871,48 @@ body {
   justify-content: center;
   padding: 30px;
 }
+
+/* קובץ התוצאות במסך המנחה (דפדפן) */
+.hc-report { margin-top: 16px; }
+.hc-report .hc-btn { width: 100%; }
+.hc-report-note { margin: 6px 0 0; font-size: 14px; color: #aab2d6; line-height: 1.5; }
+
+/* פס «המסך הזה רק בשבילכם» בראש הקונסולה, עד שסוגרים אותו */
+.hc-setup-tip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  background: rgba(123, 140, 255, 0.12);
+  border: 1px solid rgba(123, 140, 255, 0.45);
+  border-radius: 12px;
+  padding: 10px 16px;
+  margin-bottom: 14px;
+  font-size: 16px;
+  font-weight: 700;
+}
+.hc-setup-tip-open {
+  background: #2a7d4f;
+  border: none;
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.hc-setup-tip-open:hover { background: #329159; }
+.hc-setup-tip-close {
+  margin-inline-start: auto;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #eef1ff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 15px;
+  cursor: pointer;
+}
+.hc-setup-tip-close:hover { background: rgba(255, 255, 255, 0.2); }
 
 /* באנר "מסך התחברות פתוח בתצוגה" בלשונית שמות/קבוצות של הקונסולה */
 .hc-connect-banner {
@@ -6649,6 +6700,7 @@ body {
 }
 .q-mode-pill--bet { background: #f5c518; color: #3a2c05; }
 .q-mode-pill--majority { background: rgba(255, 255, 255, 0.14); color: #fff; border: 1.5px solid rgba(255, 255, 255, 0.35); }
+.q-mode-pill--survey { background: #1fa5a0; color: #fff; }
 
 /* מונה הצבעות חי על כרטיס תשובה (setting.liveVoteCounts) */
 .q-live {

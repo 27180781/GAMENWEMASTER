@@ -60,7 +60,7 @@ import {
   readSavedPlayerName,
   savePlayerName,
 } from './votePad.ts';
-import { mirrorSoundActions } from './soundTrack.ts';
+import { mirrorApplause, mirrorSoundActions } from './soundTrack.ts';
 import { LiveSubscriber, type ViewerConnection, type ViewerUpdate } from './subscriber.ts';
 import { isViewToken, liveRelayBase } from './token.ts';
 import type { LiveSnapshot, LiveTimer } from './types.ts';
@@ -478,7 +478,7 @@ function ViewerChrome({
   const [fullscreen, setFullscreen] = useState(false);
   const hideTimer = useRef<number | null>(null);
   const audioRef = useRef<AudioManager | null>(null);
-  const seqRef = useRef({ sound: -1, cue: -1 });
+  const seqRef = useRef({ sound: -1, cue: -1, applause: -1 });
 
   const showControls = useCallback(() => {
     setControlsShown(true);
@@ -519,20 +519,25 @@ function ViewerChrome({
     // נוצר בתוך הלחיצה — כך הדפדפן מתיר לו לנגן.
     audioRef.current ??= new AudioManager();
     // הסאונד הנוכחי (מוזיקת רקע בלולאה) מתחיל מיד; אפקטים שעברו — לא.
-    seqRef.current = { sound: -1, cue: seqRef.current.cue };
+    seqRef.current = { ...seqRef.current, sound: -1 };
     setSoundOn(true);
   };
 
   // שיקוף הסאונד של המסך הראשי.
   const sound = soundSource?.sound;
   const cues = soundSource?.cues;
+  const applause = soundSource?.applause;
   useEffect(() => {
     if (sound === undefined || cues === undefined) return;
     const lastCue = cues.reduce((max, cue) => Math.max(max, cue.seq), -1);
     const audio = audioRef.current;
     if (!soundOn || audio === null) {
       // כבוי: רק זוכרים עד איפה הגענו, כדי שהפעלה לא תנגן אפקטים ישנים.
-      seqRef.current = { sound: seqRef.current.sound, cue: Math.max(seqRef.current.cue, lastCue) };
+      seqRef.current = {
+        sound: seqRef.current.sound,
+        cue: Math.max(seqRef.current.cue, lastCue),
+        applause: Math.max(seqRef.current.applause, applause?.seq ?? -1),
+      };
       return;
     }
     const result = mirrorSoundActions(
@@ -543,20 +548,22 @@ function ViewerChrome({
       Date.now(),
       toLocal,
     );
-    seqRef.current = { sound: result.lastSeq, cue: result.lastCueSeq };
+    const clap = mirrorApplause(applause, seqRef.current.applause, Date.now(), toLocal);
+    seqRef.current = { sound: result.lastSeq, cue: result.lastCueSeq, applause: clap.lastSeq };
     for (const action of result.actions) {
       if (action.type === 'play')
         audio.play(channelOf(action.channel), action.src, { loop: action.loop });
       else if (action.type === 'applause') {
-        // הצופה רק משקף: אם המסך הראשי ממשיך אחרי המחיאות את מה שהשהה, ההמשך
-        // מגיע אליו כצליל נפרד. בלי העצירה כאן הוא היה ממשיך גם מול מסך ראשי
-        // ישן, שאינו ממשיך כלום.
+        // מסך ראשי מלפני 2026-10: המחיאות שם החליפו את הצליל, ומה שהוא ממשיך
+        // אחריהן מגיע לכאן כצליל נפרד.
         audio.stopAll();
         audio.playApplause();
       } else if (action.type === 'cue') audio.playCue(action.kind);
       else audio.stopAll();
     }
-  }, [sound, cues, soundOn, toLocal]);
+    // אחרי הצליל, כדי שצליל חדש באותה תמונה לא יעצור אותן.
+    if (clap.play !== null) audio.playApplause(clap.play.src || null);
+  }, [sound, cues, applause, soundOn, toLocal]);
 
   const canFullscreen = typeof document !== 'undefined' && document.fullscreenEnabled === true;
   const toggleFullscreen = () => {

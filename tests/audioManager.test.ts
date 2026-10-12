@@ -4,7 +4,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AudioManager } from '../src/app/AudioManager.ts';
+import { APPLAUSE_DUCK, AudioManager } from '../src/app/AudioManager.ts';
 
 class FakeAudio {
   static instances: FakeAudio[] = [];
@@ -200,31 +200,34 @@ class FakeAudioContext {
   }
 }
 
-describe('AudioManager — מחיאות כפיים משהות ולא עוצרות', () => {
-  it('מחיאות מקובץ בזמן הטיימר: הטיימר מושהה, וממשיך מאותה נקודה כשהן נגמרות', () => {
+describe('AudioManager — מחיאות כפיים מעל הצליל', () => {
+  it('מחיאות מקובץ בזמן הטיימר: הטיימר ממשיך מונמך, וחוזר לווליום המלא כשהן נגמרות', () => {
     const manager = setup();
     manager.play('timer', 't.mp3', { loop: true });
     const t = FakeAudio.instances[0]!;
     manager.playApplause('clap.mp3');
     const clap = FakeAudio.instances[1]!;
-    expect(t.paused).toBe(true);
-    expect(t.src).toBe('t.mp3'); // הושהה, לא נעצר — הרכיב נשאר עם הקובץ
+    expect(t.playing).toBe(true); // לא נעצר ולא הושהה
+    expect(t.volume).toBe(APPLAUSE_DUCK);
     expect(clap.src).toBe('clap.mp3');
     expect(clap.playing).toBe(true);
+    expect(clap.volume).toBe(1);
     clap.fire('ended');
-    expect(t.playing).toBe(true); // אותו רכיב ממשיך, לא ניגון חדש מההתחלה
+    expect(t.playing).toBe(true);
+    expect(t.volume).toBe(1);
     expect(FakeAudio.instances).toHaveLength(2);
   });
 
-  it('גם כשקובץ המחיאות נכשל בטעינה — מה שהושהה ממשיך', () => {
+  it('גם כשקובץ המחיאות נכשל בטעינה — הצליל חוזר לווליום המלא', () => {
     const manager = setup();
     manager.play('playersConnecting', 'lobby.mp3', { loop: true });
     manager.playApplause('broken.mp3');
     FakeAudio.instances[1]!.fire('error');
     expect(FakeAudio.instances[0]!.playing).toBe(true);
+    expect(FakeAudio.instances[0]!.volume).toBe(1);
   });
 
-  it('ניגון אחר בזמן המחיאות מבטל את ההמשך: המשחק כבר עבר הלאה', () => {
+  it('ניגון חדש בזמן המחיאות עוצר את שניהם, והצליל החדש בווליום מלא', () => {
     const manager = setup();
     manager.play('timer', 't.mp3', { loop: true });
     manager.playApplause('clap.mp3');
@@ -232,130 +235,114 @@ describe('AudioManager — מחיאות כפיים משהות ולא עוצרו�
     manager.play('inShowAns', 'reveal.mp3');
     const reveal = FakeAudio.instances[2]!;
     expect(clap.playing).toBe(false);
-    clap.fire('ended');
     expect(FakeAudio.instances[0]!.playing).toBe(false);
-    expect(FakeAudio.instances[0]!.src).toBe('');
     expect(reveal.playing).toBe(true);
+    expect(reveal.volume).toBe(1);
+    clap.fire('ended'); // מחיאות שנקטעו לא נוגעות בווליום של הצליל החדש
+    expect(reveal.volume).toBe(1);
   });
 
-  it('עצירה של הערוץ שהושהה (סוף ההצבעה) מבטלת את ההמשך', () => {
+  it('עצירת ערוץ (סוף ההצבעה) עוצרת רק אותו: המחיאות ממשיכות עד הסוף', () => {
     const manager = setup();
     manager.play('timer', 't.mp3', { loop: true });
     manager.playApplause('clap.mp3');
     manager.stop('timer');
-    FakeAudio.instances[1]!.fire('ended');
-    expect(FakeAudio.instances[0]!.playing).toBe(false);
-  });
-
-  it('עצירה של ערוץ אחר לא נוגעת בהמשך', () => {
-    const manager = setup();
-    manager.play('timer', 't.mp3', { loop: true });
-    manager.playApplause('clap.mp3');
-    manager.stop('winnersList');
-    FakeAudio.instances[1]!.fire('ended');
-    expect(FakeAudio.instances[0]!.playing).toBe(true);
-  });
-
-  it('stopAll בזמן המחיאות עוצר הכול, כולל ההמשך', () => {
-    const manager = setup();
-    manager.play('timer', 't.mp3', { loop: true });
-    manager.playApplause('clap.mp3');
-    manager.stopAll();
     const clap = FakeAudio.instances[1]!;
-    expect(clap.playing).toBe(false);
+    expect(FakeAudio.instances[0]!.playing).toBe(false);
+    expect(clap.playing).toBe(true);
     clap.fire('ended');
     expect(FakeAudio.instances[0]!.playing).toBe(false);
   });
 
-  it('מחיאות בזמן מחיאות: רק הסיום של האחרונות ממשיך את מה שהיה לפניהן', () => {
+  it('stopAll בזמן המחיאות עוצר הכול', () => {
     const manager = setup();
     manager.play('timer', 't.mp3', { loop: true });
+    manager.playApplause('clap.mp3');
+    manager.stopAll();
+    expect(FakeAudio.instances.every((a) => !a.playing)).toBe(true);
+  });
+
+  it('מחיאות בזמן מחיאות מתחילות מחדש, והצליל חוזר לווליום רק בסוף האחרונות', () => {
+    const manager = setup();
+    manager.play('timer', 't.mp3', { loop: true });
+    const t = FakeAudio.instances[0]!;
     manager.playApplause('clap.mp3');
     const first = FakeAudio.instances[1]!;
     manager.playApplause('clap.mp3');
     const second = FakeAudio.instances[2]!;
     expect(first.playing).toBe(false);
-    first.fire('ended'); // הראשונות נקטעו — הסיום שלהן לא ממשיך כלום
-    expect(FakeAudio.instances[0]!.playing).toBe(false);
+    expect(second.playing).toBe(true);
+    expect(t.volume).toBe(APPLAUSE_DUCK);
+    first.fire('ended'); // הראשונות נקטעו — הסיום שלהן לא מחזיר את הווליום
+    expect(t.volume).toBe(APPLAUSE_DUCK);
     second.fire('ended');
-    expect(FakeAudio.instances[0]!.playing).toBe(true);
+    expect(t.volume).toBe(1);
+    expect(t.playing).toBe(true);
   });
 
-  it('מחיאות כשלא מתנגן כלום — אין מה להמשיך', () => {
-    const manager = setup();
-    const events: string[] = [];
-    manager.setObserver((e) => events.push(e.type));
-    manager.playApplause('clap.mp3');
-    FakeAudio.instances[0]!.fire('ended');
-    expect(FakeAudio.instances).toHaveLength(1);
-    expect(events).toEqual(['play']);
-  });
-
-  it('צליל חד-פעמי שכבר נגמר לא חוזר אחרי המחיאות', () => {
-    const manager = setup();
-    manager.play('showQuestion', 'q.mp3');
-    const q = FakeAudio.instances[0]!;
-    q.fire('ended'); // נגמר מעצמו
-    manager.playApplause('clap.mp3');
-    FakeAudio.instances[1]!.fire('ended');
-    expect(q.playing).toBe(false);
-  });
-
-  it('מסך הצפייה שומע את ההמשך: המחיאות כמו קודם, ואחריהן הצליל שהושהה', () => {
+  it('מסך הצפייה מקבל את המחיאות כאירוע משלהן, בלי לגעת בצליל', () => {
     const manager = setup();
     manager.play('timer', 't.mp3', { loop: true });
     const events: unknown[] = [];
     manager.setObserver((e) => events.push(e));
     manager.playApplause('clap.mp3');
     FakeAudio.instances[1]!.fire('ended');
-    expect(events).toEqual([
-      { type: 'play', channel: 'generic', src: 'clap.mp3', loop: false },
-      { type: 'play', channel: 'timer', src: 't.mp3', loop: true },
-    ]);
+    expect(events).toEqual([{ type: 'applause', src: 'clap.mp3' }]);
   });
 
-  it('מחיאות מסונתזות (בלי קובץ): הטיימר מושהה עד שהן נגמרות', () => {
+  it('מחיאות מסונתזות (בלי קובץ): הטיימר ממשיך מונמך עד שהן נגמרות', () => {
     const manager = setup();
     FakeAudioContext.sources = [];
     vi.stubGlobal('AudioContext', FakeAudioContext as unknown as typeof AudioContext);
-    const events: string[] = [];
+    const events: unknown[] = [];
     manager.play('timer', 't.mp3', { loop: true });
-    manager.setObserver((e) => events.push(e.type));
+    manager.setObserver((e) => events.push(e));
     manager.playApplause(null);
     const t = FakeAudio.instances[0]!;
     const source = FakeAudioContext.sources[0]!;
     expect(source.started).toBe(true);
-    expect(t.paused).toBe(true);
-    source.onended?.();
     expect(t.playing).toBe(true);
-    expect(events).toEqual(['applause', 'play']);
+    expect(t.volume).toBe(APPLAUSE_DUCK);
+    source.onended?.();
+    expect(t.volume).toBe(1);
+    expect(events).toEqual([{ type: 'applause', src: null }]);
   });
 
-  it('בסביבה בלי אודיו (אין AudioContext) מה שהושהה ממשיך מיד', () => {
+  it('בסביבה בלי אודיו (אין AudioContext) הצליל לא מונמך', () => {
     const manager = setup();
     manager.play('timer', 't.mp3', { loop: true });
     manager.playApplause('  ');
     expect(FakeAudio.instances[0]!.playing).toBe(true);
+    expect(FakeAudio.instances[0]!.volume).toBe(1);
   });
 
-  it('ווליום שמשתנה בזמן המחיאות חל גם עליהן וגם על מה שימשיך', () => {
+  it('ווליום שמשתנה בזמן המחיאות: הן בווליום החדש, והצליל מונמך ממנו', () => {
     const manager = setup();
     manager.play('timer', 't.mp3', { loop: true });
     manager.playApplause('clap.mp3');
-    manager.setVolume(0.3);
-    expect(FakeAudio.instances[1]!.volume).toBe(0.3);
+    manager.setVolume(0.5);
+    expect(FakeAudio.instances[1]!.volume).toBe(0.5);
+    expect(FakeAudio.instances[0]!.volume).toBe(0.5 * APPLAUSE_DUCK);
     FakeAudio.instances[1]!.fire('ended');
-    expect(FakeAudio.instances[0]!.volume).toBe(0.3);
+    expect(FakeAudio.instances[0]!.volume).toBe(0.5);
   });
 
-  it('אודיו נעול (אין אינטראקציה): המחיאות ממתינות כמו כל צליל, בלי המשך', () => {
+  it('אודיו נעול (אין אינטראקציה): המחיאות מדלגות, ומה שממתין נשאר', async () => {
     FakeAudio.instances = [];
-    vi.stubGlobal('window', { addEventListener: () => {}, removeEventListener: () => {} });
+    winListeners = {};
+    vi.stubGlobal('window', {
+      addEventListener: (type: string, cb: () => void) => (winListeners[type] = cb),
+      removeEventListener: (type: string) => delete winListeners[type],
+    });
     vi.stubGlobal('Audio', FakeAudio as unknown as typeof Audio);
     vi.stubGlobal('navigator', { userActivation: { hasBeenActive: false } });
     const manager = new AudioManager();
     manager.play('playersConnecting', 'lobby.mp3', { loop: true });
     manager.playApplause('clap.mp3');
     expect(FakeAudio.instances).toHaveLength(0);
+    winListeners.keydown?.();
+    await flush();
+    expect(FakeAudio.instances.map((a) => a.src)).toEqual(['lobby.mp3']);
+    expect(FakeAudio.instances[0]!.playing).toBe(true);
   });
 });

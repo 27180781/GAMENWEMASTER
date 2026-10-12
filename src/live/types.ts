@@ -35,6 +35,10 @@ export interface LiveTimer {
   at: number;
 }
 
+/**
+ * 'applause' — רק ממסך ראשי מלפני 2026-10, שבו מחיאות הכפיים החליפו את הצליל.
+ * היום הן ב-`LiveSnapshot.applause`, לצד הצליל.
+ */
 export type LiveSoundKind = 'none' | 'play' | 'applause';
 
 /** הסאונד האחרון שהמסך הראשי ניגן (הסאונדים במנוע בלעדיים — אחד בכל רגע). */
@@ -53,6 +57,14 @@ export type LiveCueKind = 'climb' | 'fall' | 'fanfare';
 export interface LiveCue {
   seq: number;
   kind: LiveCueKind;
+  at: number;
+}
+
+/** מחיאות הכפיים האחרונות במסך הראשי — מתנגנות מעל הצליל ולא במקומו. */
+export interface LiveApplause {
+  seq: number;
+  /** הקובץ שהוגדר (genericMediaSound), או '' למחיאות המסונתזות. */
+  src: string;
   at: number;
 }
 
@@ -133,6 +145,11 @@ export interface LiveSnapshot {
   colors: Record<string, string>;
   sound: LiveSound;
   cues: LiveCue[];
+  /**
+   * מחיאות הכפיים האחרונות (null — עוד לא היו). חסר אצל מסך ראשי בגרסה
+   * שקדמה לו, שבה הן הגיעו ב-`sound`, ולכן אופציונלי.
+   */
+  applause?: LiveApplause | null;
   /**
    * וידאו המנחה (תוספת בתשלום, ראו video/): null — אין שידור. חסר אצל מסך
    * ראשי בגרסה שקדמה לו, ולכן אופציונלי.

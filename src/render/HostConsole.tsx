@@ -13,8 +13,9 @@ import {
   type ControlChannel,
   type HostStateSnapshot,
 } from '../app/controlChannel.ts';
-import { canExtendDisplay, extendDisplay } from '../app/clickerBridge.ts';
+import { canExtendDisplay, canOpenHostWindow, extendDisplay } from '../app/clickerBridge.ts';
 import { EMPTY_ROSTER, loadRoster, saveRoster, type RosterData } from '../app/roster.ts';
+import { downloadBlob } from '../app/xlsx.ts';
 import { RosterPanel } from './RosterPanel.tsx';
 import { SlideEditor } from './SlideEditor.tsx';
 
@@ -28,8 +29,15 @@ const PHASE_LABEL: Record<string, string> = {
   showing: 'הצגה', voting: 'הצבעה', results: 'חשיפת תשובה', ended: 'הסתיים',
 };
 
-/** מדריך הקמת שני מסכים: מעבר לתצוגה מורחבת + גרירת חלון המשחק למקרן. */
+/**
+ * מדריך הקמת שני מסכים: מעבר לתצוגה מורחבת + העברת חלון המשחק למקרן.
+ * ב-EXE חלון המשחק נפתח במסך מלא ומסך המנחה הוא חלון של התוכנה. בדפדפן המשחק
+ * נפתח בחלון רגיל ומסך המנחה בחלון קופץ (או בטאב, כשהדפדפן חסם חלונות). עד
+ * 2026-10 גם הדפדפן קיבל את ההוראות של ה-EXE, ומנחה שעבד בדפדפן לא מצא בהן איך
+ * לנהל את המשחק בלי שהקהל יראה (משוב לקוח, 2026-10-11).
+ */
 function SetupGuide({ onClose }: { onClose?: () => void }) {
+  const desktop = canOpenHostWindow();
   return (
     <div className="hc-guide">
       <h2 className="hc-guide-title">🖥 הקמת שני מסכים (מחשב + מקרן)</h2>
@@ -37,7 +45,8 @@ function SetupGuide({ onClose }: { onClose?: () => void }) {
         <li>
           חברו את המקרן/מסך שני, ועברו ל<b>תצוגה מורחבת</b>: הקישו{' '}
           <span className="hc-key">⊞ Win</span> + <span className="hc-key">P</span> ואז בחרו{' '}
-          <b>"הרחב"</b> (Extend).
+          <b>"הרחב"</b> (Extend). במצב <b>"שכפל"</b> (Duplicate) המקרן מראה בדיוק את מה
+          שעל מסך המחשב, כולל המסך הזה.
           {canExtendDisplay() && (
             <div>
               <button className="hc-guide-btn" onClick={() => extendDisplay()}>
@@ -46,15 +55,32 @@ function SetupGuide({ onClose }: { onClose?: () => void }) {
             </div>
           )}
         </li>
-        <li>
-          <b>חלון המשחק</b> (המסך הגדול) נפתח במסך מלא, ובמסך מלא אי אפשר לגרור אותו.
-          צאו ממנו בכפתור 🗗 שבפינה או ב-<span className="hc-key">F11</span>, גררו אותו אל
-          צג המקרן, ושם הקישו <span className="hc-key">F11</span> שוב למסך מלא.
-        </li>
+        {desktop ? (
+          <li>
+            <b>חלון המשחק</b> (המסך הגדול) נפתח במסך מלא, ובמסך מלא אי אפשר לגרור אותו.
+            צאו ממנו בכפתור 🗗 שבפינה או ב-<span className="hc-key">F11</span>, גררו אותו אל
+            צג המקרן, ושם הקישו <span className="hc-key">F11</span> שוב למסך מלא.
+          </li>
+        ) : (
+          <li>
+            העבירו את <b>חלון המשחק</b> (החלון שבו המשחק פתוח) אל המקרן. אם הוא במסך מלא, צאו
+            קודם ב-<span className="hc-key">F11</span>. לחצו עליו והקישו{' '}
+            <span className="hc-key">⊞ Win</span> + <span className="hc-key">Shift</span> +{' '}
+            <span className="hc-key">→</span> (או <span className="hc-key">←</span>), או גררו
+            אותו בפס העליון אל צג המקרן, ושם הקישו <span className="hc-key">F11</span> למסך מלא
+            (או ⛶ שבפינת המשחק).
+          </li>
+        )}
         <li>
           השאירו את <b>חלון המנחה הזה</b> על מסך המחשב — כאן שולטים במשחק בלי
           שהקהל רואה.
         </li>
+        {!desktop && (
+          <li>
+            מסך המנחה נפתח כטאב בתוך חלון המשחק, ולא כחלון משלו? גררו את הטאב מסרגל
+            הטאבים אל מחוץ לחלון, והוא יהפוך לחלון נפרד שאפשר להשאיר על מסך המחשב.
+          </li>
+        )}
       </ol>
       {onClose && (
         <button className="hc-guide-close" onClick={onClose}>
@@ -65,11 +91,45 @@ function SetupGuide({ onClose }: { onClose?: () => void }) {
   );
 }
 
+/** בלי תשובה מהמסך הראשי בתוך הזמן הזה (נסגר, או גרסה ישנה) — מוותרים ומסבירים. */
+const REPORT_TIMEOUT_MS = 15000;
+
+/** הפס «המסך הזה רק בשבילכם» נסגר פעם אחת לכל מחשב. */
+const SETUP_TIP_KEY = 'trivia.hostConsole.setupTipDismissed';
+
+function setupTipDismissed(): boolean {
+  try {
+    return localStorage.getItem(SETUP_TIP_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 export function HostConsole() {
   const [snap, setSnap] = useState<HostStateSnapshot | null>(null);
   const [editGame, setEditGame] = useState<GameFile | null>(null);
   const [view, setView] = useState<'control' | 'roster' | 'edit'>('control');
   const [showGuide, setShowGuide] = useState(false);
+  /**
+   * פס קטן מעל הקונסולה עד שסוגרים אותו: המדריך מוצג מעצמו רק בהמתנה לחיבור,
+   * וכשהמשחק כבר פתוח הקונסולה מתחברת מיד, כך שהמנחה לא ראה אותו.
+   */
+  const [setupTip, setSetupTip] = useState(() => !setupTipDismissed());
+  const dismissSetupTip = () => {
+    setSetupTip(false);
+    try {
+      localStorage.setItem(SETUP_TIP_KEY, '1');
+    } catch {
+      // בלי אחסון (מצב פרטי) הפס פשוט יחזור בפעם הבאה.
+    }
+  };
+  /**
+   * קובץ התוצאות בדפדפן: המסך הראשי בונה אותו ושולח לכאן, וההורדה קורית בחלון
+   * הזה, על מסך המחשב. ב-EXE הוא נשמר מעצמו לתיקיית התוצאות, ולכן אין כפתור.
+   */
+  const [report, setReport] = useState<'idle' | 'busy' | 'done' | 'noAnswer'>('idle');
+  const reportIdRef = useRef<string | null>(null);
+  const reportTimerRef = useRef<number | null>(null);
   /** מסך התחברות לקבוצות פתוח בתצוגה (נפתח מכאן) — לחיווי + כפתור סגירה. */
   const [connectOpen, setConnectOpen] = useState(false);
   /** אין קשר עם המסך הראשי (אין פעימת-לב) — המצב המוצג עלול להיות ישן. */
@@ -83,6 +143,19 @@ export function HostConsole() {
     const ch = openControlChannel((msg) => {
       if (msg.t === 'game') {
         setEditGame(msg.game);
+        return;
+      }
+      if (msg.t === 'reportFile') {
+        if (msg.id !== reportIdRef.current) return; // בקשה של מסך מנחה אחר
+        reportIdRef.current = null;
+        if (reportTimerRef.current !== null) window.clearTimeout(reportTimerRef.current);
+        downloadBlob(
+          new Blob([msg.bytes], {
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          }),
+          msg.name,
+        );
+        setReport('done');
         return;
       }
       if (msg.t !== 'state') return;
@@ -108,6 +181,7 @@ export function HostConsole() {
     }, 2000);
     return () => {
       window.clearInterval(watch);
+      if (reportTimerRef.current !== null) window.clearTimeout(reportTimerRef.current);
       ch.close();
       chRef.current = null;
     };
@@ -133,6 +207,19 @@ export function HostConsole() {
     post({ t: 'score', target: 'player', id: voterId, delta });
   const adjustGroup = (groupId: string, delta: number) =>
     post({ t: 'score', target: 'group', id: groupId, delta });
+
+  const requestReport = () => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    reportIdRef.current = id;
+    setReport('busy');
+    if (reportTimerRef.current !== null) window.clearTimeout(reportTimerRef.current);
+    reportTimerRef.current = window.setTimeout(() => {
+      if (reportIdRef.current !== id) return;
+      reportIdRef.current = null;
+      setReport('noAnswer');
+    }, REPORT_TIMEOUT_MS);
+    post({ t: 'report', id });
+  };
 
   const applyGameEdit = (g: GameFile) => {
     setEditGame(g);
@@ -163,6 +250,17 @@ export function HostConsole() {
         <div className="hc-stale-bar" role="alert">
           ⚠️ אין קשר עם המסך הראשי — ייתכן שהמשחק נסגר או נטען מחדש. הנתונים
           שמוצגים כאן אינם מעודכנים, ופקודות לא יגיעו.
+        </div>
+      )}
+      {setupTip && (
+        <div className="hc-setup-tip">
+          <span>🖥 המסך הזה רק בשבילכם. גם הקהל רואה אותו במקרן?</span>
+          <button className="hc-setup-tip-open" onClick={() => setShowGuide(true)}>
+            כך מסדרים
+          </button>
+          <button className="hc-setup-tip-close" title="לא להציג שוב" onClick={dismissSetupTip}>
+            ✕
+          </button>
         </div>
       )}
       <header className="hc-head">
@@ -322,6 +420,20 @@ export function HostConsole() {
                   </li>
                 ))}
               </ol>
+              {!canOpenHostWindow() && (
+                <div className="hc-report">
+                  <button className="hc-btn" disabled={report === 'busy'} onClick={requestReport}>
+                    {report === 'busy' ? '⏳ מכין את הקובץ…' : '📊 הורדת קובץ התוצאות (אקסל)'}
+                  </button>
+                  <p className="hc-report-note" role={report === 'noAnswer' ? 'alert' : undefined}>
+                    {report === 'done'
+                      ? '✓ הקובץ ירד בחלון הזה.'
+                      : report === 'noAnswer'
+                        ? 'המסך הראשי לא ענה. רעננו את חלון המשחק ונסו שוב.'
+                        : 'הקובץ יורד בחלון הזה, על מסך המחשב, ולא במקרן.'}
+                  </p>
+                </div>
+              )}
             </div>
           </section>
         </div>

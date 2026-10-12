@@ -947,12 +947,20 @@ export function GameHost({
   }, [backupCfg, diskBackup, stage, game.id, engine, nameOf]);
 
   // סוף משחק → קובץ אקסל סיכום (משתתפים/שאלות/קבוצות). פעם אחת בלבד, ורק במסך
-  // המנצחים האמיתי (לא תצוגה מקדימה של W). אונליין: הורדה בדפדפן. אופליין (EXE):
-  // שמירה לדיסק בתיקיית התוצאות. הנתונים = מצב הסיום, שהוא גם הגיבוי האחרון.
+  // המנצחים האמיתי (לא תצוגה מקדימה של W). אופליין (EXE): שמירה לדיסק בתיקיית
+  // התוצאות. אונליין: הורדה בדפדפן רק כשהתוצאות לא נשמרות בשרת (דמו). משחק
+  // שנשמר בשרת (backupCfg) כבר לא מוריד מעצמו: ההורדה קפצה בחלון המשחק, כלומר
+  // מול הקהל במקרן, והקובץ נושא את מספרי הטלפון של המשתתפים (משוב לקוח,
+  // 2026-10-11). התוצאות נמצאות בבונה («האירועים שלי»), ובמשחק מורידים אותן
+  // ביד: ממסך המנחה, שנשאר על מסך המחשב, או מתפריט המפעיל.
+  // הנתונים = מצב הסיום, שהוא גם הגיבוי האחרון.
   const canReportToDisk = offline && canSaveReport();
+  /** אונליין: «הורדת קובץ התוצאות» בתפריט המפעיל (אופליין בדפדפן — אין לאן). */
+  const canDownloadReport = !offline;
   useEffect(() => {
     if (stage !== 'winners' || winnersPreviewRef.current !== null) return;
     if (!canReportToDisk && offline) return; // אופליין בדפדפן (לא EXE) — אין לאן
+    if (!canReportToDisk && backupCfg !== null) return; // נשמר בשרת — בלי הורדה מול הקהל
     if (reportDownloadedRef.current) return;
     reportDownloadedRef.current = true;
     const g = engine.getGame();
@@ -968,7 +976,14 @@ export function GameHost({
         debugLog('game', `יצירת קובץ סיכום נכשלה (${String(err)})`),
       );
     }
-  }, [canReportToDisk, offline, stage, engine, nameOf]);
+  }, [canReportToDisk, offline, backupCfg, stage, engine, nameOf]);
+
+  /** הורדת קובץ התוצאות כמו שהוא עכשיו — מתפריט המפעיל (אונליין). */
+  const downloadReportNow = useCallback(() => {
+    void downloadGameReport(engine.getGame(), engine.getState(), rosterRef.current, nameOf).catch(
+      (err) => debugLog('game', `יצירת קובץ סיכום נכשלה (${String(err)})`),
+    );
+  }, [engine, nameOf]);
 
   /**
    * שמירת קובץ התוצאות *עכשיו* — דורסת את הקובץ הקודם של אותו משחק. משמשת גם
@@ -1719,8 +1734,8 @@ export function GameHost({
           break;
         case 3:
           // מחיאות כפיים: הקובץ שהוגדר ב-genericMediaSound שבגייסון, ובלעדיו
-          // מחיאות מסונתזות (WebAudio). מה שמתנגן (הטיימר, מוזיקת הפתיחה או
-          // הטבלה) רק מושהה וממשיך כשהן נגמרות — ראו AudioManager.playApplause.
+          // מחיאות מסונתזות (WebAudio). הן מעל מה שמתנגן (הטיימר, מוזיקת
+          // הפתיחה או הטבלה), שרק מונמך עד שהן נגמרות — ראו AudioManager.playApplause.
           audio.playApplause(soundsRef.current.genericMediaSound.src);
           break;
         case 4:
@@ -1853,6 +1868,17 @@ export function GameHost({
           if (msg.target === 'player') adjustPlayerRef.current(msg.id, msg.delta);
           else adjustGroupRef.current(msg.id, msg.delta);
           break;
+        case 'report': {
+          // קובץ התוצאות למסך המנחה: התצוגה מחזיקה את המנוע ובונה אותו, ומסך
+          // המנחה מוריד אותו אצלו, על מסך המחשב ולא במקרן.
+          const g = engine.getGame();
+          void buildGameReportBytes(g, engine.getState(), rosterRef.current, (id) => nameOfRef.current(id))
+            .then((bytes) =>
+              controlRef.current?.post({ t: 'reportFile', id: msg.id, name: reportFilename(g), bytes }),
+            )
+            .catch((err) => debugLog('game', `יצירת קובץ סיכום נכשלה (${String(err)})`));
+          break;
+        }
       }
     },
     [engine, goBack, game.id],
@@ -1870,7 +1896,7 @@ export function GameHost({
 
   useEffect(() => {
     const ch = openControlChannel((msg) => {
-      if (msg.t === 'state' || msg.t === 'game') return; // הד/הצד-השני — התצוגה מתעלמת
+      if (msg.t === 'state' || msg.t === 'game' || msg.t === 'reportFile') return; // הד/הצד-השני — התצוגה מתעלמת
       if (msg.t === 'hello') {
         hostSeenRef.current = true; // יש מסך מנחה מאזין — מכאן שולחים פעימות
         ch.post(buildSnapshotRef.current());
@@ -3408,6 +3434,7 @@ export function GameHost({
               ? { onShowReceiver: () => showReceiver() }
               : {})}
             {...(canReportToDisk ? { onOpenReports: () => desktopOpenReports() } : {})}
+            {...(canDownloadReport ? { onDownloadReport: downloadReportNow } : {})}
             onEndGame={() => {
               setLeadersOverlay(false);
               setStage('winners');
