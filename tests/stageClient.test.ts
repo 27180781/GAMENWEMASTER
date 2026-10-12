@@ -13,6 +13,7 @@ import { pidFor } from '../server/live-stage.mjs';
 // @ts-expect-error — שרת ב-JS, בלי הצהרות טיפוסים
 import { createVideo } from '../server/live-video.mjs';
 import { STAGE_HEIGHT, STAGE_WIDTH } from '../src/render/Stage.tsx';
+import { backoffMs } from '../src/live/video/api.ts';
 import {
   DEFAULT_STAGE_WINDOW_PREFS,
   galleryLayout,
@@ -410,16 +411,42 @@ function hostOf(relayBase: string, options: { graceMs?: number; fetch?: typeof f
   return { ctl, box };
 }
 
-/** `offline` — הטלפון איבד את הרשת: שום בקשה, גם לא ההודעה שהמצלמה כבתה. */
+/**
+ * `offline` — הטלפון איבד את הרשת: שום בקשה, גם לא ההודעה שהמצלמה כבתה
+ * (`missed` סופר את ניסיונות ההדלקה שנפלו כך). `hold` — דופק שיצא נשאר בדרך
+ * (`held`) ומגיע לשרת רק כשמשחררים אותו, גם אם הטלפון כבר בלי רשת.
+ * `beating` — כמה דפיקות בדרך עכשיו.
+ */
 function camOf(relayBase: string, n: number) {
-  const box = { state: STAGE_CAM_OFF as StageCamState, phases: [] as string[], offline: false };
+  const box = {
+    state: STAGE_CAM_OFF as StageCamState,
+    phases: [] as string[],
+    offline: false,
+    missed: 0,
+    hold: false,
+    held: [] as Array<() => void>,
+    beating: 0,
+  };
   const cam = new StageCamPublisher({
     relayBase,
     viewToken: TOKEN,
     cid: cid(n),
     media: { getUserMedia: async () => fakeCamera(), createPeerConnection: newPC },
-    fetch: (input, init) =>
-      box.offline ? Promise.reject(new Error('offline')) : fetch(input, init),
+    fetch: async (input, init) => {
+      const url = String(input);
+      if (box.offline) {
+        if (url.endsWith('/video/cam')) box.missed += 1;
+        throw new Error('offline');
+      }
+      if (!url.endsWith('/video/cam-beat')) return fetch(input, init);
+      box.beating += 1;
+      try {
+        if (box.hold) await new Promise<void>((send) => box.held.push(send));
+        return await fetch(input, init);
+      } finally {
+        box.beating -= 1;
+      }
+    },
     sendBeacon: (url, body) => (box.offline ? true : beacon(url, body)),
     beatMs: 40,
     onState: (s) => {
@@ -616,59 +643,95 @@ describe('במה — המסך הראשי, המשתתף והצופה', () => {
     expect(host.ctl.live).toBeNull();
   });
 
-  it('משתתף שהמצלמה שלו כבתה לרגע נשאר על הבמה; מי שלא חזר — יורד אחרי הזמן', async () => {
-    const { relayBase, publish, video } = await start();
-    const host = hostOf(relayBase, { graceMs: 800 });
-    host.ctl.setGen(await publish());
-    host.ctl.open();
-    await until(
-      () => host.box.state.phase,
-      (p) => p === 'open',
-    );
-    const ruti = camOf(relayBase, 1);
-    await ruti.cam.start('רותי');
-    const dan = camOf(relayBase, 2);
-    await dan.cam.start('דן');
-    await until(
-      () => host.box.state.cams.length,
-      (n) => n === 2,
-    );
-    host.ctl.put(pid(1));
-    host.ctl.put(pid(2));
-    await until(
-      () => host.box.state.ids.length,
-      (n) => n === 2,
-    );
+  // שני מסלולים לחזרה של רותי, וכל אחד נבדק תמיד: עד 2026-10 הבדיקה סמכה על
+  // כך שאף דופק לא בדרך ברגע הניתוק, ונפלה ב-Windows כשהיה אחד (בניית ה-EXE של
+  // «במה»). ההמתנה של המנחה כאן קצרה מ-60 השניות של האמת, אבל ארוכה פי כמה
+  // מההמתנה הראשונה של המשתתף לפני ניסיון נוסף (backoffMs(1)).
+  it.each([
+    { path: 'הדופק האחרון הגיע לפני הניתוק', onTheWire: false, graceMs: 1500 },
+    { path: 'דופק שהיה בדרך הגיע אחרי שהשרת שכח', onTheWire: true, graceMs: 3 * backoffMs(1) },
+  ])(
+    'משתתף שהמצלמה שלו כבתה לרגע נשאר על הבמה; מי שלא חזר — יורד אחרי הזמן ($path)',
+    { timeout: 20_000 },
+    async ({ onTheWire, graceMs }) => {
+      const { relayBase, publish, video } = await start();
+      const host = hostOf(relayBase, { graceMs });
+      host.ctl.setGen(await publish());
+      host.ctl.open();
+      await until(
+        () => host.box.state.phase,
+        (p) => p === 'open',
+      );
+      const ruti = camOf(relayBase, 1);
+      await ruti.cam.start('רותי');
+      const dan = camOf(relayBase, 2);
+      await dan.cam.start('דן');
+      await until(
+        () => host.box.state.cams.length,
+        (n) => n === 2,
+      );
+      host.ctl.put(pid(1));
+      host.ctl.put(pid(2));
+      await until(
+        () => host.box.state.ids.length,
+        (n) => n === 2,
+      );
 
-    // שני הטלפונים איבדו את הרשת, והשרת שוכח את שתי המצלמות (שתקו יותר מדי;
-    // השידור של המנחה והבמה עצמה עוד בזמן). רותי חוזרת לרשת ומתחברת מחדש לבד,
-    // עם אותו מזהה, לאותו מקום; דן לא חוזר — ויורד אחרי הזמן.
-    ruti.box.offline = true;
-    dan.box.offline = true;
-    const from = host.box.history.length;
-    clock += 36_000;
-    video.tick();
-    await new Promise((r) => setTimeout(r, 150));
-    ruti.box.offline = false;
-    await until(
-      () => ruti.box.phases,
-      (p) => p.includes('reconnecting') && p.at(-1) === 'live',
-    );
-    expect(ruti.box.state.id).toBe(pid(1));
-    await until(
-      () => host.box.state.ids,
-      (ids) => ids.length === 1 && ids[0] === pid(1),
-    );
-    await until(
-      () => host.box.state.wanted,
-      (w) => w.length === 1,
-    );
-    expect(host.box.state.wanted).toEqual([pid(1)]);
-    const after = host.box.history.slice(from);
-    // השרת באמת שכח את רותי לרגע, והמנחה לא איבד אותה אף פעם
-    expect(after.some((s) => !s.cams.some((c) => c.id === pid(1)))).toBe(true);
-    expect(after.every((s) => s.phase === 'open' && s.wanted[0] === pid(1))).toBe(true);
-  });
+      // שני הטלפונים איבדו את הרשת, והשרת שוכח את שתי המצלמות (שתקו יותר מדי;
+      // השידור של המנחה והבמה עצמה עוד בזמן). רותי חוזרת לרשת ומתחברת מחדש לבד,
+      // עם אותו מזהה, לאותו מקום; דן לא חוזר — ויורד אחרי הזמן.
+      if (onTheWire) {
+        ruti.box.hold = true;
+        await until(
+          () => ruti.box.held.length,
+          (n) => n > 0,
+        );
+      } else {
+        await until(
+          () => ruti.box.beating,
+          (n) => n === 0,
+        );
+      }
+      ruti.box.offline = true;
+      dan.box.offline = true;
+      const from = host.box.history.length;
+      clock += 36_000;
+      video.tick();
+      if (onTheWire) {
+        // הדופק מגיע עכשיו, והשרת כבר שכח את רותי: היא מתחילה להתחבר מחדש כשהיא
+        // עוד בלי רשת, הניסיון נופל, והבא — רק אחרי ההמתנה.
+        ruti.box.hold = false;
+        ruti.box.held.splice(0).forEach((send) => send());
+        await until(
+          () => ruti.box.missed,
+          (n) => n > 0,
+        );
+      } else {
+        await new Promise((r) => setTimeout(r, 150));
+      }
+      ruti.box.offline = false;
+      await until(
+        () => ruti.box.phases,
+        (p) => p.includes('reconnecting') && p.at(-1) === 'live',
+        graceMs,
+      );
+      expect(ruti.box.state.id).toBe(pid(1));
+      await until(
+        () => host.box.state.ids,
+        (ids) => ids.length === 1 && ids[0] === pid(1),
+      );
+      await until(
+        () => host.box.state.wanted,
+        (w) => w.length === 1,
+        graceMs + 4000,
+      );
+      expect(host.box.state.wanted).toEqual([pid(1)]);
+      const after = host.box.history.slice(from);
+      // השרת באמת שכח את רותי לרגע, והמנחה לא איבד אותה אף פעם
+      expect(after.some((s) => !s.cams.some((c) => c.id === pid(1)))).toBe(true);
+      expect(after.every((s) => s.phase === 'open' && s.wanted[0] === pid(1))).toBe(true);
+    },
+  );
 
   it('צופים: מעל התקרה — «מלאה»; המסך הראשי רואה גם מי שלא על הבמה', async () => {
     const { relayBase, publish } = await start({
