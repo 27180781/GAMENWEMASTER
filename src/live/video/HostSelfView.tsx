@@ -20,14 +20,11 @@ import {
   type MouseEvent,
   type PointerEvent,
 } from 'react';
-import { STAGE_WIDTH } from '../../render/Stage.tsx';
 import type { HostVideoHandle } from './useHostVideo.ts';
 import {
   compactPos,
   DEFAULT_SELF_VIEW_PREFS,
-  dragSelfView,
   expandedPos,
-  isDrag,
   parseSelfViewPrefs,
   prefsAfterDrag,
   SELF_VIEW_STORAGE_KEY,
@@ -37,6 +34,7 @@ import {
   type Point,
   type SelfViewPrefs,
 } from './selfView.ts';
+import { useFloatingDrag } from './useFloatingDrag.ts';
 import './hostVideo.css';
 
 const keepFocus = (event: MouseEvent) => event.preventDefault();
@@ -58,24 +56,9 @@ function writePrefs(prefs: SelfViewPrefs): void {
   }
 }
 
-/** כמה פיקסלים במסך הם פיקסל אחד בבמה (הבמה מוקטנת ב-transform). */
-function stageScaleOf(el: HTMLElement): number {
-  const width = el.closest('.stage')?.getBoundingClientRect().width ?? 0;
-  return width > 0 ? width / STAGE_WIDTH : 1;
-}
-
 /** פיירפוקס, למשל, לא נותן לדף לפתוח חלון כזה — אז אין כפתור. */
 function pipSupported(): boolean {
   return typeof document !== 'undefined' && document.pictureInPictureEnabled === true;
-}
-
-interface DragState {
-  id: number;
-  start: Point;
-  pointer: Point;
-  scale: number;
-  moved: boolean;
-  last: Point;
 }
 
 export function HostSelfView({ video }: { video: HostVideoHandle }) {
@@ -90,9 +73,7 @@ function SelfViewWindow({ stream, cam, mic }: { stream: MediaStream; cam: boolea
   const [pip, setPip] = useState(false);
   // הכפתור «בחלון נפרד» אחרי שגררו אותו; עד אז הוא בפינה של החלונית.
   const [pipPill, setPipPill] = useState<Point | null>(null);
-  const [dragging, setDragging] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const drag = useRef<DragState | null>(null);
 
   const compact = prefs.minimized || pip;
   const size = selfViewSize(compact);
@@ -139,58 +120,24 @@ function SelfViewWindow({ stream, cam, mic }: { stream: MediaStream; cam: boolea
     void document.exitPictureInPicture().catch(() => {});
   };
 
-  const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    event.stopPropagation();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const pointer = { x: event.clientX, y: event.clientY };
-    drag.current = {
-      id: event.pointerId,
-      start: shown,
-      pointer,
-      scale: stageScaleOf(event.currentTarget),
-      moved: false,
-      last: shown,
-    };
-  };
-
-  const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    const d = drag.current;
-    if (d === null || d.id !== event.pointerId) return;
-    const now = { x: event.clientX, y: event.clientY };
-    if (!d.moved && !isDrag(d.pointer, now)) return;
-    if (!d.moved) {
-      d.moved = true;
-      setDragging(true);
-    }
-    d.last = dragSelfView(d.start, d.pointer, now, d.scale, size);
-    const pos = d.last;
-    if (pip && !prefs.minimized) setPipPill(pos);
-    else setPrefs((p) => ({ ...p, pos }));
-  };
-
-  const finish = (event: PointerEvent<HTMLDivElement>, cancelled: boolean) => {
-    const d = drag.current;
-    if (d === null || d.id !== event.pointerId) return;
-    drag.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId))
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    if (d.moved) {
-      setDragging(false);
-      const pos = cancelled
-        ? d.last
-        : dragSelfView(d.start, d.pointer, { x: event.clientX, y: event.clientY }, d.scale, size);
+  const { dragging, handlers } = useFloatingDrag({
+    shown,
+    size,
+    onMove: (pos) => {
+      if (pip && !prefs.minimized) setPipPill(pos);
+      else setPrefs((p) => ({ ...p, pos }));
+    },
+    onDrop: (pos) => {
       if (pip && !prefs.minimized) setPipPill(pos);
       save(prefsAfterDrag(prefs, pip, pos));
-      return;
-    }
+    },
     // לחיצה בלי גרירה על הכפתור הממוזער: פותחת אותו, או מחזירה מהחלון הנפרד.
-    if (!cancelled && compact) {
+    onTap: () => {
+      if (!compact) return;
       if (pip) closePip();
       else restore();
-    }
-  };
+    },
+  });
 
   const className = `host-self-view${compact ? ' is-compact' : ''}${dragging ? ' is-dragging' : ''}`;
   const title = pip
@@ -205,10 +152,7 @@ function SelfViewWindow({ stream, cam, mic }: { stream: MediaStream; cam: boolea
       dir="rtl"
       style={{ left: shown.x, top: shown.y }}
       title={title}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={(event) => finish(event, false)}
-      onPointerCancel={(event) => finish(event, true)}
+      {...handlers}
       onMouseDown={keepFocus}
       onClick={(event) => event.stopPropagation()}
     >

@@ -7,7 +7,7 @@
  * הבא» של המנחה, ולחיצה עליו אחרי לחיצה על כפתור הייתה מפעילה גם את הכפתור.
  */
 
-import { useEffect, useRef, type MouseEvent } from 'react';
+import { useEffect, useRef, type MouseEvent, type ReactNode } from 'react';
 import type { HostVideoError, HostVideoState } from './hostVideo.ts';
 import type { DeviceOption, HostVideoHandle } from './useHostVideo.ts';
 import './hostVideo.css';
@@ -180,8 +180,14 @@ export function HostVideoPanel({ video }: { video: HostVideoHandle }) {
   );
 }
 
-/** התג בפינת המסך הראשי. */
-export function HostVideoChip({ video }: { video: HostVideoHandle }) {
+/** התג בפינת המסך הראשי. `extra` — כפתורים נוספים כשהווידאו דלוק (הבמה, StageHostViews.tsx). */
+export function HostVideoChip({
+  video,
+  extra = null,
+}: {
+  video: HostVideoHandle;
+  extra?: ReactNode;
+}) {
   const { state } = video;
   if (!isOn(state)) {
     const error = state.phase === 'error' ? ERROR_SHORT[state.error ?? 'failed'] : null;
@@ -228,6 +234,7 @@ export function HostVideoChip({ video }: { video: HostVideoHandle }) {
       >
         {state.mic ? '🎤' : '🔇'}
       </button>
+      {extra}
       <button tabIndex={-1} onMouseDown={keepFocus} onClick={video.stop} title="כיבוי הווידאו">
         ⏹
       </button>

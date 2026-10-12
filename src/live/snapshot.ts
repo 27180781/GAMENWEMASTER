@@ -121,7 +121,7 @@ function pickKnown<T extends object>(value: T, keys: readonly string[]): T {
 }
 
 const GLOBAL_SETTING_KEYS = Object.keys(globalSettingsSchema.shape).filter(
-  (key) => key !== 'narration' && key !== 'hostVideo',
+  (key) => key !== 'narration' && key !== 'hostVideo' && key !== 'hostVideoStage',
 );
 const SLIDE_SETTING_KEYS = Object.keys(slideSettingsSchema.shape);
 
@@ -484,12 +484,25 @@ export class LiveSnapshotBuilder {
       colors,
       sound: { ...input.sound },
       cues: input.cues.map((c) => ({ ...c })),
-      video:
-        input.video === null
-          ? null
-          : { gen: input.video.gen, cam: input.video.cam, mic: input.video.mic },
+      video: liveVideoCopy(input.video),
     };
   }
+}
+
+/**
+ * וידאו המנחה במצב המסך. «במה» פתוחה — גם מי עליה, עם השמות (מוסווים כמו שאר
+ * השמות: השם הוא מה שהמשתתף כתב, והקישור מועבר הלאה בקלות).
+ */
+function liveVideoCopy(video: LiveVideo | null): LiveVideo | null {
+  if (video === null) return null;
+  const copy: LiveVideo = { gen: video.gen, cam: video.cam, mic: video.mic };
+  if (video.stage != null) {
+    copy.stage = {
+      v: video.stage.v,
+      ids: video.stage.ids.map((e) => ({ id: e.id, name: maskPhoneLike(e.name) })),
+    };
+  }
+  return copy;
 }
 
 /** כותרת מסך תוצאות ההימור — נוסח שקופית ההימור שהשאלה הנוכחית הכריעה. */

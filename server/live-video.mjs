@@ -28,6 +28,9 @@
  *   POST /live/<W>/video/ping    צופה: דופק
  *   POST /live/<W>/video/leave   צופה: עזב (גם sendBeacon, בלי content-type)
  *
+ * «במה» — מצלמות של משתתפים שהמנחה מעלה לכל הצופים — באותו נתיב, בקובץ
+ * משלה (server/live-stage.mjs): stage, cam-*, stage-*.
+ *
  * הגדרות (משתני סביבה של אפליקציית המנוע ב-CapRover):
  *   CF_REALTIME_APP_ID, CF_REALTIME_APP_SECRET — חובה (Realtime › Serverless SFU)
  *   CF_TURN_KEY_ID, CF_TURN_KEY_API_TOKEN      — רשות: TURN לרשתות חסומות
@@ -38,6 +41,7 @@
  */
 
 import { createHash, randomBytes } from 'node:crypto';
+import { createStage, STAGE_ACTIONS } from './live-stage.mjs';
 
 const PUB_PREFIX = 'trivia-live-pub:v1:';
 const VIEW_PREFIX = 'trivia-live-view:v1:';
@@ -135,7 +139,7 @@ function newId() {
  *   fetch?: typeof fetch,
  *   now?: () => number,
  *   env?: Record<string, string | undefined>,
- *   limits?: Partial<typeof DEFAULT_VIDEO_LIMITS>,
+ *   limits?: Partial<typeof DEFAULT_VIDEO_LIMITS> & { stage?: Record<string, number> },
  *   log?: (line: string) => void,
  * }} [options]
  */
@@ -280,6 +284,8 @@ export function createVideo({
                 ok: true,
                 room: normalizeRoom(json.room),
                 cap: viewerCapFor(videoParticipantsOf(setting), cfg),
+                // «במה» (מצלמות משתתפים): תוספת על וידאו המנחה, בשדה משלה.
+                stage: setting.hostVideoStage === true,
               }
             : { ok: false, error: 'not-entitled' };
       }
@@ -327,6 +333,8 @@ export function createVideo({
   function retirePublication(token, pub, reason) {
     if (pubs.get(token) === pub) pubs.delete(token);
     if (reason === 'superseded') retired.set(pub.gen, now());
+    // המנחה כיבה את הווידאו — גם הבמה נסגרת. בניתוק היא ממתינה לו (live-stage.mjs).
+    if (reason === 'stopped') stage.closeStage(token, 'closed');
     closeTracks(pub.session, pub.mids);
     // הצופים של השידור הזה מקבלים "gone" בדופק ומתחברים לשידור החדש.
     for (const v of viewers.values()) if (v.token === token && v.gen === pub.gen) dropViewer(v);
@@ -627,13 +635,16 @@ export function createVideo({
       case 'leave':
         return handleLeave(token, body);
       default:
-        return [404, { error: 'not-found' }];
+        return STAGE_ACTIONS.includes(action)
+          ? stage.handle(req, token, action, body)
+          : [404, { error: 'not-found' }];
     }
   }
 
   /** ניקוי: צפיות ששתקו, שידורים שהמנחה שלהם נעלם, זיכרונות ישנים. */
   function tick() {
     const at = now();
+    stage.tick();
     for (const v of viewers.values()) if (!viewerAlive(v)) dropViewer(v);
     for (const [token, pub] of pubs) if (!pubAlive(pub)) retirePublication(token, pub, 'timeout');
     for (const [gen, when] of retired) if (at - when > cfg.retiredMemoryMs) retired.delete(gen);
@@ -644,13 +655,32 @@ export function createVideo({
   }
 
   function stats() {
-    return { configured, publications: pubs.size, viewers: totalViewers() };
+    return { configured, publications: pubs.size, viewers: totalViewers(), ...stage.stats() };
   }
+
+  const stage = createStage({
+    cf,
+    cfError,
+    newSession,
+    closeTracks,
+    iceServers,
+    isHost: (req, token) => hostKey(req, token) !== null,
+    checkHost,
+    livePub: (token) => {
+      const pub = pubs.get(token);
+      return pub !== undefined && pubAlive(pub) ? pub : null;
+    },
+    configured,
+    now,
+    log,
+    video: cfg,
+    limits: cfg.stage ?? {},
+  });
 
   /** לבדיקות: מחכה שכל הסגירות שנשלחו יחזרו. */
   async function settle() {
     while (cleanups.size > 0) await Promise.all([...cleanups]);
   }
 
-  return { handle, tick, stats, settle, config: cfg, pubs, viewers };
+  return { handle, tick, stats, settle, config: cfg, pubs, viewers, stage };
 }

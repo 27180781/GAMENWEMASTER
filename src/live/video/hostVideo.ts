@@ -129,7 +129,13 @@ export const SIMULCAST_ENCODINGS: RTCRtpEncodingParameters[] = [
   { rid: 'b', scaleResolutionDownBy: 2, maxBitrate: 150_000, maxFramerate: 15 },
 ];
 
-function mediaErrorOf(err: unknown): HostVideoError {
+/** מה השתבש בפתיחת המצלמה / המיקרופון (משותף גם למצלמה של המשתתף ב«במה»). */
+export type MediaErrorKind = Extract<
+  HostVideoError,
+  'permission' | 'no-devices' | 'busy' | 'failed'
+>;
+
+export function mediaErrorOf(err: unknown): MediaErrorKind {
   const name = (err as { name?: string } | null)?.name ?? '';
   if (name === 'NotAllowedError' || name === 'SecurityError') return 'permission';
   if (name === 'NotFoundError' || name === 'OverconstrainedError') return 'no-devices';

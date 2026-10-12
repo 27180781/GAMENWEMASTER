@@ -25,6 +25,17 @@ export const SELF_VIEW_SIZE: Size = { width: 320, height: 180 };
 /** החלונית הממוזערת (וגם «בחלון נפרד»): כפתור אחד. */
 export const SELF_VIEW_PILL_SIZE: Size = { width: 220, height: 44 };
 
+/**
+ * הגדלים של חלונית צפה: פתוחה, וממוזערת לכפתור. אותם חישובים משמשים גם את
+ * חלונית הבמה (StageWindow.tsx), בגדלים שלה.
+ */
+export interface FloatSizes {
+  tile: Size;
+  pill: Size;
+}
+
+export const SELF_VIEW_SIZES: FloatSizes = { tile: SELF_VIEW_SIZE, pill: SELF_VIEW_PILL_SIZE };
+
 /** מרחק מינימלי משולי הבמה, כדי שתמיד יהיה במה לתפוס. */
 export const SELF_VIEW_EDGE = 12;
 
@@ -50,8 +61,8 @@ export const DEFAULT_SELF_VIEW_PREFS: SelfViewPrefs = {
   minimized: false,
 };
 
-export function selfViewSize(minimized: boolean): Size {
-  return minimized ? SELF_VIEW_PILL_SIZE : SELF_VIEW_SIZE;
+export function selfViewSize(minimized: boolean, sizes: FloatSizes = SELF_VIEW_SIZES): Size {
+  return minimized ? sizes.pill : sizes.tile;
 }
 
 /** בתוך הבמה, עם שוליים — גם אחרי מזעור, פתיחה או גרירה רחוקה מדי. */
@@ -65,52 +76,60 @@ export function clampSelfViewPos(pos: Point, size: Size): Point {
 }
 
 /**
- * מזעור: הכפתור נצמד לפינה של החלונית שקרובה לפינת המסך, כך שחלונית שיושבת
- * בפינה התחתונה מתמזערת לאותה פינה ולא נשארת תלויה באוויר.
+ * מעבר מגודל לגודל (מזעור, פתיחה, הגדלה): הפינה של החלונית שקרובה לפינת
+ * המסך נשארת במקומה, כך שחלונית שיושבת בפינה התחתונה משתנה באותה פינה ולא
+ * נשארת תלויה באוויר.
  */
-export function compactPos(tile: Point): Point {
-  const right = tile.x + SELF_VIEW_SIZE.width / 2 > STAGE_WIDTH / 2;
-  const bottom = tile.y + SELF_VIEW_SIZE.height / 2 > STAGE_HEIGHT / 2;
+export function anchoredPos(pos: Point, from: Size, to: Size): Point {
+  const right = pos.x + from.width / 2 > STAGE_WIDTH / 2;
+  const bottom = pos.y + from.height / 2 > STAGE_HEIGHT / 2;
   return clampSelfViewPos(
     {
-      x: right ? tile.x + SELF_VIEW_SIZE.width - SELF_VIEW_PILL_SIZE.width : tile.x,
-      y: bottom ? tile.y + SELF_VIEW_SIZE.height - SELF_VIEW_PILL_SIZE.height : tile.y,
+      x: right ? pos.x + from.width - to.width : pos.x,
+      y: bottom ? pos.y + from.height - to.height : pos.y,
     },
-    SELF_VIEW_PILL_SIZE,
+    to,
   );
 }
 
+/** מזעור: הכפתור נצמד לפינה של החלונית שקרובה לפינת המסך. */
+export function compactPos(tile: Point, sizes: FloatSizes = SELF_VIEW_SIZES): Point {
+  return anchoredPos(tile, sizes.tile, sizes.pill);
+}
+
 /** הפתיחה מחדש: ההפך מ-compactPos, ולכן מזעור ופתיחה מחזירים בדיוק לאותו מקום. */
-export function expandedPos(pill: Point): Point {
-  const right = pill.x + SELF_VIEW_PILL_SIZE.width / 2 > STAGE_WIDTH / 2;
-  const bottom = pill.y + SELF_VIEW_PILL_SIZE.height / 2 > STAGE_HEIGHT / 2;
-  return clampSelfViewPos(
-    {
-      x: right ? pill.x + SELF_VIEW_PILL_SIZE.width - SELF_VIEW_SIZE.width : pill.x,
-      y: bottom ? pill.y + SELF_VIEW_PILL_SIZE.height - SELF_VIEW_SIZE.height : pill.y,
-    },
-    SELF_VIEW_SIZE,
-  );
+export function expandedPos(pill: Point, sizes: FloatSizes = SELF_VIEW_SIZES): Point {
+  return anchoredPos(pill, sizes.pill, sizes.tile);
 }
 
 /**
  * איפה מה שמוצג יושב: החלונית במקום שלה, הכפתור הממוזער במקום שלו, ובזמן החלון
  * הנפרד הכפתור בפינה של החלונית, או איפה שגררו אותו (pipPill).
  */
-export function shownSelfViewPos(prefs: SelfViewPrefs, pip: boolean, pipPill: Point | null): Point {
-  if (prefs.minimized) return clampSelfViewPos(prefs.pos, SELF_VIEW_PILL_SIZE);
-  const tile = clampSelfViewPos(prefs.pos, SELF_VIEW_SIZE);
+export function shownSelfViewPos(
+  prefs: SelfViewPrefs,
+  pip: boolean,
+  pipPill: Point | null,
+  sizes: FloatSizes = SELF_VIEW_SIZES,
+): Point {
+  if (prefs.minimized) return clampSelfViewPos(prefs.pos, sizes.pill);
+  const tile = clampSelfViewPos(prefs.pos, sizes.tile);
   if (!pip) return tile;
-  return pipPill === null ? compactPos(tile) : clampSelfViewPos(pipPill, SELF_VIEW_PILL_SIZE);
+  return pipPill === null ? compactPos(tile, sizes) : clampSelfViewPos(pipPill, sizes.pill);
 }
 
 /**
  * מה נשמר אחרי גרירה. בזמן החלון הנפרד גוררים את הכפתור, והחלון הנפרד לא נשמר
  * במחשב, ולכן נשמרת החלונית שתיפתח בפינה של המקום שאליו הכפתור הגיע.
  */
-export function prefsAfterDrag(prefs: SelfViewPrefs, pip: boolean, dropped: Point): SelfViewPrefs {
+export function prefsAfterDrag(
+  prefs: SelfViewPrefs,
+  pip: boolean,
+  dropped: Point,
+  sizes: FloatSizes = SELF_VIEW_SIZES,
+): SelfViewPrefs {
   if (prefs.minimized || !pip) return { pos: dropped, minimized: prefs.minimized };
-  return { pos: expandedPos(dropped), minimized: false };
+  return { pos: expandedPos(dropped, sizes), minimized: false };
 }
 
 /**

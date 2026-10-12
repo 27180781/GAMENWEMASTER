@@ -132,7 +132,9 @@ import { GroupConnectScreen } from '../render/GroupConnectScreen.tsx';
 import { useLivePublisher } from '../live/useLivePublisher.ts';
 import { HostVideoChip } from '../live/video/HostVideoControls.tsx';
 import { HostSelfView } from '../live/video/HostSelfView.tsx';
+import { StageChipButton, StageManager, StageWindow } from '../live/video/StageHostViews.tsx';
 import { useHostVideo } from '../live/video/useHostVideo.ts';
+import { useStageHost } from '../live/video/useStage.ts';
 import {
   endGame,
   getBackup,
@@ -319,6 +321,8 @@ export function GameHost({
   const [settingsOpen, setSettingsOpen] = useState(false);
   /** לשונית "שמות וקבוצות" — מרשם השחקנים, נגיש לכל אורך המשחק. */
   const [rosterOpen, setRosterOpen] = useState(false);
+  /** חלון ניהול «במה» (מצלמות המשתתפים, src/live/video) — שכבה מעל, כמו תפריט המפעיל. */
+  const [stageManagerOpen, setStageManagerOpen] = useState(false);
   /** אישור אזהרת הרישיון (משחק בלי קוד חדר) — נסגר בלחיצה. */
   const [licenseAck, setLicenseAck] = useState(false);
   const [roster, setRoster] = useState<RosterData>(() => loadRoster(game.id));
@@ -2801,7 +2805,8 @@ export function GameHost({
       if (event.key === 'Escape') {
         // ESC סוגר קודם שכבות פתוחות; אחרת: ב-EXE — אישור יציאה מהמשחק,
         // באונליין/דפדפן — פתיחת/סגירת תפריט המפעיל (כמו קודם).
-        if (lobbyOverlay) setLobbyOverlay(false);
+        if (stageManagerOpen) setStageManagerOpen(false);
+        else if (lobbyOverlay) setLobbyOverlay(false);
         else if (captureOn) setCaptureOn(false);
         else if (rosterOpen) setRosterOpen(false);
         else if (settingsOpen) setSettingsOpen(false);
@@ -2810,7 +2815,8 @@ export function GameHost({
         else setMenuOpen(true);
         return;
       }
-      if (menuOpen || settingsOpen || rosterOpen || exitConfirm || captureOn) return;
+      if (menuOpen || settingsOpen || rosterOpen || exitConfirm || captureOn || stageManagerOpen)
+        return;
       // X — מסך התחברות שחקנים מאופס, גם באמצע המשחק. לפי code ולא לפי key,
       // כדי שיעבוד גם כשפריסת המקלדת עברית (שם אותו מקש מפיק 'ס').
       if (event.code === 'KeyX' || event.key === 'x' || event.key === 'X') {
@@ -2880,7 +2886,7 @@ export function GameHost({
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [stage, menuOpen, settingsOpen, rosterOpen, exitConfirm, captureOn, lobbyOverlay, showResetLobby, canExit, leadersOverlay, connectCategory, startupModal, engine, advance, goBack, onRequestRefresh]);
+  }, [stage, menuOpen, settingsOpen, rosterOpen, exitConfirm, captureOn, stageManagerOpen, lobbyOverlay, showResetLobby, canExit, leadersOverlay, connectCategory, startupModal, engine, advance, goBack, onRequestRefresh]);
 
   /** "התחלת המשחק מחדש" מתוך מסך ההגדרות — איפוס מלא וחזרה למסך הפתיחה. */
   const restartGame = useCallback(() => {
@@ -2927,6 +2933,18 @@ export function GameHost({
     gameId: game.id,
     roomId,
   });
+  // «במה»: משתתפים מדליקים מצלמה בקישור הצפייה, והמנחה מעלה עד 9 מהם למסך של
+  // כולם — תוספת על וידאו המנחה (‏setting.hostVideoStage; השרת בודק שוב).
+  const stageHost = useStageHost({
+    enabled: useSocket && setting.hostVideo === true && setting.hostVideoStage === true,
+    gameId: game.id,
+    roomId,
+    gen: hostVideo.live?.gen ?? null,
+  });
+  // הבמה כבר לא זמינה (הווידאו כבה בשרת, הרישיון) — החלון שלה לא נשאר חוסם מקשים.
+  useEffect(() => {
+    if (!stageHost.available) setStageManagerOpen(false);
+  }, [stageHost.available]);
   const live = useLivePublisher({
     enabled: useSocket,
     gameId: game.id,
@@ -2973,7 +2991,7 @@ export function GameHost({
       functionStatus,
       functionDetail,
       paused: overlayActive,
-      video: hostVideo.live,
+      video: hostVideo.live === null ? null : { ...hostVideo.live, stage: stageHost.live },
     },
   });
 
@@ -3315,8 +3333,25 @@ export function GameHost({
             }
           />
         )}
-        {hostVideo.available && <HostVideoChip video={hostVideo} />}
+        {hostVideo.available && (
+          <HostVideoChip
+            video={hostVideo}
+            extra={
+              stageHost.available ? (
+                <StageChipButton stage={stageHost} onManage={() => setStageManagerOpen(true)} />
+              ) : null
+            }
+          />
+        )}
         {hostVideo.available && <HostSelfView video={hostVideo} />}
+        {stageHost.available && <StageWindow stage={stageHost} />}
+        {stageManagerOpen && stageHost.available && (
+          <StageManager
+            stage={stageHost}
+            videoLive={hostVideo.live !== null}
+            onClose={() => setStageManagerOpen(false)}
+          />
+        )}
         {syntheticCrowd && (
           <span className="demo-badge">
             דמו · {crowdConfig.voterCount.toLocaleString()} שחקנים
@@ -3355,6 +3390,15 @@ export function GameHost({
             narrationVolume={narrationVolume}
             onNarrationVolumeChange={setNarrationVolume}
             {...(hostVideo.available ? { hostVideo } : {})}
+            {...(stageHost.available
+              ? {
+                  stage: stageHost,
+                  onManageStage: () => {
+                    setMenuOpen(false);
+                    setStageManagerOpen(true);
+                  },
+                }
+              : {})}
             voteSource={voteSourceLabel}
             hostVoterId={hostVoterId}
             {...(canReportToDisk

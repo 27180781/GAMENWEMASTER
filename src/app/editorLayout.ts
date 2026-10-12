@@ -35,9 +35,10 @@ export interface SettingsSection {
  * מייצרת (ENGINE-narration.md). אין מה לערוך בו ביד, והשתקה/ווליום נמצאים
  * במקום הנכון — תפריט המפעיל (ESC).
  *
- * `hostVideo` (וידאו המנחה בחלון הצפייה) מגיע מהרישיון ואינו הגדרה של המשחק.
+ * `hostVideo` (וידאו המנחה בחלון הצפייה) ו-`hostVideoStage` («במה») מגיעים
+ * מהרישיון ואינם הגדרות של המשחק.
  */
-export const HIDDEN_SETTINGS = ['limit', 'narration', 'hostVideo'];
+export const HIDDEN_SETTINGS = ['limit', 'narration', 'hostVideo', 'hostVideoStage'];
 
 /**
  * הקבוצות, בסדר ובשמות של העורך המקוון. `titleThroughoutGame` ו-`logo` יושבים

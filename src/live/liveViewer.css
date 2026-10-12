@@ -136,6 +136,13 @@
   font-weight: 700;
 }
 
+/* «במה» פתוחה: אפשר להדליק מצלמה (video/StageViewerViews.tsx) */
+.live-btn--cam {
+  background: rgba(124, 58, 237, 0.9);
+  border-color: rgba(255, 255, 255, 0.6);
+  font-weight: 700;
+}
+
 /* ---- טלפון לאורך: הבמה (16:9) קטנה — רמז לסובב ---- */
 
 .live-rotate-hint {
@@ -343,6 +350,161 @@
   cursor: pointer;
 }
 
+/* ---- «במה»: מי שעל הבמה, והמצלמה של הצופה (video/StageViewerViews.tsx) ---- */
+
+.live-stage {
+  /* כמה גובה הרשת תופסת לכל היותר — פחות כשיש שלט הצבעה מתחתיה */
+  --live-stage-h: 28vh;
+  flex: none;
+  padding: 8px 12px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.live-side--video .live-stage {
+  --live-stage-h: 42vh;
+}
+
+.live-stage-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  opacity: 0.9;
+}
+
+.live-stage-hide {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.live-stage-note {
+  margin-bottom: 6px;
+  font-size: 12px;
+  text-align: center;
+  opacity: 0.8;
+}
+
+/* הרשת לא גבוהה מ-‎--live-stage-h‎: הגובה שלה תמיד לכל היותר הרוחב × 9/16 */
+.live-stage-grid {
+  --cols: 1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  width: min(100%, var(--live-stage-h) * 16 / 9);
+  margin: 0 auto;
+}
+
+.live-stage-tile {
+  position: relative;
+  flex: 0 0 calc((100% - (var(--cols) - 1) * 6px) / var(--cols));
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #05070f;
+}
+
+.live-stage-tile.is-own {
+  outline: 2px solid #4ade80;
+  outline-offset: -2px;
+}
+
+.live-stage-wait {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.live-stage-wait .spinner {
+  width: 18px;
+  height: 18px;
+  border-width: 3px;
+}
+
+.live-stage-name {
+  position: absolute;
+  bottom: 4px;
+  inset-inline-start: 4px;
+  max-width: calc(100% - 8px);
+  overflow: hidden;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.live-stage-cam {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(37, 99, 235, 0.12);
+}
+
+.live-stage-cam.is-onstage {
+  background: rgba(22, 163, 74, 0.22);
+}
+
+.live-stage-cam.is-ended {
+  background: rgba(127, 29, 29, 0.28);
+}
+
+.live-stage-cam-preview {
+  position: relative;
+  flex: 0 0 84px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #000;
+}
+
+.live-stage-cam-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.live-stage-cam-buttons {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.live-stage-cam-buttons button {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
 @media (orientation: portrait) {
   .live-viewer.has-side {
     flex-direction: column;
@@ -375,6 +537,16 @@
 
   .live-side--video .live-video {
     width: min(100% - 24px, 40vh * 16 / 9);
+  }
+
+  /* לאורך: פחות גובה לבמה, כדי שיישאר מקום לשלט */
+  .live-stage {
+    --live-stage-h: 22vh;
+    padding: 8px 12px;
+  }
+
+  .live-side--video .live-stage {
+    --live-stage-h: 32vh;
   }
 }
 

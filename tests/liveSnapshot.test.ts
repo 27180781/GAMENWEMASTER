@@ -287,6 +287,40 @@ describe('מצב המסך למסך הצפייה', () => {
     expect(on.video).toEqual({ gen: 'g1', cam: true, mic: false });
   });
 
+  it('במה: גם הדגל שלה לא יוצא; מי שעל הבמה — רק מזהה ושם, ושם שנראה כמו טלפון מוסווה', () => {
+    const game = liveGame();
+    game.setting.hostVideo = true;
+    game.setting.hostVideoStage = true;
+    const engine = new GameEngine(game);
+    const video = {
+      gen: 'g1',
+      cam: true,
+      mic: true,
+      stage: {
+        v: 3,
+        extra: 'x',
+        ids: [
+          { id: 'a'.repeat(16), name: 'רותי', cid: 'secret' },
+          { id: 'b'.repeat(16), name: '050-1234567' },
+        ],
+      },
+    } as unknown as LiveVideo;
+    const snap = new LiveSnapshotBuilder().build(input(engine, { video }));
+    expect('hostVideoStage' in snap.game.setting).toBe(false);
+    expect(snap.video).toEqual({
+      gen: 'g1',
+      cam: true,
+      mic: true,
+      stage: {
+        v: 3,
+        ids: [
+          { id: 'a'.repeat(16), name: 'רותי' },
+          { id: 'b'.repeat(16), name: '050••••567' },
+        ],
+      },
+    });
+  });
+
   it('טיימר: עוגן חדש רק כשהספירה של הצופה הייתה סוטה', () => {
     const engine = votingOnFirst();
     const builder = new LiveSnapshotBuilder();
