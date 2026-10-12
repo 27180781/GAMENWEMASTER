@@ -45,7 +45,7 @@ COPY --from=build /app/dist /usr/share/nginx/html
 COPY tools/fetch-desktop-assets.mjs tools/refresh-desktop-assets.mjs /app/tools/
 # ממסר מסך הצפייה (?view=) — Node בלי תלויות, מאחורי nginx ב-/live/. וידאו
 # המנחה (live-video.mjs) קורא את מפתחות Cloudflare ממשתני הסביבה של האפליקציה.
-COPY server/live-relay.mjs server/live-video.mjs /app/server/
+COPY server/live-relay.mjs server/live-video.mjs server/live-stage.mjs /app/server/
 # שם שונה מ-/docker-entrypoint.sh של תמונת nginx: ה-ENTRYPOINT שלה ממשיך לרוץ
 # כרגיל (ומריץ את סקריפטי ה-init שלה), ואז מפעיל את ה-CMD הזה במקום nginx.
 COPY docker-entrypoint.sh /entrypoint.sh
