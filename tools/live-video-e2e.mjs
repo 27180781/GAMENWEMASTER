@@ -15,6 +15,9 @@
  *   3. «הפעלת צליל» אצל הצופה מדליקה גם את הקול של המנחה.
  *   4. מצלמה כבויה אצל המנחה → הצופה רואה «המצלמה כבויה» והקול ממשיך; ובחזרה.
  *   5. מונה הצופים אצל המנחה, ותפריט המפעיל (סקציית הווידאו + תצוגה מקדימה).
+ *      ולאורך הדרך «המצלמה שלי»: החלונית הצפה אצל המנחה בלבד — גרירה (גם מעבר
+ *      לשולי הבמה), מזעור ופתיחה, חלון נפרד (Picture-in-Picture), מצלמה כבויה,
+ *      ונעלמת כשהשידור עובר למסך אחר או נכבה.
  *   6. הצופה מסתיר את הווידאו → החיבור שלו נסגר (גם ב-SFU); «🎥 המנחה» מחזיר.
  *   7. שלט הצבעה + וידאו בעמודה אחת; טלפון לאורך ולרוחב (צילומים + גבולות).
  *   8. הממסר הופעל מחדש באמצע → המנחה פותח שידור חדש לבד, והצופים חוזרים אליו.
@@ -325,6 +328,49 @@ async function clickChip(page, title) {
   await page.locator(`.host-video-chip button[title="${title}"]`).click();
 }
 
+/** «המצלמה שלי» אצל המנחה: איפה (בבמה ובמסך), מה מוצג, ומה נשמר. */
+function selfViewInfo(page) {
+  return page.evaluate(() => {
+    const el = document.querySelector('.host-self-view');
+    const stage = document.querySelector('.stage');
+    if (el === null || stage === null) return { exists: false };
+    const r = el.getBoundingClientRect();
+    const s = stage.getBoundingClientRect();
+    const video = el.querySelector('video');
+    return {
+      exists: true,
+      left: Number.parseFloat(el.style.left),
+      top: Number.parseFloat(el.style.top),
+      compact: el.classList.contains('is-compact'),
+      text: el.textContent.trim(),
+      inside:
+        r.left >= s.left - 0.5 &&
+        r.top >= s.top - 0.5 &&
+        r.right <= s.right + 0.5 &&
+        r.bottom <= s.bottom + 0.5,
+      screen: { x: r.left, y: r.top, w: r.width, h: r.height },
+      scale: s.width / 1920,
+      stage: { x: s.left, y: s.top },
+      pip: video !== null && document.pictureInPictureElement === video,
+      playing: video !== null && !video.paused && video.readyState >= 2 && video.videoWidth > 0,
+      saved: localStorage.getItem('trivia.hostVideo.selfView'),
+      focus: document.activeElement?.tagName ?? null,
+    };
+  });
+}
+
+/** גרירה בעכבר אמיתי ממרכז החלונית, בפיקסלים של המסך. */
+async function dragSelfView(page, dx, dy) {
+  const box = await selfViewInfo(page);
+  const x = box.screen.x + box.screen.w / 2;
+  const y = box.screen.y + box.screen.h / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + dx / 2, y + dy / 2, { steps: 4 });
+  await page.mouse.move(x + dx, y + dy, { steps: 4 });
+  await page.mouse.up();
+}
+
 async function relayHealth(relayBase) {
   const res = await fetch(`${relayBase}/health`);
   return res.json();
@@ -504,6 +550,148 @@ async function main() {
     await viewer.screenshot({ path: path.join(OUT, '01-viewer-desktop.png') });
     await host.screenshot({ path: path.join(OUT, '01-host.png') });
 
+    // ---- 2ב. «המצלמה שלי» — חלונית צפה אצל המנחה בלבד ----
+    const selfShown = await waitFor(host, () => {
+      const el = document.querySelector('.host-self-view video');
+      return el !== null && el.videoWidth > 0 && !el.paused;
+    });
+    const s0 = await selfViewInfo(host);
+    check(
+      '«המצלמה שלי»: חלונית עם המצלמה של המנחה, בפינה ובתוך הבמה',
+      selfShown && s0.inside && !s0.compact && s0.left > 960 && s0.top > 540,
+      JSON.stringify({ left: s0.left, top: s0.top, inside: s0.inside }),
+    );
+    check(
+      '«המצלמה שלי» לא מגיעה למסך הצפייה',
+      (await viewer.locator('.host-self-view').count()) === 0,
+    );
+
+    await dragSelfView(host, -300, -150);
+    const s1 = await selfViewInfo(host);
+    const want = { left: s0.left - 300 / s0.scale, top: s0.top - 150 / s0.scale };
+    const saved1 = JSON.parse(s1.saved ?? '{}');
+    check(
+      'גרירה מזיזה את החלונית לפי הגודל של הבמה, ונשמרת במחשב',
+      Math.abs(s1.left - want.left) <= 2 &&
+        Math.abs(s1.top - want.top) <= 2 &&
+        saved1.x === s1.left &&
+        saved1.y === s1.top &&
+        s1.focus !== 'BUTTON',
+      JSON.stringify({ from: [s0.left, s0.top], to: [s1.left, s1.top], want, saved: s1.saved }),
+    );
+
+    await dragSelfView(host, -4000, -4000);
+    const s2 = await selfViewInfo(host);
+    check(
+      'גרירה מעבר לשולי המסך נעצרת בתוך הבמה',
+      s2.inside && s2.left === 12 && s2.top === 12,
+      JSON.stringify({ left: s2.left, top: s2.top }),
+    );
+
+    await host.locator('.host-self-view button[title="מזעור"]').click();
+    const s3 = await selfViewInfo(host);
+    check(
+      'מזעור: כפתור «המצלמה שלי» באותה פינה, בלי פוקוס על כפתור',
+      s3.compact &&
+        s3.text.includes('המצלמה שלי') &&
+        s3.left === s2.left &&
+        s3.top === s2.top &&
+        JSON.parse(s3.saved ?? '{}').minimized === true &&
+        s3.focus !== 'BUTTON',
+      JSON.stringify({
+        compact: s3.compact,
+        text: s3.text,
+        at: [s3.left, s3.top],
+        focus: s3.focus,
+      }),
+    );
+    await host.locator('.host-self-view').click();
+    const s4 = await selfViewInfo(host);
+    check(
+      'לחיצה על הכפתור הממוזער פותחת את החלונית בחזרה',
+      !s4.compact && s4.playing && JSON.parse(s4.saved ?? '{}').minimized === false,
+      JSON.stringify({ compact: s4.compact, playing: s4.playing }),
+    );
+
+    const pipButton = host.locator('.host-self-view button[title^="פתיחה בחלון נפרד"]');
+    const pipOffered = (await pipButton.count()) === 1;
+    if (pipOffered) await pipButton.click();
+    const inPip =
+      pipOffered &&
+      (await waitFor(host, () => document.pictureInPictureElement !== null, undefined, 5_000));
+    await sleep(300);
+    const s5 = await selfViewInfo(host);
+    check(
+      'חלון נפרד (Picture-in-Picture): הווידאו ממשיך, ובמסך נשאר כפתור קטן',
+      inPip && s5.pip && s5.compact && s5.text.includes('בחלון נפרד') && s5.playing,
+      JSON.stringify({
+        offered: pipOffered,
+        pip: s5.pip,
+        compact: s5.compact,
+        text: s5.text,
+        playing: s5.playing,
+      }),
+    );
+    await host.screenshot({ path: path.join(OUT, '01-host-self-view-pip.png') });
+    await dragSelfView(host, 200, 100);
+    const s5b = await selfViewInfo(host);
+    check(
+      'בזמן החלון הנפרד אפשר לגרור את הכפתור, והחלון הנפרד נשאר פתוח',
+      s5b.pip && s5b.compact && s5b.left > s5.left && s5b.top > s5.top && s5b.inside,
+      JSON.stringify({ from: [s5.left, s5.top], to: [s5b.left, s5b.top], pip: s5b.pip }),
+    );
+    await host.locator('.host-self-view').click();
+    const outOfPip = await waitFor(
+      host,
+      () => document.pictureInPictureElement === null,
+      undefined,
+      5_000,
+    );
+    const s6 = await selfViewInfo(host);
+    check(
+      'לחיצה על הכפתור מחזירה מהחלון הנפרד לחלונית, במקום שאליו גררו את הכפתור',
+      outOfPip &&
+        !s6.compact &&
+        !s6.pip &&
+        s6.playing &&
+        s6.left === s5b.left &&
+        s6.top === s5b.top,
+      JSON.stringify({
+        pip: s6.pip,
+        compact: s6.compact,
+        playing: s6.playing,
+        at: [s6.left, s6.top],
+        pill: [s5b.left, s5b.top],
+      }),
+    );
+
+    // בחזרה לפינה, לצילום (ולשאר הבדיקה)
+    await dragSelfView(host, (s0.left - s6.left) * s6.scale, (s0.top - s6.top) * s6.scale);
+    const s7 = await selfViewInfo(host);
+    check(
+      'גרירה חזרה לפינה',
+      Math.abs(s7.left - s0.left) <= 2 && Math.abs(s7.top - s0.top) <= 2,
+      JSON.stringify({ left: s7.left, top: s7.top }),
+    );
+
+    // מזעור בפינה התחתונה: הכפתור נצמד לפינה ולא נשאר תלוי באוויר
+    await host.locator('.host-self-view button[title="מזעור"]').click();
+    const s8 = await selfViewInfo(host);
+    check(
+      'מזעור בפינה התחתונה: הכפתור נצמד לאותה פינה',
+      s8.compact && s8.inside && s8.left + 220 === s7.left + 320 && s8.top + 44 === s7.top + 180,
+      JSON.stringify({ tile: [s7.left, s7.top], pill: [s8.left, s8.top] }),
+    );
+    await host.screenshot({ path: path.join(OUT, '01-host-self-view-minimized.png') });
+    await host.locator('.host-self-view').click();
+    const s9 = await selfViewInfo(host);
+    check(
+      'והפתיחה מחזירה את החלונית בדיוק למקום שלה',
+      !s9.compact && s9.left === s7.left && s9.top === s7.top,
+      JSON.stringify({ left: s9.left, top: s9.top }),
+    );
+    await host.screenshot({ path: path.join(OUT, '01-host-self-view.png') });
+
     // ---- 3. צליל ----
     await viewer.locator('.live-btn--call').click();
     await sleep(500);
@@ -528,12 +716,21 @@ async function main() {
       JSON.stringify(v3),
     );
     await viewer.screenshot({ path: path.join(OUT, '02-viewer-cam-off.png') });
+    const selfCamOff = await waitFor(host, () =>
+      document.querySelector('.host-self-view-off')?.textContent?.includes('המצלמה כבויה'),
+    );
+    check('«המצלמה שלי» אומרת שהמצלמה כבויה', selfCamOff);
     await clickChip(host, 'הדלקת המצלמה');
     const camOn = await waitFor(
       viewer,
       () => document.querySelector('.live-video.is-playing') !== null,
     );
     check('המצלמה חוזרת', camOn);
+    const selfCamOn = await waitFor(
+      host,
+      () => document.querySelector('.host-self-view-off') === null,
+    );
+    check('«המצלמה שלי» חוזרת עם המצלמה', selfCamOn);
 
     // ---- 5. מונה הצופים ----
     const counted = await waitFor(
@@ -739,6 +936,10 @@ async function main() {
       45_000,
     );
     check('הצופה עובר לשידור של המסך השני', viewerFollows);
+    const selfMoved =
+      (await waitFor(host, () => document.querySelector('.host-self-view') === null)) &&
+      (await waitFor(host2, () => document.querySelector('.host-self-view video')?.videoWidth > 0));
+    check('«המצלמה שלי» עוברת עם השידור למסך השני', selfMoved);
 
     // ---- 10. כיבוי ----
     await clickChip(host2, 'כיבוי הווידאו');
@@ -751,6 +952,10 @@ async function main() {
     const quiet = await waitFor(sfuPage, () => window.sfu.active().length === 0, undefined, 20_000);
     const health3 = await relayHealth(relayBase);
     check('כיבוי → החלון נעלם אצל הצופה', gone);
+    check(
+      'כיבוי → «המצלמה שלי» נעלמת אצל המנחה',
+      await waitFor(host2, () => document.querySelector('.host-self-view') === null),
+    );
     check(
       'כיבוי → Cloudflare מפסיק להעביר (המנחה והצופים)',
       quiet && health3.video?.publications === 0 && health3.video?.viewers === 0,
