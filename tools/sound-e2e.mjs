@@ -18,15 +18,18 @@
  * (server/live-relay.mjs) ושרת הצבעות מדומה. סרטון הבדיקה נוצר בדפדפן בתחילת הריצה
  * (MediaRecorder), כך שאין קובצי מדיה בריפו ושום דבר לא יוצא לרשת.
  *
- * כלל שנבדק בכל צעד: AudioManager מנגן ערוץ אחד בכל רגע — שני צלילים יחד הם כישלון.
+ * כללים שנבדקים בכל צעד: AudioManager מנגן ערוץ אחד בכל רגע — שני צלילים יחד הם
+ * כישלון, חוץ ממחיאות כפיים, שמתנגנות מעל הצליל. בזמן המחיאות הצליל מונמך, ובלעדיהן
+ * כל צליל בווליום מלא.
  *
  * התרחישים:
  *   question-sound       צליל השאלה: שאלה 1 אחרי מסך הפתיחה, כניסה רגילה, אחרי טבלת
  *                        המובילים האוטומטית והידנית, טבלה בזמן הצבעה, מסך ההתחברות (X),
  *                        תצוגת המנצחים (W) והתחלה מחדש (#234).
  *   no-question-sound    משחק בלי צליל שאלה: מחיאות כפיים מתחת לטבלה ממשיכות כשהיא נסגרת.
- *   applause             מחיאות כפיים (3) משהות את מוזיקת הפתיחה ואת הטיימר וממשיכות
- *                        אותם מאותה נקודה; הצבעה שנסגרה בזמנן לא מחזירה את הטיימר.
+ *   applause             מחיאות כפיים (3) מעל מוזיקת הפתיחה ומעל הטיימר, שממשיכים
+ *                        מונמכים וחוזרים לווליום המלא כשהן נגמרות; הצבעה שנסגרה
+ *                        בזמנן עוצרת את הטיימר, והמחיאות ממשיכות עד הסוף.
  *   media-under-leaders  סרטון פתיחה שעולה מתחת לטבלה האוטומטית מחכה, ומתחיל מההתחלה,
  *                        עם קול, כשהיא נסגרת; כשהוא נגמר השאלה עולה עם הצליל שלה.
  *   video-slide-under-leaders  אותו דבר בשקופית וידאו (בלי שאלה).
@@ -53,7 +56,7 @@
  *                        השאלה, ו«משחק חדש» חוזר למסך הפתיחה.
  *   host-console         מסך המנחה בלשונית נפרדת מריץ את המשחק, ושותק בעצמו.
  *   live-viewer          מסך הצפייה (‎?view=‎) שומע מה שהאולם שומע, כולל מחיאות כפיים
- *                        שממשיכות את הטיימר (#235).
+ *                        מעל הטיימר (#235).
  *
  * דפדפן: playwright-core עם Chromium המותקן (/opt/pw-browsers/chromium אם קיים,
  * אחרת CHROMIUM_PATH או ערוץ chrome), מושתק (‎--mute-audio‎: הניגון והאירועים
@@ -144,6 +147,7 @@ const SOUNDS = {
   winnersMediaSound: ['winners.wav', 20],
   genericMediaSound: ['applause.wav', APPLAUSE_S], // מחיאות הכפיים (מקש 3)
 };
+const APPLAUSE_FILE = SOUNDS.genericMediaSound[0];
 
 /** שאלת טריוויה: שלוש תשובות, הראשונה נכונה. */
 function trivia(id, { time = 15, open = '', autoSkip } = {}) {
@@ -416,7 +420,11 @@ function instrument() {
         (el) =>
           !el.paused && !el.ended && el.error === null && (el.getAttribute('src') ?? '') !== '',
       )
-      .map((el) => ({ src: name(el), t: Math.round(el.currentTime * 10) / 10 }));
+      .map((el) => ({
+        src: name(el),
+        t: Math.round(el.currentTime * 10) / 10,
+        v: Math.round(el.volume * 100) / 100,
+      }));
   window.__pageMedia = () =>
     [...document.querySelectorAll('video, audio')].map((el) => ({
       tag: el.tagName.toLowerCase(),
@@ -533,7 +541,13 @@ const listText = (list) => (list.length === 0 ? 'שקט' : list.join(' + '));
 function judge(expect, events, screen) {
   const problems = [];
   const now = names(screen.sound);
-  if (screen.sound.length > 1) problems.push(`שני צלילים יחד: ${listText(now)}`);
+  const channels = screen.sound.filter((s) => s.src !== APPLAUSE_FILE);
+  const claps = screen.sound.length - channels.length;
+  if (channels.length > 1 || claps > 1) problems.push(`שני צלילים יחד: ${listText(now)}`);
+  for (const s of channels) {
+    if (claps > 0 && s.v >= 1) problems.push(`${s.src} לא הונמך מתחת למחיאות הכפיים`);
+    if (claps === 0 && s.v < 1) problems.push(`${s.src} נשאר מונמך (${s.v}) בלי מחיאות כפיים`);
+  }
   if (expect.sound !== undefined) {
     const want = [...expect.sound].sort();
     if (now.join() !== want.join()) problems.push(`נשמע ${listText(now)} במקום ${listText(want)}`);
@@ -815,7 +829,9 @@ const SCENARIOS = [
       await t.step('שאלה 1 — אין צליל שאלה, שקט', t.space(), { sound: [] });
       await t.playToReveal('שאלה 1');
       await t.step('שאלה 2 מאחורי הטבלה האוטומטית', t.space(), { sound: ['winnerslist.wav'] });
-      await t.step('מחיאות כפיים (3) מתחת לטבלה', t.key('3'), { sound: ['applause.wav'] });
+      await t.step('מחיאות כפיים (3) מתחת לטבלה — מעל המוזיקה שלה', t.key('3'), {
+        sound: ['applause.wav', 'winnerslist.wav'],
+      });
       await t.step('הטבלה נסגרה באמצע — מחיאות הכפיים ממשיכות', t.space(), {
         sound: ['applause.wav'],
         check: (s, ev) =>
@@ -828,30 +844,39 @@ const SCENARIOS = [
   },
   {
     name: 'applause',
-    title: 'מחיאות כפיים משהות וממשיכות',
+    title: 'מחיאות כפיים מעל המוזיקה',
     async run(t) {
+      /** הצליל ממשיך מאותה נקודה ולא מתחיל מחדש. */
+      const keeps = (file, from) => (s) => {
+        const it = s.sound.find((x) => x.src === file);
+        return it === undefined || it.t >= from || `${file} התחיל מחדש (${it.t}s)`;
+      };
       await t.open({ slides: [Q({ time: 30 }), Q()] });
       await t.step('מסך הפתיחה', t.wait(1500), { sound: ['connecting.wav'] });
-      await t.step('מחיאות כפיים (3) במסך הפתיחה', t.key('3'), { sound: ['applause.wav'] });
-      await t.step('הן נגמרו — מוזיקת הפתיחה ממשיכה מאותה נקודה', t.wait(APPLAUSE_S * 1000 + 800), {
+      await t.step('מחיאות כפיים (3) במסך הפתיחה — מעל המוזיקה', t.key('3'), {
+        sound: ['applause.wav', 'connecting.wav'],
+        started: { 'connecting.wav': 0 },
+        check: keeps('connecting.wav', 1.4),
+      });
+      await t.step('הן נגמרו — מוזיקת הפתיחה בווליום מלא, מאותה נקודה', t.wait(APPLAUSE_S * 1000 + 800), {
         sound: ['connecting.wav'],
-        check: (s) =>
-          s.sound.length === 0 ||
-          s.sound[0].t >= 1.4 ||
-          `מוזיקת הפתיחה התחילה מחדש (${s.sound[0].t}s)`,
+        started: { 'connecting.wav': 0 },
+        check: keeps('connecting.wav', 1.4 + APPLAUSE_S),
       });
       await t.step('שאלה 1', t.space(), { sound: ['q-sound.wav'] });
       await t.step('התשובות', t.space(3), { sound: ['q-sound.wav'] });
       await t.step('הצבעה (30 שניות)', t.space(), { sound: ['timer.wav'] });
       await t.step('מחיאות כפיים בזמן ההצבעה', t.key('3'), {
-        sound: ['applause.wav'],
+        sound: ['applause.wav', 'timer.wav'],
+        started: { 'timer.wav': 0 },
         check: (s) => timerValue(s) !== null || 'הספירה נעצרה',
       });
-      await t.step('הן נגמרו — צליל הטיימר ממשיך', t.wait(APPLAUSE_S * 1000 + 800), {
+      await t.step('הן נגמרו — צליל הטיימר בווליום מלא', t.wait(APPLAUSE_S * 1000 + 800), {
         sound: ['timer.wav'],
+        started: { 'timer.wav': 0 },
       });
-      await t.step('שוב מחיאות כפיים', t.key('3'), { sound: ['applause.wav'] });
-      await t.step('ההצבעה נסגרה בזמנן', t.space(), { sound: ['applause.wav'] });
+      await t.step('שוב מחיאות כפיים', t.key('3'), { sound: ['applause.wav', 'timer.wav'] });
+      await t.step('ההצבעה נסגרה בזמנן — המחיאות ממשיכות', t.space(), { sound: ['applause.wav'] });
       await t.step('הן נגמרו — שקט, הטיימר לא חוזר', t.wait(APPLAUSE_S * 1000 + 800), {
         sound: [],
       });
@@ -1594,13 +1619,13 @@ const SCENARIOS = [
         await t.step('התשובות', t.space(3), both({ sound: ['q-sound.wav'] }), LIVE);
         await t.step('הצבעה', t.space(), both({ sound: ['timer.wav'] }), LIVE);
         await t.step(
-          'מחיאות כפיים (3) בזמן ההצבעה',
+          'מחיאות כפיים (3) בזמן ההצבעה — מעל הטיימר, אצל כולם',
           t.key('3'),
-          both({ sound: ['applause.wav'] }),
+          both({ sound: ['applause.wav', 'timer.wav'] }),
           LIVE,
         );
         await t.step(
-          'הן נגמרו — הטיימר ממשיך אצל כולם',
+          'הן נגמרו — הטיימר בווליום מלא אצל כולם',
           t.wait(APPLAUSE_S * 1000),
           both({ sound: ['timer.wav'] }),
           LIVE,

@@ -6,7 +6,12 @@ import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { AliasTable, keyBetween } from '../src/live/aliases.ts';
 import { applyPatch, diff, isValidPatch, shareEqual, type PatchOp } from '../src/live/patch.ts';
-import { FRESH_SOUND_MS, SoundTrack, mirrorSoundActions } from '../src/live/soundTrack.ts';
+import {
+  FRESH_SOUND_MS,
+  SoundTrack,
+  mirrorApplause,
+  mirrorSoundActions,
+} from '../src/live/soundTrack.ts';
 import {
   isViewToken,
   liveRelayBase,
@@ -179,6 +184,32 @@ describe('שיקוף הסאונד', () => {
     for (let i = 0; i < 6; i++) track.record({ type: 'cue', kind: 'climb' });
     expect(track.cues).toHaveLength(4);
     expect(track.record({ type: 'play', channel: 'generic', src: null, loop: false })).toBe(false);
+  });
+
+  it('מחיאות כפיים: לצד הצליל ולא במקומו, ואצל הצופה רק כשהן טריות', () => {
+    let now = 1000;
+    const track = new SoundTrack(() => now);
+    track.record({ type: 'play', channel: 'timer', src: 'timer.mp3', loop: true });
+    expect(track.record({ type: 'applause', src: 'clap.mp3' })).toBe(true);
+    expect(track.sound).toMatchObject({ kind: 'play', channel: 'timer', src: 'timer.mp3' });
+    expect(track.applause).toMatchObject({ src: 'clap.mp3', at: 1000 });
+    now = 2000;
+    track.record({ type: 'applause', src: null }); // מסונתזות
+    const clap = track.applause!;
+    expect(clap).toMatchObject({ src: '', at: 2000 });
+    const toLocal = (t: number) => t;
+    expect(mirrorApplause(clap, -1, 2000 + FRESH_SOUND_MS - 1, toLocal)).toEqual({
+      play: { src: '' },
+      lastSeq: clap.seq,
+    });
+    expect(mirrorApplause(clap, -1, 2000 + FRESH_SOUND_MS + 1, toLocal)).toEqual({
+      play: null,
+      lastSeq: clap.seq,
+    });
+    // כבר נוגנו — כלום
+    expect(mirrorApplause(clap, clap.seq, 2000, toLocal)).toEqual({ play: null, lastSeq: clap.seq });
+    // מסך ראשי בגרסה קודמת: אין שדה, והמחיאות מגיעות ב-sound
+    expect(mirrorApplause(undefined, 5, 2000, toLocal)).toEqual({ play: null, lastSeq: 5 });
   });
 
   it('הצופה: לולאה מתחילה גם באיחור, חד-פעמי רק כשהוא טרי', () => {

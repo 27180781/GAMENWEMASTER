@@ -34,6 +34,7 @@ import type { Group, RosterData } from '../app/roster.ts';
 import { AliasTable } from './aliases.ts';
 import {
   LIVE_SCHEMA,
+  type LiveApplause,
   type LiveCue,
   type LiveOverlays,
   type LiveSnapshot,
@@ -88,6 +89,7 @@ export interface LiveHostInput {
   mediaStartedAt: number | null;
   sound: LiveSound;
   cues: LiveCue[];
+  applause: LiveApplause | null;
   /**
    * תמונה מוקטנת של תמונת השאלה, לשקופית "התמונה מתבהרת" כל עוד ההצבעה לא
    * נסגרה (ראו revealThumb.ts). null = אין עדיין — נשלח פיקסל שקוף.
@@ -484,6 +486,7 @@ export class LiveSnapshotBuilder {
       colors,
       sound: { ...input.sound },
       cues: input.cues.map((c) => ({ ...c })),
+      applause: input.applause === null ? null : { ...input.applause },
       video: liveVideoCopy(input.video),
     };
   }

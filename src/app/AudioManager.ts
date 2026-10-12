@@ -1,10 +1,10 @@
 /**
  * AudioManager אחד לכל ערוצי הסאונד (SPEC סעיף 9):
  * - **סאונד חדש עוצר את כל הסאונדים הקודמים** (בכל הערוצים, וגם מחיאות
- *   הכפיים) — לעולם לא מתנגנים כמה במקביל, כדי שלא יתערבבו.
- * - **מחיאות כפיים רק משהות** את מה שמתנגן (הטיימר, מוזיקת הפתיחה, הטבלה),
- *   והוא ממשיך מאותה נקודה כשהן נגמרות. ניגון או עצירה אחרים בינתיים מבטלים
- *   את ההמשך: המשחק כבר עבר למקום אחר.
+ *   הכפיים) — לעולם לא מתנגנים שני ערוצים במקביל, כדי שלא יתערבבו.
+ * - **מחיאות כפיים מתנגנות מעל** מה שמתנגן (הטיימר, מוזיקת הפתיחה, הטבלה):
+ *   הוא לא נעצר, רק יורד ל-APPLAUSE_DUCK מהווליום עד שהן נגמרות, כמו אצל
+ *   תקליטן. (עד 2026-10 הן השהו אותו, והמוזיקה הקצבית שתקה בכל מחיאה.)
  * - ווליום מפעיל גלובלי.
  * - autoplay נפתח רק אחרי אינטראקציה ראשונה (מגבלת דפדפן) — עד אז ניסיונות
  *   ניגון נכשלים בשקט ומנוגנים שוב ברגע שהמשתמש מבצע אינטראקציה.
@@ -38,26 +38,26 @@ export type AudioEvent =
   | { type: 'play'; channel: SoundChannel; src: string | null; loop: boolean }
   | { type: 'stop'; channel: SoundChannel }
   | { type: 'stopAll' }
-  | { type: 'applause' }
+  /** מחיאות כפיים מעל הצליל הנוכחי; src = הקובץ שהוגדר, null = מסונתזות. */
+  | { type: 'applause'; src: string | null }
   | { type: 'cue'; kind: 'climb' | 'fall' | 'fanfare' };
 
 // הערה: טעינת הסאונד מראש מטופלת מרוכז ב-mediaLoader (useMediaPreload) יחד עם
 // שאר המדיה — כאן רק ניגון בפועל.
 
-/** צליל שמחיאות הכפיים השהו — ממשיך מאותה נקודה כשהן נגמרות. */
-interface SuspendedSound extends PendingPlay {
-  channel: SoundChannel;
-  audio: HTMLAudioElement;
-}
+/**
+ * כמה מהווליום נשאר לצליל הנוכחי בזמן מחיאות הכפיים: מספיק כדי שהקצב לא
+ * ייעלם, ומספיק נמוך כדי שהמחיאות יישמעו מעליו.
+ */
+export const APPLAUSE_DUCK = 0.4;
 
 export class AudioManager {
   private readonly active = new Map<SoundChannel, HTMLAudioElement>();
-  /** מה התבקש לנגן בכל אלמנט — כדי שהמשך אחרי מחיאות כפיים ישוקף לצופים כפי שהיה. */
-  private readonly playing = new WeakMap<HTMLAudioElement, PendingPlay>();
   private readonly pending = new Map<SoundChannel, PendingPlay>();
-  private suspended: SuspendedSound | null = null;
-  /** מחיאות הכפיים האחרונות. סיום של קודמות (או של כאלה שנקטעו) לא ממשיך כלום. */
+  /** מחיאות הכפיים האחרונות. סיום של קודמות (או של כאלה שנקטעו) לא מחזיר את הווליום. */
   private applauseToken = 0;
+  /** מחיאות כפיים מתנגנות עכשיו, והצליל הנוכחי מונמך (APPLAUSE_DUCK). */
+  private ducked = false;
   /** מחיאות כפיים מקובץ (genericMediaSound) — לא ב-active, כי הן לא "הצליל הנוכחי". */
   private applauseAudio: HTMLAudioElement | null = null;
   private volume = 1;
@@ -133,17 +133,24 @@ export class AudioManager {
 
   setVolume(volume: number): void {
     this.volume = Math.min(1, Math.max(0, volume));
-    for (const audio of this.active.values()) audio.volume = this.volume;
-    if (this.suspended) this.suspended.audio.volume = this.volume;
+    this.applyChannelVolume();
     if (this.applauseAudio) this.applauseAudio.volume = this.volume;
+  }
+
+  /** הווליום של הערוצים: של המפעיל, ובזמן מחיאות כפיים — מונמך. */
+  private channelVolume(): number {
+    return this.ducked ? this.volume * APPLAUSE_DUCK : this.volume;
+  }
+
+  private applyChannelVolume(): void {
+    const volume = this.channelVolume();
+    for (const audio of this.active.values()) audio.volume = volume;
   }
 
   /** מנגן src בערוץ נתון; קודם עוצר כל סאונד אחר שמתנגן. src ריק/null עוצר בלבד. */
   play(channel: SoundChannel, src: string | null, { loop = false } = {}): void {
     this.emit({ type: 'play', channel, src, loop });
     // סאונד חדש עוצר את כל הקודמים (כל הערוצים + מחיאות כפיים) — בלי ערבוב.
-    // מה שמחיאות הכפיים השהו כבר לא ימשיך: המשחק עבר הלאה.
-    this.dropSuspended();
     this.stopActiveSounds();
     this.pending.clear();
     if (!src) return;
@@ -154,12 +161,11 @@ export class AudioManager {
     }
     const audio = new Audio(src);
     audio.loop = loop;
-    audio.volume = this.volume;
+    audio.volume = this.channelVolume();
     audio.addEventListener('ended', () => {
       if (this.active.get(channel) === audio) this.active.delete(channel);
     });
     this.active.set(channel, audio);
-    this.playing.set(audio, { src, loop });
     debugLog('audio', `${channel} מנגן`, { src: shortSrc(src), loop });
     audio.play().catch((err: unknown) => {
       const name = err instanceof DOMException ? err.name : String(err);
@@ -185,10 +191,10 @@ export class AudioManager {
     });
   }
 
+  /** עוצר ערוץ אחד. מחיאות כפיים שמתנגנות ממשיכות עד הסוף. */
   stop(channel: SoundChannel): void {
     this.emit({ type: 'stop', channel });
     this.pending.delete(channel);
-    this.dropSuspended(channel);
     const audio = this.active.get(channel);
     if (audio) {
       audio.pause();
@@ -207,9 +213,10 @@ export class AudioManager {
     this.stopApplause();
   }
 
-  /** עוצר מחיאות כפיים שמתנגנות, כך שהסיום שלהן כבר לא ימשיך את מה שהושהה. */
+  /** עוצר מחיאות כפיים שמתנגנות, והצליל הנוכחי חוזר לווליום המלא. */
   private stopApplause(): void {
     this.applauseToken += 1;
+    this.unduck();
     if (this.applauseSource) {
       try {
         this.applauseSource.stop();
@@ -225,18 +232,14 @@ export class AudioManager {
     }
   }
 
-  /** מבטל את ההמשך של מה שמחיאות הכפיים השהו (כל צליל, או רק בערוץ הזה). */
-  private dropSuspended(channel?: SoundChannel): void {
-    const s = this.suspended;
-    if (s === null || (channel !== undefined && s.channel !== channel)) return;
-    this.suspended = null;
-    s.audio.pause();
-    s.audio.src = '';
+  private unduck(): void {
+    if (!this.ducked) return;
+    this.ducked = false;
+    this.applyChannelVolume();
   }
 
   stopAll(): void {
     this.emit({ type: 'stopAll' });
-    this.dropSuspended();
     this.stopActiveSounds();
     this.pending.clear();
   }
@@ -246,34 +249,37 @@ export class AudioManager {
    * מחיאות מסונתזות ב-WebAudio — מאות "כפיים" של רעש לבן קצר עם מעטפת דעיכה,
    * בפיזור אקראי שמתדלדל לקראת הסוף.
    *
-   * מה שמתנגן כרגע מושהה ולא נעצר, וממשיך מאותה נקודה כשהמחיאות נגמרות: בלי
-   * זה הטיימר שתק עד סוף ההצבעה, ומוזיקת הפתיחה עד שהמשחק התחיל.
+   * הן מתנגנות מעל מה שמתנגן: הטיימר, מוזיקת הפתיחה או הטבלה ממשיכים, מונמכים
+   * ל-APPLAUSE_DUCK עד שהמחיאות נגמרות. מחיאות בזמן מחיאות מתחילות מחדש.
+   * ניגון חדש או stopAll עוצרים גם אותן (בלי ערבוב של שני צלילים חדשים);
+   * stop של ערוץ — לא.
    */
   playApplause(file?: string | null): void {
     const src = file !== undefined && file !== null && file.trim() !== '' ? file : null;
-    // לצופים זה נשאר בדיוק כמו קודם: קובץ = ניגון בערוץ generic, אחרת "applause".
-    this.emit(
-      src !== null ? { type: 'play', channel: 'generic', src, loop: false } : { type: 'applause' },
-    );
-    this.suspendCurrent();
-    this.pending.clear();
+    this.emit({ type: 'applause', src });
+    this.stopApplause();
+    if (src !== null && !this.unlocked) {
+      // אודיו נעול: מחיאות הן רגע, ולנגן אותן אחר כך כבר אין טעם — ומה שממתין
+      // לאינטראקציה (מוזיקת הפתיחה) נשאר ממתין.
+      debugLog('audio', 'מחיאות כפיים דולגו (אודיו עדיין נעול עד אינטראקציה)');
+      return;
+    }
+    this.ducked = true;
+    this.applyChannelVolume();
     const token = this.applauseToken;
     const done = () => {
-      if (token === this.applauseToken) this.resumeSuspended();
+      if (token !== this.applauseToken) return;
+      this.applauseAudio = null;
+      this.applauseSource = null;
+      this.unduck();
     };
     if (src !== null) {
-      if (!this.unlocked) {
-        // אודיו נעול — המחיאות ממתינות לאינטראקציה כמו כל צליל, בלי המשך.
-        this.dropSuspended();
-        this.pending.set('generic', { src, loop: false });
-        return;
-      }
       const audio = new Audio(src);
       audio.volume = this.volume;
       audio.addEventListener('ended', done);
       audio.addEventListener('error', done);
       this.applauseAudio = audio;
-      debugLog('audio', 'generic מנגן (מחיאות כפיים)', { src: shortSrc(src) });
+      debugLog('audio', 'מחיאות כפיים מעל הצליל הנוכחי', { src: shortSrc(src) });
       audio.play().catch((err: unknown) => {
         const name = err instanceof DOMException ? err.name : String(err);
         if (name !== 'AbortError') done();
@@ -292,49 +298,14 @@ export class AudioManager {
       gain.gain.value = this.volume;
       source.connect(gain);
       gain.connect(ctx.destination);
-      source.onended = () => {
-        if (this.applauseSource === source) this.applauseSource = null;
-        done();
-      };
+      source.onended = done;
       this.applauseSource = source;
       source.start();
-      debugLog('audio', 'מחיאות כפיים (WebAudio)');
+      debugLog('audio', 'מחיאות כפיים (WebAudio) מעל הצליל הנוכחי');
     } catch {
-      // סביבה בלי אודיו — מתעלמים בשקט, ומה שהושהה ממשיך מיד
+      // סביבה בלי אודיו — מתעלמים בשקט, והצליל הנוכחי חוזר מיד לווליום המלא
       done();
     }
-  }
-
-  /**
-   * משהה את הצליל שמתנגן (יש לכל היותר אחד) ושומר אותו להמשך, ועוצר את כל
-   * השאר. מחיאות כפיים בזמן מחיאות כפיים משאירות מושהה את מה שהיה לפניהן.
-   */
-  private suspendCurrent(): void {
-    if (this.suspended === null) {
-      for (const [channel, audio] of this.active) {
-        const info = this.playing.get(audio);
-        if (info === undefined || audio.paused || audio.ended) continue;
-        this.active.delete(channel);
-        audio.pause();
-        this.suspended = { channel, audio, ...info };
-        break;
-      }
-    }
-    this.stopActiveSounds();
-  }
-
-  /** מחיאות הכפיים נגמרו: הצליל שהושהה ממשיך מאותה נקודה, וגם אצל הצופים. */
-  private resumeSuspended(): void {
-    const s = this.suspended;
-    if (s === null) return;
-    this.suspended = null;
-    this.emit({ type: 'play', channel: s.channel, src: s.src, loop: s.loop });
-    this.active.set(s.channel, s.audio);
-    s.audio.volume = this.volume;
-    debugLog('audio', `${s.channel} ממשיך אחרי מחיאות הכפיים`, { src: shortSrc(s.src) });
-    s.audio.play().catch(() => {
-      if (this.active.get(s.channel) === s.audio) this.active.delete(s.channel);
-    });
   }
 
   /**
@@ -342,7 +313,7 @@ export class AudioManager {
    *   'climb'   — ארפג'יו עולה (טיפוס בסולם).
    *   'fall'    — גלישה יורדת (החלקה בחבל).
    *   'fanfare' — תרועת ניצחון.
-   * בניגוד ל-play/playApplause, אפקטים אלו *אינם* עוצרים סאונד אחר: הם קצרים,
+   * בניגוד ל-play, אפקטים אלו *אינם* עוצרים סאונד אחר (וגם לא מנמיכים אותו): הם קצרים,
    * ולעיתים שני אפקטים קורים יחד (קבוצה מטפסת בזמן שאחרת נופלת).
    */
   playCue(kind: 'climb' | 'fall' | 'fanfare'): void {

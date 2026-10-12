@@ -22,7 +22,7 @@ import { livePublishKey, liveRelayBase, liveViewToken, liveViewUrl } from './tok
 /** מה ש-GameHost מעביר: כל מה שמוצג, בלי מה שהשידור מחשב בעצמו. */
 export type LiveHostFrame = Omit<
   LiveHostInput,
-  'sound' | 'cues' | 'revealThumb' | 'mediaStartedAt' | 'scoresPage'
+  'sound' | 'cues' | 'applause' | 'revealThumb' | 'mediaStartedAt' | 'scoresPage'
 >;
 
 export interface LivePublisherHandle {
@@ -91,6 +91,7 @@ export function useLivePublisher({
         ...f,
         sound: track.sound,
         cues: track.cues,
+        applause: track.applause,
         revealThumb,
         mediaStartedAt: mediaRef.current.at,
         scoresPage: scoresPageRef.current,

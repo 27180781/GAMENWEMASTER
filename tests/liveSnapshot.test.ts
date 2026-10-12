@@ -107,6 +107,7 @@ function input(engine: GameEngine, over: Partial<LiveHostInput> = {}): LiveHostI
     mediaStartedAt: null,
     sound: SILENCE,
     cues: [],
+    applause: null,
     revealThumb: null,
     video: null,
     ...over,

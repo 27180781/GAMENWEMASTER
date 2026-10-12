@@ -1719,8 +1719,8 @@ export function GameHost({
           break;
         case 3:
           // מחיאות כפיים: הקובץ שהוגדר ב-genericMediaSound שבגייסון, ובלעדיו
-          // מחיאות מסונתזות (WebAudio). מה שמתנגן (הטיימר, מוזיקת הפתיחה או
-          // הטבלה) רק מושהה וממשיך כשהן נגמרות — ראו AudioManager.playApplause.
+          // מחיאות מסונתזות (WebAudio). הן מעל מה שמתנגן (הטיימר, מוזיקת
+          // הפתיחה או הטבלה), שרק מונמך עד שהן נגמרות — ראו AudioManager.playApplause.
           audio.playApplause(soundsRef.current.genericMediaSound.src);
           break;
         case 4:

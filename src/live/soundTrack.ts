@@ -3,7 +3,7 @@
  *
  * הצד של המנחה: SoundTrack מקבל כל בקשה של AudioManager (setObserver) ושומר
  * את הסאונד הנוכחי — הסאונדים במנוע בלעדיים, כך שתמיד יש אחד לכל היותר — ואת
- * האפקטים הקצרים האחרונים, שמתנגנים לצידו.
+ * האפקטים הקצרים האחרונים ומחיאות הכפיים האחרונות, שמתנגנים לצידו.
  *
  * הצד של הצופה: playMirroredSound מחליט, מול מה שכבר נוגן אצלו, מה לנגן עכשיו.
  * סאונד בלולאה (מוזיקת הלובי, הטיימר) מתחיל גם אצל מי שנכנס באמצע; סאונד חד
@@ -11,7 +11,7 @@
  */
 
 import type { AudioEvent } from '../app/AudioManager.ts';
-import type { LiveCue, LiveSound } from './types.ts';
+import type { LiveApplause, LiveCue, LiveSound } from './types.ts';
 
 /** כמה אפקטים אחרונים נשמרים (שניים יכולים לקרות יחד — סולם וחבל). */
 const CUES_KEPT = 4;
@@ -30,6 +30,7 @@ export const SILENCE: LiveSound = {
 export class SoundTrack {
   sound: LiveSound = SILENCE;
   cues: LiveCue[] = [];
+  applause: LiveApplause | null = null;
   private seq = 0;
   private readonly now: () => number;
 
@@ -59,8 +60,9 @@ export class SoundTrack {
       case 'stopAll':
         return this.silence();
       case 'applause':
+        // מעל הצליל, לא במקומו: הצליל הנוכחי נשאר כפי שהוא.
         this.seq += 1;
-        this.sound = { seq: this.seq, kind: 'applause', channel: '', src: '', loop: false, at };
+        this.applause = { seq: this.seq, src: event.src ?? '', at };
         return true;
       case 'cue': {
         this.seq += 1;
@@ -81,6 +83,7 @@ export class SoundTrack {
 /** מה שהצופה צריך לעשות עכשיו כדי להשמיע את מה שהמסך הראשי משמיע. */
 export type SoundAction =
   | { type: 'play'; channel: string; src: string; loop: boolean }
+  /** מסך ראשי מלפני 2026-10: מחיאות כפיים במקום הצליל (sound.kind 'applause'). */
   | { type: 'applause' }
   | { type: 'stop' }
   | { type: 'cue'; kind: LiveCue['kind'] };
@@ -118,4 +121,21 @@ export function mirrorSoundActions(
     if (now - toLocal(cue.at) <= FRESH_SOUND_MS) actions.push({ type: 'cue', kind: cue.kind });
   }
   return { actions, lastSeq: nextSeq, lastCueSeq: nextCue };
+}
+
+/**
+ * מחיאות הכפיים (טהורה): לנגן אותן מעל הצליל רק כשהן חדשות לצופה וטריות —
+ * מי שנכנס באמצע לא ישמע מחיאות של לפני דקה. מחזירה גם את ה-seq לשמירה.
+ */
+export function mirrorApplause(
+  applause: LiveApplause | null | undefined,
+  lastSeq: number,
+  now: number,
+  toLocal: (hostTime: number) => number,
+): { play: { src: string } | null; lastSeq: number } {
+  if (applause === null || applause === undefined || applause.seq <= lastSeq) {
+    return { play: null, lastSeq };
+  }
+  const fresh = now - toLocal(applause.at) <= FRESH_SOUND_MS;
+  return { play: fresh ? { src: applause.src } : null, lastSeq: applause.seq };
 }
