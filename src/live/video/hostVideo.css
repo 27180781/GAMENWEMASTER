@@ -148,3 +148,133 @@
   font-weight: 700;
   white-space: nowrap;
 }
+
+/* ---- «המצלמה שלי»: החלונית הצפה של המנחה (HostSelfView.tsx) ----
+   המידות כמו ב-selfView.ts (‏SELF_VIEW_SIZE / SELF_VIEW_PILL_SIZE), שהגרירה
+   מחשבת לפיהן את גבולות הבמה. */
+
+.host-self-view {
+  position: absolute;
+  /* מעל טבלת המובילים (48), מתחת לתפריט המפעיל (50) ולחלונות */
+  z-index: 49;
+  width: 320px;
+  height: 180px;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  border-radius: 12px;
+  background: #000;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+  color: #fff;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.host-self-view.is-dragging {
+  cursor: grabbing;
+}
+
+.host-self-view video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* כמו מראה, כמו התצוגה המקדימה בתפריט המפעיל */
+  transform: scaleX(-1);
+  pointer-events: none;
+}
+
+.host-self-view-off {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: #111827;
+  font-size: 18px;
+  text-align: center;
+}
+
+.host-self-view-off span:last-child {
+  font-size: 15px;
+  opacity: 0.75;
+}
+
+.host-self-view-badge {
+  position: absolute;
+  bottom: 8px;
+  inset-inline-end: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(220, 38, 38, 0.85);
+  font-size: 16px;
+}
+
+.host-self-view-bar {
+  position: absolute;
+  top: 6px;
+  inset-inline-start: 6px;
+  display: flex;
+  gap: 6px;
+  opacity: 0.7;
+  transition: opacity 0.15s ease;
+}
+
+.host-self-view:hover .host-self-view-bar {
+  opacity: 1;
+}
+
+.host-self-view-bar button {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font: inherit;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.host-self-view-bar button:hover {
+  background: rgba(0, 0, 0, 0.85);
+}
+
+/* ממוזערת, או פתוחה בחלון נפרד: כפתור אחד שאפשר גם לגרור. הווידאו נשאר
+   בדף (החלון הנפרד מנגן ממנו) אבל לא נראה. */
+.host-self-view.is-compact {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 220px;
+  height: 44px;
+  padding: 0 12px;
+  border-color: rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.7);
+  box-shadow: none;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.host-self-view.is-compact:hover {
+  opacity: 1;
+}
+
+.host-self-view.is-compact video {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.host-self-view-pill {
+  overflow: hidden;
+  font-size: 18px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

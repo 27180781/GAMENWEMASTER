@@ -131,6 +131,7 @@ import {
 import { GroupConnectScreen } from '../render/GroupConnectScreen.tsx';
 import { useLivePublisher } from '../live/useLivePublisher.ts';
 import { HostVideoChip } from '../live/video/HostVideoControls.tsx';
+import { HostSelfView } from '../live/video/HostSelfView.tsx';
 import { useHostVideo } from '../live/video/useHostVideo.ts';
 import {
   endGame,
@@ -3315,6 +3316,7 @@ export function GameHost({
           />
         )}
         {hostVideo.available && <HostVideoChip video={hostVideo} />}
+        {hostVideo.available && <HostSelfView video={hostVideo} />}
         {syntheticCrowd && (
           <span className="demo-badge">
             דמו · {crowdConfig.voterCount.toLocaleString()} שחקנים
