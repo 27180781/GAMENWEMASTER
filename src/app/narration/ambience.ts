@@ -59,9 +59,19 @@ export const AMB_LOBBY = [
   'amb_lobby_3',
   'amb_lobby_4',
   'amb_lobby_5',
+  'amb_lobby_6',
+  'amb_lobby_7',
   'amb_lobby_nearly',
 ] as const;
-export const AMB_START = ['amb_start_1', 'amb_start_2', 'amb_start_3'] as const;
+/** הלובי במשחק טלפונים: בלי «השלטים ביד?» (amb_lobby_4). */
+export const AMB_LOBBY_PHONES = AMB_LOBBY.filter((key) => key !== 'amb_lobby_4');
+export const AMB_START = [
+  'amb_start_1',
+  'amb_start_2',
+  'amb_start_3',
+  'amb_start_4',
+  'amb_start_5',
+] as const;
 export const AMB_NEXT = ['amb_next_1', 'amb_next_2', 'amb_next_3'] as const;
 export const AMB_VOTING = ['amb_voting_1', 'amb_voting_2', 'amb_voting_3'] as const;
 export const AMB_ALL_CORRECT = ['amb_all_correct_1', 'amb_all_correct_2'] as const;

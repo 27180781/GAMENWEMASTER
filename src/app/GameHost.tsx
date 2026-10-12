@@ -2327,6 +2327,7 @@ export function GameHost({
       phase: state.phase,
       slideId: state.currentSlideId,
       slideType: s.type,
+      voteMode: g.setting.limit.type === 'phones' ? 'phones' : 'clickers',
       votable: isVotableSlide(s),
       questionOrdinal: questionOrdinal(g, s.id),
       answers: narrationAnswers(s),

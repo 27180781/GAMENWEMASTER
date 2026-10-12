@@ -398,8 +398,8 @@ interface BackupTarget {
 
 | מה מוצג | קטעים |
 |---|---|
-| מסך פתיחה (פעם אחת למשחק) | `flow_welcome` |
-| השאלה מוצגת | [`flow_question_number` + מספר בנקבה] + `narration.question` |
+| מסך פתיחה (פעם אחת למשחק) | `flow_welcome`, ומיד אחריו הוראות ההצבעה: `flow_howto_phones` כש-`limit.type` הוא `"phones"`, אחרת `flow_howto_clickers` |
+| השאלה מוצגת | [`flow_question_number` + מספר בנקבה] + `narration.question`; בשאלת סקר `misc_poll_intro` לפני `narration.question` |
 | שקופית הימור מוצגת | `bet_round` + `narration.question` |
 | תשובה k נחשפה | `flow_answer_number` + k + `narration.answers[k-1]` |
 | ההצבעה נפתחה | `flow_vote_open` |
@@ -426,7 +426,7 @@ Math.random** (מונה לכל מצב בזיכרון הבמאי), כך שאות�
 
 | מה מוצג | קריאת האווירה |
 |---|---|
-| מסך התחברות, כל ~45 שניות | `amb_lobby_*` לסירוגין; כל פעם שלישית `amb_connected_pre` + מספר המחוברים בזכר + `unit_participants` |
+| מסך התחברות, כל ~45 שניות | `amb_lobby_*` לסירוגין (במשחק טלפונים בלי `amb_lobby_4`, «השלטים ביד?»); כל פעם שלישית `amb_connected_pre` + מספר המחוברים בזכר + `unit_participants` |
 | יציאה ממסך הפתיחה למשחק (פעם אחת) | `amb_start_*` |
 | כניסה לשאלה שאינה הראשונה | `amb_next_*` **לפני** מספר השאלה, באותו משפט; בשאלה שחוצה את החצי (ורק ממשחק של 6 שאלות ומעלה, פעם אחת) `amb_half`; בשאלה האחרונה `amb_last_question` — כל אחד מהם **במקום** `amb_next_*`. שלושתם אירוע אחד (`questionAmbience`) ולכן **קריאה אחת לכל ביקור בשקופית**, גם כשהניסוח מתחלף באמצע |
 | חלף חצי מזמן ההצבעה | `amb_voting_*` (פעם אחת לחלון) |

@@ -21,6 +21,7 @@ import {
   AMB_CLOSE_RACE,
   AMB_CONGRATS,
   AMB_LOBBY,
+  AMB_LOBBY_PHONES,
   AMB_MOST_CORRECT,
   AMB_NEXT,
   AMB_NONE_CORRECT,
@@ -88,6 +89,12 @@ export interface DisplayedState {
   phase: NarrationPhase;
   slideId: number;
   slideType: string;
+  /**
+   * איך המשתתפים מצביעים, לפי `setting.limit.type`: `"phones"` = טלפונים, כל
+   * ערך אחר = שלטים (כמו בשאר המנוע). קובע את הוראות ההצבעה בפתיחה ואת
+   * קריאות הלובי שמדברות על שלטים.
+   */
+  voteMode: 'clickers' | 'phones';
   votable: boolean;
   /** מספר סידורי של השקופית בין שקופיות השאלה (1-based); 0 = אינה שאלה. */
   questionOrdinal: number;
@@ -470,6 +477,12 @@ function candidates(s: DisplayedState, memory: NarrationMemory): NarrationEvent[
     // מדיית הפתיחה של השקופית הראשונה, שעוד לא על המסך.)
     if (s.overlay !== 'none') return events;
     events.push({ key: 'welcome', parts: ['flow_welcome'], global: true });
+    // הוראות ההצבעה — פעם אחת למשחק, מיד אחרי "ברוכים הבאים" ובאותו צעד.
+    events.push({
+      key: 'howto',
+      parts: [s.voteMode === 'phones' ? 'flow_howto_phones' : 'flow_howto_clickers'],
+      global: true,
+    });
     // פטפוט הלובי: כל ~45 שניות, ובכל פעם שלישית מספר המחוברים במקום ניסוח
     // כללי. לא מתנגן מעל מדיה חוסמת, ונפסק ברגע שהמשחק מתחיל (השלב כבר אינו
     // 'opening').
@@ -482,7 +495,7 @@ function candidates(s: DisplayedState, memory: NarrationMemory): NarrationEvent[
           situation: 'lobby',
           parts: counted
             ? [{ pre: 'amb_connected_pre', tail: participantsClipKeys(s.connectedCount) }]
-            : [{ variants: AMB_LOBBY }],
+            : [{ variants: s.voteMode === 'phones' ? AMB_LOBBY_PHONES : AMB_LOBBY }],
         });
       }
     }
@@ -616,6 +629,8 @@ function candidates(s: DisplayedState, memory: NarrationMemory): NarrationEvent[
     } else if (s.announceQuestionNumber && s.questionOrdinal > 0) {
       parts.push('flow_question_number', ...numberClipKeys(s.questionOrdinal, 'f'));
     }
+    // שאלת סקר: אומרים שאין תשובה נכונה לפני הנוסח, כדי שאיש לא יחפש אותה.
+    if (s.slideType === 'survey') parts.push('misc_poll_intro');
     parts.push({ url: s.questionClip });
     events.push({ key: 'question', parts });
   }

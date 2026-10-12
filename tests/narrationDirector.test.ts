@@ -18,6 +18,7 @@ import {
   narrationRevealMatches,
   playableGroupClips,
 } from '../src/app/narration/gameNarration.ts';
+import { AMB_LOBBY, AMB_LOBBY_PHONES, AMB_START } from '../src/app/narration/ambience.ts';
 import { parseGameFile } from '../src/engine/index.ts';
 import { fourAnswers, rawGame, rawSlide } from './helpers.ts';
 
@@ -43,6 +44,7 @@ function base(over: Partial<DisplayedState> = {}): DisplayedState {
     phase: 'showing',
     slideId: 1,
     slideType: 'trivia',
+    voteMode: 'clickers',
     votable: true,
     questionOrdinal: 1,
     answers: [
@@ -96,6 +98,9 @@ function runSteps(states: DisplayedState[], from = emptyNarrationMemory()): Narr
 }
 
 const clipsOf = (states: DisplayedState[]) => runSteps(states).map((d) => d.clips);
+
+/** "ברוכים הבאים" ומיד אחריו הוראות ההצבעה (משחק שלטים — ברירת המחדל של `base`). */
+const WELCOME = ['flow_welcome.mp3', 'flow_howto_clickers.mp3'];
 
 describe('הצגת השאלה', () => {
   it('★ שאלה מוצגת → "שאלה מספר" + המספר + נוסח השאלה', () => {
@@ -408,7 +413,7 @@ describe('מסכי הפתיחה, המנצחים והניקוד', () => {
       base({ questionShown: true }),
       base({ stage: 'opening' }),
     ]);
-    expect(clips[0]).toEqual(['flow_welcome.mp3']);
+    expect(clips[0]).toEqual(WELCOME);
     expect(clips[1]).toEqual([]);
     expect(clips[3]).toEqual([]);
   });
@@ -602,7 +607,7 @@ describe('★ אודיו נעול — מה שנאמר פעם אחת למשחק �
       base({ stage: 'opening' }), // המפעיל נגע בלובי
       base({ stage: 'opening' }),
     ]);
-    expect(clips).toEqual([[], [], ['flow_welcome.mp3'], []]);
+    expect(clips).toEqual([[], [], WELCOME, []]);
   });
 
   it('★ "ברוכים הבאים" אינו נאמר מעל שכבה — הקליק על ⚙ שפתח את האודיו, או תפריט ESC', () => {
@@ -613,12 +618,12 @@ describe('★ אודיו נעול — מה שנאמר פעם אחת למשחק �
       base({ stage: 'opening' }), // ההגדרות נסגרו — הלובי שוב על המסך
       base({ stage: 'opening' }),
     ]);
-    expect(clips).toEqual([[], [], [], ['flow_welcome.mp3'], []]);
+    expect(clips).toEqual([[], [], [], WELCOME, []]);
   });
 
   it('"ברוכים הבאים" אינו תלוי במדיית הפתיחה של השקופית הראשונה (היא עוד לא על המסך)', () => {
     const clips = clipsOf([base({ stage: 'opening', activeMedia: 'open' })]);
-    expect(clips[0]).toEqual(['flow_welcome.mp3']);
+    expect(clips[0]).toEqual(WELCOME);
   });
 
   it('"ברוכים הבאים" שלא נאמר בלובי אינו נאמר אחרי שהמשחק התחיל', () => {
@@ -825,7 +830,7 @@ describe('קריאות אווירה', () => {
 
     it('★ קריאה כל ~45 שניות, בניסוחים מתחלפים', () => {
       const clips = clipsOf([lobby(0), lobby(30_000), lobby(45_000), lobby(50_000), lobby(90_000)]);
-      expect(clips[0]).toEqual(['flow_welcome.mp3']);
+      expect(clips[0]).toEqual(WELCOME);
       expect(clips[1]).toEqual([]); // עוד לא הגיע הזמן
       expect(clips[2]).toEqual(['amb_lobby_1.mp3']);
       expect(clips[3]).toEqual([]); // לא חוזרת לעתים קרובות יותר
@@ -1295,5 +1300,90 @@ describe('קריאות אווירה', () => {
       ]);
       expect(clips[0]).toEqual([]);
     });
+  });
+});
+
+/**
+ * משוב לקוח (2026-10): הקהל לא ידע שבסקר אין תשובה נכונה, ולא ידע איך מצביעים.
+ * שלושה מפתחות חדשים בבנק — `misc_poll_intro`, `flow_howto_clickers` /
+ * `flow_howto_phones` — ועוד ניסוחי לובי ופתיחה. בנק שנוצר לפניהם חייב
+ * להישמע בדיוק כמו קודם.
+ */
+describe('★ סקר, הוראות הצבעה ו«מוכנים?»', () => {
+  /** בנק מלא שאינו מכיר את המפתחות שנמסרו — כמו בנק שנוצר לפני שנוספו. */
+  const bankWithout = (...missing: string[]) =>
+    new Proxy(
+      {},
+      { get: (_target, key: string) => (missing.includes(key) ? undefined : `${key}.mp3`) },
+    ) as Record<string, string>;
+
+  it('★ משחק טלפונים → "ברוכים הבאים" ואחריו הוראות לטלפון', () => {
+    const clips = clipsOf([base({ stage: 'opening', voteMode: 'phones' })]);
+    expect(clips[0]).toEqual(['flow_welcome.mp3', 'flow_howto_phones.mp3']);
+  });
+
+  it('★ ההוראות נאמרות פעם אחת למשחק, גם כשחוזרים ללובי', () => {
+    const clips = clipsOf([
+      base({ stage: 'opening' }),
+      base({ questionShown: true }),
+      base({ stage: 'opening' }),
+    ]);
+    expect(clips[0]).toEqual(WELCOME);
+    expect(clips[2]).toEqual([]);
+  });
+
+  it('★ בנק בלי ההוראות → רק "ברוכים הבאים", כמו קודם', () => {
+    const bank = bankWithout('flow_howto_clickers', 'flow_howto_phones');
+    expect(clipsOf([base({ stage: 'opening', bank })])[0]).toEqual(['flow_welcome.mp3']);
+    expect(clipsOf([base({ stage: 'opening', bank, voteMode: 'phones' })])[0]).toEqual([
+      'flow_welcome.mp3',
+    ]);
+  });
+
+  it('★ שאלת סקר → "שאלה מספר" + המספר + «שאלת סקר, אין תשובה נכונה» + הנוסח', () => {
+    const [d] = runSteps([base({ slideType: 'survey', questionShown: true })]);
+    expect(d!.clips).toEqual([
+      'flow_question_number.mp3',
+      'num_f_1.mp3',
+      'misc_poll_intro.mp3',
+      'q1.mp3',
+    ]);
+  });
+
+  it('שאלת סקר בלי הכרזת מספר → הפתיח והנוסח', () => {
+    const [d] = runSteps([
+      base({ slideType: 'survey', questionShown: true, announceQuestionNumber: false }),
+    ]);
+    expect(d!.clips).toEqual(['misc_poll_intro.mp3', 'q1.mp3']);
+  });
+
+  it('שאלת טריוויה אינה מקבלת את פתיח הסקר', () => {
+    const [d] = runSteps([base({ questionShown: true })]);
+    expect(d!.clips).not.toContain('misc_poll_intro.mp3');
+  });
+
+  it('★ בנק בלי פתיח הסקר → שאלת סקר נשמעת כמו קודם', () => {
+    const [d] = runSteps([
+      base({ slideType: 'survey', questionShown: true, bank: bankWithout('misc_poll_intro') }),
+    ]);
+    expect(d!.clips).toEqual(['flow_question_number.mp3', 'num_f_1.mp3', 'q1.mp3']);
+  });
+
+  it('★ לובי במשחק טלפונים לעולם לא שואל «השלטים ביד?»', () => {
+    const lobby = (i: number, voteMode: 'clickers' | 'phones') =>
+      base({ stage: 'opening', bank: AMB_BANK, voteMode, lobbyElapsedMs: i * 45_000 });
+    const steps = (voteMode: 'clickers' | 'phones') =>
+      clipsOf(Array.from({ length: 30 }, (_, i) => lobby(i, voteMode))).flat();
+    expect(steps('phones')).not.toContain('amb_lobby_4.mp3');
+    expect(steps('phones')).toContain('amb_lobby_6.mp3');
+    expect(steps('clickers')).toContain('amb_lobby_4.mp3');
+  });
+
+  it('★ «מוכנים?» בפתיחה — הניסוחים החדשים בסבב של "מתחילים"', () => {
+    expect(AMB_START).toContain('amb_start_4');
+    expect(AMB_START).toContain('amb_start_5');
+    expect(AMB_LOBBY).toContain('amb_lobby_6');
+    expect(AMB_LOBBY).toContain('amb_lobby_7');
+    expect(AMB_LOBBY_PHONES).toEqual(AMB_LOBBY.filter((key) => key !== 'amb_lobby_4'));
   });
 });
