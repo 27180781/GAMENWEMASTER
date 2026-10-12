@@ -10,13 +10,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import type { GameFile } from '../engine/index.ts';
 import { type AutoTransition, type GameSettings } from '../app/urlParams.ts';
-import {
-  canOpenHostWindow,
-  isDesktopClicker,
-  launchReceiver,
-  openHostWindow,
-  type SealConfig,
-} from '../app/clickerBridge.ts';
+import { isDesktopClicker, launchReceiver, type SealConfig } from '../app/clickerBridge.ts';
+import { hostConsoleUrl, openHostConsole } from '../app/hostConsoleWindow.ts';
 import { MediaCachePanel } from './MediaCachePanel.tsx';
 import { GuideButton } from './GuideScreen.tsx';
 
@@ -108,6 +103,8 @@ export function SettingsScreen({
   const [intervalMs, setIntervalMs] = useState(initial.intervalMs);
   const [hostVoterId, setHostVoterId] = useState(initial.hostVoterId);
   const [autoTransition, setAutoTransition] = useState<AutoTransition>(initial.autoTransition);
+  /** הדפדפן חסם את חלון מסך המנחה — מציעים לפתוח אותו בטאב. */
+  const [hostBlocked, setHostBlocked] = useState(false);
   const [showQr, setShowQr] = useState(initial.showQr);
   const [showBottomInstructions, setShowBottomInstructions] = useState(initial.showBottomInstructions);
   const [showBottomButtons, setShowBottomButtons] = useState(initial.showBottomButtons);
@@ -194,21 +191,27 @@ export function SettingsScreen({
     'התחילו לשחק!',
   ];
 
-  // קישור/כפתור ל"מסך המנחה" הנפרד: ב-EXE — כפתור שפותח חלון נוסף; באונליין —
-  // קישור שנפתח בטאב חדש (‏?host=1). זמין רק אם יש תשתית לפתיחה.
-  const hostScreenLink = canOpenHostWindow() ? (
-    <button className="settings-host-link" onClick={() => openHostWindow()}>
-      🎛 פתח מסך מנחה (חלון נפרד)
-    </button>
-  ) : (
-    <a
-      className="settings-host-link"
-      href={`${window.location.pathname}?host=1`}
-      target="_blank"
-      rel="noopener noreferrer"
-    >
-      🎛 פתח מסך מנחה (טאב נפרד)
-    </a>
+  // כפתור ל"מסך המנחה" הנפרד: חלון משלו גם ב-EXE וגם בדפדפן (hostConsoleWindow.ts).
+  // בדפדפן זה היה קישור לטאב חדש, שנפתח בתוך חלון המשחק ועבר איתו למקרן.
+  const hostScreenLink = (
+    <>
+      <button
+        className="settings-host-link"
+        title="חלון שליטה נפרד: השאירו אותו על מסך המחשב, והעבירו את חלון המשחק למקרן"
+        onClick={() => setHostBlocked(openHostConsole() === 'blocked')}
+      >
+        🎛 פתח מסך מנחה (חלון נפרד)
+      </button>
+      {hostBlocked && (
+        <p className="settings-host-blocked" role="alert">
+          הדפדפן חסם את החלון. אפשרו חלונות קופצים לאתר הזה, או{' '}
+          <a href={hostConsoleUrl(window.location.pathname)} target="_blank" rel="noopener noreferrer">
+            פתחו את מסך המנחה בטאב
+          </a>{' '}
+          וגררו את הטאב מסרגל הטאבים החוצה, כדי שיהיה חלון משלו.
+        </p>
+      )}
+    </>
   );
 
   // כפתורי הפעולה: במסך פתיחה — "התחל משחק"; באמצע משחק — "התחל מחדש" + "המשך".
