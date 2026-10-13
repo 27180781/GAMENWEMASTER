@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   COUNTDOWN_SPACE,
+  answerFontSizes,
   answerTextMax,
   answersMinHeight,
   largestFitting,
@@ -103,5 +104,52 @@ describe('largestFitting', () => {
 
   it('הכול נכנס — קרוב לגדול ביותר', () => {
     expect(largestFitting(34, 46, () => true)).toBeGreaterThan(45.4);
+  });
+});
+
+describe('answerFontSizes', () => {
+  /** תשובה i נכנסת עד הגודל limits[i]. */
+  function sizesFor(limits: number[], css = 34, max = 46, min = 12) {
+    const fitsOne = (i: number, size: number) => size <= limits[i]!;
+    const fitsAll = (size: number) => limits.every((_, i) => fitsOne(i, size));
+    return answerFontSizes(limits.length, { css, max, min }, fitsAll, fitsOne);
+  }
+
+  it('כולן נכנסות בגודל הרגיל — כולן גדלות יחד, לגודל של הארוכה מביניהן', () => {
+    const sizes = sizesFor([60, 41.3, 52]);
+    expect(new Set(sizes).size).toBe(1);
+    expect(sizes[0]).toBeGreaterThan(40.7);
+    expect(sizes[0]).toBeLessThanOrEqual(41.3);
+  });
+
+  it('כולן קצרות — עד גודל השאלה ולא יותר', () => {
+    const sizes = sizesFor([200, 200]);
+    expect(sizes[0]).toBe(sizes[1]);
+    expect(sizes[0]).toBeGreaterThan(45.4);
+    expect(sizes[0]).toBeLessThanOrEqual(46);
+  });
+
+  it('אחת לא נכנסת בגודל הרגיל — כמו עד היום: רק היא מוקטנת', () => {
+    const sizes = sizesFor([60, 28.4, 52]);
+    expect(sizes[0]).toBeNull();
+    expect(sizes[2]).toBeNull();
+    expect(sizes[1]).toBeLessThanOrEqual(28.4);
+    expect(sizes[1]).toBeGreaterThan(27.8);
+  });
+
+  it('אחת נכנסת בדיוק בגודל הרגיל — אין הגדלה לאף אחת', () => {
+    expect(sizesFor([60, 34, 52])).toEqual([null, null, null]);
+  });
+
+  it('השאלה הוקטנה עד גודל התשובות (max = css) — אין הגדלה', () => {
+    expect(sizesFor([60, 60], 34, 34)).toEqual([null, null]);
+  });
+
+  it('לא נכנסת גם בגודל הקטן ביותר — נשארת בו, כמו FitText', () => {
+    expect(sizesFor([60, 5])).toEqual([null, 12]);
+  });
+
+  it('בלי תשובות', () => {
+    expect(answerFontSizes(0, { css: 34, max: 46, min: 12 }, () => true, () => true)).toEqual([]);
   });
 });

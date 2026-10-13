@@ -496,7 +496,7 @@ export function QuestionSlide({
     answers.filter((a) => a.correct).reduce((sum, a) => sum + (counts[String(a.id)] ?? 0), 0);
   const correctPct = total > 0 ? Math.round((correctCount / total) * 100) : 0;
 
-  // השאלה והתשובות בגובה שיש להן (questionFit.ts).
+  // השאלה והתשובות בגובה שיש להן, וגודל פונט אחיד לתשובות (questionFit.ts).
   const contentRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLDivElement>(null);

@@ -13,6 +13,12 @@
  * המקום של הספירה לאחור שמור גם לפני ההצבעה ואחריה, כדי שהגדלים לא יקפצו כשהיא
  * מופיעה ונעלמת.
  *
+ * גודל הפונט של תשובות הטקסט (בקשת הלקוח מ-1.8, «פונט גדול יותר כשהתשובות
+ * קצרות»; נסים, 13.10: «רק אם ניתן להגדיל בכל התשובות שיהיה את אותו גודל
+ * פונט»): כשכל התשובות נכנסות בגודל הרגיל, כולן גדלות יחד לגודל הגדול ביותר
+ * שבו כולן עדיין נכנסות, ולא מעבר לגודל השאלה. כשאחת לא נכנסת — כמו עד היום:
+ * כל תשובה מוקטנת לבד, עד שהיא נכנסת.
+ *
  * החשבון טהור ונבדק ביחידה; fitQuestionScreen מודד את המסך ומחיל.
  */
 
@@ -37,6 +43,9 @@ export const DENSE_ROWS = 4;
  */
 const CARD_MIN = { regular: 104, dense: 80 };
 const ROW_GAP = { regular: 20, dense: 12 };
+
+/** פי כמה מגודל ה-CSS תשובות קצרות גדלות לכל היותר: 34px → 46px, גודל השאלה. */
+export const ANSWER_GROW = 46 / 34;
 
 /** הגדלים הקטנים ביותר — כמו FitText עד היום (שאלה 13, תשובה 12). */
 const QUESTION_MIN_FONT = 13;
@@ -109,6 +118,30 @@ export function largestFitting(lo: number, hi: number, fits: (size: number) => b
   return best;
 }
 
+/**
+ * גודל הפונט של כל תשובה (null = גודל ה-CSS).
+ *   • כולן נכנסות בגודל ה-CSS → כולן באותו גודל: הגדול ביותר עד max שבו כולן
+ *     עדיין נכנסות.
+ *   • אחת לפחות לא נכנסת → כמו עד היום, כל אחת לחוד: גודל ה-CSS כשהיא נכנסת בו,
+ *     ואחרת הגדול ביותר מ-min שבו היא נכנסת.
+ * fitsAll(size) — האם כולן נכנסות בגודל הזה; fitsOne(i, size) — האם תשובה i נכנסת.
+ */
+export function answerFontSizes(
+  count: number,
+  size: { css: number; max: number; min: number },
+  fitsAll: (size: number) => boolean,
+  fitsOne: (index: number, size: number) => boolean,
+): Array<number | null> {
+  if (count === 0) return [];
+  if (fitsAll(size.css)) {
+    const common = size.max > size.css ? largestFitting(size.css, size.max, fitsAll) : size.css;
+    return Array.from({ length: count }, () => (common > size.css ? common : null));
+  }
+  return Array.from({ length: count }, (_, i) =>
+    fitsOne(i, size.css) ? null : largestFitting(size.min, size.css, (s) => fitsOne(i, s)),
+  );
+}
+
 // ---------------------------------------------------------------------------
 // המדידה במסך
 // ---------------------------------------------------------------------------
@@ -162,8 +195,7 @@ function shrinkToFit(el: HTMLElement, min: number): number {
 
 /**
  * מודד את מסך השאלה ומחיל: תקרת גובה לטקסט השאלה (או לתמונה שהיא השאלה),
- * הקטנה שלו עד שהוא נכנס, תקרת גובה לטקסט התשובות, והקטנה של כל תשובה עד שהיא
- * נכנסת. כל ריצה
+ * הקטנה שלו עד שהוא נכנס, תקרת גובה לטקסט התשובות, וגודל הפונט שלהן. כל ריצה
  * מתחילה מגדלי ה-CSS, ולכן התוצאה תלויה רק בתוכן ובמקום — ריצה חוזרת לא משנה
  * כלום.
  */
@@ -192,11 +224,12 @@ export function fitQuestionScreen(d: QuestionFitElements): void {
     answersMin: answersMinHeight(d.rows, card === null ? CARD_MIN[density] : cardMinHeight(card), rowGap),
   };
 
+  let questionSize: number | null = null;
   if (text !== null) {
     const cssMax = px(getComputedStyle(text).maxHeight);
     const max = questionContentMax(s, cssMax);
     if (max < cssMax) text.style.maxHeight = `${max}px`;
-    shrinkToFit(text, QUESTION_MIN_FONT);
+    questionSize = shrinkToFit(text, QUESTION_MIN_FONT);
   }
   // תמונה שעוד לא נטענה נספרת בגובה המלא שמותר לה — שהתשובות לא יגלשו כשהיא
   // תיטען (QuestionSlide מריץ שוב בטעינה, ואז הן מקבלות את מה שלא נוצל).
@@ -220,5 +253,21 @@ export function fitQuestionScreen(d: QuestionFitElements): void {
   });
   if (textMax < cssTextMax) for (const el of cards) el.style.maxHeight = `${textMax}px`;
 
-  for (const el of cards) shrinkToFit(el, ANSWER_MIN_FONT);
+  const css = px(getComputedStyle(first).fontSize) || 34;
+  const sizes = answerFontSizes(
+    cards.length,
+    { css, max: Math.max(css, Math.min(css * ANSWER_GROW, questionSize ?? Infinity)), min: ANSWER_MIN_FONT },
+    (size) => {
+      for (const el of cards) el.style.fontSize = `${size}px`;
+      return cards.every(fitsBox);
+    },
+    (i, size) => {
+      const el = cards[i]!;
+      el.style.fontSize = `${size}px`;
+      return fitsBox(el);
+    },
+  );
+  sizes.forEach((size, i) => {
+    cards[i]!.style.fontSize = size === null ? '' : `${size}px`;
+  });
 }
