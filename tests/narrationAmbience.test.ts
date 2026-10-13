@@ -90,6 +90,17 @@ describe('pickAmbience', () => {
     expect(pickAmbience('sit', ['a'], bankOf(['a']), {}, { skip: new Set(['a']) }).key).toBeNull();
   });
 
+  it('★ avoid נמנע מניסוח כל עוד יש חלופה, ונאמר כשאין', () => {
+    expect(pickAmbience('sit', THREE, bankOf(THREE), {}, { avoid: 'a' }).key).toBe('b');
+    expect(pickAmbience('sit', THREE, bankOf(THREE), { sit: 1 }, { avoid: 'a' }).key).toBe('b');
+    // החלופה היחידה מדולגת או חסרה — הניסוח נאמר בכל זאת, כמו ניסוח יחיד בבנק.
+    expect(pickAmbience('sit', ['a', 'b'], bankOf(['a', 'b']), {}, { avoid: 'a', skip: new Set(['b']) }).key).toBe('a');
+    expect(pickAmbience('sit', ['a', 'b'], bankOf(['a']), {}, { avoid: 'a' }).key).toBe('a');
+    // המונה מתקדם אחרי מה שנבחר בפועל.
+    const pick = pickAmbience('sit', THREE, bankOf(THREE), {}, { avoid: 'a' });
+    expect(pick.rotation).toEqual({ sit: 2 });
+  });
+
   it('לכל מצב מונה משלו — מצבים אינם מזיזים זה את זה', () => {
     let rotation: AmbienceRotation = {};
     const first = pickAmbience('one', THREE, bankOf(THREE), rotation);

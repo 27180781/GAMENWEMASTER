@@ -839,20 +839,40 @@ describe('קריאות אווירה', () => {
 
     it('★ כל קריאה שלישית היא מספר המחוברים, וכל רביעית חוזרת על ההוראות', () => {
       const clips = clipsOf([
+        lobby(0, 12),
         lobby(45_000, 12),
         lobby(90_000, 12),
         lobby(135_000, 12),
         lobby(180_000, 12),
         lobby(225_000, 12),
       ]);
-      expect(clips[2]).toEqual(['amb_connected_pre.mp3', 'num_m_12.mp3', 'unit_participants.mp3']);
-      expect(clips[3]).toEqual(['flow_howto_clickers.mp3']); // למי שהגיע מאוחר
-      expect(clips[4]).toEqual(['amb_lobby_2.mp3']); // וממשיכים בסיבוב
+      expect(clips[3]).toEqual(['amb_connected_pre.mp3', 'num_m_12.mp3', 'unit_participants.mp3']);
+      expect(clips[4]).toEqual(['flow_howto_clickers.mp3']); // למי שהגיע מאוחר
+      expect(clips[5]).toEqual(['amb_lobby_2.mp3']); // וממשיכים בסיבוב
     });
 
     it('כשמספר המחוברים אינו ידוע — ניסוח כללי במקום המספר', () => {
-      const clips = clipsOf([lobby(45_000), lobby(90_000), lobby(135_000)]);
-      expect(clips[2]).toEqual(['amb_lobby_2.mp3']);
+      const clips = clipsOf([lobby(0), lobby(45_000), lobby(90_000), lobby(135_000)]);
+      expect(clips[3]).toEqual(['amb_lobby_2.mp3']);
+    });
+
+    it('★ מדיית פתיחה בשקופית הראשונה אינה משתיקה את הלובי (היא עוד לא על המסך)', () => {
+      const clips = clipsOf([
+        amb({ stage: 'opening', lobbyElapsedMs: 0, activeMedia: 'open' }),
+        amb({ stage: 'opening', lobbyElapsedMs: 45_000, activeMedia: 'open' }),
+        amb({ stage: 'opening', lobbyElapsedMs: 90_000, activeMedia: 'open' }),
+      ]);
+      expect(clips).toEqual([WELCOME, ['amb_lobby_1.mp3'], ['amb_lobby_6.mp3']]);
+    });
+
+    it('★ שעון לובי שנדגם באיחור משתנה של מילישניות — עדיין קריאה כל 45 שניות', () => {
+      // הדגימות של setInterval מאחרות בכמה מילישניות, בכל פעם בכמות אחרת: 45,004
+      // ואחריה 90,001 הן הפרש של 44,997 — ובלי סובלנות הקריאה הייתה גולשת ל-95.
+      const steps = Array.from({ length: 49 }, (_, k) => lobby(k * 5_000 + ((k * 37) % 7), 0));
+      const said = runSteps(steps)
+        .map((d, k) => (d.clips.length > 0 ? k : -1))
+        .filter((k) => k > 0);
+      expect(said).toEqual([9, 18, 27, 36, 45]);
     });
 
     it('שכבה שאינה מוקראת מעל מסך ההתחברות — שקט', () => {
@@ -1498,7 +1518,8 @@ describe('★ סקר, הוראות הצבעה ו«מוכנים?»', () => {
       .map((d, i) => ({ t: steps[i]!.lobbyElapsedMs, n: d.clips.length }))
       .filter((step) => step.n > 0)
       .map((step) => step.t);
-    expect(said).toEqual([400_000, 445_000, 490_000]);
+    // ההוראות ב-400, הקריאה שהגיעה לתורה ממתינה להן 20 שניות, והבאה 45 אחריה.
+    expect(said).toEqual([400_000, 420_000, 465_000]);
   });
 
   it('«כמעט כולם כאן» אינו נאמר בדקות הראשונות של הלובי, גם כשהסיבוב מוגרל', () => {
@@ -1513,11 +1534,119 @@ describe('★ סקר, הוראות הצבעה ו«מוכנים?»', () => {
     }
   });
 
-  it('האודיו נפתח בדיוק בתור הפטפוט → הכול ברשימה אחת, בלי קטיעה', () => {
+  it('האודיו נפתח בדיוק בתור הפטפוט → ההוראות לבדן, והקריאה אחרי ההמתנה', () => {
     const at = (lobbyElapsedMs: number, audioUnlocked = true) =>
       base({ stage: 'opening', bank: AMB_BANK, lobbyElapsedMs, audioUnlocked });
-    const clips = clipsOf([at(0, false), at(50_000)]);
-    expect(clips[1]).toEqual([...WELCOME, 'amb_lobby_1.mp3']);
+    const clips = clipsOf([at(0, false), at(50_000), at(55_000), at(65_000), at(70_000)]);
+    expect(clips[1]).toEqual(WELCOME); // בלי משפט שנדבק אליהן
+    expect(clips[2]).toEqual([]);
+    expect(clips[3]).toEqual([]);
+    expect(clips[4]).toEqual(['amb_lobby_1.mp3']);
+  });
+
+  /**
+   * לובי בדפדפן: האודיו נעול עד הקליק הראשון, וקריאות הלובי עוברות בשקט. החזרה
+   * על ההוראות נספרת ממתי שנשמעו באמת — אחרת הקריאה הבאה אחריהן (או אפילו
+   * אותו צעד) הייתה שוב אותן הוראות.
+   */
+  it('★ ההוראות לא חוזרות מיד אחרי שנשמעו, בכל רגע שבו האודיו נפתח', () => {
+    for (let unlock = 5_000; unlock <= 400_000; unlock += 5_000) {
+      const steps = Array.from({ length: 160 }, (_, k) =>
+        base({
+          stage: 'opening',
+          bank: AMB_BANK,
+          connectedCount: 12,
+          lobbyElapsedMs: k * 5_000,
+          audioUnlocked: k * 5_000 >= unlock,
+        }),
+      );
+      const heard = runSteps(steps)
+        .map((d, k) => ({ t: k * 5_000, clips: d.clips }))
+        .filter((step) => step.t >= unlock && step.clips.length > 0);
+      expect(heard[0]).toEqual({ t: unlock, clips: WELCOME });
+      // המשפט הבא — לפחות 20 שניות אחרי ההוראות, ואף פעם לא שוב ההוראות.
+      expect(heard[1]!.t - unlock).toBeGreaterThanOrEqual(20_000);
+      const lines = heard.slice(1).map((step) => step.clips);
+      const firstRepeat = lines.findIndex((clips) => clips.includes('flow_howto_clickers.mp3'));
+      expect(firstRepeat).toBeGreaterThanOrEqual(3); // לפחות שלוש קריאות אחרות לפניה
+      for (const clips of lines) expect(clips.length).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it('★ ההגדרות נסגרות כשקריאה בתור → «ברוכים הבאים» וההוראות פעם אחת, בלי קריאה צמודה', () => {
+    const at = (lobbyElapsedMs: number, overlay: DisplayedState['overlay'], audioUnlocked: boolean) =>
+      base({ stage: 'opening', bank: AMB_BANK, connectedCount: 12, lobbyElapsedMs, overlay, audioUnlocked });
+    const steps: DisplayedState[] = [];
+    for (let t = 0; t < 150_000; t += 5_000) steps.push(at(t, 'none', false));
+    for (let t = 150_000; t < 185_000; t += 5_000) steps.push(at(t, 'other', true)); // קליק על ⚙
+    for (let t = 185_000; t <= 260_000; t += 5_000) steps.push(at(t, 'none', true));
+    const heard = runSteps(steps)
+      .map((d, k) => ({ t: steps[k]!.lobbyElapsedMs, clips: d.clips }))
+      .filter((step) => step.t >= 150_000 && step.clips.length > 0); // לפני הקליק — נזרק בנגן
+    expect(heard[0]).toEqual({ t: 185_000, clips: WELCOME });
+    expect(heard[1]!.t).toBe(205_000);
+    expect(heard[1]!.clips).not.toContain('flow_howto_clickers.mp3');
+  });
+
+  it('★ «כמעט כולם כאן» רק מהקריאה החמישית, גם בלי הוראות שתופסות את הרביעית', () => {
+    const fifth = new Set<string>();
+    for (let seed = 0; seed < AMB_LOBBY.length; seed += 1) {
+      const lines = runSteps(
+        Array.from({ length: 6 }, (_, i) =>
+          base({ stage: 'opening', bank: AMB_BANK, voteMode: 'none', lobbyElapsedMs: i * 45_000 }),
+        ),
+        emptyNarrationMemory(seed),
+      )
+        .slice(1)
+        .map((d) => d.clips);
+      expect(lines).toHaveLength(5);
+      for (const clips of lines.slice(0, 4)) expect(clips).not.toContain('amb_lobby_nearly.mp3');
+      fifth.add(lines[4]![0]!);
+    }
+    expect(fifth).toContain('amb_lobby_nearly.mp3');
+  });
+
+  it('★ החלפת מקור ההצבעה בכל רגע ובכל ריצה — אף ניסוח לובי אינו חוזר ברצף', () => {
+    const modes: [VoteMode, VoteMode][] = [
+      ['phones', 'clickers'],
+      ['clickers', 'phones'],
+      ['none', 'both'],
+      ['both', 'none'],
+    ];
+    for (const [before, after] of modes) {
+      for (let seed = 0; seed < AMB_LOBBY.length; seed += 1) {
+        for (let switchAt = 1; switchAt <= 12; switchAt += 1) {
+          const lines = runSteps(
+            Array.from({ length: 16 }, (_, i) =>
+              base({
+                stage: 'opening',
+                bank: AMB_BANK,
+                voteMode: i < switchAt ? before : after,
+                lobbyElapsedMs: i * 45_000,
+              }),
+            ),
+            emptyNarrationMemory(seed),
+          )
+            .flatMap((d) => d.clips)
+            .filter((clip) => clip.startsWith('amb_lobby'));
+          for (let i = 1; i < lines.length; i += 1) expect(lines[i]).not.toBe(lines[i - 1]);
+        }
+      }
+    }
+  });
+
+  it('★ אחרי «מוכנים?» בלובי — «מתחילים!» אינו פותח שוב ב«מוכנים?»', () => {
+    // seed 3: הלובי אומר amb_lobby_3 ואז amb_lobby_7 («מי מוכן למשחק?»), ו«מתחילים!»
+    // היה amb_start_4 («מוכנים? יוצאים לדרך!»).
+    const startAfter = (lobbySteps: number) => {
+      const steps = Array.from({ length: lobbySteps }, (_, i) =>
+        base({ stage: 'opening', bank: AMB_BANK, lobbyElapsedMs: i * 45_000 }),
+      );
+      steps.push(base({ bank: AMB_BANK, questionShown: true }));
+      return runSteps(steps, emptyNarrationMemory(3)).at(-1)!.clips[0];
+    };
+    expect(startAfter(2)).toBe('amb_start_4.mp3'); // אחרי amb_lobby_3 — כרגיל
+    expect(startAfter(3)).toBe('amb_start_5.mp3'); // אחרי «מי מוכן למשחק?»
   });
 
   it('★ «מתחילים!» משתנה מריצה לריצה — כל הניסוחים נשמעים', () => {
@@ -1582,6 +1711,34 @@ describe('★ סקר, הוראות הצבעה ו«מוכנים?»', () => {
       });
     }
     expect(heard).toContain('amb_voting_3.mp3'); // בטריוויה הוא עדיין בסבב
+  });
+
+  it('★ טריוויה וסקר לסירוגין לאורך משחק — «מי שבטוח, שילחץ» לא נעלם מהסבב', () => {
+    for (let seed = 0; seed < 6; seed += 1) {
+      const steps: DisplayedState[] = [];
+      for (let slide = 1; slide <= 16; slide += 1) {
+        const at = (remaining: number) =>
+          base({
+            bank: AMB_BANK,
+            slideId: slide,
+            slideType: slide % 2 === 0 ? 'survey' : 'trivia',
+            questionShown: true,
+            answersShown: 2,
+            phase: 'voting',
+            timer: { remaining, total: 15, paused: false },
+          });
+        steps.push(at(15), at(7));
+      }
+      const voting = runSteps(steps, emptyNarrationMemory(seed))
+        .flatMap((d) => d.clips)
+        .filter((clip) => clip.startsWith('amb_voting'));
+      expect(voting).toHaveLength(16);
+      // גם בחצי השני של המשחק כל שלושת הניסוחים עוד נשמעים (בלי נעילה על שניים).
+      expect(new Set(voting.slice(8))).toEqual(
+        new Set(AMB_VOTING.map((key) => `${key}.mp3`)),
+      );
+      for (let i = 1; i < voting.length; i += 1) expect(voting[i]).not.toBe(voting[i - 1]);
+    }
   });
 
   it('★ «מוכנים?» בפתיחה — הניסוחים החדשים בסבב של "מתחילים"', () => {

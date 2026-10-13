@@ -25,6 +25,11 @@ export interface AmbienceOptions {
    * באורכים שונים על אותו מצב היו מזיזות את המונה, וניסוח היה חוזר ברצף.
    */
   skip?: ReadonlySet<string> | undefined;
+  /**
+   * ניסוח שעדיף לא לבחור (למשל הניסוח שנאמר בפעם הקודמת במצב קרוב), אלא אם
+   * אין שום חלופה אחרת — אז הוא נאמר בכל זאת, כמו ניסוח יחיד בבנק.
+   */
+  avoid?: string | null | undefined;
 }
 
 export interface AmbiencePick {
@@ -51,13 +56,16 @@ export function pickAmbience(
   if (count === 0) return { key: null, rotation };
   const stored = rotation[situation] ?? options.start ?? 0;
   const first = ((stored % count) + count) % count;
-  for (let step = 0; step < count; step += 1) {
-    const index = (first + step) % count;
-    const key = variants[index]!;
-    if (options.skip?.has(key)) continue;
-    const url = bank[key];
-    if (url !== undefined && url !== '') {
-      return { key, rotation: { ...rotation, [situation]: (index + 1) % count } };
+  const avoid = options.avoid ?? null;
+  for (const strict of avoid === null ? [false] : [true, false]) {
+    for (let step = 0; step < count; step += 1) {
+      const index = (first + step) % count;
+      const key = variants[index]!;
+      if (options.skip?.has(key) || (strict && key === avoid)) continue;
+      const url = bank[key];
+      if (url !== undefined && url !== '') {
+        return { key, rotation: { ...rotation, [situation]: (index + 1) % count } };
+      }
     }
   }
   return { key: null, rotation };
@@ -92,8 +100,19 @@ export const AMB_START = [
   'amb_start_5',
 ] as const;
 export const AMB_NEXT = ['amb_next_1', 'amb_next_2', 'amb_next_3'] as const;
-/** בסקר `amb_voting_3` («מי שבטוח, שילחץ») מדולג דרך `skip` — אין במה להיות בטוח. */
+/**
+ * בסקר `amb_voting_3` («מי שבטוח, שילחץ») מדולג דרך `skip` — אין במה להיות
+ * בטוח. לטריוויה ולסקר מונה נפרד, והניסוח של חלון ההצבעה הקודם נמנע (`avoid`):
+ * מונה משותף היה ננעל בהחלפה בין טריוויה לסקר על שני ניסוחים, ו«מי שבטוח»
+ * לא היה נשמע יותר.
+ */
 export const AMB_VOTING = ['amb_voting_1', 'amb_voting_2', 'amb_voting_3'] as const;
+/**
+ * ניסוחי «מוכנים?» — אחרי אחד מהם בלובי, «מתחילים!» לא פותח שוב ב«מוכנים?»
+ * (`amb_start_4`), אחרת החדר שומע «מוכנים? מחממ—» «מוכנים? יוצאים לדרך!».
+ */
+export const AMB_READY_LOBBY: ReadonlySet<string> = new Set(['amb_lobby_6', 'amb_lobby_7']);
+export const AMB_READY_START = 'amb_start_4';
 export const AMB_ALL_CORRECT = ['amb_all_correct_1', 'amb_all_correct_2'] as const;
 export const AMB_NONE_CORRECT = ['amb_none_correct_1', 'amb_none_correct_2'] as const;
 export const AMB_RAFFLE = ['amb_raffle_1', 'amb_raffle_2'] as const;
@@ -117,20 +136,31 @@ export const CLOSE_RACE_RATIO = 20;
  */
 export const LOBBY_INTERVAL_MS = 45_000;
 
+/**
+ * שעון הלובי נדגם כל 5 שניות, וכל דגימה מאחרת בכמה מילישניות משתנות
+ * (45,003 ואחריה 90,001). מרווח שנמדד בין שתי דגימות קטן לפעמים במעט
+ * מהמרווח הנומינלי, ובלי סובלנות הקריאה הייתה גולשת לדגימה הבאה (50 שניות
+ * במקום 45). חצי דגימה מספיקה: ההפרשים בין דגימות הם כפולות של 5 שניות.
+ */
+export const LOBBY_SAMPLE_TOLERANCE_MS = 2_500;
+
 /** כל קריאה שלישית בלובי היא מספר המחוברים ולא ניסוח כללי. */
 export const LOBBY_COUNT_EVERY = 3;
 
 /**
- * כל קריאה רביעית בלובי (שאינה מספר המחוברים) חוזרת על הוראות ההצבעה — בשביל
- * מי שהגיע אחרי «ברוכים הבאים». בלובי של עשר דקות זה בערך פעמיים-שלוש.
+ * כל קריאה רביעית בלובי **מאז שההוראות נאמרו** (ושאינה מספר המחוברים) חוזרת
+ * על הוראות ההצבעה — בשביל מי שהגיע אחרי «ברוכים הבאים». בלובי של עשר דקות זה
+ * בערך פעמיים-שלוש. נספר מההוראות ולא מפתיחת הלובי: קריאות שעברו בשקט באודיו
+ * נעול היו מקרבות את החזרה, וההוראות היו נשמעות פעמיים ברצף.
  */
 export const LOBBY_HOWTO_EVERY = 4;
 
 /**
- * כמה זמן הלובי שותק אחרי הוראות ההצבעה. כל משפט חדש קוטע את הקודם, וההוראות
- * ארוכות: כשהאודיו נפתח רגע לפני תור הפטפוט, הקריאה הבאה הייתה חותכת אותן
- * באמצע, והן אינן נאמרות שוב. נמדד על שעון הלובי, שנדגם כל 5 שניות, ולכן
- * בפועל לפחות 15 שניות: «ברוכים הבאים» וההוראות יחד צריכים להיות קצרים מזה.
+ * כמה זמן הלובי שותק אחרי הוראות ההצבעה, גם כשקריאה הגיעה לתורה באותו צעד.
+ * כל משפט חדש קוטע את הקודם, וההוראות ארוכות: כשהאודיו נפתח רגע לפני תור
+ * הפטפוט, הקריאה הבאה הייתה חותכת אותן באמצע, והן אינן נאמרות שוב. נמדד על
+ * שעון הלובי, שנדגם כל 5 שניות, ולכן בפועל לפחות 15 שניות: «ברוכים הבאים»
+ * וההוראות יחד צריכים להיות קצרים מזה.
  */
 export const LOBBY_AFTER_WELCOME_MS = 20_000;
 
