@@ -731,6 +731,7 @@ function LiveScreen({
                       nameOf={nameOf}
                       roster={roster}
                       liveCorrectCount={snap.liveCorrectCount}
+                      groupRail={snap.groupRail ?? null}
                     />
                     <span className="slide-counter" dir="ltr">
                       {state.currentSlideIndex + 1}/{snap.game.slideCount}

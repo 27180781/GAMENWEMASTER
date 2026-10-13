@@ -80,6 +80,7 @@ function input(engine: GameEngine, over: Partial<LiveHostInput> = {}): LiveHostI
     applause: null,
     revealThumb: null,
     video: null,
+    groupRail: null,
     ...over,
   };
 }

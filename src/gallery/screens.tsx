@@ -20,12 +20,14 @@ import type { TimerView } from '../render/TimerRing.tsx';
 import { JOIN_DIAL_DISPLAY } from '../app/urlParams.ts';
 import { playRound, EMPTY_BOARD } from '../app/snakesLadders.ts';
 import type { RosterData } from '../app/roster.ts';
+import { buildGroupRail, presentPlayers, type GroupRailData } from '../app/groupRail.ts';
 import {
   GROUP_LIST,
   IMAGES,
   VOTER_IDS,
   driveSlide,
   engineAt,
+  type DrivePhase,
   makeGame,
   makeRoster,
   midTimer,
@@ -207,6 +209,7 @@ interface SlideViewOpts {
   leaders?: RailPlayer[];
   roster?: RosterData;
   functionDetail?: string;
+  groupRail?: GroupRailData | null;
 }
 
 /** SlideView + מונה השקופיות, כמו stage === 'playing' ב-GameHost. */
@@ -226,6 +229,7 @@ function playing(engine: GameEngine, opts: SlideViewOpts): ReactNode {
         functionDetail={opts.functionDetail ?? ''}
         nameOf={nameOfFor(roster)}
         roster={roster}
+        groupRail={opts.groupRail ?? null}
       />
       <span className="slide-counter" dir="ltr">
         {state.currentSlideIndex + 1}/{engine.getGame().questions.length}
@@ -283,6 +287,69 @@ function withResults(
 
 const noop = () => undefined;
 
+/** פס הקבוצות בדיוק כמו ש-GameHost בונה אותו (src/app/groupRail.ts). 26 מחוברים. */
+function railFor(engine: GameEngine, roster: RosterData, reveal: RevealState, categoryIndex = 0): GroupRailData | null {
+  const state = engine.getState();
+  return buildGroupRail({
+    roster,
+    categoryIndex,
+    slide: engine.getCurrentSlide(),
+    phase: state.phase,
+    revealCorrect: reveal.revealCorrect,
+    votes: state.phase === 'voting' ? engine.getLiveVoters() : (state.votesBySlide[state.currentSlideId] ?? null),
+    scores: state.scores,
+    answerTimes: state.answerTimes,
+    present: presentPlayers(VOTER_IDS.slice(0, 26), state.scores, state.votesBySlide),
+    gameType: engine.getGame().setting.gameType,
+  });
+}
+
+/** מרשם עם עשר כיתות (ועוד סוג קבוצות שני) — לפס עם יותר קבוצות ממה שנכנס. */
+function manyGroupsRoster(): RosterData {
+  const base = makeRoster(true);
+  const classes = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ז׳', 'ח׳', 'ט׳', 'י׳'].map((l, i) => ({
+    id: `c${i + 1}`,
+    name: `כיתה ${l}`,
+  }));
+  const memberships: RosterData['memberships'] = {};
+  VOTER_IDS.forEach((id, i) => {
+    memberships[id] = { ...base.memberships[id], cat0: classes[i % classes.length]!.id };
+  });
+  return {
+    ...base,
+    categories: [{ id: 'cat0', name: 'כיתות', groups: classes }, ...base.categories],
+    memberships,
+  };
+}
+
+/** מסך שאלה במשחק עם קבוצות — עם הפס בצד, בשלב הנתון. */
+function railScreen(
+  ctx: GalleryContext,
+  spec: SlideSpec,
+  phase: DrivePhase,
+  weights: number[],
+  opts: { roster?: RosterData; categoryIndex?: number; voters?: string[] } = {},
+): BuiltScreen {
+  const game = makeGame(ctx, [spec]);
+  const roster = opts.roster ?? makeRoster(true);
+  const all = phase === 'showing' ? {} : votesBy(weights, 23);
+  const votes =
+    opts.voters === undefined ? all : Object.fromEntries(Object.entries(all).filter(([id]) => opts.voters!.includes(id)));
+  const engine = engineAt(game, spec.id, phase, { votes, scores: scoresFor(24) });
+  const n = game.questions[0]!.question.answers.length;
+  const reveal = phase === 'results' ? revealDone(n) : revealVoting(n);
+  return {
+    game,
+    node: playing(engine, {
+      timer: phase === 'voting' ? midTimer() : null,
+      reveal,
+      roster,
+      leaders: phase === 'results' ? railPlayers(5, 1) : [],
+      groupRail: railFor(engine, roster, reveal, opts.categoryIndex),
+    }),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // המסכים
 // ---------------------------------------------------------------------------
@@ -334,6 +401,39 @@ export const SCREENS: ScreenDef[] = [
     build: (ctx) => revealScreen(ctx, IMAGE_ANSWERS, [4, 10, 5, 4]),
   },
   { id: 'poll', label: 'סקר — עוגה אחרי חשיפה', build: (ctx) => revealScreen(ctx, POLL, [5, 9, 3, 7]) },
+  { id: 'rail-showing', label: 'קבוצות — פס בצד, לפני ההצבעה', build: (ctx) => railScreen(ctx, Q4, 'showing', []) },
+  { id: 'rail-voting', label: 'קבוצות — כמה מכל קבוצה ענו', build: (ctx) => railScreen(ctx, Q4, 'voting', [3, 11, 5, 4]) },
+  { id: 'rail-reveal', label: 'קבוצות — כמה מכל קבוצה צדקו', build: (ctx) => railScreen(ctx, Q4, 'results', [3, 11, 5, 4]) },
+  { id: 'rail-poll', label: 'קבוצות — סקר, עוגה לכל קבוצה', build: (ctx) => railScreen(ctx, POLL, 'results', [5, 9, 3, 7]) },
+  {
+    id: 'rail-poll-live',
+    label: 'קבוצות — סקר עם מונה חי',
+    build: (ctx) => railScreen(ctx, { ...POLL, settings: { liveVoteCounts: true } }, 'voting', [5, 9, 3, 7]),
+  },
+  { id: 'rail-image', label: 'קבוצות — שאלה עם תמונה', build: (ctx) => railScreen(ctx, IMAGE_SIDE, 'voting', [2, 12, 5, 4]) },
+  {
+    id: 'rail-image-answers',
+    label: 'קבוצות — תשובות תמונה בחשיפה',
+    build: (ctx) => railScreen(ctx, IMAGE_ANSWERS, 'results', [4, 10, 5, 4]),
+  },
+  { id: 'rail-8', label: 'קבוצות — 8 תשובות ארוכות', build: (ctx) => railScreen(ctx, Q8, 'voting', [6, 3, 2, 3, 2, 3, 2, 2]) },
+  {
+    id: 'rail-many',
+    label: 'קבוצות — עשר כיתות (8 בפס)',
+    build: (ctx) => railScreen(ctx, Q4, 'results', [3, 11, 5, 4], { roster: manyGroupsRoster() }),
+  },
+  {
+    id: 'rail-restricted',
+    label: 'קבוצות — שאלה לקבוצה אחת',
+    build: (ctx) =>
+      railScreen(
+        ctx,
+        { ...Q4, settings: { groupRestriction: { active: true, groupName: GROUP_LIST[1]!.name } } },
+        'voting',
+        [3, 11, 5, 4],
+        { voters: VOTER_IDS.filter((_, i) => i % GROUP_LIST.length === 1) },
+      ),
+  },
   { id: 'multiselect', label: 'בחירה מרובה — חשיפה', build: (ctx) => revealScreen(ctx, MULTI, [8, 2, 6, 3, 2, 2]) },
   { id: 'question-reveal', label: 'חשיפת תשובה + מובילים', build: (ctx) => revealScreen(ctx, Q4, [3, 11, 5, 4]) },
   {

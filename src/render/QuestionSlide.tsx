@@ -29,7 +29,9 @@ import {
   type Slide,
 } from '../engine/index.ts';
 import { slideGroupRestriction } from '../app/groupRestriction.ts';
+import type { GroupRailData } from '../app/groupRail.ts';
 import { FitText } from './FitText.tsx';
+import { GroupRail } from './GroupRail.tsx';
 import { LiveMirrorContext } from './mediaPause.ts';
 import { displayText } from './multiline.ts';
 import type { TimerView } from './TimerRing.tsx';
@@ -64,6 +66,9 @@ export const COIN_COLORS = [
   { bg: '#F97316', fg: '#3a1a02' }, // F כתום
 ];
 
+/** צבעי העוגות בפס הקבוצות — צבעי המטבעות, לפי סדר התשובות. */
+const RAIL_COLORS = COIN_COLORS.map((c) => c.bg);
+
 const STAR_PATH = 'M12 2l2.9 6.1 6.6.9-4.8 4.6 1.2 6.6L12 17.8 5.9 21l1.2-6.6L2.3 9.8l6.6-.9z';
 
 interface QuestionSlideProps {
@@ -91,6 +96,8 @@ interface QuestionSlideProps {
    * החשיפה (src/live/snapshot.ts) ולכן אי אפשר לחשב אותו כאן. null = מחשבים.
    */
   liveCorrectCount?: number | null;
+  /** פס הקבוצות בצד המסך (src/app/groupRail.ts); null = משחק בלי קבוצות, או שהמנחה הסתיר. */
+  groupRail?: GroupRailData | null;
 }
 
 /** סגנון השם המתעופף (setting.voterNameStyle). */
@@ -362,6 +369,7 @@ export function QuestionSlide({
   gameType = 'classic',
   betPill = null,
   liveCorrectCount = null,
+  groupRail = null,
 }: QuestionSlideProps) {
   const isVoting = state.phase === 'voting';
   // מונה הצבעות חי (setting.liveVoteCounts) — כמה בחרו בכל תשובה, בזמן ההצבעה.
@@ -422,7 +430,7 @@ export function QuestionSlide({
   const correctPct = total > 0 ? Math.round((correctCount / total) * 100) : 0;
 
   return (
-    <div className="q-screen">
+    <div className={`q-screen${groupRail !== null ? ' q-screen--rail' : ''}${hasImage ? ' q-screen--side-image' : ''}`}>
       <div className="q-content">
         {/* כותרת */}
         <div className="q-header">
@@ -590,6 +598,8 @@ export function QuestionSlide({
             </div>
           ) : null}
         </div>
+
+        {groupRail !== null && <GroupRail data={groupRail} colors={RAIL_COLORS} />}
       </div>
 
       {/* אווטרים מתעופפים */}

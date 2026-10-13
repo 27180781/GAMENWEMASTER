@@ -864,6 +864,221 @@ body {
   text-overflow: ellipsis;
 }
 
+/* ---------- פס הקבוצות (GroupRail, משחק עם קבוצות) ---------- */
+/* הפס תופס עמודה משלו בצד ימין (בצד של מונה העונים), מתחת לכותרת, והאזור
+   הראשי והפס התחתון מתכווצים לרוחב שנשאר — כך הפס לעולם לא מסתיר שאלה,
+   תשובה או את מובילי השאלה. הלוגו והכותרת זזים למרכז של מה שנשאר, מעל השאלה.
+   ימין פיזי (ולא inline-start), כמו התמונה הצדדית ב-left: המסמך תמיד RTL. */
+.q-screen--rail { --rail-space: 344px; }
+.q-screen--rail .q-main,
+.q-screen--rail .q-footer { margin-right: var(--rail-space); }
+.q-screen--rail .q-header-center { left: calc(50% - var(--rail-space) / 2); }
+
+/* תמונה צדדית (300px מ-left:24 → קצה ב-324): בועת השאלה והספירה ממורכזות
+   ברוחב שאינו מגיע אליה. בלי פס: מרכז 880, ‎2 × (880 − 344) = 1072; עם פס המרכז
+   זז ב-rail-space/2, ולכן התקרה קטנה ב-rail-space כולו. עד 2026-10 בועה ארוכה
+   (1180px) נכנסה 34px מתחת לתמונה. */
+.q-screen--side-image .q-question { max-width: min(1180px, calc(1072px - var(--rail-space, 0px))); }
+.q-screen--side-image .q-countdown { width: min(820px, 84%, calc(1072px - var(--rail-space, 0px))); }
+
+@property --gr-p {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+/* bottom: 12px — מעל תג וידאו המנחה ופס רמזי המקשים שבתחתית המסך */
+.gr-rail {
+  position: absolute;
+  top: 132px; /* מתחת לכותרת */
+  bottom: 12px;
+  right: 0;
+  width: 320px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: #fff;
+  pointer-events: none;
+  animation: gr-in 0.5s ease both;
+}
+.gr-head {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 16px;
+  border-radius: 22px;
+  background: rgba(0, 0, 0, 0.42);
+  border: 1.5px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+}
+.gr-head-title { font-weight: 800; font-size: 21px; line-height: 1.2; white-space: nowrap; }
+.gr-head-cat {
+  max-width: 100%;
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1.2;
+  opacity: 0.78;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* השורות ממוקמות לפי המקום (‎--i‎, ראו GroupRail.tsx). הגובה מתחלק לפי מספר
+   הקבוצות (לפחות 4), עד 96px לשורה. */
+.gr-rows {
+  --gr-gap: 10px;
+  --gr-row-h: min(96px, calc((100% - (var(--gr-n, 4) - 1) * var(--gr-gap)) / var(--gr-n, 4)));
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  list-style: none;
+}
+.gr-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--i, 0) * (var(--gr-row-h) + var(--gr-gap)));
+  height: var(--gr-row-h);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  grid-template-areas:
+    'rank name fig'
+    'rank score fig';
+  align-content: center;
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 2px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: rgba(8, 10, 26, 0.72);
+  border: 2px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+  transition:
+    top 0.8s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.4s ease;
+}
+/* המובילה: מסגרת זהב בשכבה משלה, מעל המסגרת של השורה — ערכות הנושא צובעות
+   את השורות כמו שאר הכרטיסים (themes.css), והמסגרת הזאת נשארת בכולן. */
+.gr-row--lead::after {
+  content: '';
+  position: absolute;
+  inset: -2px; /* בדיוק על המסגרת של השורה (2px) */
+  border: 3px solid #f5c518;
+  border-radius: inherit;
+  box-shadow: 0 0 22px rgba(245, 197, 24, 0.45);
+  pointer-events: none;
+  animation: gr-lead-in 0.5s ease both;
+}
+.gr-row--out { opacity: 0.5; }
+.gr-rank {
+  grid-area: rank;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+.gr-rank--1 { background: #f5c518; color: #3a2c05; box-shadow: 0 0 14px rgba(245, 197, 24, 0.55); }
+.gr-rank--2 { background: #d9dee7; color: #1f2937; }
+.gr-rank--3 { background: #d08a4a; color: #2b1505; }
+/* שם הקבוצה: עד שתי שורות, ו-FitText מקטין שם ארוך מזה */
+.gr-name {
+  grid-area: name;
+  align-self: end;
+  min-width: 0;
+  max-height: 56px;
+  overflow: hidden;
+  font-weight: 900;
+  font-size: 24px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.gr-score {
+  grid-area: score;
+  align-self: start;
+  font-weight: 800;
+  font-size: 19px;
+  line-height: 1.15;
+  color: rgba(255, 255, 255, 0.78);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.gr-fig { grid-area: fig; }
+/* טבעת אחוז: כמה ענו (לבן) / כמה צדקו (ירוק, כמו פס צדקו/טעו) */
+.gr-ring {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  transition: --gr-p 0.6s ease;
+}
+.gr-ring::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(var(--gr-ring, #fff) calc(var(--gr-p) * 1%), rgba(255, 255, 255, 0.18) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
+}
+.gr-ring--correct { --gr-ring: #2ec94f; }
+.gr-ring-num { position: relative; font-weight: 900; font-size: 19px; line-height: 1; font-variant-numeric: tabular-nums; }
+.gr-ring-num--full { font-size: 15px; } /* 100% */
+/* עוגה קטנה בצבעי התשובות — כמו סימון הסקר ליד השאלה */
+.gr-pie {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  transform: perspective(220px) rotateX(30deg);
+  box-shadow: 0 8px 0 -3px rgba(0, 0, 0, 0.45), 0 12px 16px rgba(0, 0, 0, 0.45);
+}
+.gr-pie--empty { opacity: 0.55; }
+.gr-fig--out {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 26px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.gr-more {
+  flex: 0 0 auto;
+  text-align: center;
+  font-weight: 700;
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+/* שמונה קבוצות — שורות נמוכות יותר (עד 84px עם שורת סוג הקבוצות ו«ועוד») */
+.gr-rail--dense .gr-row { padding: 4px 12px; }
+.gr-rail--dense .gr-rank { width: 38px; height: 38px; font-size: 19px; }
+.gr-rail--dense .gr-name { font-size: 21px; line-height: 1.1; max-height: 47px; }
+.gr-rail--dense .gr-score { font-size: 17px; }
+.gr-rail--dense .gr-ring { width: 60px; height: 60px; }
+.gr-rail--dense .gr-ring-num { font-size: 16px; }
+.gr-rail--dense .gr-ring-num--full { font-size: 13px; }
+.gr-rail--dense :is(.gr-pie, .gr-fig--out) { width: 54px; height: 54px; }
+@keyframes gr-in {
+  from { opacity: 0; transform: translateX(28px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes gr-lead-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 /* ---------- אווטרים מתעופפים ---------- */
 /* z-index 1: מעל רקע הבמה אך מתחת ל-q-content (z-index 2) — כך המספרים והשמות
    העולים בהצבעה נראים ברקע אך מוסתרים מאחורי השאלות והתשובות ואינם מפריעים לקריאה. */

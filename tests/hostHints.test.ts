@@ -103,3 +103,19 @@ describe('hostKeyHints — מקשי מספרים לפי הקשר', () => {
     expect(keys({ phase: 'voting', hasGroups: true })).toEqual(['רווח', '4/5', '6', '1', '2', '3', 'N']);
   });
 });
+
+describe('hostKeyHints — G, פס הקבוצות', () => {
+  it('במשחק עם קבוצות, במסך השאלה — G לפני N, והכיתוב לפי המצב', () => {
+    expect(keys({ phase: 'voting', groupRail: true })).toEqual(['רווח', '4/5', '6', '1', '2', '3', 'G', 'N']);
+    const label = (shown: boolean) =>
+      hostKeyHints({ ...base, groupRail: shown }).find((h) => h.key === 'G')?.label;
+    expect(label(true)).toBe('הסתרת פס הקבוצות');
+    expect(label(false)).toBe('פס הקבוצות');
+  });
+
+  it('בלי קבוצות, או בשקופית שאין בה פס — בלי G', () => {
+    expect(keys({ phase: 'voting' })).not.toContain('G');
+    expect(keys({ slideType: 'subject', votable: false, groupRail: true })).not.toContain('G');
+    expect(keys({ slideType: 'bet', groupRail: true })).not.toContain('G');
+  });
+});

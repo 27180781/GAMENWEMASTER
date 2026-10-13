@@ -397,6 +397,15 @@ export function HostConsole() {
                 {inVoting && <button className="hc-btn" onClick={() => host(4)}>⏱ +10 שניות</button>}
                 {inVoting && <button className="hc-btn" onClick={() => host(5)}>⏱ −10 שניות</button>}
                 {inVoting && <button className="hc-btn" onClick={() => host(6)}>⏸ השהיה / המשך</button>}
+                {snap.groupRail !== undefined && (
+                  <button
+                    className="hc-btn"
+                    title="דירוג הקבוצות וכמה מכל קבוצה ענו, בצד מסך השאלה (מקש G)"
+                    onClick={() => post({ t: 'groupRail', shown: !snap.groupRail })}
+                  >
+                    {snap.groupRail ? '👥 הסתרת פס הקבוצות' : '👥 הצגת פס הקבוצות'}
+                  </button>
+                )}
                 <button className="hc-btn hc-btn--skip" onClick={() => cmd('nextSlide')}>⏭ דילוג לשקופית הבאה</button>
               </div>
             </div>

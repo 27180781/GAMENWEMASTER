@@ -18,6 +18,7 @@ import { QuestionSlide, type RailPlayer, type RevealState } from './QuestionSlid
 import { SubjectSlide } from './SubjectSlide.tsx';
 import { WinnersListScreen, WinnersScreen } from './screens.tsx';
 import type { RosterData } from '../app/roster.ts';
+import type { GroupRailData } from '../app/groupRail.ts';
 import type { TimerView } from './TimerRing.tsx';
 
 interface SlideViewProps {
@@ -41,6 +42,8 @@ interface SlideViewProps {
   onBlockingMediaEnded?: () => void;
   /** מסך הצפייה: כמה ענו נכון, כשסימון התשובה הנכונה עוד מוסתר ממנו (ראו QuestionSlide). */
   liveCorrectCount?: number | null;
+  /** פס הקבוצות בצד מסך השאלה (src/app/groupRail.ts); null = אין. */
+  groupRail?: GroupRailData | null;
 }
 
 /** מסך שקופית "פונקציה" — פעולת מערכת (API / ניקוד / משתתפים) עם חיווי מצב. */
@@ -118,6 +121,7 @@ export function SlideView({
   roster,
   onBlockingMediaEnded,
   liveCorrectCount = null,
+  groupRail = null,
 }: SlideViewProps) {
   const slide = engine.getCurrentSlide();
   const game = engine.getGame();
@@ -207,6 +211,7 @@ export function SlideView({
             gameType={engine.getGame().setting.gameType}
             betPill={betPill}
             liveCorrectCount={liveCorrectCount}
+            groupRail={groupRail}
           />
         )}
       </div>

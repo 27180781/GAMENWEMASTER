@@ -141,6 +141,19 @@ export class GameEngine {
     return this.game.setting.allowChangeVote || slide.setting.allowChangeVote;
   }
 
+  /**
+   * מי הצביע על מה בחלון ההצבעה הפתוח (voterId → answerId), כפי שהמנוע יקבע
+   * אם ההצבעה תיסגר עכשיו: עם שינוי הצבעה — האחרונה של כל מצביע, ובלעדיו —
+   * הראשונה (הנעולה). null מחוץ לחלון הצבעה. `liveVotes` נותן רק מונים, וזה
+   * למסכים שצריכים לדעת *מי* (פס הקבוצות). לקריאה בלבד: אסור לשנות את האובייקט.
+   */
+  getLiveVoters(): Readonly<Record<string, number>> | null {
+    if (this.state.phase !== 'voting') return null;
+    return this.allowChangeVoteFor(this.getCurrentSlide())
+      ? (this.voting.latestVoters ?? {})
+      : this.voting.lockedVotes;
+  }
+
   /** זמן התגובה הממוצע (ms) של מצביע — נמוך = מהיר. אין תשובות → Infinity. */
   averageResponseMs(voterId: string): number {
     const t = this.state.answerTimes[voterId];

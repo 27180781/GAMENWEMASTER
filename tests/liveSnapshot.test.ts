@@ -18,6 +18,7 @@ import {
 } from '../src/live/snapshot.ts';
 import { SILENCE } from '../src/live/soundTrack.ts';
 import type { LiveVideo } from '../src/live/video/api.ts';
+import type { GroupRailData, GroupRailMode } from '../src/app/groupRail.ts';
 import type { RailPlayer } from '../src/render/QuestionSlide.tsx';
 import { fourAnswers, makeGame, makeSnapshot, rawSlide } from './helpers.ts';
 
@@ -110,6 +111,7 @@ function input(engine: GameEngine, over: Partial<LiveHostInput> = {}): LiveHostI
     applause: null,
     revealThumb: null,
     video: null,
+    groupRail: null,
     ...over,
   };
 }
@@ -385,4 +387,50 @@ describe('מצב המסך למסך הצפייה', () => {
     expect(mirror.getGame().questions).toHaveLength(4);
     expect(mirror.getCurrentSlide().question.que).toBe('ש1');
   });
+
+  it('פס הקבוצות: עובר כמו במסך הראשי, מסוכם לקבוצות — בלי מי בכל קבוצה', () => {
+    const engine = votingOnFirst();
+    const groupRail = railData('answered');
+    const snap = new LiveSnapshotBuilder().build(input(engine, { groupRail }));
+    expect(snap.groupRail).toEqual(groupRail);
+    expect(snap.groupRail).not.toBe(groupRail);
+    const json = JSON.stringify(snap.groupRail);
+    for (const phone of PHONES) expect(json).not.toContain(phone);
+    // מחוץ למשחק עצמו — אין פס
+    expect(new LiveSnapshotBuilder().build(input(engine, { stage: 'winners', groupRail })).groupRail).toBeNull();
+  });
+
+  it('פס הקבוצות: כמה צדקו — רק אחרי החשיפה; איך הצביעו — רק כשהמונים גלויים', () => {
+    const engine = votingOnFirst();
+    const build = (mode: GroupRailMode, over: Partial<LiveHostInput> = {}) =>
+      new LiveSnapshotBuilder().build(input(engine, { groupRail: railData(mode), ...over })).groupRail;
+    expect(build('correct')).toBeNull();
+    expect(build('split')).toBeNull();
+    engine.dispatch({ type: 'VOTING_TIMEOUT', at: T0 + 15_000 });
+    const revealed = { reveal: { questionShown: true, answersShown: 4, revealCorrect: true } };
+    expect(build('correct', revealed)?.mode).toBe('correct');
+    expect(build('split', revealed)?.mode).toBe('split');
+  });
 });
+
+/** פס קבוצות כמו ש-GameHost בונה (buildGroupRail) — שתי קבוצות. */
+function railData(mode: GroupRailMode): GroupRailData {
+  const row = (groupId: string, name: string, rank: number) => ({
+    groupId,
+    name,
+    rank,
+    score: 30 - rank * 10,
+    members: 3,
+    voted: 2,
+    pct: mode === 'answered' || mode === 'correct' ? 67 : null,
+    split: mode === 'split' ? [1, 1, 0, 0] : null,
+    out: false,
+  });
+  return {
+    mode,
+    categoryName: 'צבעים',
+    categoryCount: 1,
+    rows: [row('red', 'אדומים', 1), row('blue', 'כחולים', 2)],
+    more: 0,
+  };
+}
