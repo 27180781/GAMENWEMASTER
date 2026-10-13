@@ -31,7 +31,15 @@ export interface HostHintInput {
   betPending?: boolean;
   /** מסך תוצאות ההימור פתוח — הרווח סוגר אותו וממשיך. */
   betOverlay?: boolean;
+  /**
+   * פס הקבוצות בצד מסך השאלה (groupRail.ts): האם הוא מוצג. חסר = אין למשחק
+   * קבוצות, ואז אין רמז למקש G.
+   */
+  groupRail?: boolean;
 }
+
+/** השקופיות שפס הקבוצות מופיע בהן (מסך השאלה) — רק בהן רמז המקש G. */
+const RAIL_HINT_SLIDES = new Set(['trivia', 'survey', 'ans_images']);
 
 /** מה עושה הרווח (מקש 0) בשלב הנוכחי. */
 function spaceAction(a: HostHintInput): string {
@@ -58,7 +66,8 @@ function spaceAction(a: HostHintInput): string {
 
 /**
  * רשימת רמזי המקשים לשלב הנוכחי: רווח (פעולה משתנה) + מקשי מספרים לפי הקשר.
- * 4/5 (‎±10 שניות) ו-6 (השהיה) רלוונטיים רק בזמן הצבעה; 1/2/3/N תמיד במשחק.
+ * 4/5 (‎±10 שניות) ו-6 (השהיה) רלוונטיים רק בזמן הצבעה; 1/2/3/N תמיד במשחק,
+ * ו-G (פס הקבוצות) במסך השאלה של משחק עם קבוצות.
  */
 export function hostKeyHints(a: HostHintInput): HostHint[] {
   const hints: HostHint[] = [{ key: 'רווח', label: spaceAction(a) }];
@@ -75,6 +84,9 @@ export function hostKeyHints(a: HostHintInput): HostHint[] {
   hints.push({ key: '1', label: 'טבלת מובילים' });
   hints.push({ key: '2', label: 'צעד אחורה' });
   hints.push({ key: '3', label: 'מחיאות כפיים' });
+  if (a.groupRail !== undefined && RAIL_HINT_SLIDES.has(a.slideType)) {
+    hints.push({ key: 'G', label: a.groupRail ? 'הסתרת פס הקבוצות' : 'פס הקבוצות' });
+  }
   hints.push({ key: 'N', label: a.hasNextSlide ? 'דילוג לשקופית הבאה' : 'סיום המשחק' });
   return hints;
 }

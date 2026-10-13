@@ -193,12 +193,13 @@
 }
 .game-root[data-visual-theme='gala'] :is(
   .leader-card:not(.leader-card--top), .score-cell, .group-list li, .gs-card:not(.gs-card--lead),
-  .votes-col:not(.votes-col--correct), .bet-row, .sl-result, .lobby-count, .q-answered-pill, .q-live
+  .votes-col:not(.votes-col--correct), .bet-row, .sl-result, .lobby-count, .q-answered-pill, .q-live,
+  .gr-head, .gr-row
 ) {
   background: linear-gradient(180deg, rgba(20, 25, 54, 0.84), rgba(8, 10, 26, 0.84));
   border-color: rgba(201, 168, 92, 0.5);
 }
-.game-root[data-visual-theme='gala'] :is(.leader-card, .score-cell, .gs-card, .votes-col, .bet-col, .sl-result) {
+.game-root[data-visual-theme='gala'] :is(.leader-card, .score-cell, .gs-card, .votes-col, .bet-col, .sl-result, .gr-head, .gr-row) {
   border-radius: 8px;
   border-color: rgba(201, 168, 92, 0.65);
   box-shadow: inset 0 1px 0 rgba(255, 236, 190, 0.12), 0 10px 28px rgba(2, 3, 10, 0.35);

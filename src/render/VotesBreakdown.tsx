@@ -2,10 +2,10 @@
  * מסך פירוט הצבעות השחקנים על שקופית (פקודת מנחה 5, בשלב חשיפת התשובה).
  * מחולק לפי התשובות: כל תשובה בעמודה משלה, עם התג/צבע שלה (כמו במסך השאלה),
  * טקסט/תמונה, אחוז וכמות, ומתחתיה רשימת השמות של מי שהצביע עליה. עובד לטריוויה
- * (עם סימון התשובה הנכונה), סקר, ותשובות-תמונה (ans_images).
+ * ולתשובות-תמונה (ans_images) עם סימון התשובה הנכונה, ולסקר.
  */
 
-import { isImageQuestion, questionDisplayText, type Slide } from '../engine/index.ts';
+import { isImageQuestion, marksCorrectAnswer, questionDisplayText, type Slide } from '../engine/index.ts';
 import { ANSWER_LETTERS, COIN_COLORS } from './QuestionSlide.tsx';
 import { FitText } from './FitText.tsx';
 import { displayText } from './multiline.ts';
@@ -26,8 +26,9 @@ interface VotesBreakdownProps {
 const MAX_NAMES_PER_ANSWER = 80;
 
 export function VotesBreakdown({ slide, votes, nameOf, ansIsNumber, onClose }: VotesBreakdownProps) {
-  const isTrivia = slide.type === 'trivia';
   const isImages = slide.type === 'ans_images';
+  // הנכונה מסומנת כמו במסך השאלה: ב-trivia, ובתשובות-כתמונה כשסומנה בהן נכונה.
+  const marksCorrect = marksCorrectAnswer(slide);
   const total = Object.keys(votes).length;
 
   // קיבוץ המצביעים לפי answerId, ממוין לפי שם.
@@ -71,7 +72,7 @@ export function VotesBreakdown({ slide, votes, nameOf, ansIsNumber, onClose }: V
             const percent = total > 0 ? Math.round((count / total) * 100) : 0;
             const coin = COIN_COLORS[index] ?? COIN_COLORS[0]!;
             const label = ansIsNumber ? answer.id : (ANSWER_LETTERS[index] ?? answer.id);
-            const correct = isTrivia && answer.correct;
+            const correct = marksCorrect && answer.correct;
             const shown = voters.slice(0, MAX_NAMES_PER_ANSWER);
             const extra = count - shown.length;
             return (

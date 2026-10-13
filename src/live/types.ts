@@ -19,6 +19,7 @@ import type { RailPlayer, RevealState } from '../render/QuestionSlide.tsx';
 import type { RaffleEntry } from '../render/RaffleOverlay.tsx';
 import type { BoardState } from '../app/snakesLadders.ts';
 import type { Category, Group } from '../app/roster.ts';
+import type { GroupRailData } from '../app/groupRail.ts';
 import type { LiveVideo } from './video/api.ts';
 
 /** גרסת המבנה. מסך צפייה שמקבל גרסה אחרת מבקש מהצופה לרענן. */
@@ -155,4 +156,9 @@ export interface LiveSnapshot {
    * ראשי בגרסה שקדמה לו, ולכן אופציונלי.
    */
   video?: LiveVideo | null;
+  /**
+   * פס הקבוצות בצד מסך השאלה (src/app/groupRail.ts), כבר מסוכם לקבוצות — בלי
+   * מי בכל קבוצה. null — אין פס. חסר אצל מסך ראשי בגרסה שקדמה לו.
+   */
+  groupRail?: GroupRailData | null;
 }

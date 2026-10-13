@@ -58,3 +58,19 @@ export function scoredLikeTrivia(slide: Slide): boolean {
   const answers = slide.question.answers;
   return answers.some((a) => a.correct) && answers.some((a) => !a.correct);
 }
+
+/**
+ * האם יש בשקופית תשובה נכונה להצביע עליה על המסך: הדגשת הנכונה וצעיף על
+ * השגויות בחשיפה, פס «צדקו / טעו» בזמן ההצבעה, וחמשת המהירים שצדקו.
+ *
+ * • trivia — תמיד.
+ * • ans_images — כשמסומנת לפחות תמונה נכונה אחת **וגם** לפחות אחת שאינה, לפי
+ *   הסימון ברגע זה (ב«הרוב קובע» המנוע כותב אותו רק בסגירת ההצבעה). כשכל
+ *   התמונות מסומנות (ייבוא מהמערכת הישנה) או אף אחת, אין על מה להצביע.
+ */
+export function marksCorrectAnswer(slide: Slide): boolean {
+  if (slide.type === 'trivia') return true;
+  if (slide.type !== 'ans_images') return false;
+  const answers = slide.question.answers;
+  return answers.some((a) => a.correct) && answers.some((a) => !a.correct);
+}

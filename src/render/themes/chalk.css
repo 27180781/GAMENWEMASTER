@@ -157,7 +157,8 @@
 /* שורות בטבלאות: משטח לוח עם קו גיר מקווקו */
 .game-root[data-visual-theme='chalk'] :is(
   .leader-card:not(.leader-card--top), .score-cell, .group-list li, .gs-card:not(.gs-card--lead),
-  .votes-col:not(.votes-col--correct), .bet-row, .sl-result, .lobby-count, .q-answered-pill, .q-live
+  .votes-col:not(.votes-col--correct), .bet-row, .sl-result, .lobby-count, .q-answered-pill, .q-live,
+  .gr-head, .gr-row
 ) {
   background:
     repeating-linear-gradient(-32deg, rgba(255, 255, 255, 0.03) 0 2px, transparent 2px 9px),
@@ -165,7 +166,7 @@
   border-color: rgba(246, 243, 230, 0.55);
   border-style: dashed;
 }
-.game-root[data-visual-theme='chalk'] :is(.leader-card, .score-cell, .gs-card, .votes-col, .bet-col, .sl-result) {
+.game-root[data-visual-theme='chalk'] :is(.leader-card, .score-cell, .gs-card, .votes-col, .bet-col, .sl-result, .gr-head, .gr-row) {
   border-radius: 14px 20px 12px 22px / 20px 12px 22px 14px;
   border-style: dashed;
 }

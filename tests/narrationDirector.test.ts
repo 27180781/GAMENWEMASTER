@@ -1226,6 +1226,31 @@ describe('קריאות אווירה', () => {
       ]);
     });
 
+    it('★ דירוג הקבוצות מעל מסכי הסיום (מקש 4): הקבוצה המובילה, וההכרזות של המסך ממתינות לסגירה', () => {
+      const winners = [100, 90, 80];
+      const groups = [
+        { name: 'הכחולים', points: 100 },
+        { name: 'הצהובים', points: 40 },
+      ];
+      const groupClips = { הכחולים: 'blue.mp3' };
+      const end = (over: Partial<DisplayedState>) => amb({ winners, groups, groupClips, ...over });
+      const [open, closed, reopened, scoreboardOpen, scoreboard] = runSteps([
+        end({ stage: 'winners', overlay: 'groups' }),
+        end({ stage: 'winners' }),
+        end({ stage: 'winners', overlay: 'groups' }),
+        end({ stage: 'scoreboard', overlay: 'groups' }),
+        end({ stage: 'scoreboard' }),
+      ]);
+      expect(open!.clips).toEqual(['amb_group_lead_pre.mp3', 'blue.mp3']);
+      expect(closed!.clips).toEqual(['amb_winners_intro.mp3', 'lb_winners.mp3']);
+      expect(closed!.cancel).toBe(true);
+      // באותו מסך — לא חוזר על עצמו
+      expect(reopened!.clips).toEqual([]);
+      // מסך חדש (הניקוד של כולם) — שוב הקבוצה המובילה, ו"תודה" אחרי הסגירה
+      expect(scoreboardOpen!.clips).toEqual(['amb_group_lead_pre.mp3', 'blue.mp3']);
+      expect(scoreboard!.clips).toEqual(['lb_title.mp3', 'flow_thanks.mp3']);
+    });
+
     it('★ "אמיצים!" כשההצבעה על ההימור נפתחת', () => {
       const bet = { slideType: 'bet', questionOrdinal: 0, questionShown: true, questionClip: 'bet.mp3' };
       const clips = clipsOf([amb(bet), amb({ ...bet, phase: 'voting' })]);

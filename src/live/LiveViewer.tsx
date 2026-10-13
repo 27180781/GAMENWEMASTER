@@ -730,7 +730,9 @@ function LiveScreen({
                       functionDetail={snap.fn.detail}
                       nameOf={nameOf}
                       roster={roster}
+                      groupBonus={snap.groupBonus}
                       liveCorrectCount={snap.liveCorrectCount}
+                      groupRail={snap.groupRail ?? null}
                     />
                     <span className="slide-counter" dir="ltr">
                       {state.currentSlideIndex + 1}/{snap.game.slideCount}
@@ -746,7 +748,7 @@ function LiveScreen({
 
                 {stage === 'playing' && overlays.leaders && (
                   <div className="leaders-overlay">
-                    <WinnersListScreen engine={engine} nameOf={nameOf} roster={roster} />
+                    <WinnersListScreen engine={engine} nameOf={nameOf} roster={roster} groupBonus={snap.groupBonus} />
                   </div>
                 )}
                 {stage === 'playing' && overlays.votes && (
@@ -771,7 +773,8 @@ function LiveScreen({
                     title={overlays.bet.title}
                   />
                 )}
-                {stage === 'playing' && overlays.groups !== null && (
+                {/* גם מעל מסכי הסיום, כמו במסך הראשי (מקש 4 במנצחים ובניקוד של כולם) */}
+                {stage !== 'opening' && overlays.groups !== null && (
                   <GroupStandingsOverlay
                     roster={roster}
                     scores={state.scores}

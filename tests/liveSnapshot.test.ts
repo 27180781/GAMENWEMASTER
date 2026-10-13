@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { GameEngine, type GameFile } from '../src/engine/index.ts';
-import { EMPTY_ROSTER } from '../src/app/roster.ts';
+import { addCategory, addGroup, assignGroupByNumber, EMPTY_ROSTER } from '../src/app/roster.ts';
 import { mirrorEngine } from '../src/live/mirrorEngine.ts';
 import {
   BLANK_IMAGE,
@@ -18,6 +18,7 @@ import {
 } from '../src/live/snapshot.ts';
 import { SILENCE } from '../src/live/soundTrack.ts';
 import type { LiveVideo } from '../src/live/video/api.ts';
+import type { GroupRailData, GroupRailMode } from '../src/app/groupRail.ts';
 import type { RailPlayer } from '../src/render/QuestionSlide.tsx';
 import { fourAnswers, makeGame, makeSnapshot, rawSlide } from './helpers.ts';
 
@@ -110,6 +111,7 @@ function input(engine: GameEngine, over: Partial<LiveHostInput> = {}): LiveHostI
     applause: null,
     revealThumb: null,
     video: null,
+    groupRail: null,
     ...over,
   };
 }
@@ -176,6 +178,32 @@ describe('מצב המסך למסך הצפייה', () => {
     expect(snap.liveCorrectCount).toBe(2);
     expect(snap.leaders).toEqual([]);
     expect(snap.state.scores).toEqual({});
+  });
+
+  it('תשובה כתמונה עם נכונה מסומנת: «צדקו» עובר לפס, הנכונה עצמה לא', () => {
+    const images = [1, 2, 3, 4].map((id) => ({
+      ans: `https://cdn.example/a${id}.jpg`,
+      correct: id === 3,
+      id,
+    }));
+    const engine = new GameEngine(
+      makeGame([rawSlide({ id: 1, type: 'ans_images', que: 'איזו?', answers: images, timeForQue: 15 })], {
+        id: GAME_ID,
+        room: 2047,
+      }),
+    );
+    engine.dispatch({ type: 'OPEN_VOTING', at: T0 });
+    engine.dispatch({
+      type: 'VOTE_SNAPSHOT',
+      snapshot: makeSnapshot(1, 1, { [PHONES[0]!]: 3, [PHONES[1]!]: 1, [PHONES[2]!]: 3 }),
+      at: T0 + 1000,
+    });
+    const snap = new LiveSnapshotBuilder().build(input(engine));
+    expect(snap.liveCorrectCount).toBe(2);
+    // הצורה נשמרת (יש נכונה וגם שגויה), אבל הסימון מטעה: לא התמונה האמיתית
+    const correct = snap.game.slides['0']!.question.answers.map((a) => a.correct);
+    expect(correct).toEqual([true, false, false, false]);
+    expect(snap.leaders).toEqual([]);
   });
 
   it('מונה הצבעות חי שהמנחה הדליק — המונים עוברים, הנכונה עדיין לא', () => {
@@ -359,4 +387,77 @@ describe('מצב המסך למסך הצפייה', () => {
     expect(mirror.getGame().questions).toHaveLength(4);
     expect(mirror.getCurrentSlide().question.que).toBe('ש1');
   });
+
+  it('פס הקבוצות: עובר כמו במסך הראשי, מסוכם לקבוצות — בלי מי בכל קבוצה', () => {
+    const engine = votingOnFirst();
+    const groupRail = railData('answered');
+    const snap = new LiveSnapshotBuilder().build(input(engine, { groupRail }));
+    expect(snap.groupRail).toEqual(groupRail);
+    expect(snap.groupRail).not.toBe(groupRail);
+    const json = JSON.stringify(snap.groupRail);
+    for (const phone of PHONES) expect(json).not.toContain(phone);
+    // מחוץ למשחק עצמו — אין פס
+    expect(new LiveSnapshotBuilder().build(input(engine, { stage: 'winners', groupRail })).groupRail).toBeNull();
+  });
+
+  it('פס הקבוצות: כמה צדקו — רק אחרי החשיפה; איך הצביעו — רק כשהמונים גלויים', () => {
+    const engine = votingOnFirst();
+    const build = (mode: GroupRailMode, over: Partial<LiveHostInput> = {}) =>
+      new LiveSnapshotBuilder().build(input(engine, { groupRail: railData(mode), ...over })).groupRail;
+    expect(build('correct')).toBeNull();
+    expect(build('split')).toBeNull();
+    engine.dispatch({ type: 'VOTING_TIMEOUT', at: T0 + 15_000 });
+    const revealed = { reveal: { questionShown: true, answersShown: 4, revealCorrect: true } };
+    expect(build('correct', revealed)?.mode).toBe('correct');
+    expect(build('split', revealed)?.mode).toBe('split');
+  });
+
+  it('דירוג הקבוצות (מקש 4) עובר גם מעל מסכי הסיום, עם הקבוצות והבונוס', () => {
+    const engine = votingOnFirst();
+    engine.dispatch({ type: 'VOTING_TIMEOUT', at: T0 + 15_000 });
+    let roster = addCategory(EMPTY_ROSTER, 'צבעים', 'cat1');
+    roster = addGroup(roster, 'cat1', 'אדומים', 'red');
+    roster = addGroup(roster, 'cat1', 'כחולים', 'blue');
+    roster = assignGroupByNumber(roster, PHONES[0]!, 'cat1', 1);
+    roster = assignGroupByNumber(roster, PHONES[1]!, 'cat1', 2);
+    const base = { roster, groupBonus: { blue: 5 } };
+    const open = { ...base, overlays: { ...input(engine).overlays, groups: { categoryIndex: 0 } } };
+    for (const stage of ['winners', 'scoreboard'] as const) {
+      const snap = new LiveSnapshotBuilder().build(input(engine, { ...open, stage }));
+      expect(snap.overlays.groups).toEqual({ categoryIndex: 0 });
+      expect(snap.roster.categories.map((c) => c.groups.length)).toEqual([2]);
+      expect(Object.keys(snap.roster.memberships)).toHaveLength(2);
+      expect(snap.groupBonus).toEqual({ blue: 5 });
+      expectNoSecrets(JSON.stringify(snap));
+    }
+    // סגור — מסך הסיום לבדו, בלי הקבוצות
+    const closed = new LiveSnapshotBuilder().build(input(engine, { ...base, stage: 'winners' }));
+    expect(closed.overlays.groups).toBeNull();
+    expect(closed.roster.categories).toEqual([]);
+    expect(closed.groupBonus).toEqual({});
+    // לא במסך הפתיחה
+    expect(new LiveSnapshotBuilder().build(input(engine, { ...open, stage: 'opening' })).overlays.groups).toBeNull();
+  });
 });
+
+/** פס קבוצות כמו ש-GameHost בונה (buildGroupRail) — שתי קבוצות. */
+function railData(mode: GroupRailMode): GroupRailData {
+  const row = (groupId: string, name: string, rank: number) => ({
+    groupId,
+    name,
+    rank,
+    score: 30 - rank * 10,
+    members: 3,
+    voted: 2,
+    pct: mode === 'answered' || mode === 'correct' ? 67 : null,
+    split: mode === 'split' ? [1, 1, 0, 0] : null,
+    out: false,
+  });
+  return {
+    mode,
+    categoryName: 'צבעים',
+    categoryCount: 1,
+    rows: [row('red', 'אדומים', 1), row('blue', 'כחולים', 2)],
+    more: 0,
+  };
+}

@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import {
   GameEngine,
   descendingScoreAt,
+  marksCorrectAnswer,
   parseGameFile,
   scoredLikeTrivia,
 } from '../src/engine/index.ts';
@@ -200,6 +201,22 @@ describe('תשובה בתמונה — מנוקדת כמו טריוויה כשס�
       rawGame([rawSlide({ id: 1, type: 'survey', que: 'ס', answers: fourAnswers(0), scoreForQue: 5 })]),
     ).questions[0]!;
     expect(scoredLikeTrivia(survey)).toBe(false);
+  });
+
+  it('★ marksCorrectAnswer — מה המסך מסמן: טריוויה תמיד, תמונות רק עם נכונה ושגויה, «הרוב קובע» רק אחרי ההכרעה', () => {
+    expect(marksCorrectAnswer(triviaGame().questions[0]!)).toBe(true);
+    expect(marksCorrectAnswer(imagesGame(BUILDER_ANSWERS).questions[0]!)).toBe(true);
+    expect(marksCorrectAnswer(imagesGame(LEGACY_ANSWERS).questions[0]!)).toBe(false);
+    const none = BUILDER_ANSWERS.map((a) => ({ ...a, correct: false }));
+    expect(marksCorrectAnswer(imagesGame(none).questions[0]!)).toBe(false);
+    // «הרוב קובע» בתמונות: מנוקדת, אבל אין מה לסמן עד שההצבעה נסגרת
+    const majority = imagesGame(none, { majorityDecides: true }).questions[0]!;
+    expect(scoredLikeTrivia(majority)).toBe(true);
+    expect(marksCorrectAnswer(majority)).toBe(false);
+    const survey = parseGameFile(
+      rawGame([rawSlide({ id: 1, type: 'survey', que: 'ס', answers: fourAnswers(0), scoreForQue: 5 })]),
+    ).questions[0]!;
+    expect(marksCorrectAnswer(survey)).toBe(false);
   });
 
   it('★ הבוחר בתמונה הנכונה מקבל scoreForQue; השגוי — לא', () => {

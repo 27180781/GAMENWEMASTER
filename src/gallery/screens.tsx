@@ -20,12 +20,14 @@ import type { TimerView } from '../render/TimerRing.tsx';
 import { JOIN_DIAL_DISPLAY } from '../app/urlParams.ts';
 import { playRound, EMPTY_BOARD } from '../app/snakesLadders.ts';
 import type { RosterData } from '../app/roster.ts';
+import { buildGroupRail, presentPlayers, type GroupRailData } from '../app/groupRail.ts';
 import {
   GROUP_LIST,
   IMAGES,
   VOTER_IDS,
   driveSlide,
   engineAt,
+  type DrivePhase,
   makeGame,
   makeRoster,
   midTimer,
@@ -94,6 +96,21 @@ const Q8: SlideSpec = {
     ['ערבה, הדס, לולב ואתרוג — אך רק בשבת חול המועד ולא ביום טוב', false],
     ['אין חובה ליטול, זהו מנהג עדות מסוימות בלבד ואין לו מקור', false],
     ['לולב ואתרוג ביד שמאל, הדסים וערבות ביד ימין — ההפך מהמקובל', false],
+  ],
+};
+
+/** שש תשובות ארוכות — המקסימום שהבונה מאפשר — עם שאלה של שלוש שורות. */
+const Q6: SlideSpec = {
+  id: 1,
+  type: 'trivia',
+  que: 'איזה מהמנהגים הבאים נהוג בליל הסדר כדי לעורר את סקרנות הילדים ולגרום להם לשאול שאלות על יציאת מצרים, לפי מה שמובא בהגדה?',
+  answers: [
+    ['מסירים את הקערה מהשולחן לפני שאוכלים, כדי שהילדים ישאלו למה', true],
+    ['מחלקים לכל ילד ארבע כוסות של מיץ ענבים לפני הקידוש', false],
+    ['קוראים את ההגדה כולה בעמידה, מתחילתה ועד סופה', false],
+    ['מדליקים נר נוסף לכבוד אליהו הנביא בפתח הבית', false],
+    ['אוכלים את האפיקומן בתחילת הסעודה ולא בסופה', false],
+    ['שרים את «חד גדיא» לפני «מה נשתנה» ולא אחריו', false],
   ],
 };
 
@@ -207,6 +224,7 @@ interface SlideViewOpts {
   leaders?: RailPlayer[];
   roster?: RosterData;
   functionDetail?: string;
+  groupRail?: GroupRailData | null;
 }
 
 /** SlideView + מונה השקופיות, כמו stage === 'playing' ב-GameHost. */
@@ -226,6 +244,7 @@ function playing(engine: GameEngine, opts: SlideViewOpts): ReactNode {
         functionDetail={opts.functionDetail ?? ''}
         nameOf={nameOfFor(roster)}
         roster={roster}
+        groupRail={opts.groupRail ?? null}
       />
       <span className="slide-counter" dir="ltr">
         {state.currentSlideIndex + 1}/{engine.getGame().questions.length}
@@ -283,6 +302,69 @@ function withResults(
 
 const noop = () => undefined;
 
+/** פס הקבוצות בדיוק כמו ש-GameHost בונה אותו (src/app/groupRail.ts). 26 מחוברים. */
+function railFor(engine: GameEngine, roster: RosterData, reveal: RevealState, categoryIndex = 0): GroupRailData | null {
+  const state = engine.getState();
+  return buildGroupRail({
+    roster,
+    categoryIndex,
+    slide: engine.getCurrentSlide(),
+    phase: state.phase,
+    revealCorrect: reveal.revealCorrect,
+    votes: state.phase === 'voting' ? engine.getLiveVoters() : (state.votesBySlide[state.currentSlideId] ?? null),
+    scores: state.scores,
+    answerTimes: state.answerTimes,
+    present: presentPlayers(VOTER_IDS.slice(0, 26), state.scores, state.votesBySlide),
+    gameType: engine.getGame().setting.gameType,
+  });
+}
+
+/** מרשם עם עשר כיתות (ועוד סוג קבוצות שני) — לפס עם יותר קבוצות ממה שנכנס. */
+function manyGroupsRoster(): RosterData {
+  const base = makeRoster(true);
+  const classes = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ז׳', 'ח׳', 'ט׳', 'י׳'].map((l, i) => ({
+    id: `c${i + 1}`,
+    name: `כיתה ${l}`,
+  }));
+  const memberships: RosterData['memberships'] = {};
+  VOTER_IDS.forEach((id, i) => {
+    memberships[id] = { ...base.memberships[id], cat0: classes[i % classes.length]!.id };
+  });
+  return {
+    ...base,
+    categories: [{ id: 'cat0', name: 'כיתות', groups: classes }, ...base.categories],
+    memberships,
+  };
+}
+
+/** מסך שאלה במשחק עם קבוצות — עם הפס בצד, בשלב הנתון. */
+function railScreen(
+  ctx: GalleryContext,
+  spec: SlideSpec,
+  phase: DrivePhase,
+  weights: number[],
+  opts: { roster?: RosterData; categoryIndex?: number; voters?: string[] } = {},
+): BuiltScreen {
+  const game = makeGame(ctx, [spec]);
+  const roster = opts.roster ?? makeRoster(true);
+  const all = phase === 'showing' ? {} : votesBy(weights, 23);
+  const votes =
+    opts.voters === undefined ? all : Object.fromEntries(Object.entries(all).filter(([id]) => opts.voters!.includes(id)));
+  const engine = engineAt(game, spec.id, phase, { votes, scores: scoresFor(24) });
+  const n = game.questions[0]!.question.answers.length;
+  const reveal = phase === 'results' ? revealDone(n) : revealVoting(n);
+  return {
+    game,
+    node: playing(engine, {
+      timer: phase === 'voting' ? midTimer() : null,
+      reveal,
+      roster,
+      leaders: phase === 'results' ? railPlayers(5, 1) : [],
+      groupRail: railFor(engine, roster, reveal, opts.categoryIndex),
+    }),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // המסכים
 // ---------------------------------------------------------------------------
@@ -321,14 +403,75 @@ export const SCREENS: ScreenDef[] = [
     label: 'שאלה — 8 תשובות ארוכות',
     build: (ctx) => votingScreen(ctx, Q8, [6, 3, 2, 3, 2, 3, 2, 2]),
   },
+  {
+    id: 'question-8-reveal',
+    label: 'שאלה — 8 תשובות ארוכות, חשיפה',
+    build: (ctx) => revealScreen(ctx, Q8, [6, 3, 2, 3, 2, 3, 2, 2]),
+  },
+  {
+    id: 'question-6-banner',
+    label: 'שאלה — 6 תשובות ארוכות, מונה חי ובאנר',
+    build: (ctx) => ({
+      ...votingScreen(ctx, { ...Q6, settings: { liveVoteCounts: true } }, [9, 4, 2, 3, 2, 3]),
+      banner: true,
+    }),
+  },
   { id: 'question-image', label: 'שאלה עם תמונה', build: (ctx) => votingScreen(ctx, IMAGE_SIDE, [2, 12, 5, 4]) },
   {
     id: 'question-image-mode',
     label: 'שאלה שהיא תמונה (queMode image)',
     build: (ctx) => votingScreen(ctx, IMAGE_MODE, [12, 4, 4, 3]),
   },
+  {
+    id: 'question-image-mode-6',
+    label: 'שאלה שהיא תמונה — 6 תשובות',
+    build: (ctx) =>
+      votingScreen(
+        ctx,
+        { ...IMAGE_MODE, answers: [...IMAGE_MODE.answers!, ['באר שבע', false], ['נצרת', false]] },
+        [12, 4, 4, 3, 2, 1],
+      ),
+  },
   { id: 'image-answers', label: 'תשובות תמונה', build: (ctx) => votingScreen(ctx, IMAGE_ANSWERS, [4, 10, 5, 4]) },
+  {
+    id: 'image-answers-reveal',
+    label: 'תשובות תמונה — חשיפה + מובילים',
+    build: (ctx) => revealScreen(ctx, IMAGE_ANSWERS, [4, 10, 5, 4]),
+  },
   { id: 'poll', label: 'סקר — עוגה אחרי חשיפה', build: (ctx) => revealScreen(ctx, POLL, [5, 9, 3, 7]) },
+  { id: 'rail-showing', label: 'קבוצות — פס בצד, לפני ההצבעה', build: (ctx) => railScreen(ctx, Q4, 'showing', []) },
+  { id: 'rail-voting', label: 'קבוצות — כמה מכל קבוצה ענו', build: (ctx) => railScreen(ctx, Q4, 'voting', [3, 11, 5, 4]) },
+  { id: 'rail-reveal', label: 'קבוצות — כמה מכל קבוצה צדקו', build: (ctx) => railScreen(ctx, Q4, 'results', [3, 11, 5, 4]) },
+  { id: 'rail-poll', label: 'קבוצות — סקר, עוגה לכל קבוצה', build: (ctx) => railScreen(ctx, POLL, 'results', [5, 9, 3, 7]) },
+  {
+    id: 'rail-poll-live',
+    label: 'קבוצות — סקר עם מונה חי',
+    build: (ctx) => railScreen(ctx, { ...POLL, settings: { liveVoteCounts: true } }, 'voting', [5, 9, 3, 7]),
+  },
+  { id: 'rail-image', label: 'קבוצות — שאלה עם תמונה', build: (ctx) => railScreen(ctx, IMAGE_SIDE, 'voting', [2, 12, 5, 4]) },
+  {
+    id: 'rail-image-answers',
+    label: 'קבוצות — תשובות תמונה בחשיפה',
+    build: (ctx) => railScreen(ctx, IMAGE_ANSWERS, 'results', [4, 10, 5, 4]),
+  },
+  { id: 'rail-8', label: 'קבוצות — 8 תשובות ארוכות', build: (ctx) => railScreen(ctx, Q8, 'voting', [6, 3, 2, 3, 2, 3, 2, 2]) },
+  {
+    id: 'rail-many',
+    label: 'קבוצות — עשר כיתות (8 בפס)',
+    build: (ctx) => railScreen(ctx, Q4, 'results', [3, 11, 5, 4], { roster: manyGroupsRoster() }),
+  },
+  {
+    id: 'rail-restricted',
+    label: 'קבוצות — שאלה לקבוצה אחת',
+    build: (ctx) =>
+      railScreen(
+        ctx,
+        { ...Q4, settings: { groupRestriction: { active: true, groupName: GROUP_LIST[1]!.name } } },
+        'voting',
+        [3, 11, 5, 4],
+        { voters: VOTER_IDS.filter((_, i) => i % GROUP_LIST.length === 1) },
+      ),
+  },
   { id: 'multiselect', label: 'בחירה מרובה — חשיפה', build: (ctx) => revealScreen(ctx, MULTI, [8, 2, 6, 3, 2, 2]) },
   { id: 'question-reveal', label: 'חשיפת תשובה + מובילים', build: (ctx) => revealScreen(ctx, Q4, [3, 11, 5, 4]) },
   {
@@ -442,7 +585,7 @@ export const SCREENS: ScreenDef[] = [
         ctx,
         (engine) => (
           <div className="leaders-overlay">
-            <WinnersListScreen engine={engine} nameOf={nameOfFor(roster)} roster={roster} />
+            <WinnersListScreen engine={engine} nameOf={nameOfFor(roster)} roster={roster} groupBonus={{ g3: 15 }} />
           </div>
         ),
         { roster },
@@ -481,6 +624,32 @@ export const SCREENS: ScreenDef[] = [
       const game = makeGame(ctx, [Q4]);
       const engine = engineAt(game, 1, 'showing', { scores: scoresFor(24) });
       return { game, node: <WinnersScreen engine={engine} nameOf={nameOfFor(makeRoster(false))} /> };
+    },
+  },
+  {
+    id: 'winners-groups',
+    label: 'פודיום + דירוג הקבוצות (מקש 4)',
+    build: (ctx) => {
+      const roster = makeRoster(true);
+      const game = makeGame(ctx, [Q4]);
+      const engine = engineAt(game, 1, 'showing', { scores: scoresFor(24) });
+      const state = engine.getState();
+      return {
+        game,
+        node: (
+          <>
+            <WinnersScreen engine={engine} nameOf={nameOfFor(roster)} />
+            <GroupStandingsOverlay
+              roster={roster}
+              scores={state.scores}
+              answerTimes={state.answerTimes}
+              nameOf={nameOfFor(roster)}
+              categoryIndex={0}
+              onClose={noop}
+            />
+          </>
+        ),
+      };
     },
   },
   {

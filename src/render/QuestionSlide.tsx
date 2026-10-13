@@ -14,13 +14,14 @@
  * ומייצגים את כפתורי השלט — אינם מושפעים מהערכה.
  */
 
-import { useContext, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import {
   descendingScoreAt,
   descendingScoreOf,
   imageRevealBlurFor,
   imageRevealOf,
   isImageQuestion,
+  marksCorrectAnswer,
   scoredLikeTrivia,
   showsSideImage,
   type GamePhase,
@@ -28,9 +29,12 @@ import {
   type Slide,
 } from '../engine/index.ts';
 import { slideGroupRestriction } from '../app/groupRestriction.ts';
+import type { GroupRailData } from '../app/groupRail.ts';
 import { FitText } from './FitText.tsx';
+import { GroupRail } from './GroupRail.tsx';
 import { LiveMirrorContext } from './mediaPause.ts';
 import { displayText } from './multiline.ts';
+import { DENSE_ROWS, fitQuestionScreen } from './questionFit.ts';
 import type { TimerView } from './TimerRing.tsx';
 
 export interface RevealState {
@@ -63,6 +67,9 @@ export const COIN_COLORS = [
   { bg: '#F97316', fg: '#3a1a02' }, // F כתום
 ];
 
+/** צבעי העוגות בפס הקבוצות — צבעי המטבעות, לפי סדר התשובות. */
+const RAIL_COLORS = COIN_COLORS.map((c) => c.bg);
+
 const STAR_PATH = 'M12 2l2.9 6.1 6.6.9-4.8 4.6 1.2 6.6L12 17.8 5.9 21l1.2-6.6L2.3 9.8l6.6-.9z';
 
 interface QuestionSlideProps {
@@ -90,6 +97,8 @@ interface QuestionSlideProps {
    * החשיפה (src/live/snapshot.ts) ולכן אי אפשר לחשב אותו כאן. null = מחשבים.
    */
   liveCorrectCount?: number | null;
+  /** פס הקבוצות בצד המסך (src/app/groupRail.ts); null = משחק בלי קבוצות, או שהמנחה הסתיר. */
+  groupRail?: GroupRailData | null;
 }
 
 /** סגנון השם המתעופף (setting.voterNameStyle). */
@@ -289,6 +298,72 @@ function RevealImage({
   );
 }
 
+/**
+ * מריץ את fitQuestionScreen (questionFit.ts): כשהתוכן משתנה, כשהמסך משנה גודל
+ * (פס הקבוצות מצר את התשובות, באנר ההצטרפות מנמיך), כשגופן נטען וכשתמונת השאלה
+ * נטענת. rows = 0 — תשובות תמונה, שאין להן תשובות טקסט להתאים.
+ */
+function useQuestionFit(
+  refs: {
+    content: RefObject<HTMLDivElement | null>;
+    header: RefObject<HTMLDivElement | null>;
+    main: RefObject<HTMLDivElement | null>;
+    footer: RefObject<HTMLDivElement | null>;
+    question: RefObject<HTMLDivElement | null>;
+    answers: RefObject<HTMLUListElement | null>;
+  },
+  rows: number,
+  contentKey: string,
+) {
+  useLayoutEffect(() => {
+    const content = refs.content.current;
+    const header = refs.header.current;
+    const main = refs.main.current;
+    const footer = refs.footer.current;
+    const question = refs.question.current;
+    if (content === null || header === null || main === null || footer === null || question === null) return undefined;
+    const run = () =>
+      fitQuestionScreen({
+        content,
+        header,
+        main,
+        footer,
+        question,
+        answers: rows === 0 ? null : refs.answers.current,
+        rows,
+      });
+    run();
+
+    // גובה המסך (באנר) ורוחב האזור הראשי (פס הקבוצות). ההתאמה עצמה לא משנה אף
+    // אחד מהם, ולכן אין כאן לולאה.
+    let size = `${content.clientHeight}×${main.clientWidth}`;
+    const observer =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(() => {
+            const next = `${content.clientHeight}×${main.clientWidth}`;
+            if (next === size) return;
+            size = next;
+            run();
+          });
+    observer?.observe(content);
+    observer?.observe(main);
+    // גופן שנטען אחרי המדידה משנה את רוחב הטקסט.
+    const fonts = typeof document === 'undefined' ? undefined : document.fonts;
+    fonts?.addEventListener('loadingdone', run);
+    // תמונה שהיא השאלה ועוד לא נטענה נספרה בגובה המלא שמותר לה.
+    const image = question.querySelector('img.q-question-main-image');
+    image?.addEventListener('load', run);
+    return () => {
+      observer?.disconnect();
+      fonts?.removeEventListener('loadingdone', run);
+      image?.removeEventListener('load', run);
+    };
+    // refs יציבים; contentKey מסכם את כל מה שמשנה את הטקסט או את רוחבו.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, contentKey]);
+}
+
 /** סימון קטן של עוגת סקר (תלת-מימדי) — ליד השאלה בשקופית סקר. */
 function SurveyIcon() {
   return <span className="q-survey-icon" title="שאלת סקר" aria-label="סקר" />;
@@ -361,12 +436,12 @@ export function QuestionSlide({
   gameType = 'classic',
   betPill = null,
   liveCorrectCount = null,
+  groupRail = null,
 }: QuestionSlideProps) {
   const isVoting = state.phase === 'voting';
   // מונה הצבעות חי (setting.liveVoteCounts) — כמה בחרו בכל תשובה, בזמן ההצבעה.
   const liveCounts = isVoting && slide.setting.liveVoteCounts;
   const majority = slide.setting.majorityDecides;
-  const isTrivia = slide.type === 'trivia';
   const isImages = slide.type === 'ans_images';
   const isSurvey = slide.type === 'survey';
   const answers = slide.question.answers;
@@ -392,17 +467,14 @@ export function QuestionSlide({
   // דלוק). כך "מעבר אוטומטי כבוי" באמת עוצר אחרי הטיימר עד ללחיצה.
   const revealed = revealState.revealCorrect;
   /**
-   * האם יש לשקופית "תשובה נכונה" להצביע עליה בחשיפה.
-   *
-   * ב-trivia תמיד. תשובות-כתמונה מנוקדות כהשתתפות (כמו סקר) ולכן לא סומנה בהן
-   * תשובה עד היום — אבל כשהמחבר כן סימן אחת, ראוי להראות אותה. התנאי דורש גם
-   * מסומנת אחת *וגם* אחת שאינה: כשכולן מסומנות (או אף אחת) אין על מה להצביע,
-   * ואז לא מעמעמים כלום. הניקוד אינו מושפע — זה חיווי בלבד.
+   * האם יש לשקופית "תשובה נכונה" להצביע עליה (ראו marksCorrectAnswer): ב-trivia
+   * תמיד, ובתשובות-כתמונה כשהמחבר סימן נכונה. כשכל התמונות מסומנות (או אף אחת)
+   * אין על מה להצביע, ואז לא מעמעמים כלום ואין פס צדקו/טעו ומובילים.
    */
-  const marksCorrect =
-    isTrivia || (isImages && answers.some((a) => a.correct) && answers.some((a) => !a.correct));
-  // פס מובילים מוצג רק ב-trivia אחרי חשיפת התשובה הנכונה.
-  const showBoard = revealState.revealCorrect && isTrivia && leaders.length > 0;
+  const marksCorrect = marksCorrectAnswer(slide);
+  // פס המובילים (חמשת המהירים שצדקו) — אחרי חשיפת התשובה הנכונה, בכל שקופית
+  // שמסמנת אותה. עד 2026-10 רק ב-trivia, ובתשובה כתמונה הוא לא הופיע (משוב לקוח).
+  const showBoard = revealState.revealCorrect && marksCorrect && leaders.length > 0;
 
   // שאלת תמונה: התמונה היא נוסח השאלה, ולכן היא מוצגת בבועת השאלה — ולא גם
   // ככרטיס בצד. ראו questionMode.ts.
@@ -424,11 +496,33 @@ export function QuestionSlide({
     answers.filter((a) => a.correct).reduce((sum, a) => sum + (counts[String(a.id)] ?? 0), 0);
   const correctPct = total > 0 ? Math.round((correctCount / total) * 100) : 0;
 
+  // השאלה והתשובות בגובה שיש להן, וגודל פונט אחיד לתשובות (questionFit.ts).
+  const contentRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLDivElement>(null);
+  const footerRef = useRef<HTMLDivElement>(null);
+  const questionRef = useRef<HTMLDivElement>(null);
+  const answersRef = useRef<HTMLUListElement>(null);
+  const showAnswerCards = !(isSurvey && revealed);
+  useQuestionFit(
+    { content: contentRef, header: headerRef, main: mainRef, footer: footerRef, question: questionRef, answers: answersRef },
+    isImages ? 0 : ansRows,
+    JSON.stringify([
+      slide.question.que,
+      imageQuestion ? slide.question.src : '',
+      isImages ? [] : answers.map((a) => a.ans),
+      liveCounts,
+      showAnswerCards,
+      hasImage,
+      groupRail !== null,
+    ]),
+  );
+
   return (
-    <div className="q-screen">
-      <div className="q-content">
+    <div className={`q-screen${groupRail !== null ? ' q-screen--rail' : ''}${hasImage ? ' q-screen--side-image' : ''}`}>
+      <div className="q-content" ref={contentRef}>
         {/* כותרת */}
-        <div className="q-header">
+        <div className="q-header" ref={headerRef}>
           <div className="q-hud-left">
             <div className="q-answered-pill">
               <span className="q-answered-dot" />
@@ -473,7 +567,7 @@ export function QuestionSlide({
         )}
 
         {/* אזור ראשי */}
-        <div className="q-main">
+        <div className="q-main" ref={mainRef}>
           {/* ספירה לאחור — רק בזמן ההצבעה: עיגול השניות + פס הטיימר שאוזל
               במדויק לפי הזמן שנותר (צבע ראשי/משני). */}
           {isVoting && (
@@ -490,7 +584,7 @@ export function QuestionSlide({
             </div>
           )}
 
-          <div className={`q-question${revealState.questionShown ? '' : ' reveal-hidden'}`}>
+          <div className={`q-question${revealState.questionShown ? '' : ' reveal-hidden'}`} ref={questionRef}>
             <div className="q-question-row">
               {isSurvey && <SurveyIcon />}
               {imageQuestion ? (
@@ -507,19 +601,21 @@ export function QuestionSlide({
                   <img className="q-question-main-image" src={slide.question.src} alt="שאלה" />
                 )
               ) : (
-                /* min נמוך במכוון: עדיף שאלה ארוכה בפונט קטן על שאלה שסופה נעלם. */
-                <FitText className="q-question-text" min={13}>
+                /* הגודל והתקרה — useQuestionFit. data-fit-text: לבדיקת הגלישה בצילומים
+                   (tools/theme-shots.mjs), כמו ב-FitText. */
+                <span className="q-question-text" data-fit-text="">
                   {displayText(slide.question.que)}
-                </FitText>
+                </span>
               )}
             </div>
           </div>
 
-          {isSurvey && revealed ? (
+          {!showAnswerCards ? (
             <SurveyPie answers={answers} counts={counts} total={total} />
           ) : (
           <ul
-            className={`q-answers${isImages ? ' q-answers--images' : ''}`}
+            ref={answersRef}
+            className={`q-answers${isImages ? ' q-answers--images' : ansRows >= DENSE_ROWS ? ' q-answers--dense' : ''}`}
             style={isImages ? imagesGridVars : answersGridVars}
           >
             {answers.map((answer, index) => {
@@ -549,9 +645,9 @@ export function QuestionSlide({
                       <img className="q-card-image" src={answer.ans} alt={`תשובה ${answer.id}`} />
                     </>
                   ) : (
-                    <FitText className="q-card-text" min={11}>
+                    <span className="q-card-text" data-fit-text="">
                       {displayText(answer.ans)}
-                    </FitText>
+                    </span>
                   )}
                   {liveCounts && (
                     <span className="q-live" dir="ltr">
@@ -567,7 +663,7 @@ export function QuestionSlide({
         </div>
 
         {/* כותרת תחתית — פס צדקו/טעו (ירוק/אדום קבוע) חי בזמן ההצבעה, מובילים בחשיפה */}
-        <div className={`q-footer${showBoard ? ' q-footer--board' : ''}`}>
+        <div className={`q-footer${showBoard ? ' q-footer--board' : ''}`} ref={footerRef}>
           {showBoard ? (
             <Leaderboard leaders={leaders} />
           ) : isVoting && majority ? (
@@ -577,7 +673,7 @@ export function QuestionSlide({
                 🗳 הרוב קובע — התשובה הנכונה תיקבע בסיום ההצבעה לפי מה שרוב העונים בחרו
               </div>
             </div>
-          ) : isVoting && isTrivia ? (
+          ) : isVoting && marksCorrect ? (
             <div className="q-splitbar">
               {total > 0 ? (
                 <>
@@ -593,6 +689,8 @@ export function QuestionSlide({
             </div>
           ) : null}
         </div>
+
+        {groupRail !== null && <GroupRail data={groupRail} colors={RAIL_COLORS} />}
       </div>
 
       {/* אווטרים מתעופפים */}

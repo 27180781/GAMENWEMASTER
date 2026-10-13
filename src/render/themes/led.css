@@ -214,7 +214,8 @@
 /* שורות בטבלאות: תאי לוח כהים עם פס ענבר בקצה התחילי */
 .game-root[data-visual-theme='led'] :is(
   .leader-card:not(.leader-card--top), .score-cell, .group-list li, .gs-card:not(.gs-card--lead),
-  .votes-col:not(.votes-col--correct), .bet-row, .sl-result, .lobby-count, .q-answered-pill, .q-live
+  .votes-col:not(.votes-col--correct), .bet-row, .sl-result, .lobby-count, .q-answered-pill, .q-live,
+  .gr-head, .gr-row
 ) {
   background:
     radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.07) 0 0.9px, transparent 1.5px) 0 0 / 6px 6px,
@@ -222,11 +223,12 @@
   border-color: rgba(255, 182, 39, 0.35);
 }
 .game-root[data-visual-theme='led'] :is(
-  .leader-card:not(.leader-card--top), .score-cell, .gs-card:not(.gs-card--lead), .bet-row, .sl-result
+  .leader-card:not(.leader-card--top), .score-cell, .gs-card:not(.gs-card--lead), .bet-row, .sl-result,
+  .gr-row
 ) {
   box-shadow: inset -6px 0 0 var(--led-amber), inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 8px 22px rgba(0, 0, 0, 0.4);
 }
-.game-root[data-visual-theme='led'] :is(.leader-card, .score-cell, .gs-card, .votes-col, .bet-col, .sl-result) {
+.game-root[data-visual-theme='led'] :is(.leader-card, .score-cell, .gs-card, .votes-col, .bet-col, .sl-result, .gr-head, .gr-row) {
   border-radius: 10px;
 }
 .game-root[data-visual-theme='led'] .leader-card--top {

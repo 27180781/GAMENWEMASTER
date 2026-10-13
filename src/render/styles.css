@@ -542,9 +542,9 @@ body {
   gap: 18px;
 }
 /* גובה חסום — אך *בלי* חיתוך שורות. הגבלת שורות (line-clamp) הייתה קוצצת את
-   סוף השאלה בשקט; במקומה יש כאן תקציב גובה, ו-FitText מקטין את הפונט עד
-   שהטקסט כולו נכנס בתוכו. 240px הוא התקציב הגדול ביותר שעדיין מותיר מקום
-   לשמונה תשובות בארבע שורות (ראו החישוב אצל .q-card-text). */
+   סוף השאלה בשקט; במקומה יש כאן תקציב גובה, והפונט קטן עד שהטקסט כולו נכנס
+   בתוכו. 240px היא התקרה; כשהתשובות צריכות את המקום (5 תשובות ומעלה)
+   src/render/questionFit.ts מנמיך אותה במסך עצמו. */
 .q-question-text {
   /* Enter בעורך = שורה חדשה במסך (ראו multiline.ts) */
   white-space: pre-line;
@@ -619,9 +619,9 @@ body {
 .q-coin--reveal { font-size: 25px; }
 .q-card--correct .q-coin { box-shadow: 0 0 0 4px color-mix(in srgb, var(--text) 55%, transparent), 0 6px 16px rgba(0, 0, 0, 0.4); }
 /* כמו בשאלה: תקציב גובה במקום הגבלת שורות, כדי שתשובה ארוכה תוקטן ולא תיקצץ.
-   תקציב הגובה נגזר מהמקרה הצפוף ביותר — 8 תשובות בארבע שורות:
-   4 × (110 + 24 ריפוד) = 536, ועוד שאלה מלאה (240 + 44) ורווח 22 = 842px,
-   בתוך 856px הפנויים בין הכותרת לפס התחתון. */
+   התקציב כאן הוא התקרה; src/render/questionFit.ts מנמיך אותו במסך לפי מה
+   שנשאר אחרי השאלה והספירה לאחור, וקובע את גודל הפונט (אחיד לכל התשובות
+   כשכולן נכנסות). */
 .q-card-text {
   /* Enter בעורך = שורה חדשה במסך (ראו multiline.ts) */
   white-space: pre-line;
@@ -633,12 +633,21 @@ body {
   color: var(--text);
   transition: color 0.45s ease;
   /* התקציב (536px) מתחלק בין שורות התשובות בפועל: 8 תשובות (4 שורות) → 110px
-     לכרטיס כמו קודם, אבל 2–4 תשובות מקבלות פי 2–4 מזה. --ans-rows מגיע
-     מ-QuestionSlide. */
+     לכרטיס, ו-2–4 תשובות מקבלות פי 2–4 מזה. --ans-rows מגיע מ-QuestionSlide. */
   max-height: calc(536px / var(--ans-rows, 4) - 24px);
   overflow: hidden;
 }
 .q-card--correct .q-card-text { color: var(--pill); }
+/* 7–8 תשובות טקסט (4 שורות): כרטיסים צפופים. בגודל הרגיל הכרטיס הנמוך ביותר הוא
+   104px (המטבע 74 ועוד ריפוד ומסגרת), ארבע שורות תופסות 476px, ובזמן ההצבעה
+   נשארו לשאלה 88px בלבד. כאן 80px ו-356px (src/render/questionFit.ts). */
+.q-answers--dense { row-gap: 12px; }
+.q-answers--dense .q-card { min-height: 76px; padding: 8px 18px; gap: 14px; }
+.q-answers--dense .q-coin { width: 58px; height: 58px; font-size: 32px; }
+.q-answers--dense .q-coin--reveal { font-size: 20px; }
+.q-answers--dense .q-live { min-width: 84px; padding: 3px 10px; border-radius: 14px; }
+.q-answers--dense .q-live b { font-size: 24px; }
+.q-answers--dense .q-live small { font-size: 13px; margin-top: 2px; }
 
 /* גריד תמונות (ans_images) — התמונות ממלאות את הכרטיס בשורה אחת, והמספר/אחוז
    צף על הפינה העליונה של התמונה (במקום מטבע נפרד מעליה שמבזבז שטח). */
@@ -862,6 +871,221 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ---------- פס הקבוצות (GroupRail, משחק עם קבוצות) ---------- */
+/* הפס תופס עמודה משלו בצד ימין (בצד של מונה העונים), מתחת לכותרת, והאזור
+   הראשי והפס התחתון מתכווצים לרוחב שנשאר — כך הפס לעולם לא מסתיר שאלה,
+   תשובה או את מובילי השאלה. הלוגו והכותרת זזים למרכז של מה שנשאר, מעל השאלה.
+   ימין פיזי (ולא inline-start), כמו התמונה הצדדית ב-left: המסמך תמיד RTL. */
+.q-screen--rail { --rail-space: 344px; }
+.q-screen--rail .q-main,
+.q-screen--rail .q-footer { margin-right: var(--rail-space); }
+.q-screen--rail .q-header-center { left: calc(50% - var(--rail-space) / 2); }
+
+/* תמונה צדדית (300px מ-left:24 → קצה ב-324): בועת השאלה והספירה ממורכזות
+   ברוחב שאינו מגיע אליה. בלי פס: מרכז 880, ‎2 × (880 − 344) = 1072; עם פס המרכז
+   זז ב-rail-space/2, ולכן התקרה קטנה ב-rail-space כולו. עד 2026-10 בועה ארוכה
+   (1180px) נכנסה 34px מתחת לתמונה. */
+.q-screen--side-image .q-question { max-width: min(1180px, calc(1072px - var(--rail-space, 0px))); }
+.q-screen--side-image .q-countdown { width: min(820px, 84%, calc(1072px - var(--rail-space, 0px))); }
+
+@property --gr-p {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+/* bottom: 12px — מעל תג וידאו המנחה ופס רמזי המקשים שבתחתית המסך */
+.gr-rail {
+  position: absolute;
+  top: 132px; /* מתחת לכותרת */
+  bottom: 12px;
+  right: 0;
+  width: 320px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: #fff;
+  pointer-events: none;
+  animation: gr-in 0.5s ease both;
+}
+.gr-head {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 16px;
+  border-radius: 22px;
+  background: rgba(0, 0, 0, 0.42);
+  border: 1.5px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+}
+.gr-head-title { font-weight: 800; font-size: 21px; line-height: 1.2; white-space: nowrap; }
+.gr-head-cat {
+  max-width: 100%;
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1.2;
+  opacity: 0.78;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* השורות ממוקמות לפי המקום (‎--i‎, ראו GroupRail.tsx). הגובה מתחלק לפי מספר
+   הקבוצות (לפחות 4), עד 96px לשורה. */
+.gr-rows {
+  --gr-gap: 10px;
+  --gr-row-h: min(96px, calc((100% - (var(--gr-n, 4) - 1) * var(--gr-gap)) / var(--gr-n, 4)));
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  list-style: none;
+}
+.gr-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--i, 0) * (var(--gr-row-h) + var(--gr-gap)));
+  height: var(--gr-row-h);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  grid-template-areas:
+    'rank name fig'
+    'rank score fig';
+  align-content: center;
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 2px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: rgba(8, 10, 26, 0.72);
+  border: 2px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+  transition:
+    top 0.8s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.4s ease;
+}
+/* המובילה: מסגרת זהב בשכבה משלה, מעל המסגרת של השורה — ערכות הנושא צובעות
+   את השורות כמו שאר הכרטיסים (themes.css), והמסגרת הזאת נשארת בכולן. */
+.gr-row--lead::after {
+  content: '';
+  position: absolute;
+  inset: -2px; /* בדיוק על המסגרת של השורה (2px) */
+  border: 3px solid #f5c518;
+  border-radius: inherit;
+  box-shadow: 0 0 22px rgba(245, 197, 24, 0.45);
+  pointer-events: none;
+  animation: gr-lead-in 0.5s ease both;
+}
+.gr-row--out { opacity: 0.5; }
+.gr-rank {
+  grid-area: rank;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+.gr-rank--1 { background: #f5c518; color: #3a2c05; box-shadow: 0 0 14px rgba(245, 197, 24, 0.55); }
+.gr-rank--2 { background: #d9dee7; color: #1f2937; }
+.gr-rank--3 { background: #d08a4a; color: #2b1505; }
+/* שם הקבוצה: עד שתי שורות, ו-FitText מקטין שם ארוך מזה */
+.gr-name {
+  grid-area: name;
+  align-self: end;
+  min-width: 0;
+  max-height: 56px;
+  overflow: hidden;
+  font-weight: 900;
+  font-size: 24px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.gr-score {
+  grid-area: score;
+  align-self: start;
+  font-weight: 800;
+  font-size: 19px;
+  line-height: 1.15;
+  color: rgba(255, 255, 255, 0.78);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.gr-fig { grid-area: fig; }
+/* טבעת אחוז: כמה ענו (לבן) / כמה צדקו (ירוק, כמו פס צדקו/טעו) */
+.gr-ring {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  transition: --gr-p 0.6s ease;
+}
+.gr-ring::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(var(--gr-ring, #fff) calc(var(--gr-p) * 1%), rgba(255, 255, 255, 0.18) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
+}
+.gr-ring--correct { --gr-ring: #2ec94f; }
+.gr-ring-num { position: relative; font-weight: 900; font-size: 19px; line-height: 1; font-variant-numeric: tabular-nums; }
+.gr-ring-num--full { font-size: 15px; } /* 100% */
+/* עוגה קטנה בצבעי התשובות — כמו סימון הסקר ליד השאלה */
+.gr-pie {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  transform: perspective(220px) rotateX(30deg);
+  box-shadow: 0 8px 0 -3px rgba(0, 0, 0, 0.45), 0 12px 16px rgba(0, 0, 0, 0.45);
+}
+.gr-pie--empty { opacity: 0.55; }
+.gr-fig--out {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 26px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.gr-more {
+  flex: 0 0 auto;
+  text-align: center;
+  font-weight: 700;
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+/* שמונה קבוצות — שורות נמוכות יותר (עד 84px עם שורת סוג הקבוצות ו«ועוד») */
+.gr-rail--dense .gr-row { padding: 4px 12px; }
+.gr-rail--dense .gr-rank { width: 38px; height: 38px; font-size: 19px; }
+.gr-rail--dense .gr-name { font-size: 21px; line-height: 1.1; max-height: 47px; }
+.gr-rail--dense .gr-score { font-size: 17px; }
+.gr-rail--dense .gr-ring { width: 60px; height: 60px; }
+.gr-rail--dense .gr-ring-num { font-size: 16px; }
+.gr-rail--dense .gr-ring-num--full { font-size: 13px; }
+.gr-rail--dense :is(.gr-pie, .gr-fig--out) { width: 54px; height: 54px; }
+@keyframes gr-in {
+  from { opacity: 0; transform: translateX(28px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes gr-lead-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* ---------- אווטרים מתעופפים ---------- */
@@ -6626,7 +6850,8 @@ body {
   max-width: 100%;
   /* פיקסלים ולא vh: ‏vh נמדד על החלון ולא על הבמה, ו-42vh (453px ב-1080p, יותר
      בחלון גבוה) דחף את שורת התשובות התחתונה אל מתחת לפס הצדקו/טעו. 320px
-     משאיר מקום לכותרת, לספירה, לשתי שורות תשובות ולפס התחתון. */
+     משאיר מקום לכותרת, לספירה, לשתי שורות תשובות ולפס התחתון; עם יותר שורות
+     src/render/questionFit.ts מנמיך את התקרה במסך עצמו. */
   max-height: 320px;
   min-width: 0;
   border-radius: 18px;

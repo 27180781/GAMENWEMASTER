@@ -145,12 +145,13 @@
 }
 .game-root[data-visual-theme='neon'] :is(
   .leader-card:not(.leader-card--top), .score-cell, .group-list li, .gs-card:not(.gs-card--lead),
-  .votes-col:not(.votes-col--correct), .bet-row, .sl-result, .lobby-count, .q-answered-pill, .q-live
+  .votes-col:not(.votes-col--correct), .bet-row, .sl-result, .lobby-count, .q-answered-pill, .q-live,
+  .gr-head, .gr-row
 ) {
   background: linear-gradient(180deg, rgba(14, 9, 32, 0.86), rgba(4, 2, 12, 0.86));
   border-color: color-mix(in srgb, var(--vt-neon-core) 75%, transparent);
 }
-.game-root[data-visual-theme='neon'] :is(.leader-card, .score-cell, .gs-card, .votes-col, .bet-col, .sl-result) {
+.game-root[data-visual-theme='neon'] :is(.leader-card, .score-cell, .gs-card, .votes-col, .bet-col, .sl-result, .gr-head, .gr-row) {
   border-color: var(--vt-neon-core);
   box-shadow: inset 0 0 14px color-mix(in srgb, var(--vt-neon) 28%, transparent), 0 0 14px 1px var(--vt-neon-a);
 }

@@ -575,6 +575,15 @@ function candidates(s: DisplayedState, memory: NarrationMemory): NarrationEvent[
     return events;
   }
 
+  // דירוג הקבוצות מעל מסכי הסיום (מקש 4): אומרים את הקבוצה המובילה, כמו באמצע
+  // המשחק, וההכרזות של המסך שמתחתיו ממתינות עד שהוא נסגר — אחרת "והמנצחים
+  // הם…" היה נאמר מעל טבלת הקבוצות.
+  if ((s.stage === 'winners' || s.stage === 'scoreboard') && s.overlay === 'groups') {
+    const parts = groupParts(s);
+    if (parts !== null) events.push({ key: 'groups', parts });
+    return events;
+  }
+
   if (s.stage === 'winners') {
     events.push({ key: 'winnersIntro', parts: ['amb_winners_intro'] });
     events.push({ key: 'winners', parts: ['lb_winners'] });

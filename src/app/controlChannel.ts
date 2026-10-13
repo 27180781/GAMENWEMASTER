@@ -45,6 +45,16 @@ export interface HostStateSnapshot {
   groupBonus?: Record<string, number>;
   /** שם הקבוצה שהשקופית הנוכחית מוגבלת אליה (חסר = פתוחה לכולם). */
   restrictedGroup?: string;
+  /**
+   * פס הקבוצות בצד מסך השאלה (groupRail.ts): האם הוא מוצג. חסר = אין למשחק
+   * קבוצות (או תצוגה ישנה), ואז מסך המנחה לא מציג את המתג.
+   */
+  groupRail?: boolean;
+  /**
+   * דירוג הקבוצות (מקש 4) פתוח על המסך. במסכי הסיום מסך המנחה מציג לפיו כפתור
+   * לפתוח ולסגור אותו. חסר = אין למשחק קבוצות (או תצוגה ישנה).
+   */
+  groupStandings?: boolean;
   reveal: { questionShown: boolean; answersShown: number; revealCorrect: boolean };
 }
 
@@ -81,7 +91,8 @@ export type HostCommand =
    * שהם שני דברים שונים לגמרי (ראו scoreAdjust.ts).
    */
   | { t: 'score'; target: 'player' | 'group'; id: string; delta: number }
-  | { t: 'report'; id: string }; // בקשה לקובץ התוצאות — התצוגה עונה ב-HostReportMessage
+  | { t: 'report'; id: string } // בקשה לקובץ התוצאות — התצוגה עונה ב-HostReportMessage
+  | { t: 'groupRail'; shown: boolean }; // הצגה/הסתרה של פס הקבוצות (כמו מקש G)
 
 export type ControlMessage = HostStateSnapshot | HostGameMessage | HostReportMessage | HostCommand;
 

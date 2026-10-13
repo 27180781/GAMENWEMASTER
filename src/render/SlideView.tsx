@@ -18,6 +18,7 @@ import { QuestionSlide, type RailPlayer, type RevealState } from './QuestionSlid
 import { SubjectSlide } from './SubjectSlide.tsx';
 import { WinnersListScreen, WinnersScreen } from './screens.tsx';
 import type { RosterData } from '../app/roster.ts';
+import type { GroupRailData } from '../app/groupRail.ts';
 import type { TimerView } from './TimerRing.tsx';
 
 interface SlideViewProps {
@@ -37,10 +38,14 @@ interface SlideViewProps {
   nameOf?: (voterId: string) => string;
   /** מרשם הקבוצות — לשקופית פונקציה מסוג "screen"/"leaderboard". */
   roster?: RosterData;
+  /** בונוס ידני לקבוצות — לדירוג הקבוצתי בשקופית "leaderboard", כמו בשאר המסכים. */
+  groupBonus?: Readonly<Record<string, number>>;
   /** סיום מדיה חוסמת (סרטון/יוטיוב) — למעבר אוטומטי אם מוגדר playToEnd. */
   onBlockingMediaEnded?: () => void;
   /** מסך הצפייה: כמה ענו נכון, כשסימון התשובה הנכונה עוד מוסתר ממנו (ראו QuestionSlide). */
   liveCorrectCount?: number | null;
+  /** פס הקבוצות בצד מסך השאלה (src/app/groupRail.ts); null = אין. */
+  groupRail?: GroupRailData | null;
 }
 
 /** מסך שקופית "פונקציה" — פעולת מערכת (API / ניקוד / משתתפים) עם חיווי מצב. */
@@ -116,8 +121,10 @@ export function SlideView({
   functionDetail = '',
   nameOf,
   roster,
+  groupBonus,
   onBlockingMediaEnded,
   liveCorrectCount = null,
+  groupRail = null,
 }: SlideViewProps) {
   const slide = engine.getCurrentSlide();
   const game = engine.getGame();
@@ -138,7 +145,12 @@ export function SlideView({
     const fn = slide.function;
     if (fn?.action === 'screen') {
       return fn.screen?.type === 'leaderboard' ? (
-        <WinnersListScreen engine={engine} {...(nameOf ? { nameOf } : {})} {...(roster ? { roster } : {})} />
+        <WinnersListScreen
+          engine={engine}
+          {...(nameOf ? { nameOf } : {})}
+          {...(roster ? { roster } : {})}
+          {...(groupBonus ? { groupBonus } : {})}
+        />
       ) : (
         <WinnersScreen engine={engine} {...(nameOf ? { nameOf } : {})} />
       );
@@ -207,6 +219,7 @@ export function SlideView({
             gameType={engine.getGame().setting.gameType}
             betPill={betPill}
             liveCorrectCount={liveCorrectCount}
+            groupRail={groupRail}
           />
         )}
       </div>

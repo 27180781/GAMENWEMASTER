@@ -15,6 +15,7 @@ import {
   globalSettingsSchema,
   isImageQuestion,
   isVotableSlide,
+  marksCorrectAnswer,
   scoredLikeTrivia,
   slideSettingsSchema,
   type GameFile,
@@ -30,6 +31,7 @@ import type { TimerView } from '../render/TimerRing.tsx';
 import { avatarColor } from '../render/avatar.ts';
 import type { BoardState } from '../app/snakesLadders.ts';
 import { hasGroupData } from '../app/groupScore.ts';
+import type { GroupRailData } from '../app/groupRail.ts';
 import type { Group, RosterData } from '../app/roster.ts';
 import { AliasTable } from './aliases.ts';
 import {
@@ -97,6 +99,8 @@ export interface LiveHostInput {
   revealThumb: string | null;
   /** וידאו המנחה בשידור (useHostVideo), או null. */
   video: LiveVideo | null;
+  /** פס הקבוצות כפי שהמסך הראשי מציג אותו (GameHost), או null. */
+  groupRail: GroupRailData | null;
 }
 
 /**
@@ -231,6 +235,28 @@ function liveSlide(slide: Slide, view: SlideVisibility | null): Slide {
   return out as unknown as Slide;
 }
 
+/**
+ * פס הקבוצות למסך הצפייה — העתק של מה שהמסך הראשי מציג (GameHost בונה אותו
+ * לפי השלב, כבר מסוכם לקבוצות). כאן רק מוודאים שוב שאין בו מה שהמסך עוד לא
+ * חשף: כמה מכל קבוצה צדקו — רק אחרי החשיפה; איך כל קבוצה הצביעה — רק אחרי
+ * החשיפה, או בזמן ההצבעה כשהמונים החיים ממילא על המסך.
+ */
+function liveGroupRail(
+  rail: GroupRailData | null,
+  at: { revealed: boolean; voting: boolean; liveCounts: boolean },
+): GroupRailData | null {
+  if (rail === null) return null;
+  if (rail.mode === 'correct' && !at.revealed) return null;
+  if (rail.mode === 'split' && !at.revealed && !(at.voting && at.liveCounts)) return null;
+  return {
+    mode: rail.mode,
+    categoryName: rail.categoryName,
+    categoryCount: rail.categoryCount,
+    more: rail.more,
+    rows: rail.rows.map((row) => ({ ...row, split: row.split === null ? null : [...row.split] })),
+  };
+}
+
 /** עוגן הטיימר הקודם עדיין מתאר את הטיימר הנוכחי? (אז לא שולחים כלום חדש) */
 function timerStillMatches(anchor: LiveTimer, timer: TimerView): boolean {
   if (anchor.paused !== timer.paused || anchor.total !== timer.total) return false;
@@ -311,7 +337,7 @@ export class LiveSnapshotBuilder {
     if (
       slide !== undefined &&
       voting &&
-      slide.type === 'trivia' &&
+      marksCorrectAnswer(slide) &&
       !majority &&
       state.liveVotes !== null
     ) {
@@ -323,9 +349,11 @@ export class LiveSnapshotBuilder {
 
     // ---- ניקוד: רק כשמוצג מסך שמשתמש בו ----
     const fnScreen = playing && slide?.type === 'function' && slide.function?.action === 'screen';
-    const groupsShown = playing && (input.overlays.groups !== null || input.overlays.leaders);
-    const scoresShown =
-      input.stage === 'winners' || input.stage === 'scoreboard' || groupsShown || fnScreen;
+    const endStage = input.stage === 'winners' || input.stage === 'scoreboard';
+    // דירוג הקבוצות (מקש 4) מוצג גם מעל מסכי הסיום, כמו במסך הראשי.
+    const groupsOverlayShown = (playing || endStage) && input.overlays.groups !== null;
+    const groupsShown = groupsOverlayShown || (playing && input.overlays.leaders);
+    const scoresShown = endStage || groupsShown || fnScreen;
     const scores = scoresShown ? aliasMap(state.scores) : {};
     const answerTimes = scoresShown ? aliasMap(state.answerTimes) : {};
 
@@ -424,7 +452,7 @@ export class LiveSnapshotBuilder {
         playing && input.overlays.bet
           ? { title: armedBetTitle(game, state.currentSlideIndex) }
           : null,
-      groups: playing ? input.overlays.groups : null,
+      groups: groupsOverlayShown ? input.overlays.groups : null,
       board: boardShown ? input.overlays.board : null,
       connect: input.overlays.connect,
       raffle:
@@ -439,6 +467,15 @@ export class LiveSnapshotBuilder {
               ),
             },
     };
+
+    const groupRail =
+      playing && slide !== undefined
+        ? liveGroupRail(input.groupRail, {
+            revealed,
+            voting,
+            liveCounts: slide.setting.liveVoteCounts,
+          })
+        : null;
 
     const players = playing ? rail(input.players) : [];
     // מי ענה נכון מוצג רק אחרי החשיפה — לפני כן הוא היה מגלה מה התשובה.
@@ -488,6 +525,7 @@ export class LiveSnapshotBuilder {
       cues: input.cues.map((c) => ({ ...c })),
       applause: input.applause === null ? null : { ...input.applause },
       video: liveVideoCopy(input.video),
+      groupRail,
     };
   }
 }

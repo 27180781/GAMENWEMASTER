@@ -25,6 +25,12 @@ interface OperatorMenuProps {
   onNarrationMutedChange?: (muted: boolean) => void;
   narrationVolume?: number;
   onNarrationVolumeChange?: (volume: number) => void;
+  /**
+   * פס הקבוצות בצד מסך השאלה (src/app/groupRail.ts): undefined = אין למשחק
+   * קבוצות, ואז אין מתג; אחרת — האם הוא מוצג.
+   */
+  groupRail?: boolean;
+  onGroupRailChange?: (shown: boolean) => void;
   /** וידאו המנחה במסך הצפייה — רק כשהרישיון כולל אותו (ראו src/live/video). */
   hostVideo?: HostVideoHandle;
   /** «במה» — מצלמות המשתתפים, רק כשהרישיון כולל אותה (src/live/video/stage.ts). */
@@ -61,6 +67,8 @@ export function OperatorMenu({
   onNarrationMutedChange,
   narrationVolume = 1,
   onNarrationVolumeChange,
+  groupRail,
+  onGroupRailChange,
   hostVideo,
   stage,
   onManageStage,
@@ -160,6 +168,16 @@ export function OperatorMenu({
               </label>
             </>
           )}
+          {groupRail !== undefined && (
+            <label title="דירוג הקבוצות וכמה מכל קבוצה ענו, בצד מסך השאלה. מקש G מסתיר ומחזיר">
+              <input
+                type="checkbox"
+                checked={groupRail}
+                onChange={(e) => onGroupRailChange?.(e.target.checked)}
+              />{' '}
+              פס הקבוצות בצד השאלה (G)
+            </label>
+          )}
           {hostVideo && <HostVideoPanel video={hostVideo} />}
           {stage && onManageStage && (
             <StageMenuSection
@@ -176,6 +194,7 @@ export function OperatorMenu({
             <strong>פקודות מנחה (מקלדת / שלט):</strong> רווח או 0 — השלב הבא · 2 — שלב
             אחורה · 1 — מסך מובילים/חזרה · 3 — מחיאות כפיים · 4 — ‏10+ שניות לטיימר ·
             5 — ‏10- שניות · 6 — עצירת/המשך טיימר והצבעה
+            {groupRail !== undefined && ' · G — הסתרת/הצגת פס הקבוצות'}
           </p>
         </section>
 
