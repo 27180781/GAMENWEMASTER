@@ -585,7 +585,7 @@ export const SCREENS: ScreenDef[] = [
         ctx,
         (engine) => (
           <div className="leaders-overlay">
-            <WinnersListScreen engine={engine} nameOf={nameOfFor(roster)} roster={roster} />
+            <WinnersListScreen engine={engine} nameOf={nameOfFor(roster)} roster={roster} groupBonus={{ g3: 15 }} />
           </div>
         ),
         { roster },

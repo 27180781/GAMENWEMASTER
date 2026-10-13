@@ -1061,14 +1061,14 @@ export function GameHost({
     reportDownloadedRef.current = true;
     const g = engine.getGame();
     if (canReportToDisk) {
-      void buildGameReportBytes(g, engine.getState(), rosterRef.current, nameOf)
+      void buildGameReportBytes(g, engine.getState(), rosterRef.current, nameOf, groupBonusRef.current)
         .then((bytes) => desktopSaveReport(reportFilename(g), bytes))
         .then((saved) => {
           if (saved !== null) debugLog('game', `קובץ תוצאות נשמר: ${saved}`);
         })
         .catch((err) => debugLog('game', `שמירת קובץ תוצאות נכשלה (${String(err)})`));
     } else {
-      void downloadGameReport(g, engine.getState(), rosterRef.current, nameOf).catch((err) =>
+      void downloadGameReport(g, engine.getState(), rosterRef.current, nameOf, groupBonusRef.current).catch((err) =>
         debugLog('game', `יצירת קובץ סיכום נכשלה (${String(err)})`),
       );
     }
@@ -1076,7 +1076,7 @@ export function GameHost({
 
   /** הורדת קובץ התוצאות כמו שהוא עכשיו — מתפריט המפעיל (אונליין). */
   const downloadReportNow = useCallback(() => {
-    void downloadGameReport(engine.getGame(), engine.getState(), rosterRef.current, nameOf).catch(
+    void downloadGameReport(engine.getGame(), engine.getState(), rosterRef.current, nameOf, groupBonusRef.current).catch(
       (err) => debugLog('game', `יצירת קובץ סיכום נכשלה (${String(err)})`),
     );
   }, [engine, nameOf]);
@@ -1093,7 +1093,7 @@ export function GameHost({
     liveReportBusyRef.current = true;
     try {
       const g = engine.getGame();
-      const bytes = await buildGameReportBytes(g, engine.getState(), rosterRef.current, nameOf);
+      const bytes = await buildGameReportBytes(g, engine.getState(), rosterRef.current, nameOf, groupBonusRef.current);
       const saved = await desktopSaveReport(reportFilename(g), bytes);
       if (saved !== null) {
         setReportSavedAt(Date.now());
@@ -1993,7 +1993,7 @@ export function GameHost({
           // קובץ התוצאות למסך המנחה: התצוגה מחזיקה את המנוע ובונה אותו, ומסך
           // המנחה מוריד אותו אצלו, על מסך המחשב ולא במקרן.
           const g = engine.getGame();
-          void buildGameReportBytes(g, engine.getState(), rosterRef.current, (id) => nameOfRef.current(id))
+          void buildGameReportBytes(g, engine.getState(), rosterRef.current, (id) => nameOfRef.current(id), groupBonusRef.current)
             .then((bytes) =>
               controlRef.current?.post({ t: 'reportFile', id: msg.id, name: reportFilename(g), bytes }),
             )
@@ -3298,6 +3298,7 @@ export function GameHost({
               functionDetail={functionDetail}
               nameOf={nameOf}
               roster={roster}
+              groupBonus={groupBonus}
               onBlockingMediaEnded={onBlockingMediaEnded}
               groupRail={groupRail}
             />
@@ -3322,7 +3323,7 @@ export function GameHost({
         {/* טבלת הניקוד באמצע משחק (פקודת מנחה 1) — מסך נפרד מלא מעל כל התצוגה */}
         {stage === 'playing' && leadersOverlay && (
           <div className="leaders-overlay">
-            <WinnersListScreen engine={engine} nameOf={nameOf} roster={roster} />
+            <WinnersListScreen engine={engine} nameOf={nameOf} roster={roster} groupBonus={groupBonus} />
           </div>
         )}
 

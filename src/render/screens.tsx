@@ -181,11 +181,18 @@ export function WinnersListScreen({
   engine,
   nameOf = identityName,
   roster,
+  groupBonus,
 }: {
   engine: EngineView;
   nameOf?: NameResolver;
   /** מרשם הקבוצות — כשמסופק ויש שיוכים, מוצג גם דירוג קבוצתי לצד הדירוג האישי. */
   roster?: RosterData;
+  /**
+   * בונוס ידני לקבוצות (groupId → נקודות), כמו במסך דירוג הקבוצות (מקש 4) ובפס
+   * הקבוצות. עד 2026-10 הדירוג כאן חושב בלעדיו, ולכן קבוצה שקיבלה בונוס הופיעה
+   * כאן במקום אחר ובניקוד אחר.
+   */
+  groupBonus?: Readonly<Record<string, number>>;
 }) {
   const setting = engine.getGame().setting;
   // מספר המובילים כפי שהוגדר בקובץ המשחק (winnersListCount; ברירת מחדל 5).
@@ -233,7 +240,7 @@ export function WinnersListScreen({
             <div className="winners-col group-standings">
               <h2 className="winners-col-title">דירוג קבוצתי (ממוצע)</h2>
               {categories.map((cat) => {
-                const standings = groupStandings(roster, cat.id, state.scores, state.answerTimes);
+                const standings = groupStandings(roster, cat.id, state.scores, state.answerTimes, groupBonus);
                 return (
                   <div key={cat.id} className="group-cat">
                     <h3 className="group-cat-name">{cat.name || 'קבוצות'}</h3>

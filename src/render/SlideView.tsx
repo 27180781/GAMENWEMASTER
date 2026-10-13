@@ -38,6 +38,8 @@ interface SlideViewProps {
   nameOf?: (voterId: string) => string;
   /** מרשם הקבוצות — לשקופית פונקציה מסוג "screen"/"leaderboard". */
   roster?: RosterData;
+  /** בונוס ידני לקבוצות — לדירוג הקבוצתי בשקופית "leaderboard", כמו בשאר המסכים. */
+  groupBonus?: Readonly<Record<string, number>>;
   /** סיום מדיה חוסמת (סרטון/יוטיוב) — למעבר אוטומטי אם מוגדר playToEnd. */
   onBlockingMediaEnded?: () => void;
   /** מסך הצפייה: כמה ענו נכון, כשסימון התשובה הנכונה עוד מוסתר ממנו (ראו QuestionSlide). */
@@ -119,6 +121,7 @@ export function SlideView({
   functionDetail = '',
   nameOf,
   roster,
+  groupBonus,
   onBlockingMediaEnded,
   liveCorrectCount = null,
   groupRail = null,
@@ -142,7 +145,12 @@ export function SlideView({
     const fn = slide.function;
     if (fn?.action === 'screen') {
       return fn.screen?.type === 'leaderboard' ? (
-        <WinnersListScreen engine={engine} {...(nameOf ? { nameOf } : {})} {...(roster ? { roster } : {})} />
+        <WinnersListScreen
+          engine={engine}
+          {...(nameOf ? { nameOf } : {})}
+          {...(roster ? { roster } : {})}
+          {...(groupBonus ? { groupBonus } : {})}
+        />
       ) : (
         <WinnersScreen engine={engine} {...(nameOf ? { nameOf } : {})} />
       );

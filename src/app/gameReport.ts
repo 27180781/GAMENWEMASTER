@@ -2,7 +2,8 @@
  * בונה קובץ אקסל סיכום לסוף המשחק. שלושה גליונות:
  *   • משתתפים — מה כל שחקן ענה בכל שאלה, כמה נענו/נכונות, וניקוד סופי.
  *   • שאלות — פילוח הצבעות לכל שאלה (תשובה נכונה, מס׳ עונים, אחוז נכון, בחירות).
- *   • קבוצות — דירוג הקבוצות לכל קטגוריה (ניקוד כולל/ממוצע, מהירות ממוצעת).
+ *   • קבוצות — דירוג הקבוצות לכל קטגוריה (ניקוד כולל, בונוס, ממוצע, מהירות
+ *     ממוצעת), באותו סדר כמו מסך דירוג הקבוצות (מקש 4) — כולל הבונוס הידני.
  *
  * טהור (פרט לפונקציית ההורדה) — buildReportSheets ניתן לבדיקה ביחידה.
  */
@@ -19,6 +20,8 @@ export function buildReportSheets(
   state: GameState,
   roster: RosterData,
   nameOf: (voterId: string) => string,
+  /** בונוסים ידניים לקבוצות (ראו scoreAdjust.ts). חסר = אין בונוסים. */
+  groupBonus?: Readonly<Record<string, number>>,
 ): SheetData[] {
   // הימור מצביע אבל אינו שאלה — הוא מקבל גליון משלו ולא עמודת "ש".
   const votable = game.questions.filter((s) => isVotableSlide(s) && s.type !== 'bet');
@@ -105,13 +108,16 @@ export function buildReportSheets(
     'מס׳',
     'חברים',
     'ניקוד כולל',
+    'בונוס',
     'ניקוד ממוצע',
     'מהירות ממוצעת (שנ׳)',
   ];
   const groupRows: Cell[][] = [];
   for (const category of roster.categories) {
     if (category.groups.length === 0) continue;
-    for (const st of groupStandings(roster, category.id, state.scores, state.answerTimes)) {
+    // הדירוג והממוצע כולל הבונוס — כמו במסך דירוג הקבוצות ובפס הקבוצות. עד
+    // 2026-10 הגליון דירג בלעדיו, ואחרי בונוס הראה סדר אחר ממה שהוצג במקש 4.
+    for (const st of groupStandings(roster, category.id, state.scores, state.answerTimes, groupBonus)) {
       const speed: Cell = Number.isFinite(st.avgMs) ? Math.round(st.avgMs / 100) / 10 : '—';
       groupRows.push([
         category.name,
@@ -119,6 +125,7 @@ export function buildReportSheets(
         st.number,
         st.memberCount,
         st.totalScore,
+        st.bonus,
         Math.round(st.avgScore * 10) / 10,
         speed,
       ]);
@@ -168,8 +175,9 @@ export async function downloadGameReport(
   state: GameState,
   roster: RosterData,
   nameOf: (voterId: string) => string,
+  groupBonus?: Readonly<Record<string, number>>,
 ): Promise<void> {
-  const blob = await buildXlsxBlob(buildReportSheets(game, state, roster, nameOf));
+  const blob = await buildXlsxBlob(buildReportSheets(game, state, roster, nameOf, groupBonus));
   downloadBlob(blob, reportFilename(game));
 }
 
@@ -179,7 +187,8 @@ export async function buildGameReportBytes(
   state: GameState,
   roster: RosterData,
   nameOf: (voterId: string) => string,
+  groupBonus?: Readonly<Record<string, number>>,
 ): Promise<Uint8Array> {
-  const blob = await buildXlsxBlob(buildReportSheets(game, state, roster, nameOf));
+  const blob = await buildXlsxBlob(buildReportSheets(game, state, roster, nameOf, groupBonus));
   return new Uint8Array(await blob.arrayBuffer());
 }

@@ -730,6 +730,7 @@ function LiveScreen({
                       functionDetail={snap.fn.detail}
                       nameOf={nameOf}
                       roster={roster}
+                      groupBonus={snap.groupBonus}
                       liveCorrectCount={snap.liveCorrectCount}
                       groupRail={snap.groupRail ?? null}
                     />
@@ -747,7 +748,7 @@ function LiveScreen({
 
                 {stage === 'playing' && overlays.leaders && (
                   <div className="leaders-overlay">
-                    <WinnersListScreen engine={engine} nameOf={nameOf} roster={roster} />
+                    <WinnersListScreen engine={engine} nameOf={nameOf} roster={roster} groupBonus={snap.groupBonus} />
                   </div>
                 )}
                 {stage === 'playing' && overlays.votes && (
