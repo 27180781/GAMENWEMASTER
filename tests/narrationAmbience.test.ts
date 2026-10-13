@@ -68,6 +68,39 @@ describe('pickAmbience', () => {
     expect(pickAmbience('sit', THREE, bankOf(THREE), { sit: -1 }).key).toBe('c');
   });
 
+  it('★ מצב חדש מתחיל מנקודת ההתחלה של הריצה, ומשם ממשיך בסיבוב', () => {
+    const first = pickAmbience('sit', THREE, bankOf(THREE), {}, { start: 4 });
+    expect(first.key).toBe('b');
+    expect(pickAmbience('sit', THREE, bankOf(THREE), first.rotation, { start: 4 }).key).toBe('c');
+    // מצב שכבר נבחר בו ניסוח אינו מושפע מנקודת ההתחלה.
+    expect(pickAmbience('sit', THREE, bankOf(THREE), { sit: 0 }, { start: 4 }).key).toBe('a');
+  });
+
+  it('★ skip מדלג כאילו חסר בבנק — על אותו מונה, בלי חזרה ברצף', () => {
+    let rotation: AmbienceRotation = {};
+    const picks: (string | null)[] = [];
+    for (let i = 0; i < 6; i += 1) {
+      const skip = i % 2 === 1 ? new Set(['c']) : undefined;
+      const pick = pickAmbience('sit', THREE, bankOf(THREE), rotation, { skip });
+      rotation = pick.rotation;
+      picks.push(pick.key);
+    }
+    // a, b, c, (c מדולג) a, b, (c מדולג) a — אף פעם לא אותו ניסוח פעמיים ברצף.
+    expect(picks).toEqual(['a', 'b', 'c', 'a', 'b', 'a']);
+    expect(pickAmbience('sit', ['a'], bankOf(['a']), {}, { skip: new Set(['a']) }).key).toBeNull();
+  });
+
+  it('★ avoid נמנע מניסוח כל עוד יש חלופה, ונאמר כשאין', () => {
+    expect(pickAmbience('sit', THREE, bankOf(THREE), {}, { avoid: 'a' }).key).toBe('b');
+    expect(pickAmbience('sit', THREE, bankOf(THREE), { sit: 1 }, { avoid: 'a' }).key).toBe('b');
+    // החלופה היחידה מדולגת או חסרה — הניסוח נאמר בכל זאת, כמו ניסוח יחיד בבנק.
+    expect(pickAmbience('sit', ['a', 'b'], bankOf(['a', 'b']), {}, { avoid: 'a', skip: new Set(['b']) }).key).toBe('a');
+    expect(pickAmbience('sit', ['a', 'b'], bankOf(['a']), {}, { avoid: 'a' }).key).toBe('a');
+    // המונה מתקדם אחרי מה שנבחר בפועל.
+    const pick = pickAmbience('sit', THREE, bankOf(THREE), {}, { avoid: 'a' });
+    expect(pick.rotation).toEqual({ sit: 2 });
+  });
+
   it('לכל מצב מונה משלו — מצבים אינם מזיזים זה את זה', () => {
     let rotation: AmbienceRotation = {};
     const first = pickAmbience('one', THREE, bankOf(THREE), rotation);

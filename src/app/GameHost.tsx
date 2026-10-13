@@ -170,6 +170,14 @@ const NARRATION_VOLUME_KEY = 'trivia.narration.volume';
 /** כמה מנמיכים את סאונד המשחק בזמן שהקריין מדבר (רק כש-duck דלוק בקובץ). */
 const NARRATION_DUCK = 0.25;
 
+/**
+ * נקודת ההתחלה של סיבוב ניסוחי האווירה לריצה הזאת (NarrationMemory.seed). בלי
+ * הגרלה «מתחילים!» הוא תמיד אותו ניסוח, כי הוא נאמר פעם אחת לריצה.
+ */
+function narrationSeed(): number {
+  return Math.floor(Math.random() * 1_000_000);
+}
+
 function readNarrationMuted(): boolean {
   try {
     return window.localStorage.getItem(NARRATION_MUTE_KEY) === '1';
@@ -2255,7 +2263,7 @@ export function GameHost({
                 menuOpen
               ? 'other'
               : 'none';
-  const narrationMemoryRef = useRef(emptyNarrationMemory());
+  const narrationMemoryRef = useRef(emptyNarrationMemory(narrationSeed()));
 
   useEffect(() => {
     if (!narrationActive) return;
@@ -2327,6 +2335,9 @@ export function GameHost({
       phase: state.phase,
       slideId: state.currentSlideId,
       slideType: s.type,
+      // מה שבאמת פעיל עכשיו, ולא limit.type: חבילת אופליין תמיד "clickers",
+      // והמפעיל יכול להצביע בה גם בטלפונים (או רק בהם).
+      voteMode: isComposite ? 'both' : useClicker ? 'clickers' : useSocket ? 'phones' : 'none',
       votable: isVotableSlide(s),
       questionOrdinal: questionOrdinal(g, s.id),
       answers: narrationAnswers(s),
@@ -2412,6 +2423,9 @@ export function GameHost({
     groupsCatIndex,
     groupBonus,
     board,
+    isComposite,
+    useClicker,
+    useSocket,
   ]);
 
   // הקפאת/הפשרת טיימר ההצבעה בזמן שכבה חוסמת. מכבדים עצירה ידנית (מקש 6): מפשירים
@@ -2940,7 +2954,7 @@ export function GameHost({
     reportDownloadedRef.current = false;
     winnersPreviewRef.current = null;
     // ריצה חדשה = קריינות מתחילה מהתחלה ("ברוכים הבאים" הוא פעם אחת לריצה).
-    narrationMemoryRef.current = emptyNarrationMemory();
+    narrationMemoryRef.current = emptyNarrationMemory(narrationSeed());
     narration.cancel();
     setSettingsOpen(false);
     debugLog('command', 'התחלת המשחק מחדש (מתוך ההגדרות)', {
