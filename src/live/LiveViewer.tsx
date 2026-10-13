@@ -772,7 +772,8 @@ function LiveScreen({
                     title={overlays.bet.title}
                   />
                 )}
-                {stage === 'playing' && overlays.groups !== null && (
+                {/* גם מעל מסכי הסיום, כמו במסך הראשי (מקש 4 במנצחים ובניקוד של כולם) */}
+                {stage !== 'opening' && overlays.groups !== null && (
                   <GroupStandingsOverlay
                     roster={roster}
                     scores={state.scores}

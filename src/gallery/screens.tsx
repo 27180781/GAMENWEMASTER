@@ -627,6 +627,32 @@ export const SCREENS: ScreenDef[] = [
     },
   },
   {
+    id: 'winners-groups',
+    label: 'פודיום + דירוג הקבוצות (מקש 4)',
+    build: (ctx) => {
+      const roster = makeRoster(true);
+      const game = makeGame(ctx, [Q4]);
+      const engine = engineAt(game, 1, 'showing', { scores: scoresFor(24) });
+      const state = engine.getState();
+      return {
+        game,
+        node: (
+          <>
+            <WinnersScreen engine={engine} nameOf={nameOfFor(roster)} />
+            <GroupStandingsOverlay
+              roster={roster}
+              scores={state.scores}
+              answerTimes={state.answerTimes}
+              nameOf={nameOfFor(roster)}
+              categoryIndex={0}
+              onClose={noop}
+            />
+          </>
+        ),
+      };
+    },
+  },
+  {
     id: 'all-scores',
     label: 'הניקוד של כל המשתתפים',
     build: (ctx) => {

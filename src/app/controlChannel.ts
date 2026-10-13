@@ -50,6 +50,11 @@ export interface HostStateSnapshot {
    * קבוצות (או תצוגה ישנה), ואז מסך המנחה לא מציג את המתג.
    */
   groupRail?: boolean;
+  /**
+   * דירוג הקבוצות (מקש 4) פתוח על המסך. במסכי הסיום מסך המנחה מציג לפיו כפתור
+   * לפתוח ולסגור אותו. חסר = אין למשחק קבוצות (או תצוגה ישנה).
+   */
+  groupStandings?: boolean;
   reveal: { questionShown: boolean; answersShown: number; revealCorrect: boolean };
 }
 

@@ -349,9 +349,11 @@ export class LiveSnapshotBuilder {
 
     // ---- ניקוד: רק כשמוצג מסך שמשתמש בו ----
     const fnScreen = playing && slide?.type === 'function' && slide.function?.action === 'screen';
-    const groupsShown = playing && (input.overlays.groups !== null || input.overlays.leaders);
-    const scoresShown =
-      input.stage === 'winners' || input.stage === 'scoreboard' || groupsShown || fnScreen;
+    const endStage = input.stage === 'winners' || input.stage === 'scoreboard';
+    // דירוג הקבוצות (מקש 4) מוצג גם מעל מסכי הסיום, כמו במסך הראשי.
+    const groupsOverlayShown = (playing || endStage) && input.overlays.groups !== null;
+    const groupsShown = groupsOverlayShown || (playing && input.overlays.leaders);
+    const scoresShown = endStage || groupsShown || fnScreen;
     const scores = scoresShown ? aliasMap(state.scores) : {};
     const answerTimes = scoresShown ? aliasMap(state.answerTimes) : {};
 
@@ -450,7 +452,7 @@ export class LiveSnapshotBuilder {
         playing && input.overlays.bet
           ? { title: armedBetTitle(game, state.currentSlideIndex) }
           : null,
-      groups: playing ? input.overlays.groups : null,
+      groups: groupsOverlayShown ? input.overlays.groups : null,
       board: boardShown ? input.overlays.board : null,
       connect: input.overlays.connect,
       raffle:

@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { GameEngine, type GameFile } from '../src/engine/index.ts';
-import { EMPTY_ROSTER } from '../src/app/roster.ts';
+import { addCategory, addGroup, assignGroupByNumber, EMPTY_ROSTER } from '../src/app/roster.ts';
 import { mirrorEngine } from '../src/live/mirrorEngine.ts';
 import {
   BLANK_IMAGE,
@@ -410,6 +410,33 @@ describe('מצב המסך למסך הצפייה', () => {
     const revealed = { reveal: { questionShown: true, answersShown: 4, revealCorrect: true } };
     expect(build('correct', revealed)?.mode).toBe('correct');
     expect(build('split', revealed)?.mode).toBe('split');
+  });
+
+  it('דירוג הקבוצות (מקש 4) עובר גם מעל מסכי הסיום, עם הקבוצות והבונוס', () => {
+    const engine = votingOnFirst();
+    engine.dispatch({ type: 'VOTING_TIMEOUT', at: T0 + 15_000 });
+    let roster = addCategory(EMPTY_ROSTER, 'צבעים', 'cat1');
+    roster = addGroup(roster, 'cat1', 'אדומים', 'red');
+    roster = addGroup(roster, 'cat1', 'כחולים', 'blue');
+    roster = assignGroupByNumber(roster, PHONES[0]!, 'cat1', 1);
+    roster = assignGroupByNumber(roster, PHONES[1]!, 'cat1', 2);
+    const base = { roster, groupBonus: { blue: 5 } };
+    const open = { ...base, overlays: { ...input(engine).overlays, groups: { categoryIndex: 0 } } };
+    for (const stage of ['winners', 'scoreboard'] as const) {
+      const snap = new LiveSnapshotBuilder().build(input(engine, { ...open, stage }));
+      expect(snap.overlays.groups).toEqual({ categoryIndex: 0 });
+      expect(snap.roster.categories.map((c) => c.groups.length)).toEqual([2]);
+      expect(Object.keys(snap.roster.memberships)).toHaveLength(2);
+      expect(snap.groupBonus).toEqual({ blue: 5 });
+      expectNoSecrets(JSON.stringify(snap));
+    }
+    // סגור — מסך הסיום לבדו, בלי הקבוצות
+    const closed = new LiveSnapshotBuilder().build(input(engine, { ...base, stage: 'winners' }));
+    expect(closed.overlays.groups).toBeNull();
+    expect(closed.roster.categories).toEqual([]);
+    expect(closed.groupBonus).toEqual({});
+    // לא במסך הפתיחה
+    expect(new LiveSnapshotBuilder().build(input(engine, { ...open, stage: 'opening' })).overlays.groups).toBeNull();
   });
 });
 

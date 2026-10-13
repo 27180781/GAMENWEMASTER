@@ -226,8 +226,14 @@ export function HostConsole() {
     post({ t: 'setGame', game: g });
   };
 
-  const inResults = snap?.phase === 'results';
+  /** מסכי הסיום — המנצחים והניקוד של כולם. */
+  const atEnd = snap?.stage === 'winners' || snap?.stage === 'scoreboard';
+  // בתצוגה המקדימה של המנצחים (W) השלב של השקופית נשאר, אבל הכפתורים שלה לא
+  // רלוונטיים: דירוג הקבוצות כבר מופיע בכפתור של מסכי הסיום.
+  const inResults = snap?.phase === 'results' && !atEnd;
   const inVoting = snap?.phase === 'voting';
+  /** 4 ו-5 מזיזים את הטיימר רק בזמן ההצבעה עצמה; במסכי הסיום הם של דירוג הקבוצות. */
+  const timerKeys = inVoting && !atEnd;
   const leaders = useMemo(() => snap?.leaders ?? [], [snap]);
 
   if (snap === null) {
@@ -393,9 +399,14 @@ export function HostConsole() {
                 <button className="hc-btn" onClick={() => host(1)}>🏆 טבלת מובילים</button>
                 <button className="hc-btn" onClick={() => host(3)}>👏 מחיאות כפיים</button>
                 {inResults && <button className="hc-btn" onClick={() => host(4)}>📊 דירוג קבוצות</button>}
+                {atEnd && snap.groupStandings !== undefined && (
+                  <button className="hc-btn" title="מעל מסך הסיום (מקש 4)" onClick={() => host(4)}>
+                    {snap.groupStandings ? '✕ סגירת דירוג הקבוצות' : '📊 דירוג קבוצות'}
+                  </button>
+                )}
                 {inResults && <button className="hc-btn" onClick={() => host(5)}>📋 פירוט הצבעות</button>}
-                {inVoting && <button className="hc-btn" onClick={() => host(4)}>⏱ +10 שניות</button>}
-                {inVoting && <button className="hc-btn" onClick={() => host(5)}>⏱ −10 שניות</button>}
+                {timerKeys && <button className="hc-btn" onClick={() => host(4)}>⏱ +10 שניות</button>}
+                {timerKeys && <button className="hc-btn" onClick={() => host(5)}>⏱ −10 שניות</button>}
                 {inVoting && <button className="hc-btn" onClick={() => host(6)}>⏸ השהיה / המשך</button>}
                 {snap.groupRail !== undefined && (
                   <button

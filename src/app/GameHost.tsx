@@ -816,6 +816,16 @@ export function GameHost({
   const railAvailableRef = useRef(railAvailable);
   railAvailableRef.current = railAvailable;
 
+  // דירוג הקבוצות נסגר במעבר בין שלבים: שכבה שנפתחה בזמן המשחק לא עולה מעל מסך
+  // המנצחים (W, N בשקופית האחרונה, «סיום משחק»), ושכבה שנפתחה בסיום לא נשארת
+  // פתוחה כשחוזרים ממנו למשחק (W). נקבע כבר ברינדור ולא ב-effect, כדי שאף פריים
+  // (וגם לא הקריין או מסך הצפייה) לא יראה את השכבה מעל המסך החדש.
+  const [groupsStage, setGroupsStage] = useState(stage);
+  if (groupsStage !== stage) {
+    setGroupsStage(stage);
+    setGroupsOverlay(false);
+  }
+
   // פענוח-מקדים של השקופית הבאה: כשמציגים שקופית, מפענחים כבר את המדיה של הבאה
   // (תמונת שאלה / תמונות תשובה / רקע) כדי שהמעבר אליה יהיה מיידי. הסרטון-רקע
   // המשותף כבר פוענח פעם אחת (במסך ההגדרות) ולכן מדולג כאן.
@@ -1739,7 +1749,12 @@ export function GameHost({
     const stage = stageRef.current;
     // מסכי הסיום קודם: השכבות שלמטה מוצגות רק בזמן המשחק. שכבה שנשארה פתוחה
     // מאחורי מסך המנצחים (W, «סיום משחק» בתפריט) נסגרה ברווח במקום שייחשף
-    // מקום, והרווח נראה כאילו לא עשה כלום.
+    // מקום, והרווח נראה כאילו לא עשה כלום. דירוג הקבוצות הוא היוצא מן הכלל: הוא
+    // מוצג גם מעל מסכי הסיום (מקש 4), ורווח סוגר אותו וחוזר לאותו מקום.
+    if ((stage === 'winners' || stage === 'scoreboard') && groupsOverlayRef.current) {
+      setGroupsOverlay(false);
+      return;
+    }
     if (stage === 'winners') {
       // חשיפת המנצחים אחד-אחד; אחרי שכולם נחשפו — מעבר למסך ניקוד כל המשתתפים.
       const podiumTotal = Math.min(engine.getWinners(engine.getGame().setting.multiWinners).length, 5);
@@ -1792,7 +1807,11 @@ export function GameHost({
   const goBack = useCallback(() => {
     const stage = stageRef.current;
     if (stage === 'playing') stepBack();
-    else if (stage === 'winners') {
+    else if (groupsOverlayRef.current) {
+      // דירוג הקבוצות פתוח מעל מסך סיום — אחורה סוגר אותו, במקום לשנות את המסך
+      // שמתחתיו בלי שרואים.
+      setGroupsOverlay(false);
+    } else if (stage === 'winners') {
       // מבטלים חשיפת מנצח אחרון. כשאין חשופים, בתצוגה המקדימה (W) חוזרים למשחק
       // בדיוק כמו ב-W — כולל ניקוי הסימון, שבלעדיו סוף המשחק האמיתי לא נרשם
       // (דוח, תוצאות, נעילת הגיבוי). במסך המנצחים האמיתי אין לאן לחזור: הסוף
@@ -1825,6 +1844,13 @@ export function GameHost({
           audio.playApplause(soundsRef.current.genericMediaSound.src);
           break;
         case 4:
+          // מסכי הסיום (מנצחים, הניקוד של כולם) — דירוג הקבוצות המלא מעל המסך,
+          // וסגירה חוזרת לאותו מקום. המשחק עצמו לא נפתח מחדש, ולכן מה שנרשם בסוף
+          // (הדוח, התוצאות, נעילת הגיבוי) לא זז. (משוב לקוח, «מי בראש», 7.9.)
+          if (stageRef.current === 'winners' || stageRef.current === 'scoreboard') {
+            if (hasGroupData(rosterRef.current)) setGroupsOverlay((open) => !open);
+            break;
+          }
           // בשלב חשיפת התשובה (results) עם נתוני קבוצות — פותח/סוגר את מסך דירוג
           // הקבוצות; אחרת (בזמן טיימר ההצבעה) נשאר קיצור להוספת 10 שניות.
           // דירוג הקבוצות ופירוט ההצבעות הדדית-בלעדיים — פתיחת האחד סוגרת את השני.
@@ -1839,6 +1865,9 @@ export function GameHost({
           if (groupsOverlayRef.current) {
             // מסך הקבוצות פתוח — מקש 5 מעביר בין סוגי הקבוצות (קטגוריות).
             setGroupsCatIndex((i) => i + 1);
+          } else if (stageRef.current === 'winners' || stageRef.current === 'scoreboard') {
+            // מסכי הסיום, כשהדירוג סגור — כלום: פירוט ההצבעות והטיימר לא מוצגים
+            // כאן, ושינוי שלהם מאחורי המסך היה צץ בחזרה מהתצוגה המקדימה (W).
           } else if (engine.getState().phase === 'results' && isVotableSlide(engine.getCurrentSlide())) {
             // בשלב חשיפת התשובה — פותח/סוגר את פירוט הצבעות השחקנים.
             setVotesOverlay((open) => !open);
@@ -1918,6 +1947,7 @@ export function GameHost({
       reveal: { ...revealRef.current },
       ...(restricted !== null ? { restrictedGroup: restricted } : {}),
       ...(railAvailableRef.current ? { groupRail: !groupRailHiddenRef.current } : {}),
+      ...(hasGroupData(rosterRef.current) ? { groupStandings: groupsOverlayRef.current } : {}),
     };
   }, [engine]);
 
@@ -2011,9 +2041,10 @@ export function GameHost({
   // פרסום-מחדש בכל שינוי רלוונטי (שלב/שקופית/הצבעות חיות/מרשם/מחוברים).
   useEffect(() => {
     controlRef.current?.post(buildSnapshot());
-    // groupBonus והסתרת פס הקבוצות נשמרים ב-ref (לא ב-deps של buildSnapshot),
-    // ולכן הם חייבים להופיע כאן — אחרת שינוי בתצוגה לא היה מגיע למסך הניהול.
-  }, [stage, state, reveal, connectedIds, roster, groupBonus, groupRailHidden, buildSnapshot]);
+    // groupBonus, הסתרת פס הקבוצות ודירוג הקבוצות נשמרים ב-ref (לא ב-deps של
+    // buildSnapshot), ולכן הם חייבים להופיע כאן — אחרת שינוי בתצוגה לא היה מגיע
+    // למסך הניהול.
+  }, [stage, state, reveal, connectedIds, roster, groupBonus, groupRailHidden, groupsOverlay, buildSnapshot]);
 
   // פרסום המשחק המלא (לעריכה) בכל החלפת תוכן — כולל אחרי עריכה חיה (hot-swap).
   useEffect(() => {
@@ -3329,8 +3360,9 @@ export function GameHost({
           />
         )}
 
-        {/* דירוג הקבוצות (פקודת מנחה 4) — קבוצה מובילה + מובילים בכל קבוצה; מקש 5 מחליף סוג */}
-        {stage === 'playing' && groupsOverlay && (
+        {/* דירוג הקבוצות (פקודת מנחה 4) — קבוצה מובילה + מובילים בכל קבוצה; מקש 5 מחליף סוג.
+            גם מעל מסכי הסיום (המנצחים והניקוד של כולם). */}
+        {stage !== 'opening' && groupsOverlay && (
           <GroupStandingsOverlay
             roster={roster}
             scores={state.scores}
