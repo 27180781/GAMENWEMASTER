@@ -542,9 +542,9 @@ body {
   gap: 18px;
 }
 /* גובה חסום — אך *בלי* חיתוך שורות. הגבלת שורות (line-clamp) הייתה קוצצת את
-   סוף השאלה בשקט; במקומה יש כאן תקציב גובה, ו-FitText מקטין את הפונט עד
-   שהטקסט כולו נכנס בתוכו. 240px הוא התקציב הגדול ביותר שעדיין מותיר מקום
-   לשמונה תשובות בארבע שורות (ראו החישוב אצל .q-card-text). */
+   סוף השאלה בשקט; במקומה יש כאן תקציב גובה, והפונט קטן עד שהטקסט כולו נכנס
+   בתוכו. 240px היא התקרה; כשהתשובות צריכות את המקום (5 תשובות ומעלה)
+   src/render/questionFit.ts מנמיך אותה במסך עצמו. */
 .q-question-text {
   /* Enter בעורך = שורה חדשה במסך (ראו multiline.ts) */
   white-space: pre-line;
@@ -619,9 +619,8 @@ body {
 .q-coin--reveal { font-size: 25px; }
 .q-card--correct .q-coin { box-shadow: 0 0 0 4px color-mix(in srgb, var(--text) 55%, transparent), 0 6px 16px rgba(0, 0, 0, 0.4); }
 /* כמו בשאלה: תקציב גובה במקום הגבלת שורות, כדי שתשובה ארוכה תוקטן ולא תיקצץ.
-   תקציב הגובה נגזר מהמקרה הצפוף ביותר — 8 תשובות בארבע שורות:
-   4 × (110 + 24 ריפוד) = 536, ועוד שאלה מלאה (240 + 44) ורווח 22 = 842px,
-   בתוך 856px הפנויים בין הכותרת לפס התחתון. */
+   התקציב כאן הוא התקרה; src/render/questionFit.ts מנמיך אותו במסך לפי מה
+   שנשאר אחרי השאלה והספירה לאחור, ומקטין כל תשובה עד שהיא נכנסת. */
 .q-card-text {
   /* Enter בעורך = שורה חדשה במסך (ראו multiline.ts) */
   white-space: pre-line;
@@ -633,12 +632,21 @@ body {
   color: var(--text);
   transition: color 0.45s ease;
   /* התקציב (536px) מתחלק בין שורות התשובות בפועל: 8 תשובות (4 שורות) → 110px
-     לכרטיס כמו קודם, אבל 2–4 תשובות מקבלות פי 2–4 מזה. --ans-rows מגיע
-     מ-QuestionSlide. */
+     לכרטיס, ו-2–4 תשובות מקבלות פי 2–4 מזה. --ans-rows מגיע מ-QuestionSlide. */
   max-height: calc(536px / var(--ans-rows, 4) - 24px);
   overflow: hidden;
 }
 .q-card--correct .q-card-text { color: var(--pill); }
+/* 7–8 תשובות טקסט (4 שורות): כרטיסים צפופים. בגודל הרגיל הכרטיס הנמוך ביותר הוא
+   104px (המטבע 74 ועוד ריפוד ומסגרת), ארבע שורות תופסות 476px, ובזמן ההצבעה
+   נשארו לשאלה 88px בלבד. כאן 80px ו-356px (src/render/questionFit.ts). */
+.q-answers--dense { row-gap: 12px; }
+.q-answers--dense .q-card { min-height: 76px; padding: 8px 18px; gap: 14px; }
+.q-answers--dense .q-coin { width: 58px; height: 58px; font-size: 32px; }
+.q-answers--dense .q-coin--reveal { font-size: 20px; }
+.q-answers--dense .q-live { min-width: 84px; padding: 3px 10px; border-radius: 14px; }
+.q-answers--dense .q-live b { font-size: 24px; }
+.q-answers--dense .q-live small { font-size: 13px; margin-top: 2px; }
 
 /* גריד תמונות (ans_images) — התמונות ממלאות את הכרטיס בשורה אחת, והמספר/אחוז
    צף על הפינה העליונה של התמונה (במקום מטבע נפרד מעליה שמבזבז שטח). */
@@ -6841,7 +6849,8 @@ body {
   max-width: 100%;
   /* פיקסלים ולא vh: ‏vh נמדד על החלון ולא על הבמה, ו-42vh (453px ב-1080p, יותר
      בחלון גבוה) דחף את שורת התשובות התחתונה אל מתחת לפס הצדקו/טעו. 320px
-     משאיר מקום לכותרת, לספירה, לשתי שורות תשובות ולפס התחתון. */
+     משאיר מקום לכותרת, לספירה, לשתי שורות תשובות ולפס התחתון; עם יותר שורות
+     src/render/questionFit.ts מנמיך את התקרה במסך עצמו. */
   max-height: 320px;
   min-width: 0;
   border-radius: 18px;

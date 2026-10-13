@@ -99,6 +99,21 @@ const Q8: SlideSpec = {
   ],
 };
 
+/** שש תשובות ארוכות — המקסימום שהבונה מאפשר — עם שאלה של שלוש שורות. */
+const Q6: SlideSpec = {
+  id: 1,
+  type: 'trivia',
+  que: 'איזה מהמנהגים הבאים נהוג בליל הסדר כדי לעורר את סקרנות הילדים ולגרום להם לשאול שאלות על יציאת מצרים, לפי מה שמובא בהגדה?',
+  answers: [
+    ['מסירים את הקערה מהשולחן לפני שאוכלים, כדי שהילדים ישאלו למה', true],
+    ['מחלקים לכל ילד ארבע כוסות של מיץ ענבים לפני הקידוש', false],
+    ['קוראים את ההגדה כולה בעמידה, מתחילתה ועד סופה', false],
+    ['מדליקים נר נוסף לכבוד אליהו הנביא בפתח הבית', false],
+    ['אוכלים את האפיקומן בתחילת הסעודה ולא בסופה', false],
+    ['שרים את «חד גדיא» לפני «מה נשתנה» ולא אחריו', false],
+  ],
+};
+
 const MULTI: SlideSpec = {
   id: 1,
   type: 'multiselect',
@@ -388,11 +403,34 @@ export const SCREENS: ScreenDef[] = [
     label: 'שאלה — 8 תשובות ארוכות',
     build: (ctx) => votingScreen(ctx, Q8, [6, 3, 2, 3, 2, 3, 2, 2]),
   },
+  {
+    id: 'question-8-reveal',
+    label: 'שאלה — 8 תשובות ארוכות, חשיפה',
+    build: (ctx) => revealScreen(ctx, Q8, [6, 3, 2, 3, 2, 3, 2, 2]),
+  },
+  {
+    id: 'question-6-banner',
+    label: 'שאלה — 6 תשובות ארוכות, מונה חי ובאנר',
+    build: (ctx) => ({
+      ...votingScreen(ctx, { ...Q6, settings: { liveVoteCounts: true } }, [9, 4, 2, 3, 2, 3]),
+      banner: true,
+    }),
+  },
   { id: 'question-image', label: 'שאלה עם תמונה', build: (ctx) => votingScreen(ctx, IMAGE_SIDE, [2, 12, 5, 4]) },
   {
     id: 'question-image-mode',
     label: 'שאלה שהיא תמונה (queMode image)',
     build: (ctx) => votingScreen(ctx, IMAGE_MODE, [12, 4, 4, 3]),
+  },
+  {
+    id: 'question-image-mode-6',
+    label: 'שאלה שהיא תמונה — 6 תשובות',
+    build: (ctx) =>
+      votingScreen(
+        ctx,
+        { ...IMAGE_MODE, answers: [...IMAGE_MODE.answers!, ['באר שבע', false], ['נצרת', false]] },
+        [12, 4, 4, 3, 2, 1],
+      ),
   },
   { id: 'image-answers', label: 'תשובות תמונה', build: (ctx) => votingScreen(ctx, IMAGE_ANSWERS, [4, 10, 5, 4]) },
   {

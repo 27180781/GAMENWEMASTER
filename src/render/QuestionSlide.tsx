@@ -14,7 +14,7 @@
  * ומייצגים את כפתורי השלט — אינם מושפעים מהערכה.
  */
 
-import { useContext, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import {
   descendingScoreAt,
   descendingScoreOf,
@@ -34,6 +34,7 @@ import { FitText } from './FitText.tsx';
 import { GroupRail } from './GroupRail.tsx';
 import { LiveMirrorContext } from './mediaPause.ts';
 import { displayText } from './multiline.ts';
+import { DENSE_ROWS, fitQuestionScreen } from './questionFit.ts';
 import type { TimerView } from './TimerRing.tsx';
 
 export interface RevealState {
@@ -297,6 +298,72 @@ function RevealImage({
   );
 }
 
+/**
+ * מריץ את fitQuestionScreen (questionFit.ts): כשהתוכן משתנה, כשהמסך משנה גודל
+ * (פס הקבוצות מצר את התשובות, באנר ההצטרפות מנמיך), כשגופן נטען וכשתמונת השאלה
+ * נטענת. rows = 0 — תשובות תמונה, שאין להן תשובות טקסט להתאים.
+ */
+function useQuestionFit(
+  refs: {
+    content: RefObject<HTMLDivElement | null>;
+    header: RefObject<HTMLDivElement | null>;
+    main: RefObject<HTMLDivElement | null>;
+    footer: RefObject<HTMLDivElement | null>;
+    question: RefObject<HTMLDivElement | null>;
+    answers: RefObject<HTMLUListElement | null>;
+  },
+  rows: number,
+  contentKey: string,
+) {
+  useLayoutEffect(() => {
+    const content = refs.content.current;
+    const header = refs.header.current;
+    const main = refs.main.current;
+    const footer = refs.footer.current;
+    const question = refs.question.current;
+    if (content === null || header === null || main === null || footer === null || question === null) return undefined;
+    const run = () =>
+      fitQuestionScreen({
+        content,
+        header,
+        main,
+        footer,
+        question,
+        answers: rows === 0 ? null : refs.answers.current,
+        rows,
+      });
+    run();
+
+    // גובה המסך (באנר) ורוחב האזור הראשי (פס הקבוצות). ההתאמה עצמה לא משנה אף
+    // אחד מהם, ולכן אין כאן לולאה.
+    let size = `${content.clientHeight}×${main.clientWidth}`;
+    const observer =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(() => {
+            const next = `${content.clientHeight}×${main.clientWidth}`;
+            if (next === size) return;
+            size = next;
+            run();
+          });
+    observer?.observe(content);
+    observer?.observe(main);
+    // גופן שנטען אחרי המדידה משנה את רוחב הטקסט.
+    const fonts = typeof document === 'undefined' ? undefined : document.fonts;
+    fonts?.addEventListener('loadingdone', run);
+    // תמונה שהיא השאלה ועוד לא נטענה נספרה בגובה המלא שמותר לה.
+    const image = question.querySelector('img.q-question-main-image');
+    image?.addEventListener('load', run);
+    return () => {
+      observer?.disconnect();
+      fonts?.removeEventListener('loadingdone', run);
+      image?.removeEventListener('load', run);
+    };
+    // refs יציבים; contentKey מסכם את כל מה שמשנה את הטקסט או את רוחבו.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, contentKey]);
+}
+
 /** סימון קטן של עוגת סקר (תלת-מימדי) — ליד השאלה בשקופית סקר. */
 function SurveyIcon() {
   return <span className="q-survey-icon" title="שאלת סקר" aria-label="סקר" />;
@@ -429,11 +496,33 @@ export function QuestionSlide({
     answers.filter((a) => a.correct).reduce((sum, a) => sum + (counts[String(a.id)] ?? 0), 0);
   const correctPct = total > 0 ? Math.round((correctCount / total) * 100) : 0;
 
+  // השאלה והתשובות בגובה שיש להן (questionFit.ts).
+  const contentRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLDivElement>(null);
+  const footerRef = useRef<HTMLDivElement>(null);
+  const questionRef = useRef<HTMLDivElement>(null);
+  const answersRef = useRef<HTMLUListElement>(null);
+  const showAnswerCards = !(isSurvey && revealed);
+  useQuestionFit(
+    { content: contentRef, header: headerRef, main: mainRef, footer: footerRef, question: questionRef, answers: answersRef },
+    isImages ? 0 : ansRows,
+    JSON.stringify([
+      slide.question.que,
+      imageQuestion ? slide.question.src : '',
+      isImages ? [] : answers.map((a) => a.ans),
+      liveCounts,
+      showAnswerCards,
+      hasImage,
+      groupRail !== null,
+    ]),
+  );
+
   return (
     <div className={`q-screen${groupRail !== null ? ' q-screen--rail' : ''}${hasImage ? ' q-screen--side-image' : ''}`}>
-      <div className="q-content">
+      <div className="q-content" ref={contentRef}>
         {/* כותרת */}
-        <div className="q-header">
+        <div className="q-header" ref={headerRef}>
           <div className="q-hud-left">
             <div className="q-answered-pill">
               <span className="q-answered-dot" />
@@ -478,7 +567,7 @@ export function QuestionSlide({
         )}
 
         {/* אזור ראשי */}
-        <div className="q-main">
+        <div className="q-main" ref={mainRef}>
           {/* ספירה לאחור — רק בזמן ההצבעה: עיגול השניות + פס הטיימר שאוזל
               במדויק לפי הזמן שנותר (צבע ראשי/משני). */}
           {isVoting && (
@@ -495,7 +584,7 @@ export function QuestionSlide({
             </div>
           )}
 
-          <div className={`q-question${revealState.questionShown ? '' : ' reveal-hidden'}`}>
+          <div className={`q-question${revealState.questionShown ? '' : ' reveal-hidden'}`} ref={questionRef}>
             <div className="q-question-row">
               {isSurvey && <SurveyIcon />}
               {imageQuestion ? (
@@ -512,19 +601,21 @@ export function QuestionSlide({
                   <img className="q-question-main-image" src={slide.question.src} alt="שאלה" />
                 )
               ) : (
-                /* min נמוך במכוון: עדיף שאלה ארוכה בפונט קטן על שאלה שסופה נעלם. */
-                <FitText className="q-question-text" min={13}>
+                /* הגודל והתקרה — useQuestionFit. data-fit-text: לבדיקת הגלישה בצילומים
+                   (tools/theme-shots.mjs), כמו ב-FitText. */
+                <span className="q-question-text" data-fit-text="">
                   {displayText(slide.question.que)}
-                </FitText>
+                </span>
               )}
             </div>
           </div>
 
-          {isSurvey && revealed ? (
+          {!showAnswerCards ? (
             <SurveyPie answers={answers} counts={counts} total={total} />
           ) : (
           <ul
-            className={`q-answers${isImages ? ' q-answers--images' : ''}`}
+            ref={answersRef}
+            className={`q-answers${isImages ? ' q-answers--images' : ansRows >= DENSE_ROWS ? ' q-answers--dense' : ''}`}
             style={isImages ? imagesGridVars : answersGridVars}
           >
             {answers.map((answer, index) => {
@@ -554,9 +645,9 @@ export function QuestionSlide({
                       <img className="q-card-image" src={answer.ans} alt={`תשובה ${answer.id}`} />
                     </>
                   ) : (
-                    <FitText className="q-card-text" min={11}>
+                    <span className="q-card-text" data-fit-text="">
                       {displayText(answer.ans)}
-                    </FitText>
+                    </span>
                   )}
                   {liveCounts && (
                     <span className="q-live" dir="ltr">
@@ -572,7 +663,7 @@ export function QuestionSlide({
         </div>
 
         {/* כותרת תחתית — פס צדקו/טעו (ירוק/אדום קבוע) חי בזמן ההצבעה, מובילים בחשיפה */}
-        <div className={`q-footer${showBoard ? ' q-footer--board' : ''}`}>
+        <div className={`q-footer${showBoard ? ' q-footer--board' : ''}`} ref={footerRef}>
           {showBoard ? (
             <Leaderboard leaders={leaders} />
           ) : isVoting && majority ? (
