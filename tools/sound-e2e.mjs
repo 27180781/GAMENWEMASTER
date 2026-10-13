@@ -49,9 +49,10 @@
  *                        המנצחים האמיתי לא עושה כלום. קובץ התוצאות לא יורד מעצמו מול
  *                        הקהל: הוא יורד ממסך המנחה (בחלון שלו) או מתפריט המפעיל.
  *   fast-forward-end     N בשקופית האחרונה מתחת לטבלה: הרווח הראשון חושף מנצח.
- *   groups-end           דירוג הקבוצות (4) גם מעל מסך המנצחים ומסך הניקוד: רווח, 2,
- *                        ✕ ומסך המנחה סוגרים אותו בלי להזיז את המסך שמתחת, ו-W או
- *                        סוף המשחק לא משאירים אותו פתוח.
+ *   groups-end           במשחק עם קבוצות מסך המנצחים (גם W) נפתח בדירוג הקבוצות, רווח
+ *                        עובר לפודיום ו-2 בתחילתו חוזר לדירוג. מקש 4 פותח אותו גם
+ *                        מעל המנצחים ומסך הניקוד, ורווח, 2, ✕ ומסך המנחה סוגרים
+ *                        אותו בלי להזיז את המסך שמתחת.
  *   going-back           2 בשאלה הראשונה לא מקדם, 2 בזמן הצבעה חוזר לתשובות בלי צליל,
  *                        ו-Backspace בשאלה הראשונה מתחיל אותה נקייה.
  *   restart              התחלה מחדש מההגדרות כשעומדים בשאלה 1: היא עולה שוב עם הצליל.
@@ -1454,7 +1455,7 @@ const SCENARIOS = [
   },
   {
     name: 'groups-end',
-    title: 'דירוג הקבוצות (4) מעל מסך המנצחים ומסך הניקוד',
+    title: 'במשחק עם קבוצות: מסך המנצחים נפתח בדירוג הקבוצות, ומקש 4 גם במסכי הסיום',
     async run(t) {
       const groupsOpen = (s) => s.groups || 'דירוג הקבוצות לא מוצג';
       const groupsClosed = (s) => !s.groups || 'דירוג הקבוצות עדיין מוצג';
@@ -1466,19 +1467,39 @@ const SCENARIOS = [
       await t.step('4 שוב — נסגר', t.key('4'), { quiet: true, check: groupsClosed });
       await t.step('שאלה 2', t.space());
       await t.playToReveal('שאלה 2');
-      await t.step('4 — דירוג הקבוצות', t.key('4'), { quiet: true, check: groupsOpen });
       await t.step(
-        'W — תצוגת המנצחים בלי הדירוג מעליה',
+        'W — תצוגת המנצחים נפתחת בדירוג הקבוצות',
         t.key('KeyW'),
         {
           sound: ['winners.wav'],
-          check: (s) => [s.winners || 'מסך המנצחים לא מוצג', groupsClosed(s)],
+          check: (s) => [s.winners || 'מסך המנצחים לא מוצג', groupsOpen(s), podium(0)(s)],
         },
         600,
       );
+      await t.step('רווח — הפודיום האישי', t.space(), {
+        quiet: true,
+        check: (s) => [s.winners || 'מסך המנצחים נעלם', groupsClosed(s), podium(0)(s)],
+      });
+      await t.step('2 בתחילת הפודיום — חזרה לדירוג הקבוצות', t.key('2'), {
+        quiet: true,
+        check: (s) => [s.winners || 'מסך המנצחים נעלם', groupsOpen(s)],
+      });
       await t.step(
-        'W — חזרה למשחק, הדירוג לא חוזר',
-        t.key('KeyW'),
+        '2 בדירוג — חזרה למשחק, כמו W',
+        t.key('2'),
+        {
+          check: (s) => [
+            onSlide('2/2')(s),
+            !s.winners || 'מסך המנצחים עדיין מוצג',
+            groupsClosed(s),
+          ],
+        },
+        600,
+      );
+      await t.step('4 — דירוג הקבוצות', t.key('4'), { quiet: true, check: groupsOpen });
+      await t.step(
+        'W ושוב W — חזרה למשחק בלי הדירוג',
+        t.keys(['KeyW', 'KeyW']),
         {
           check: (s) => [
             onSlide('2/2')(s),
@@ -1489,19 +1510,33 @@ const SCENARIOS = [
         600,
       );
       await t.step(
-        'סוף המשחק — מסך המנצחים בלי הדירוג',
+        'סוף המשחק — מסך המנצחים נפתח בדירוג הקבוצות',
         t.space(),
         {
           sound: ['winners.wav'],
           check: (s) => [
             s.winners || 'מסך המנצחים לא מוצג',
-            groupsClosed(s),
+            groupsOpen(s),
+            podium(0)(s),
             t.backupPosts().some((p) => p.path === '/save-backup/game-over') ||
               'סוף המשחק לא נשלח לגיבוי',
           ],
         },
         2500,
       );
+      await t.step('2 בדירוג במסך המנצחים האמיתי — לא קורה כלום', t.key('2'), {
+        quiet: true,
+        check: (s) => [s.winners || 'מסך המנצחים נעלם', groupsOpen(s)],
+      });
+      await t.step('רווח — הפודיום האישי, עוד בלי מנצח', t.space(), {
+        quiet: true,
+        check: (s) => [groupsClosed(s), podium(0)(s)],
+      });
+      await t.step('2 — חזרה לדירוג הקבוצות', t.key('2'), { quiet: true, check: groupsOpen });
+      await t.step('רווח — שוב לפודיום', t.space(), {
+        quiet: true,
+        check: (s) => [groupsClosed(s), podium(0)(s)],
+      });
       await t.step('רווח — חושף מנצח', t.space(), { check: podium(1) });
       await t.step('4 — דירוג הקבוצות מעל מסך המנצחים', t.key('4'), {
         quiet: true,
@@ -1528,16 +1563,27 @@ const SCENARIOS = [
         },
         { quiet: true, check: (s) => [groupsClosed(s), podium(1)(s)] },
       );
+      await t.step('2 — מסתיר את המנצח', t.key('2'), {
+        quiet: true,
+        check: (s) => [groupsClosed(s), podium(0)(s)],
+      });
+      await t.step('2 בתחילת הפודיום — דירוג הקבוצות', t.key('2'), {
+        quiet: true,
+        check: groupsOpen,
+      });
       await t.step(
         'רווח עד מסך הניקוד',
         async () => {
-          for (let i = 0; i < 6; i++) {
+          for (let i = 0; i < 8; i++) {
             if ((await t.page.locator('.all-scores-screen').count()) > 0) break;
             await t.page.keyboard.press('Space');
             await sleep(STEP);
           }
         },
-        { sound: ['winnerslist.wav'], check: (s) => s.scoreboard || 'מסך הניקוד לא מוצג' },
+        {
+          sound: ['winnerslist.wav'],
+          check: (s) => [s.scoreboard || 'מסך הניקוד לא מוצג', groupsClosed(s)],
+        },
         800,
       );
       await t.step('4 — דירוג הקבוצות מעל מסך הניקוד', t.key('4'), {
@@ -1549,17 +1595,26 @@ const SCENARIOS = [
         quiet: true,
         check: (s) => [groupsClosed(s), s.scoreboard || 'מסך הניקוד נעלם'],
       });
+      await t.step(
+        '2 ממסך הניקוד — ישר לפודיום, בלי דירוג הקבוצות',
+        t.key('2'),
+        {
+          sound: ['winners.wav'],
+          check: (s) => [s.winners || 'מסך המנצחים לא מוצג', groupsClosed(s), podium(0)(s)],
+        },
+        600,
+      );
       await t.openHostConsole();
       await t.step(
         'מסך המנחה: «דירוג קבוצות»',
         t.hostClick(/דירוג קבוצות/),
-        { quiet: true, check: (s) => [groupsOpen(s), s.scoreboard || 'מסך הניקוד נעלם'] },
+        { quiet: true, check: (s) => [groupsOpen(s), s.winners || 'מסך המנצחים נעלם'] },
         800,
       );
       await t.step(
         'מסך המנחה: «סגירת דירוג הקבוצות»',
         t.hostClick(/סגירת דירוג הקבוצות/),
-        { quiet: true, check: (s) => [groupsClosed(s), s.scoreboard || 'מסך הניקוד נעלם'] },
+        { quiet: true, check: (s) => [groupsClosed(s), podium(0)(s)] },
         800,
       );
     },

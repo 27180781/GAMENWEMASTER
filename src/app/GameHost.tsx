@@ -816,14 +816,16 @@ export function GameHost({
   const railAvailableRef = useRef(railAvailable);
   railAvailableRef.current = railAvailable;
 
-  // דירוג הקבוצות נסגר במעבר בין שלבים: שכבה שנפתחה בזמן המשחק לא עולה מעל מסך
-  // המנצחים (W, N בשקופית האחרונה, «סיום משחק»), ושכבה שנפתחה בסיום לא נשארת
+  // דירוג הקבוצות במעבר בין שלבים. במשחק עם קבוצות מסך המנצחים נפתח בו (משוב
+  // לקוח, «מי בראש», 7.9: הקבוצות לפני המנצחים האישיים), ורווח עובר ממנו לפודיום
+  // האישי; חזרה ממסך הניקוד (2) נוחתת ישר בפודיום. בכל מעבר אחר הוא נסגר: שכבה
+  // שנפתחה בזמן המשחק לא עולה מעל מסך המנצחים, ושכבה שנפתחה בסיום לא נשארת
   // פתוחה כשחוזרים ממנו למשחק (W). נקבע כבר ברינדור ולא ב-effect, כדי שאף פריים
-  // (וגם לא הקריין או מסך הצפייה) לא יראה את השכבה מעל המסך החדש.
+  // (וגם לא הקריין או מסך הצפייה) לא יראה את המסך החדש עם השכבה הלא נכונה.
   const [groupsStage, setGroupsStage] = useState(stage);
   if (groupsStage !== stage) {
     setGroupsStage(stage);
-    setGroupsOverlay(false);
+    setGroupsOverlay(stage === 'winners' && groupsStage !== 'scoreboard' && railAvailable);
   }
 
   // פענוח-מקדים של השקופית הבאה: כשמציגים שקופית, מפענחים כבר את המדיה של הבאה
@@ -1806,8 +1808,11 @@ export function GameHost({
   /** "אחורה" — מסלול אחיד: בשקופית (stepBack) וגם במסכי הסיום. */
   const goBack = useCallback(() => {
     const stage = stageRef.current;
+    // במשחק עם קבוצות דירוג הקבוצות הוא הצעד הראשון של מסך המנצחים: 2 בתחילת
+    // הפודיום חוזר אליו, ו-2 בו ממשיך אחורה כמו מתחילת הפודיום.
+    const groupsStep = stage === 'winners' && winnersRevealedRef.current === 0 && railAvailableRef.current;
     if (stage === 'playing') stepBack();
-    else if (groupsOverlayRef.current) {
+    else if (groupsOverlayRef.current && !groupsStep) {
       // דירוג הקבוצות פתוח מעל מסך סיום — אחורה סוגר אותו, במקום לשנות את המסך
       // שמתחתיו בלי שרואים.
       setGroupsOverlay(false);
@@ -1818,6 +1823,7 @@ export function GameHost({
       // כבר נרשם, ומשחק שממשיך אחריו לא נשמר. (כשהמנוע עצמו בסוף, החזרה גם
       // הקפיצה שוב את מסך המנצחים ואת המוזיקה שלו מההתחלה.)
       if (winnersRevealedRef.current > 0) setWinnersRevealed((n) => Math.max(0, n - 1));
+      else if (groupsStep && !groupsOverlayRef.current) setGroupsOverlay(true);
       else if (winnersPreviewRef.current !== null) {
         setStage(winnersPreviewRef.current);
         winnersPreviewRef.current = null;
