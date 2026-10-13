@@ -4,7 +4,7 @@
  * הפונקציות טהורות (PRNG עם seed) כדי שיהיו ניתנות לבדיקה.
  */
 
-import { countsOfVotes, type Slide, type VoteSnapshot } from '../engine/index.ts';
+import { countsOfVotes, marksCorrectAnswer, type Slide, type VoteSnapshot } from '../engine/index.ts';
 
 export interface PlannedVote {
   voterId: string;
@@ -56,7 +56,7 @@ export function planCrowdVotes(slide: Slide, options: CrowdOptions = {}): Planne
   const plan: PlannedVote[] = [];
   for (let i = 1; i <= voterCount; i++) {
     let answerId: number;
-    if (slide.type === 'trivia' && correct && random() < correctBias) {
+    if (marksCorrectAnswer(slide) && correct && random() < correctBias) {
       answerId = correct.id;
     } else {
       const pick = answers[Math.floor(random() * answers.length)];

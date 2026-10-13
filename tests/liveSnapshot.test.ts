@@ -178,6 +178,32 @@ describe('מצב המסך למסך הצפייה', () => {
     expect(snap.state.scores).toEqual({});
   });
 
+  it('תשובה כתמונה עם נכונה מסומנת: «צדקו» עובר לפס, הנכונה עצמה לא', () => {
+    const images = [1, 2, 3, 4].map((id) => ({
+      ans: `https://cdn.example/a${id}.jpg`,
+      correct: id === 3,
+      id,
+    }));
+    const engine = new GameEngine(
+      makeGame([rawSlide({ id: 1, type: 'ans_images', que: 'איזו?', answers: images, timeForQue: 15 })], {
+        id: GAME_ID,
+        room: 2047,
+      }),
+    );
+    engine.dispatch({ type: 'OPEN_VOTING', at: T0 });
+    engine.dispatch({
+      type: 'VOTE_SNAPSHOT',
+      snapshot: makeSnapshot(1, 1, { [PHONES[0]!]: 3, [PHONES[1]!]: 1, [PHONES[2]!]: 3 }),
+      at: T0 + 1000,
+    });
+    const snap = new LiveSnapshotBuilder().build(input(engine));
+    expect(snap.liveCorrectCount).toBe(2);
+    // הצורה נשמרת (יש נכונה וגם שגויה), אבל הסימון מטעה: לא התמונה האמיתית
+    const correct = snap.game.slides['0']!.question.answers.map((a) => a.correct);
+    expect(correct).toEqual([true, false, false, false]);
+    expect(snap.leaders).toEqual([]);
+  });
+
   it('מונה הצבעות חי שהמנחה הדליק — המונים עוברים, הנכונה עדיין לא', () => {
     const game = liveGame();
     game.questions[0]!.setting.liveVoteCounts = true;

@@ -15,6 +15,7 @@ import {
   globalSettingsSchema,
   isImageQuestion,
   isVotableSlide,
+  marksCorrectAnswer,
   scoredLikeTrivia,
   slideSettingsSchema,
   type GameFile,
@@ -311,7 +312,7 @@ export class LiveSnapshotBuilder {
     if (
       slide !== undefined &&
       voting &&
-      slide.type === 'trivia' &&
+      marksCorrectAnswer(slide) &&
       !majority &&
       state.liveVotes !== null
     ) {

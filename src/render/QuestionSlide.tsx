@@ -21,6 +21,7 @@ import {
   imageRevealBlurFor,
   imageRevealOf,
   isImageQuestion,
+  marksCorrectAnswer,
   scoredLikeTrivia,
   showsSideImage,
   type GamePhase,
@@ -366,7 +367,6 @@ export function QuestionSlide({
   // מונה הצבעות חי (setting.liveVoteCounts) — כמה בחרו בכל תשובה, בזמן ההצבעה.
   const liveCounts = isVoting && slide.setting.liveVoteCounts;
   const majority = slide.setting.majorityDecides;
-  const isTrivia = slide.type === 'trivia';
   const isImages = slide.type === 'ans_images';
   const isSurvey = slide.type === 'survey';
   const answers = slide.question.answers;
@@ -392,17 +392,14 @@ export function QuestionSlide({
   // דלוק). כך "מעבר אוטומטי כבוי" באמת עוצר אחרי הטיימר עד ללחיצה.
   const revealed = revealState.revealCorrect;
   /**
-   * האם יש לשקופית "תשובה נכונה" להצביע עליה בחשיפה.
-   *
-   * ב-trivia תמיד. תשובות-כתמונה מנוקדות כהשתתפות (כמו סקר) ולכן לא סומנה בהן
-   * תשובה עד היום — אבל כשהמחבר כן סימן אחת, ראוי להראות אותה. התנאי דורש גם
-   * מסומנת אחת *וגם* אחת שאינה: כשכולן מסומנות (או אף אחת) אין על מה להצביע,
-   * ואז לא מעמעמים כלום. הניקוד אינו מושפע — זה חיווי בלבד.
+   * האם יש לשקופית "תשובה נכונה" להצביע עליה (ראו marksCorrectAnswer): ב-trivia
+   * תמיד, ובתשובות-כתמונה כשהמחבר סימן נכונה. כשכל התמונות מסומנות (או אף אחת)
+   * אין על מה להצביע, ואז לא מעמעמים כלום ואין פס צדקו/טעו ומובילים.
    */
-  const marksCorrect =
-    isTrivia || (isImages && answers.some((a) => a.correct) && answers.some((a) => !a.correct));
-  // פס מובילים מוצג רק ב-trivia אחרי חשיפת התשובה הנכונה.
-  const showBoard = revealState.revealCorrect && isTrivia && leaders.length > 0;
+  const marksCorrect = marksCorrectAnswer(slide);
+  // פס המובילים (חמשת המהירים שצדקו) — אחרי חשיפת התשובה הנכונה, בכל שקופית
+  // שמסמנת אותה. עד 2026-10 רק ב-trivia, ובתשובה כתמונה הוא לא הופיע (משוב לקוח).
+  const showBoard = revealState.revealCorrect && marksCorrect && leaders.length > 0;
 
   // שאלת תמונה: התמונה היא נוסח השאלה, ולכן היא מוצגת בבועת השאלה — ולא גם
   // ככרטיס בצד. ראו questionMode.ts.
@@ -577,7 +574,7 @@ export function QuestionSlide({
                 🗳 הרוב קובע — התשובה הנכונה תיקבע בסיום ההצבעה לפי מה שרוב העונים בחרו
               </div>
             </div>
-          ) : isVoting && isTrivia ? (
+          ) : isVoting && marksCorrect ? (
             <div className="q-splitbar">
               {total > 0 ? (
                 <>

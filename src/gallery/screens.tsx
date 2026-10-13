@@ -328,6 +328,11 @@ export const SCREENS: ScreenDef[] = [
     build: (ctx) => votingScreen(ctx, IMAGE_MODE, [12, 4, 4, 3]),
   },
   { id: 'image-answers', label: 'תשובות תמונה', build: (ctx) => votingScreen(ctx, IMAGE_ANSWERS, [4, 10, 5, 4]) },
+  {
+    id: 'image-answers-reveal',
+    label: 'תשובות תמונה — חשיפה + מובילים',
+    build: (ctx) => revealScreen(ctx, IMAGE_ANSWERS, [4, 10, 5, 4]),
+  },
   { id: 'poll', label: 'סקר — עוגה אחרי חשיפה', build: (ctx) => revealScreen(ctx, POLL, [5, 9, 3, 7]) },
   { id: 'multiselect', label: 'בחירה מרובה — חשיפה', build: (ctx) => revealScreen(ctx, MULTI, [8, 2, 6, 3, 2, 2]) },
   { id: 'question-reveal', label: 'חשיפת תשובה + מובילים', build: (ctx) => revealScreen(ctx, Q4, [3, 11, 5, 4]) },
