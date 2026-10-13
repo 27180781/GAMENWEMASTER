@@ -16,6 +16,17 @@
 /** מונה סיבוב לכל מצב: מזהה המצב → האינדקס שממנו מתחילים בפעם הבאה. */
 export type AmbienceRotation = Readonly<Record<string, number>>;
 
+export interface AmbienceOptions {
+  /** מאיזה אינדקס מתחיל מצב שעוד לא נבחר בו ניסוח (ברירת מחדל 0). */
+  start?: number;
+  /**
+   * ניסוחים שאסור לבחור עכשיו, כאילו חסרו בבנק. כך רשימה אחת ומונה אחד
+   * משרתים כמה מקרים (סקר בלי «מי שבטוח», לובי בלי שלטים): רשימות נפרדות
+   * באורכים שונים על אותו מצב היו מזיזות את המונה, וניסוח היה חוזר ברצף.
+   */
+  skip?: ReadonlySet<string> | undefined;
+}
+
 export interface AmbiencePick {
   /** מפתח הבנק שנבחר, או null כשאף ניסוח של המצב אינו קיים בבנק. */
   key: string | null;
@@ -34,15 +45,16 @@ export function pickAmbience(
   variants: readonly string[],
   bank: Record<string, string>,
   rotation: AmbienceRotation,
-  start = 0,
+  options: AmbienceOptions = {},
 ): AmbiencePick {
   const count = variants.length;
   if (count === 0) return { key: null, rotation };
-  const stored = rotation[situation] ?? start;
+  const stored = rotation[situation] ?? options.start ?? 0;
   const first = ((stored % count) + count) % count;
   for (let step = 0; step < count; step += 1) {
     const index = (first + step) % count;
     const key = variants[index]!;
+    if (options.skip?.has(key)) continue;
     const url = bank[key];
     if (url !== undefined && url !== '') {
       return { key, rotation: { ...rotation, [situation]: (index + 1) % count } };
@@ -57,18 +69,21 @@ export function pickAmbience(
 // שמשחקים ותיקים אינם מכירים.
 // ---------------------------------------------------------------------------
 
+/**
+ * הסדר משולב בכוונה: שני ה«מוכנים?» (6, 7) ושני ה«עוד מעט מתחילים» (3, 5)
+ * אינם סמוכים. בלי שלטים `amb_lobby_4` מדולג, ו-`amb_lobby_nearly` מדולג עד
+ * LOBBY_NEARLY_AFTER — שניהם דרך `skip`, על אותו מונה.
+ */
 export const AMB_LOBBY = [
   'amb_lobby_1',
+  'amb_lobby_6',
   'amb_lobby_2',
   'amb_lobby_3',
+  'amb_lobby_7',
   'amb_lobby_4',
   'amb_lobby_5',
-  'amb_lobby_6',
-  'amb_lobby_7',
   'amb_lobby_nearly',
 ] as const;
-/** הלובי כשאין שלטים בין מקורות ההצבעה: בלי «השלטים ביד?» (amb_lobby_4). */
-export const AMB_LOBBY_NO_CLICKERS = AMB_LOBBY.filter((key) => key !== 'amb_lobby_4');
 export const AMB_START = [
   'amb_start_1',
   'amb_start_2',
@@ -77,9 +92,8 @@ export const AMB_START = [
   'amb_start_5',
 ] as const;
 export const AMB_NEXT = ['amb_next_1', 'amb_next_2', 'amb_next_3'] as const;
+/** בסקר `amb_voting_3` («מי שבטוח, שילחץ») מדולג דרך `skip` — אין במה להיות בטוח. */
 export const AMB_VOTING = ['amb_voting_1', 'amb_voting_2', 'amb_voting_3'] as const;
-/** בסקר אין «מי שבטוח» — אין במה להיות בטוח (amb_voting_3). */
-export const AMB_VOTING_POLL = AMB_VOTING.filter((key) => key !== 'amb_voting_3');
 export const AMB_ALL_CORRECT = ['amb_all_correct_1', 'amb_all_correct_2'] as const;
 export const AMB_NONE_CORRECT = ['amb_none_correct_1', 'amb_none_correct_2'] as const;
 export const AMB_RAFFLE = ['amb_raffle_1', 'amb_raffle_2'] as const;
@@ -96,7 +110,11 @@ export const AMB_CONGRATS = ['amb_congrats', 'amb_winner_cheer'] as const;
  */
 export const CLOSE_RACE_RATIO = 20;
 
-/** כל כמה זמן נאמרת קריאת אווירה במסך ההתחברות (ms). */
+/**
+ * כל כמה זמן נאמרת קריאת אווירה במסך ההתחברות (ms) — נמדד מהקריאה הקודמת.
+ * קריאות שהוחמצו (שכבה פתוחה, אודיו נעול) אינן מושלמות בצרור: כל קריאה חדשה
+ * קוטעת את הקודמת, וצרור היה חותך את כולן.
+ */
 export const LOBBY_INTERVAL_MS = 45_000;
 
 /** כל קריאה שלישית בלובי היא מספר המחוברים ולא ניסוח כללי. */
@@ -109,11 +127,18 @@ export const LOBBY_COUNT_EVERY = 3;
 export const LOBBY_HOWTO_EVERY = 4;
 
 /**
- * כמה זמן הלובי שותק אחרי «ברוכים הבאים» והוראות ההצבעה. כל משפט חדש קוטע את
- * הקודם, וההוראות ארוכות: כשהאודיו נפתח רגע לפני תור הפטפוט, הקריאה הבאה
- * הייתה חותכת אותן באמצע, והן אינן נאמרות שוב.
+ * כמה זמן הלובי שותק אחרי הוראות ההצבעה. כל משפט חדש קוטע את הקודם, וההוראות
+ * ארוכות: כשהאודיו נפתח רגע לפני תור הפטפוט, הקריאה הבאה הייתה חותכת אותן
+ * באמצע, והן אינן נאמרות שוב. נמדד על שעון הלובי, שנדגם כל 5 שניות, ולכן
+ * בפועל לפחות 15 שניות: «ברוכים הבאים» וההוראות יחד צריכים להיות קצרים מזה.
  */
 export const LOBBY_AFTER_WELCOME_MS = 20_000;
+
+/**
+ * «כמעט כולם כאן» (amb_lobby_nearly) נאמר רק אחרי כמה קריאות לובי (כ-3 דקות),
+ * גם כשנקודת ההתחלה של הסיבוב מוגרלת: בפתיחת הלובי החדר עוד ריק.
+ */
+export const LOBBY_NEARLY_AFTER = 4;
 
 /**
  * "מהר!" — כמה שניות לפני סגירת ההצבעה. **שתיים**, כלשון החוזה

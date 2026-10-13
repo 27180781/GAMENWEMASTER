@@ -69,11 +69,25 @@ describe('pickAmbience', () => {
   });
 
   it('★ מצב חדש מתחיל מנקודת ההתחלה של הריצה, ומשם ממשיך בסיבוב', () => {
-    const first = pickAmbience('sit', THREE, bankOf(THREE), {}, 4);
+    const first = pickAmbience('sit', THREE, bankOf(THREE), {}, { start: 4 });
     expect(first.key).toBe('b');
-    expect(pickAmbience('sit', THREE, bankOf(THREE), first.rotation, 4).key).toBe('c');
+    expect(pickAmbience('sit', THREE, bankOf(THREE), first.rotation, { start: 4 }).key).toBe('c');
     // מצב שכבר נבחר בו ניסוח אינו מושפע מנקודת ההתחלה.
-    expect(pickAmbience('sit', THREE, bankOf(THREE), { sit: 0 }, 4).key).toBe('a');
+    expect(pickAmbience('sit', THREE, bankOf(THREE), { sit: 0 }, { start: 4 }).key).toBe('a');
+  });
+
+  it('★ skip מדלג כאילו חסר בבנק — על אותו מונה, בלי חזרה ברצף', () => {
+    let rotation: AmbienceRotation = {};
+    const picks: (string | null)[] = [];
+    for (let i = 0; i < 6; i += 1) {
+      const skip = i % 2 === 1 ? new Set(['c']) : undefined;
+      const pick = pickAmbience('sit', THREE, bankOf(THREE), rotation, { skip });
+      rotation = pick.rotation;
+      picks.push(pick.key);
+    }
+    // a, b, c, (c מדולג) a, b, (c מדולג) a — אף פעם לא אותו ניסוח פעמיים ברצף.
+    expect(picks).toEqual(['a', 'b', 'c', 'a', 'b', 'a']);
+    expect(pickAmbience('sit', ['a'], bankOf(['a']), {}, { skip: new Set(['a']) }).key).toBeNull();
   });
 
   it('לכל מצב מונה משלו — מצבים אינם מזיזים זה את זה', () => {

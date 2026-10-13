@@ -18,13 +18,7 @@ import {
   narrationRevealMatches,
   playableGroupClips,
 } from '../src/app/narration/gameNarration.ts';
-import {
-  AMB_LOBBY,
-  AMB_LOBBY_NO_CLICKERS,
-  AMB_START,
-  AMB_VOTING,
-  AMB_VOTING_POLL,
-} from '../src/app/narration/ambience.ts';
+import { AMB_LOBBY, AMB_START, AMB_VOTING } from '../src/app/narration/ambience.ts';
 import { parseGameFile } from '../src/engine/index.ts';
 import { fourAnswers, rawGame, rawSlide } from './helpers.ts';
 
@@ -840,7 +834,7 @@ describe('קריאות אווירה', () => {
       expect(clips[1]).toEqual([]); // עוד לא הגיע הזמן
       expect(clips[2]).toEqual(['amb_lobby_1.mp3']);
       expect(clips[3]).toEqual([]); // לא חוזרת לעתים קרובות יותר
-      expect(clips[4]).toEqual(['amb_lobby_2.mp3']);
+      expect(clips[4]).toEqual(['amb_lobby_6.mp3']);
     });
 
     it('★ כל קריאה שלישית היא מספר המחוברים, וכל רביעית חוזרת על ההוראות', () => {
@@ -853,12 +847,12 @@ describe('קריאות אווירה', () => {
       ]);
       expect(clips[2]).toEqual(['amb_connected_pre.mp3', 'num_m_12.mp3', 'unit_participants.mp3']);
       expect(clips[3]).toEqual(['flow_howto_clickers.mp3']); // למי שהגיע מאוחר
-      expect(clips[4]).toEqual(['amb_lobby_3.mp3']); // וממשיכים בסיבוב
+      expect(clips[4]).toEqual(['amb_lobby_2.mp3']); // וממשיכים בסיבוב
     });
 
     it('כשמספר המחוברים אינו ידוע — ניסוח כללי במקום המספר', () => {
       const clips = clipsOf([lobby(45_000), lobby(90_000), lobby(135_000)]);
-      expect(clips[2]).toEqual(['amb_lobby_3.mp3']);
+      expect(clips[2]).toEqual(['amb_lobby_2.mp3']);
     });
 
     it('שכבה שאינה מוקראת מעל מסך ההתחברות — שקט', () => {
@@ -1401,7 +1395,22 @@ describe('★ סקר, הוראות הצבעה ו«מוכנים?»', () => {
     expect(lobbyRun('phones')).toContain('amb_lobby_6.mp3');
     expect(lobbyRun('clickers')).toContain('amb_lobby_4.mp3');
     expect(lobbyRun('both')).toContain('amb_lobby_4.mp3');
-    expect(AMB_LOBBY_NO_CLICKERS).toEqual(AMB_LOBBY.filter((key) => key !== 'amb_lobby_4'));
+  });
+
+  it('★ החלפת מקור ההצבעה בלובי אינה מחזירה ניסוח ברצף (מונה אחד לשתי הרשימות)', () => {
+    const lines = clipsOf(
+      Array.from({ length: 24 }, (_, i) =>
+        base({
+          stage: 'opening',
+          bank: AMB_BANK,
+          voteMode: i < 6 ? 'phones' : i < 12 ? 'both' : i < 18 ? 'phones' : 'clickers',
+          lobbyElapsedMs: i * 45_000,
+        }),
+      ),
+    )
+      .flat()
+      .filter((clip) => clip.startsWith('amb_lobby'));
+    for (let i = 1; i < lines.length; i += 1) expect(lines[i]).not.toBe(lines[i - 1]);
   });
 
   it('★ ההוראות חוזרות בלובי לפי מקור ההצבעה, ולא בלי מקור', () => {
@@ -1421,8 +1430,8 @@ describe('★ סקר, הוראות הצבעה ו«מוכנים?»', () => {
     ) as Record<string, string>;
     const at = (lobbyElapsedMs: number) => base({ stage: 'opening', bank, lobbyElapsedMs });
     const clips = clipsOf([at(45_000), at(90_000), at(135_000), at(180_000)]);
-    // מספר המחוברים לא ידוע, ולכן גם השלישית ניסוח: 1, 2, 3 — והרביעית 4.
-    expect(clips[3]).toEqual(['amb_lobby_4.mp3']);
+    // מספר המחוברים לא ידוע, ולכן גם השלישית ניסוח — והרביעית היא הניסוח הרביעי בסבב.
+    expect(clips[3]).toEqual([`${AMB_LOBBY[3]}.mp3`]);
   });
 
   /**
@@ -1432,7 +1441,15 @@ describe('★ סקר, הוראות הצבעה ו«מוכנים?»', () => {
   it('★ הפטפוט אינו קוטע את ההוראות — ממתין להן, ואינו הולך לאיבוד', () => {
     const at = (lobbyElapsedMs: number, audioUnlocked = true) =>
       base({ stage: 'opening', bank: AMB_BANK, lobbyElapsedMs, audioUnlocked });
-    const decisions = runSteps([at(0, false), at(40_000), at(45_000), at(55_000), at(60_000), at(90_000)]);
+    const decisions = runSteps([
+      at(0, false),
+      at(40_000),
+      at(45_000),
+      at(55_000),
+      at(60_000),
+      at(100_000),
+      at(105_000),
+    ]);
     const clips = decisions.map((d) => d.clips);
     expect(clips[0]).toEqual([]); // אודיו נעול
     expect(clips[1]).toEqual(WELCOME);
@@ -1440,7 +1457,60 @@ describe('★ סקר, הוראות הצבעה ו«מוכנים?»', () => {
     expect(decisions[2]!.cancel).toBe(false);
     expect(clips[3]).toEqual([]);
     expect(clips[4]).toEqual(['amb_lobby_1.mp3']); // 20 שניות אחרי ההוראות
-    expect(clips[5]).toEqual(['amb_lobby_2.mp3']); // והלוח נשאר במקומו
+    expect(clips[5]).toEqual([]); // והבאה 45 שניות אחריה, לא לפי הלוח הישן
+    expect(clips[6]).toEqual(['amb_lobby_6.mp3']);
+  });
+
+  it('★ בנק בלי ההוראות: «ברוכים הבאים» לבדו אינו מעכב את הפטפוט, כמו קודם', () => {
+    const bank = new Proxy(
+      {},
+      { get: (_target, key: string) => (key.startsWith('flow_howto') ? undefined : `${key}.mp3`) },
+    ) as Record<string, string>;
+    const at = (lobbyElapsedMs: number, audioUnlocked = true) =>
+      base({ stage: 'opening', bank, lobbyElapsedMs, audioUnlocked });
+    const clips = clipsOf([at(0, false), at(40_000), at(45_000)]);
+    expect(clips[1]).toEqual(['flow_welcome.mp3']);
+    expect(clips[2]).toEqual(['amb_lobby_1.mp3']);
+  });
+
+  /**
+   * שכבה פתוחה בלובי (קליטת שלטים, מרשם, תפריט) דקות ארוכות: השעון רץ והקריאות
+   * מוחמצות. אסור להשלים אותן בצרור — כל קריאה קוטעת את הקודמת, וגם את
+   * ההוראות כשהן בתור.
+   */
+  it('★ אחרי שכבה ארוכה בלובי — קריאה אחת, והבאה רק 45 שניות אחריה', () => {
+    const at = (lobbyElapsedMs: number, overlay: DisplayedState['overlay'] = 'none') =>
+      base({ stage: 'opening', bank: AMB_BANK, voteMode: 'both', connectedCount: 12, lobbyElapsedMs, overlay });
+    const steps = [at(0), at(15_000, 'other'), at(150_000, 'other'), at(295_000, 'other')];
+    for (let t = 300_000; t <= 400_000; t += 5_000) steps.push(at(t));
+    const said = runSteps(steps)
+      .map((d, i) => ({ t: steps[i]!.lobbyElapsedMs, clips: d.clips }))
+      .filter((step) => step.t >= 300_000 && step.clips.length > 0)
+      .map((step) => step.t);
+    expect(said).toEqual([300_000, 345_000, 390_000]);
+  });
+
+  it('ריצה חדשה כשהלובי כבר פתוח (שעון שלא התאפס) — בלי צרור קריאות', () => {
+    const at = (lobbyElapsedMs: number) =>
+      base({ stage: 'opening', bank: AMB_BANK, voteMode: 'both', lobbyElapsedMs });
+    const steps = Array.from({ length: 21 }, (_, i) => at(400_000 + i * 5_000));
+    const said = runSteps(steps, emptyNarrationMemory(3))
+      .map((d, i) => ({ t: steps[i]!.lobbyElapsedMs, n: d.clips.length }))
+      .filter((step) => step.n > 0)
+      .map((step) => step.t);
+    expect(said).toEqual([400_000, 445_000, 490_000]);
+  });
+
+  it('«כמעט כולם כאן» אינו נאמר בדקות הראשונות של הלובי, גם כשהסיבוב מוגרל', () => {
+    for (let seed = 0; seed < AMB_LOBBY.length; seed += 1) {
+      const first = runSteps(
+        Array.from({ length: 5 }, (_, i) =>
+          base({ stage: 'opening', bank: AMB_BANK, lobbyElapsedMs: i * 45_000 }),
+        ),
+        emptyNarrationMemory(seed),
+      ).flatMap((d) => d.clips);
+      expect(first).not.toContain('amb_lobby_nearly.mp3');
+    }
   });
 
   it('האודיו נפתח בדיוק בתור הפטפוט → הכול ברשימה אחת, בלי קטיעה', () => {
@@ -1471,27 +1541,47 @@ describe('★ סקר, הוראות הצבעה ו«מוכנים?»', () => {
         .flatMap((d) => d.clips)
         .filter((clip) => clip.startsWith('amb_lobby'));
     const firsts = new Set(Array.from({ length: AMB_LOBBY.length }, (_, seed) => lobbyOf(seed)[0]));
-    expect(firsts.size).toBe(AMB_LOBBY.length);
+    // כל ניסוח יכול לפתוח, חוץ מ«כמעט כולם כאן».
+    expect(firsts).toEqual(
+      new Set(AMB_LOBBY.filter((key) => key !== 'amb_lobby_nearly').map((key) => `${key}.mp3`)),
+    );
     for (let seed = 0; seed < AMB_LOBBY.length; seed += 1) {
       const lines = lobbyOf(seed);
       for (let i = 1; i < lines.length; i += 1) expect(lines[i]).not.toBe(lines[i - 1]);
     }
   });
 
-  it('★ בסקר אין «מי שבטוח, שילחץ» בחלון ההצבעה', () => {
-    const votingOf = (slideType: string, seed: number) =>
-      runSteps(
-        [
-          base({ bank: AMB_BANK, slideType, questionShown: true, answersShown: 2, phase: 'voting', timer: { remaining: 15, total: 15, paused: false } }),
-          base({ bank: AMB_BANK, slideType, questionShown: true, answersShown: 2, phase: 'voting', timer: { remaining: 7, total: 15, paused: false } }),
-        ],
-        emptyNarrationMemory(seed),
-      )[1]!.clips;
-    const seeds = Array.from({ length: AMB_VOTING.length }, (_, seed) => seed);
-    const poll = seeds.flatMap((seed) => votingOf('survey', seed));
-    expect(poll).not.toContain('amb_voting_3.mp3');
-    expect(new Set(poll)).toEqual(new Set(AMB_VOTING_POLL.map((key) => `${key}.mp3`)));
-    expect(seeds.flatMap((seed) => votingOf('trivia', seed))).toContain('amb_voting_3.mp3');
+  it('★ בסקר אין «מי שבטוח, שילחץ», וסקר אחרי טריוויה אינו חוזר על הניסוח שלה', () => {
+    const heard = new Set<string>();
+    for (let seed = 0; seed < AMB_VOTING.length * 2; seed += 1) {
+      const steps: DisplayedState[] = [];
+      const kinds: string[] = [];
+      for (let slide = 1; slide <= 8; slide += 1) {
+        const slideType = slide % 2 === 0 ? 'survey' : 'trivia';
+        const at = (remaining: number) =>
+          base({
+            bank: AMB_BANK,
+            slideId: slide,
+            slideType,
+            questionShown: true,
+            answersShown: 2,
+            phase: 'voting',
+            timer: { remaining, total: 15, paused: false },
+          });
+        steps.push(at(15), at(7));
+        kinds.push(slideType);
+      }
+      const voting = runSteps(steps, emptyNarrationMemory(seed))
+        .flatMap((d) => d.clips)
+        .filter((clip) => clip.startsWith('amb_voting'));
+      expect(voting).toHaveLength(8);
+      voting.forEach((clip, i) => {
+        if (kinds[i] === 'survey') expect(clip).not.toBe('amb_voting_3.mp3');
+        if (i > 0) expect(clip).not.toBe(voting[i - 1]);
+        heard.add(clip);
+      });
+    }
+    expect(heard).toContain('amb_voting_3.mp3'); // בטריוויה הוא עדיין בסבב
   });
 
   it('★ «מוכנים?» בפתיחה — הניסוחים החדשים בסבב של "מתחילים"', () => {
