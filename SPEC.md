@@ -119,6 +119,7 @@ interface GlobalSettings {
   titleThroughoutGame: string;
   ansIsNumber: boolean;
   voterNameStyle?: 'plain' | 'bubble'; // השם שמתעופף בצד עם כל הצבעה: על הרקע (ברירת מחדל) או בבועת דיבור
+  showQuestionTypeLabel?: boolean; // תווית סוג השאלה בראש המסך («סקר · אין תשובה נכונה», «הרוב קובע»); רק false מסתיר, חסר = מוצגת. ההימור והקבוצה נשארים
   visualTheme?: 'classic' | 'studio' | 'glass' | 'scroll'; // ערכת נושא חזותית (src/engine/visualThemes.ts): מראה בלבד, לא פריסה ולא צבעים; חסר/לא מוכר = 'classic'
   multiWinners: number;            // כמה זוכים להציג (1 / 5...)
   showWinnersListAfter: number | null;
