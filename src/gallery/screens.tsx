@@ -274,8 +274,13 @@ function votingScreen(
 }
 
 /** מסך שאלה אחרי חשיפת התשובה (results + revealCorrect). */
-function revealScreen(ctx: GalleryContext, spec: SlideSpec, weights: number[]): BuiltScreen {
-  const game = makeGame(ctx, [spec]);
+function revealScreen(
+  ctx: GalleryContext,
+  spec: SlideSpec,
+  weights: number[],
+  setting?: Record<string, unknown>,
+): BuiltScreen {
+  const game = makeGame(ctx, [spec], setting);
   const engine = engineAt(game, spec.id, 'results', { votes: votesBy(weights), scores: scoresFor(20) });
   const n = game.questions[0]!.question.answers.length;
   return { game, node: playing(engine, { reveal: revealDone(n), leaders: railPlayers(5, 1) }) };
@@ -439,6 +444,11 @@ export const SCREENS: ScreenDef[] = [
     build: (ctx) => revealScreen(ctx, IMAGE_ANSWERS, [4, 10, 5, 4]),
   },
   { id: 'poll', label: 'סקר — עוגה אחרי חשיפה', build: (ctx) => revealScreen(ctx, POLL, [5, 9, 3, 7]) },
+  {
+    id: 'poll-no-type-label',
+    label: 'סקר — בלי תווית סוג השאלה בראש המסך',
+    build: (ctx) => revealScreen(ctx, POLL, [5, 9, 3, 7], { showQuestionTypeLabel: false }),
+  },
   { id: 'rail-showing', label: 'קבוצות — פס בצד, לפני ההצבעה', build: (ctx) => railScreen(ctx, Q4, 'showing', []) },
   { id: 'rail-voting', label: 'קבוצות — כמה מכל קבוצה ענו', build: (ctx) => railScreen(ctx, Q4, 'voting', [3, 11, 5, 4]) },
   { id: 'rail-reveal', label: 'קבוצות — כמה מכל קבוצה צדקו', build: (ctx) => railScreen(ctx, Q4, 'results', [3, 11, 5, 4]) },

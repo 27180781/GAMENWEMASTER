@@ -59,6 +59,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       'mainColor',
       'secondaryColor',
       'voterNameStyle',
+      'showQuestionTypeLabel',
       'visualTheme',
       'gameMedia',
       'triviaMedia',

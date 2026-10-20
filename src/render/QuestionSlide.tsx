@@ -82,6 +82,11 @@ interface QuestionSlideProps {
   players: RailPlayer[];
   /** סגנון השם המתעופף (setting.voterNameStyle); חסר = טקסט על הרקע. */
   voterNameStyle?: VoterNameStyle;
+  /**
+   * תווית סוג השאלה בכותרת, «סקר · אין תשובה נכונה» ו«הרוב קובע»
+   * (setting.showQuestionTypeLabel); false = מוסתרות. ההימור והקבוצה לא תלויים בה.
+   */
+  showTypeLabel?: boolean;
   /** חמשת הראשונים שענו נכונה על השקופית (המהיר ראשון) — לפס המובילים בחשיפה. */
   leaders: RailPlayer[];
   /** שם המשחק לכל אורכו (setting.titleThroughoutGame). */
@@ -430,6 +435,7 @@ export function QuestionSlide({
   reveal: revealState,
   players,
   voterNameStyle = 'plain',
+  showTypeLabel = true,
   leaders,
   title,
   logo,
@@ -539,9 +545,10 @@ export function QuestionSlide({
             )}
             {title !== '' && <div className="q-title-pill">{title}</div>}
             {/* סקר — עד 2026-10 רק אייקון עוגה קטן ליד השאלה הבדיל אותו משאלה רגילה,
-                ומשתתפים לא הבינו שאין כאן תשובה נכונה (משוב לקוח, 2026-10-11). */}
-            {isSurvey && <div className="q-mode-pill q-mode-pill--survey">📊 סקר · אין תשובה נכונה</div>}
-            {majority && <div className="q-mode-pill q-mode-pill--majority">🗳 הרוב קובע את התשובה</div>}
+                ומשתתפים לא הבינו שאין כאן תשובה נכונה (משוב לקוח, 2026-10-11). משחק
+                שלא רוצה את התווית מכבה אותה (showTypeLabel), והאייקון נשאר. */}
+            {showTypeLabel && isSurvey && <div className="q-mode-pill q-mode-pill--survey">📊 סקר · אין תשובה נכונה</div>}
+            {showTypeLabel && majority && <div className="q-mode-pill q-mode-pill--majority">🗳 הרוב קובע את התשובה</div>}
             {betPill !== null && (
               <div className="q-mode-pill q-mode-pill--bet">
                 🎲 הימור פעיל · {betPill.bettors} מהמרים · {betPill.total.toLocaleString('en-US')} נק׳ על הכף

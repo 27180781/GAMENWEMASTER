@@ -303,6 +303,13 @@ describe('מצב המסך למסך הצפייה', () => {
     expect(snap.game.setting.mainColor).toBe(engine.getGame().setting.mainColor);
   });
 
+  it('תווית סוג השאלה: משחק שכיבה אותה — גם מסך הצפייה בלעדיה', () => {
+    const game = liveGame();
+    game.setting.showQuestionTypeLabel = false;
+    const snap = new LiveSnapshotBuilder().build(input(new GameEngine(game)));
+    expect(snap.game.setting.showQuestionTypeLabel).toBe(false);
+  });
+
   it('וידאו המנחה: הדגל ברישיון לא יוצא לצופים; השידור — רק מזהה ומצב', () => {
     const game = liveGame();
     game.setting.hostVideo = true;

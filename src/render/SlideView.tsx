@@ -213,6 +213,7 @@ export function SlideView({
             reveal={reveal}
             players={players}
             voterNameStyle={engine.getGame().setting.voterNameStyle}
+            showTypeLabel={engine.getGame().setting.showQuestionTypeLabel !== false}
             leaders={leaders}
             title={engine.getGame().setting.titleThroughoutGame}
             logo={engine.getGame().setting.logo.src}

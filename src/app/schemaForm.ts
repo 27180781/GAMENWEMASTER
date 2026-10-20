@@ -99,6 +99,7 @@ const LABELS: Record<string, string> = {
   titleThroughoutGame: 'כותרת קבועה במשחק',
   ansIsNumber: 'תשובות ממוספרות (במקום אותיות)',
   voterNameStyle: 'שמות המצביעים שעולים בצד',
+  showQuestionTypeLabel: 'סימון סוג השאלה בראש המסך (סקר, הרוב קובע)',
   visualTheme: 'ערכת נושא חזותית',
   allowChangeVote: 'אפשר שינוי הצבעה בזמן הטיימר',
   multiWinners: 'מספר הזוכים במסך הסיום',
