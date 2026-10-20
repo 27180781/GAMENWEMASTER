@@ -124,6 +124,25 @@ function portableExePath() {
   return typeof p === 'string' && p !== '' ? p : null;
 }
 
+/** @type {Map<string, boolean>} האם יש משחק מוטבע בקובץ — לפי נתיב, ראו fileIsSealed. */
+const sealedFiles = new Map();
+
+/**
+ * האם בסוף הקובץ יש משחק מוטבע. נקרא מהדיסק פעם אחת לכל קובץ: בכל קריאה
+ * readSealedFromFile קוראת (ומפענחת) את *כל* המטען, וב-EXE עם משחק של מאות MB
+ * הבדיקה הזו רצה בעלייה כ-7 פעמים, סינכרונית ב-main — שניות של קריאה, וזיכרון
+ * כפול, בכל פתיחה. loadSealedGame ממלא את התשובה כבר בקריאה שלו.
+ * @param {string} file
+ */
+function fileIsSealed(file) {
+  let sealed = sealedFiles.get(file);
+  if (sealed === undefined) {
+    sealed = readSealedFromFile(file) !== null;
+    sealedFiles.set(file, sealed);
+  }
+  return sealed;
+}
+
 /**
  * האם אפשר לחתום מהתוכנה הזו: קובץ נייד ארוז, שאינו חתום בעצמו. (התקנת NSIS
  * אינה קובץ בודד ולכן אינה יכולה לשמש בסיס; EXE חתום כבר טוען משחק משלו.)
@@ -131,7 +150,7 @@ function portableExePath() {
 function sealCapable() {
   const selfPath = portableExePath();
   if (!app.isPackaged || selfPath === null) return false;
-  return readSealedFromFile(selfPath) === null;
+  return !fileIsSealed(selfPath);
 }
 
 /**
@@ -992,6 +1011,7 @@ function loadSealedGame() {
   const file = portableExePath() || process.execPath;
   try {
     const res = readSealedFromFile(file);
+    sealedFiles.set(file, res !== null); // sealCapable לא יקרא את הקובץ שוב
     if (res !== null) {
       sealedGame = { bytes: res.gameZip, config: res.config };
       console.log('[seal] נמצא משחק מוטבע ב-EXE:', res.config && res.config.name ? res.config.name : '(ללא שם)');
@@ -2249,8 +2269,14 @@ app.whenReady().then(() => {
       }),
     );
   });
-  // משחק מוטבע ("סגור") ב-EXE — { bytes, config } או null.
-  ipcMain.handle('game:sealed', () => sealedGame);
+  // משחק מוטבע ("סגור") ב-EXE — { config, size } או null. בלי הבייטים: החלון
+  // טוען את המשחק דרך game:loadSaved, שמחלץ אותו כאן, ועותק של כל המשחק בצינור
+  // (מאות MB במשחק עם וידאו) היה מכפיל את הזיכרון בלי שימוש.
+  ipcMain.handle('game:sealed', () =>
+    sealedGame === null ? null : { config: sealedGame.config, size: sealedGame.bytes.byteLength },
+  );
+  // הבייטים עצמם — רק לנפילה האחורה, כשהחילוץ ב-game:loadSaved נכשל.
+  ipcMain.handle('game:sealedBytes', () => (sealedGame === null ? null : sealedGame.bytes));
   ipcMain.handle('game:forget', () => {
     // מבטל את הבחירה בלבד. המשחקים שהורדו נשארים בספרייה — "טען משחק אחר"
     // אינו אמור למחוק את מה שכבר הורדת.

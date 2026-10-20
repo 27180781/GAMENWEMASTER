@@ -36,4 +36,23 @@ describe('electron-builder.yml', () => {
     expect((config.nsis as Record<string, unknown>).preCompressedFileExtensions).toEqual([]);
     expect((config.portable as Record<string, unknown>).preCompressedFileExtensions).toBeUndefined();
   });
+
+  it('★ הנייד נפרס לתיקייה חדשה בכל פתיחה ($PLUGINSDIR) — לחיצה שנייה לא נוגעת בעותק שרץ', () => {
+    const value = (config.portable as Record<string, unknown>).unpackDirName;
+    expect(value).toBe(true);
+    // הכלל של electron-builder עצמו: כשהתנאי הזה אמיתי הוא מגדיר UNPACK_DIR_NAME
+    // (תיקייה קבועה ב-%TEMP%), גם עבור false. שדרוג שמשנה אותו נופל כאן.
+    const target = readFileSync(
+      new URL('../node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js', import.meta.url),
+      'utf8',
+    );
+    expect(target).toContain('if (typeof unpackDirName === "string" || !unpackDirName) {');
+    expect(typeof value === 'string' || !value).toBe(false);
+    // ובלי UNPACK_DIR_NAME, המעטפת הניידת נפרסת לתיקיית התוספים של אותה הרצה.
+    const nsi = readFileSync(
+      new URL('../node_modules/app-builder-lib/templates/nsis/portable.nsi', import.meta.url),
+      'utf8',
+    );
+    expect(nsi).toContain('StrCpy $INSTDIR "$PLUGINSDIR\\app"');
+  });
 });

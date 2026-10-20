@@ -66,6 +66,15 @@ portable:
   # בכלל. בלעדיה אין שום סימן חיים אחרי הלחיצה, והמשתמש לוחץ שוב.
   # (את מה שאחרי החילוץ מכסה חלון הטעינה ב-electron/splash.html.)
   splashImage: build/splash.bmp
+  # תיקיית חילוץ חדשה בכל פתיחה ($PLUGINSDIR, ‏%TEMP%\nsXXXX.tmp\app), ולא
+  # תיקייה אחת לכל גרסה (%TEMP%\<מזהה הבנייה>). המעטפת מוחקת את התיקייה לפני
+  # החילוץ ואחרי שהתוכנה נסגרת, ולכן לחיצה שנייה על אותו EXE מחקה ודרסה את
+  # הקבצים של העותק שכבר רץ: הלחיצה השנייה רק מקפיצה את החלון הפתוח (נעילת
+  # מופע יחיד ב-main), אבל המעטפת שלה כבר נגעה בתיקייה המשותפת.
+  # true ולא false, למרות התיעוד: ב-electron-builder 25 הערך false מתפרש כמו
+  # ברירת המחדל (מזהה הבנייה), ורק true משאיר את התיקייה הייחודית לכל פתיחה —
+  # tests/electronBuilderConfig.test.ts בודק את זה מול הקוד של electron-builder.
+  unpackDirName: true
 
 nsis:
   artifactName: HavayaBeClick-Setup-${version}.${ext}
