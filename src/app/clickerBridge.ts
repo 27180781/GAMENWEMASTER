@@ -43,6 +43,12 @@ export interface SealConfig {
   name?: string;
 }
 
+/** משחק מוטבע ב-EXE, בלי הבייטים: ההגדרות שבסוף הקובץ וגודל ה-ZIP. */
+export interface SealedGameInfo {
+  config: SealConfig;
+  size: number;
+}
+
 /**
  * מה החתימה של קובץ המשחק אומרת (electron/gameSignature.cjs). demoOnly: שחקני
  * דמה בלבד. why: 'changed' — הקובץ שונה אחרי שהמערכת חתמה עליו; 'unsigned' —
@@ -100,8 +106,10 @@ interface TriviaDesktop {
   rememberGame?: (name: string, bytes: Uint8Array) => void;
   /** שליפת המשחק האחרון שנשמר — { name, bytes } או null. */
   getLastGame?: () => Promise<{ name: string; bytes: Uint8Array } | null>;
-  /** משחק מוטבע ("סגור") ב-EXE — { bytes, config } או null. */
-  getSealedGame?: () => Promise<{ bytes: Uint8Array; config: SealConfig } | null>;
+  /** משחק מוטבע ("סגור") ב-EXE — { config, size } או null. הבייטים נשארים ב-main. */
+  getSealedGame?: () => Promise<SealedGameInfo | null>;
+  /** בייטי המשחק המוטבע — רק לנפילה האחורה כש-loadSavedGame('sealed') נכשל. */
+  getSealedGameBytes?: () => Promise<Uint8Array | null>;
   /** מחיקת המשחק האחרון השמור ("טען משחק אחר"). */
   forgetGame?: () => void;
   /** המשחקים שכבר הורדו ונשמרו במחשב. */
@@ -514,9 +522,23 @@ export async function gateChange(current: string, next: string | null): Promise<
   }
 }
 
-/** משחק מוטבע ("סגור") ב-EXE — { bytes, config } או null (בדפדפן/EXE גנרי). */
-export async function getSealedGame(): Promise<{ bytes: Uint8Array; config: SealConfig } | null> {
+/**
+ * משחק מוטבע ("סגור") ב-EXE — { config, size } או null (בדפדפן/EXE גנרי). את
+ * המשחק עצמו טוענים ב-desktopLoadSavedGame('sealed'), בלי להעביר אותו לכאן.
+ */
+export async function getSealedGame(): Promise<SealedGameInfo | null> {
   const fn = desktop()?.getSealedGame;
+  if (typeof fn !== 'function') return null;
+  try {
+    return await fn();
+  } catch {
+    return null;
+  }
+}
+
+/** בייטי ה-ZIP של המשחק המוטבע — רק כשהמסלול המהיר נכשל. null בדפדפן או בכשל. */
+export async function getSealedGameBytes(): Promise<Uint8Array | null> {
+  const fn = desktop()?.getSealedGameBytes;
   if (typeof fn !== 'function') return null;
   try {
     return await fn();

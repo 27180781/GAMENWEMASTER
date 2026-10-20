@@ -40,6 +40,7 @@ import {
   getLastGame,
   forgetGame,
   getSealedGame,
+  getSealedGameBytes,
   getSealMode,
   onUpdateStatus,
   getAppVersion,
@@ -719,10 +720,14 @@ export function App() {
     void (async () => {
       // עדיפות ראשונה: משחק מוטבע ("סגור") ב-EXE — נטען אוטומטית, לא ניתן להחלפה.
       const sealed = await getSealedGame();
-      if (sealed !== null && sealed.bytes.byteLength > 0) {
+      if (sealed !== null && sealed.size > 0) {
         if (await loadSavedFast('sealed')) return;
-        setSealConfig(sealed.config); // נפילה אחורה: EXE ישן בלי המסלול המהיר
-        await loadZipBuffer(toBuffer(sealed.bytes), sealed.config);
+        // נפילה אחורה: החילוץ בדיסק נכשל — רק עכשיו הבייטים עוברים לחלון.
+        const bytes = await getSealedGameBytes();
+        if (bytes !== null && bytes.byteLength > 0) {
+          setSealConfig(sealed.config);
+          await loadZipBuffer(toBuffer(bytes), sealed.config);
+        }
         return;
       }
       // אחרת: המשחק האחרון שנשמר (זכירה).

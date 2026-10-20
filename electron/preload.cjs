@@ -99,9 +99,13 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
   getLastGame() {
     return ipcRenderer.invoke('game:getLast');
   },
-  /** משחק מוטבע ("סגור") ב-EXE — { bytes, config } או null. */
+  /** משחק מוטבע ("סגור") ב-EXE — { config, size } או null (בלי הבייטים; ראו loadSavedGame). */
   getSealedGame() {
     return ipcRenderer.invoke('game:sealed');
+  },
+  /** בייטי ה-ZIP של המשחק המוטבע — רק לנפילה האחורה כש-loadSavedGame('sealed') נכשל. */
+  getSealedGameBytes() {
+    return ipcRenderer.invoke('game:sealedBytes');
   },
   /** ביטול בחירת המשחק הנוכחי ("טען משחק אחר"). הספרייה נשארת. */
   forgetGame() {
