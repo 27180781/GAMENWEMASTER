@@ -1555,6 +1555,26 @@ function reportsDir() {
   }
   return dir;
 }
+/**
+ * בגרסה הניידת (וב-EXE חתום): תיקיית «תוצאות» ליד קובץ ה-EXE, כדי שהתוצאות
+ * יישארו על הדיסק-און-קי ולא רק במחשב שהתוכנה רצה עליו. null כשאין גרסה
+ * ניידת, או כשאי אפשר לכתוב שם (כונן לקריאה בלבד, תיקייה מוגנת) — ואז
+ * התוצאות נשמרות רק בתיקייה הרגילה, כמו תמיד.
+ * @returns {string | null}
+ */
+function portableReportsDir() {
+  const exe = portableExePath();
+  if (exe === null) return null;
+  const dir = path.join(path.dirname(exe), 'תוצאות');
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.accessSync(dir, fs.constants.W_OK);
+    return dir;
+  } catch {
+    return null;
+  }
+}
+
 /** שם קובץ בטוח לתוצאות. */
 function safeReportName(name) {
   const base = String(name ?? '').replace(/[\\/:*?"<>|]/g, ' ').trim() || 'results';
@@ -1899,8 +1919,18 @@ function pushDeviceState(patch) {
  * @returns {Promise<{ status: number, body: unknown }>}
  */
 function postDevice(body) {
+  return postFunction('offline-device', body);
+}
+
+/**
+ * POST לפונקציה במערכת היצירה, באותם כללים של postDevice.
+ * @param {string} name
+ * @param {Record<string, unknown>} body
+ * @returns {Promise<{ status: number, body: unknown }>}
+ */
+function postFunction(name, body) {
   return new Promise((resolve, reject) => {
-    const req = net.request({ method: 'POST', url: `${REMOTE_BASE_URL}/offline-device` });
+    const req = net.request({ method: 'POST', url: `${REMOTE_BASE_URL}/${name}` });
     req.setHeader('apikey', REMOTE_ANON_KEY);
     req.setHeader('Authorization', `Bearer ${REMOTE_ANON_KEY}`);
     req.setHeader('Content-Type', 'application/json');
@@ -1937,6 +1967,50 @@ function postDevice(body) {
     });
     req.end(JSON.stringify(body));
   });
+}
+
+// ── תוצאות משחקים למערכת (resultUpload.cjs) ──────────────────────────────────
+// כל הפעלה שהגיעה למסך המנצחים נכנסת לתור בדיסק ויוצאת כשיש רשת, כדי שתופיע
+// ב«האירועים שלי» בבונה. גם במשחק חתום ובגרסה הניידת; לא בהרצת פיתוח בלי שרת.
+const resultUpload = require('./resultUpload.cjs');
+const RESULTS_RETRY_MS = 10 * 60 * 1000;
+const RESULTS_FIRST_FLUSH_MS = 20 * 1000;
+/** @type {NodeJS.Timeout | null} */
+let resultsTimer = null;
+/** @type {Promise<void> | null} */
+let resultsRun = null;
+
+function resultUploadEnabled() {
+  return !DEV_RUN || REMOTE_OVERRIDE.url !== null || process.env.TRIVIA_RESULT_UPLOAD === '1';
+}
+
+/** @param {number} ms */
+function scheduleResultsFlush(ms) {
+  if (resultsTimer !== null) clearTimeout(resultsTimer);
+  resultsTimer = setTimeout(() => void flushResultsNow(), ms);
+}
+
+/** סבב שליחה; סבב שכבר רץ — מחכים לו. כל עוד נשאר משהו בתור, מנסים שוב בעוד כמה דקות. */
+function flushResultsNow() {
+  if (!resultUploadEnabled()) return Promise.resolve();
+  if (resultsRun !== null) return resultsRun;
+  resultsRun = (async () => {
+    try {
+      const res = await resultUpload.flushResults({
+        userData: userData(),
+        post: (body) => postFunction('save-offline-result', body),
+      });
+      if (res.sent > 0 || res.dropped > 0) {
+        console.log('[results] תוצאות למערכת:', `${res.sent} נשלחו, ${res.dropped} נדחו, ${res.kept} ממתינות`);
+      }
+    } catch (err) {
+      console.warn('[results] שליחת תוצאות נכשלה:', /** @type {Error} */ (err).message);
+    } finally {
+      resultsRun = null;
+      if (resultUpload.pendingCount(userData()) > 0) scheduleResultsFlush(RESULTS_RETRY_MS);
+    }
+  })();
+  return resultsRun;
 }
 
 /** @type {NodeJS.Timeout | null} */
@@ -2156,6 +2230,8 @@ app.whenReady().then(() => {
   // המחשב מול המערכת: מזהה, אישורים ומשחקים שנשלחו אליו. גם הוא אחרי
   // loadSealedGame — ב-EXE סגור הוא כבוי.
   startDeviceSync();
+  // תוצאות שממתינות מהפעלות קודמות (בלי רשת באירוע) — יוצאות עכשיו כשיש רשת.
+  if (resultUploadEnabled() && resultUpload.pendingCount(userData()) > 0) scheduleResultsFlush(RESULTS_FIRST_FLUSH_MS);
   // עדכון עצמי של כלי "חתום EXE" — מסלול נפרד, כי הקובץ הנייד אינו נתמך
   // ב-electron-updater. ההשהיה קצרה יותר: הכלי אינו מריץ אירוע חי.
   setTimeout(() => void selfUpdateSealer(), 8000);
@@ -2166,6 +2242,8 @@ app.whenReady().then(() => {
     checkForUpdate();
     // גם המחשב בודק מיד אם המערכת שלחה לו משחק, במקום לחכות לבדיקה הבאה.
     if (deviceSyncEnabled() && deviceState.state !== 'ok' && deviceState.state !== 'off') scheduleDeviceSync(1000);
+    // ותוצאות שחיכו לרשת יוצאות מיד.
+    if (resultUploadEnabled() && resultUpload.pendingCount(userData()) > 0) scheduleResultsFlush(1000);
   });
   /** מצב שרת הקליקרים האחרון — לחלון שנפתח אחרי שהאירוע כבר שודר. */
   ipcMain.handle('rf317:serverState', () => lastServerState);
@@ -2322,10 +2400,22 @@ app.whenReady().then(() => {
     }
   });
   // שמירת קובץ תוצאות (אקסל) לתיקיית reports; מחזיר את הנתיב המלא.
+  // בגרסה הניידת נשמר גם עותק ליד ה-EXE (portableReportsDir); כישלון שם (הדיסק
+  // הוצא, לקריאה בלבד) לא מפיל את השמירה הרגילה.
   ipcMain.handle('report:save', (_e, name, bytes) => {
+    const file = safeReportName(name);
+    const data = Buffer.from(bytes);
+    const portable = portableReportsDir();
+    if (portable !== null) {
+      try {
+        fs.writeFileSync(path.join(portable, file), data);
+      } catch (err) {
+        console.warn('[report] עותק התוצאות ליד ה-EXE נכשל:', /** @type {Error} */ (err).message);
+      }
+    }
     try {
-      const full = path.join(reportsDir(), safeReportName(name));
-      fs.writeFileSync(full, Buffer.from(bytes));
+      const full = path.join(reportsDir(), file);
+      fs.writeFileSync(full, data);
       console.log('[report] נשמר קובץ תוצאות:', full);
       return full;
     } catch (err) {
@@ -2333,9 +2423,23 @@ app.whenReady().then(() => {
       return null;
     }
   });
-  // פתיחת תיקיית התוצאות בסייר הקבצים.
+  // תוצאת הפעלה שהגיעה לסוף → לתור, ומשם למערכת כשיש רשת (resultUpload.cjs).
+  ipcMain.handle('results:queue', (_e, entry) => {
+    if (!resultUploadEnabled()) return false;
+    const queued = resultUpload.enqueueResult(userData(), entry);
+    if (queued) void flushResultsNow();
+    return queued;
+  });
+  // פתיחת תיקיית התוצאות בסייר הקבצים: בגרסה הניידת זו שליד ה-EXE, כשיש בה קבצים.
   ipcMain.handle('report:open', () => {
-    void shell.openPath(reportsDir());
+    const portable = portableReportsDir();
+    let dir = reportsDir();
+    try {
+      if (portable !== null && fs.readdirSync(portable).some((f) => f.toLowerCase().endsWith('.xlsx'))) dir = portable;
+    } catch {
+      /* נשארים בתיקייה הרגילה */
+    }
+    void shell.openPath(dir);
   });
 
   /**

@@ -10,7 +10,13 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import type { GameFile } from '../engine/index.ts';
 import { type AutoTransition, type GameSettings } from '../app/urlParams.ts';
-import { isDesktopClicker, launchReceiver, type SealConfig } from '../app/clickerBridge.ts';
+import {
+  canSaveReport,
+  desktopOpenReports,
+  isDesktopClicker,
+  launchReceiver,
+  type SealConfig,
+} from '../app/clickerBridge.ts';
 import { hostConsoleUrl, openHostConsole } from '../app/hostConsoleWindow.ts';
 import { MediaCachePanel } from './MediaCachePanel.tsx';
 import { GuideButton } from './GuideScreen.tsx';
@@ -570,6 +576,17 @@ export function SettingsScreen({
       </div>
     ) : null;
 
+  // «תוצאות של משחקים קודמים» (EXE) — פותח את תיקיית קבצי האקסל, קובץ לכל
+  // הפעלה. מוצג במסך הפתיחה, לפני שהמשחק מתחיל, גם במשחק חתום.
+  const pastResultsLink =
+    mode === 'start' && canSaveReport() ? (
+      <div className="settings-secondary">
+        <button className="settings-pick-another" onClick={() => desktopOpenReports()}>
+          📊 תוצאות של משחקים קודמים
+        </button>
+      </div>
+    ) : null;
+
   // חלון קופץ (מודאל) של ההגדרות המתקדמות — גלילה פנימית, בלי גלילת עמוד
   const advancedModal = advancedOpen ? (
     <div className="settings-modal-overlay" onClick={() => setAdvancedOpen(false)}>
@@ -656,6 +673,8 @@ export function SettingsScreen({
               {advancedButton}
               {hostScreenLink}
               {pickAnotherLink}
+        {pastResultsLink}
+              {pastResultsLink}
             </div>
           </div>
         </div>

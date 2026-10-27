@@ -133,6 +133,8 @@ interface TriviaDesktop {
   saveReport?: (name: string, bytes: Uint8Array) => Promise<string | null>;
   /** פתיחת תיקיית התוצאות בסייר הקבצים. */
   openReports?: () => void;
+  /** תוצאת הפעלה למערכת (דרך תור בדיסק, electron/resultUpload.cjs). */
+  queueResult?: (entry: ResultUploadEntry) => Promise<boolean>;
   /** "שמירה בשם" — דיאלוג שמירה של Windows וכתיבת הבייטים לקובץ שנבחר. */
   saveFileAs?: (name: string, bytes: Uint8Array) => Promise<SaveFileResult>;
   /** יציאה מהמשחק (סגירת ה-EXE). */
@@ -592,6 +594,29 @@ export async function desktopSaveReport(name: string, bytes: Uint8Array): Promis
     return await fn(name, bytes);
   } catch {
     return null;
+  }
+}
+
+/** תוצאת הפעלה שנשלחת למערכת היצירה (save-offline-result), כדי שתופיע ב«האירועים שלי». */
+export interface ResultUploadEntry {
+  /** מזהה המשחק בבונה (UUID). */
+  gameId: string;
+  /** מזהה ההפעלה — השרת שומר כל הפעלה פעם אחת. */
+  runId: string;
+  startedAt: number;
+  endedAt: number;
+  /** אותה צורה כמו גיבוי חי: users / questions / groups / meta. */
+  gameState: Record<string, unknown>;
+}
+
+/** הכנסת תוצאת הפעלה לתור השליחה (EXE). false = לא נשלחת או שאין גשר. */
+export async function desktopQueueResult(entry: ResultUploadEntry): Promise<boolean> {
+  const fn = desktop()?.queueResult;
+  if (typeof fn !== 'function') return false;
+  try {
+    return await fn(entry);
+  } catch {
+    return false;
   }
 }
 

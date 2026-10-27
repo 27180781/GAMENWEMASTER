@@ -163,10 +163,18 @@ export function buildReportSheets(
   return sheets;
 }
 
-/** שם קובץ בטוח לפי שם/מזהה המשחק ותאריך. */
-export function reportFilename(game: GameFile, now: Date = new Date()): string {
+/**
+ * שם קובץ בטוח לפי שם/מזהה המשחק, והתאריך והשעה שבהם ההפעלה התחילה (שעון
+ * המחשב). כל הפעלה מקבלת קובץ משלה: השמירה החיה אחרי כל שאלה דורסת רק את
+ * הקובץ של אותה הפעלה, והמשך מגיבוי (אותו startedAt) ממשיך באותו קובץ. עד
+ * 2026-10 השם נשא רק את התאריך, ושתי הפעלות באותו יום נכתבו לאותו קובץ.
+ * ‏':' אסור בשם קובץ ב-Windows, ולכן השעה היא HH-MM.
+ */
+export function reportFilename(game: GameFile, startedAt: Date = new Date()): string {
   const base = (game.name || game.id || 'game').replace(/[\\/?*[\]:]/g, ' ').trim() || 'game';
-  return `סיכום-${base}-${now.toISOString().slice(0, 10)}.xlsx`;
+  const two = (n: number) => String(n).padStart(2, '0');
+  const day = `${startedAt.getFullYear()}-${two(startedAt.getMonth() + 1)}-${two(startedAt.getDate())}`;
+  return `סיכום-${base}-${day}-${two(startedAt.getHours())}-${two(startedAt.getMinutes())}.xlsx`;
 }
 
 /** בונה ומוריד את קובץ הסיכום (בדפדפן). */
@@ -176,9 +184,10 @@ export async function downloadGameReport(
   roster: RosterData,
   nameOf: (voterId: string) => string,
   groupBonus?: Readonly<Record<string, number>>,
+  startedAt?: number,
 ): Promise<void> {
   const blob = await buildXlsxBlob(buildReportSheets(game, state, roster, nameOf, groupBonus));
-  downloadBlob(blob, reportFilename(game));
+  downloadBlob(blob, reportFilename(game, startedAt !== undefined ? new Date(startedAt) : new Date()));
 }
 
 /** בונה את קובץ הסיכום כבייטים (לשמירה לדיסק ב-EXE, במקום הורדה בדפדפן). */

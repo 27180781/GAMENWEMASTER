@@ -124,9 +124,16 @@ describe('buildReportSheets', () => {
 });
 
 describe('reportFilename', () => {
-  it('בונה שם קובץ עם שם המשחק ותאריך', () => {
+  it('בונה שם קובץ עם שם המשחק, התאריך ושעת ההתחלה', () => {
     const game = { ...twoTrivia(), name: 'טריוויה/ערב' };
-    const name = reportFilename(game, new Date('2026-07-13T10:00:00Z'));
-    expect(name).toBe('סיכום-טריוויה ערב-2026-07-13.xlsx'); // '/' נוקה
+    const name = reportFilename(game, new Date(2026, 6, 13, 9, 5));
+    expect(name).toBe('סיכום-טריוויה ערב-2026-07-13-09-05.xlsx'); // '/' נוקה, ':' אסור ב-Windows
+  });
+
+  it('שתי הפעלות באותו יום מקבלות שני קבצים', () => {
+    const game = twoTrivia();
+    expect(reportFilename(game, new Date(2026, 6, 13, 18, 0))).not.toBe(
+      reportFilename(game, new Date(2026, 6, 13, 20, 30)),
+    );
   });
 });

@@ -155,6 +155,10 @@ contextBridge.exposeInMainWorld('triviaDesktop', {
   saveReport(/** @type {string} */ name, /** @type {Uint8Array} */ bytes) {
     return ipcRenderer.invoke('report:save', name, bytes);
   },
+  /** תוצאת הפעלה שהגיעה לסוף — לתור, ומשם למערכת כשיש רשת. */
+  queueResult(/** @type {unknown} */ entry) {
+    return ipcRenderer.invoke('results:queue', entry);
+  },
   /** פתיחת תיקיית התוצאות בסייר הקבצים. */
   openReports() {
     void ipcRenderer.invoke('report:open');
