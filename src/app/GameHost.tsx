@@ -51,6 +51,7 @@ import { AllScoresScreen, LobbyScreen, WinnersListScreen, WinnersScreen } from '
 import { OperatorMenu } from '../render/OperatorMenu.tsx';
 import { RaffleOverlay, type RaffleEntry } from '../render/RaffleOverlay.tsx';
 import type { RailPlayer, RevealState } from '../render/QuestionSlide.tsx';
+import { revealBoard } from './revealBoard.ts';
 import { BetResultsOverlay } from '../render/BetResultsOverlay.tsx';
 import { RosterPanel } from '../render/RosterPanel.tsx';
 import { SlideView } from '../render/SlideView.tsx';
@@ -726,14 +727,20 @@ export function GameHost({
   );
   /** מי שענה נכונה על השקופית הנוכחית, לפי סדר הגעה (המהיר ראשון) — לפס המובילים. */
   const [correctAnswerers, setCorrectAnswerers] = useState<string[]>([]);
-  const leaders = useMemo<RailPlayer[]>(
-    () =>
-      correctAnswerers.slice(0, 5).map((id) => {
-        const name = nameOf(id);
-        return { id, name, initial: railInitial(name), color: avatarColor(id) };
-      }),
-    [correctAnswerers, nameOf],
-  );
+  const leaders = useMemo<RailPlayer[]>(() => {
+    // «הראשון שעונה מנצח»: רק הזוכה ונקודותיו (ראו revealBoard.ts).
+    const slide = engine.getGame().questions[state.currentSlideIndex];
+    const board = revealBoard(
+      slide?.setting.firstClicker === true,
+      state.firstClickWinners[state.currentSlideId],
+      engine.getSlideAwards(state.currentSlideId),
+      correctAnswerers,
+    );
+    return board.map(({ id, points }) => {
+      const name = nameOf(id);
+      return { id, name, initial: railInitial(name), color: avatarColor(id), ...(points !== undefined ? { points } : {}) };
+    });
+  }, [engine, state, correctAnswerers, nameOf]);
   /** כל מי שהתחבר למשחק (לחץ מקש) — למסך הלובי. סדר הצטרפות. */
   const [connectedIds, setConnectedIds] = useState<string[]>([]);
   const connectedIdsRef = useRef<string[]>(connectedIds);

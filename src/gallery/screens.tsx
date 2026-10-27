@@ -279,11 +279,12 @@ function revealScreen(
   spec: SlideSpec,
   weights: number[],
   setting?: Record<string, unknown>,
+  leaders: RailPlayer[] = railPlayers(5, 1),
 ): BuiltScreen {
   const game = makeGame(ctx, [spec], setting);
   const engine = engineAt(game, spec.id, 'results', { votes: votesBy(weights), scores: scoresFor(20) });
   const n = game.questions[0]!.question.answers.length;
-  return { game, node: playing(engine, { reveal: revealDone(n), leaders: railPlayers(5, 1) }) };
+  return { game, node: playing(engine, { reveal: revealDone(n), leaders }) };
 }
 
 /** שקופית בתוצאות + שכבה מעליה (overlay של GameHost). */
@@ -484,6 +485,11 @@ export const SCREENS: ScreenDef[] = [
   },
   { id: 'multiselect', label: 'בחירה מרובה — חשיפה', build: (ctx) => revealScreen(ctx, MULTI, [8, 2, 6, 3, 2, 2]) },
   { id: 'question-reveal', label: 'חשיפת תשובה + מובילים', build: (ctx) => revealScreen(ctx, Q4, [3, 11, 5, 4]) },
+  {
+    id: 'first-clicker-winner',
+    label: 'הראשון שעונה מנצח — הזוכה ונקודותיו',
+    build: (ctx) => revealScreen(ctx, Q4, [3, 11, 5, 4], undefined, [{ ...railPlayers(1, 1)[0]!, points: 640 }]),
+  },
   {
     id: 'question-flyers-plain',
     label: 'שמות מצביעים — טקסט',

@@ -52,6 +52,8 @@ export interface RailPlayer {
   name: string;
   initial: string;
   color: string;
+  /** הנקודות שהשקופית נתנה לו — רק בפס של «הראשון שעונה מנצח» (revealBoard.ts). */
+  points?: number;
 }
 
 /** תגי התשובות כשאינן מספרים — אותיות לטיניות A, B, C, D… (לפי ansIsNumber ב-JSON). */
@@ -192,6 +194,7 @@ function Leaderboard({ leaders }: { leaders: RailPlayer[] }) {
             ))}
           </div>
           <FitText className="q-board-name">{leader.name}</FitText>
+          {leader.points !== undefined && <div className="q-board-points">+{leader.points}</div>}
         </div>
       ))}
     </div>
