@@ -856,6 +856,19 @@ body {
 .q-board-stars { display: flex; align-items: flex-end; gap: 2px; margin-bottom: -12px; z-index: 2; }
 .q-board-stars svg { animation: starPop 0.4s ease both; }
 .q-board-stars svg:nth-child(2) { margin-bottom: 6px; }
+/* «הראשון שעונה מנצח»: הנקודות של הזוכה, מתחת לשם (revealBoard.ts). */
+.q-board-points {
+  margin-top: 8px;
+  padding: 4px 18px;
+  border-radius: 999px;
+  background: #F5C518;
+  color: #3a2a00;
+  font-weight: 900;
+  font-size: 30px;
+  line-height: 1.2;
+  direction: ltr;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
 .q-board-name {
   display: inline-block;
   background: var(--pill);
