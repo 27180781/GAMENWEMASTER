@@ -237,6 +237,19 @@ describe('מצב המסך למסך הצפייה', () => {
     expect(snap.leaders.map((p) => p.name)).toEqual(['054••••567', '050••••233']);
   });
 
+  it('«הראשון שעונה מנצח»: הנקודות של הזוכה עוברות למסך הצפייה, בלי הטלפון', () => {
+    const engine = votingOnFirst();
+    engine.dispatch({ type: 'VOTING_TIMEOUT', at: T0 + 15_000 });
+    const snap = new LiveSnapshotBuilder().build(
+      input(engine, {
+        reveal: { questionShown: true, answersShown: 4, revealCorrect: true },
+        leaders: [{ ...rail([PHONES[0]!])[0]!, points: 640 }],
+      }),
+    );
+    expect(snap.leaders).toEqual([{ id: snap.leaders[0]!.id, name: '054••••567', initial: PHONES[0]![0], color: '#FF6B6B', points: 640 }]);
+    expect(JSON.stringify(snap.leaders)).not.toContain(PHONES[0]!);
+  });
+
   it('שאלה ותשובות שעוד לא נחשפו — ריקות', () => {
     const engine = new GameEngine(liveGame());
     const snap = new LiveSnapshotBuilder().build(

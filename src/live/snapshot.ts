@@ -291,7 +291,13 @@ export class LiveSnapshotBuilder {
       list.map((p) => {
         const a = alias(p.id);
         railColors.set(a, p.color);
-        return { id: a, name: maskPhoneLike(p.name), initial: p.initial, color: p.color };
+        return {
+          id: a,
+          name: maskPhoneLike(p.name),
+          initial: p.initial,
+          color: p.color,
+          ...(p.points !== undefined ? { points: p.points } : {}),
+        };
       });
 
     const slide = game.questions[state.currentSlideIndex];

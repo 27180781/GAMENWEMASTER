@@ -161,6 +161,14 @@ export class GameEngine {
   }
 
   /**
+   * הניקוד שהשקופית נתנה בסגירת ההצבעה האחרונה שלה (voterId → נקודות), בלי
+   * ההימור שהוכרע בה. ריק לפני הסגירה. לתצוגה בלבד (פס הזוכה ב-firstClicker).
+   */
+  getSlideAwards(slideId: number): Readonly<Record<string, number>> {
+    return this.awardedBySlide[slideId] ?? {};
+  }
+
+  /**
    * מובילי טבלת הניקוד, ממוינים יורד. שובר-שוויון: כשהניקוד זהה בדיוק, המהיר
    * יותר (זמן תגובה ממוצע נמוך) מדורג גבוה יותר; ואז לפי המזהה ליציבות.
    */
