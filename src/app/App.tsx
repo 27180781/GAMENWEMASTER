@@ -656,7 +656,8 @@ export function App() {
     let cancelled = false;
     (async () => {
       try {
-        const response = await fetch(params.gameUrl!);
+        // בלי מטמון: הקובץ נושא את רשימת המשתתפים, והיא משתנה בבונה גם ביום האירוע.
+        const response = await fetch(params.gameUrl!, { cache: 'no-store' });
         if (!response.ok) {
           throw new Error(`השרת החזיר ${response.status} ${response.statusText}`);
         }
@@ -1049,6 +1050,21 @@ export function App() {
     }
   }, [params, applyRawGame]);
 
+  /**
+   * משיכה טרייה של הקובץ לרענון השמות במשחק (GameHost, rosterRefresh.ts) — בלי
+   * להחיל את התוכן ובלי שגיאה על המסך: כישלון = null, והמשחק ממשיך כמו שהוא.
+   */
+  const fetchLatestGame = useCallback(async (): Promise<GameFile | null> => {
+    if (params.gameUrl === null) return null;
+    try {
+      const response = await fetch(params.gameUrl, { cache: 'no-store' });
+      if (!response.ok) return null;
+      return parseGameFileLenient(await response.json()).game;
+    } catch {
+      return null;
+    }
+  }, [params]);
+
   // ערוץ הפוש (postMessage תמיד; SSE/WebSocket אם סופק &push=)
   useEffect(() => {
     if (params.gameUrl === null && params.pushUrl === null) return;
@@ -1437,6 +1453,7 @@ export function App() {
           onRosterChange={clickerSave.nudge}
           onReleaseClickers={clickerSave.release}
           demoOnly={signatureLock !== null}
+          fetchLatestGame={params.gameUrl !== null && !offline ? fetchLatestGame : undefined}
         />
         {/* בזמן משחק — עיגול זעיר בפינה, לא פס מלא שמכער את המסך */}
         {!mediaPreload.done && <MediaLoadDot {...mediaPreload} />}

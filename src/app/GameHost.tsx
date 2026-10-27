@@ -99,14 +99,19 @@ import {
   forgetRosterSourceIds,
   groupCounts,
   loadRoster,
+  loadRosterSource,
   playerGroupNames,
   reassignRoster,
   resetCategoryMemberships,
   saveRoster,
+  saveRosterSource,
+  syncRosterWithFile,
   type ReleasedClicker,
   type RosterData,
 } from './roster.ts';
 import { selectPlayersToRemove } from './functionPlayers.ts';
+import { applyReleases, loadReleases } from './clickerRelease.ts';
+import { createRefreshScheduler, shouldRefreshForVoter, type RefreshScheduler } from './rosterRefresh.ts';
 import { groupCategories, groupStandings, hasGroupData } from './groupScore.ts';
 import { buildGroupRail, groupRailAvailable, presentPlayers } from './groupRail.ts';
 import { adjustGroupBonus } from '../engine/scoreAdjust.ts';
@@ -274,6 +279,12 @@ interface GameHostProps {
    * דמה בלבד, מה שלא יהיה בהגדרות. מסך "איך משחקים?" כבר מציע רק דמה — זה גיבוי.
    */
   demoOnly?: boolean;
+  /**
+   * משיכה טרייה של קובץ המשחק (‎?game=URL‎, בלי מטמון) — רק למשחק אונליין.
+   * GameHost ממזג ממנה את השמות והקבוצות בלבד: כשהמשחק מתחיל, וכשמצביע לא מוכר
+   * מגיע מהטלפון (rosterRefresh.ts). undefined = אין ממה למשוך.
+   */
+  fetchLatestGame?: (() => Promise<GameFile | null>) | undefined;
 }
 
 export function GameHost({
@@ -288,6 +299,7 @@ export function GameHost({
   onReleaseClickers,
   onRosterChange,
   demoOnly = false,
+  fetchLatestGame,
 }: GameHostProps) {
   // המנוע נוצר פעם אחת; רענון תוכן מתבצע דרך engine.updateGame בלי remount,
   // כדי לשמר את מהלך המשחק (ניקוד/מיקום). ראו useEffect על שינוי game למטה.
@@ -414,6 +426,46 @@ export function GameHost({
   applyGroupPressesRef.current = applyGroupPresses;
   const rosterRef = useRef(roster);
   rosterRef.current = roster;
+
+  /**
+   * רענון השמות מהבונה באמצע הפעלה אונליין (rosterRefresh.ts): בכניסה למשחק,
+   * ופעם אחת לכל מצביע לא מוכר מהטלפון (ראו onPlayerJoined למטה). רק השמות
+   * והקבוצות — אותו מיזוג של הטעינה, מול המרשם הנוכחי ברגע הסיום, כך שעריכות
+   * של המפעיל ושיוכים שנעשו בינתיים נשמרים. כישלון רשת פשוט משאיר את מה שיש.
+   */
+  const fetchLatestGameRef = useRef(fetchLatestGame);
+  fetchLatestGameRef.current = fetchLatestGame;
+  const askedVotersRef = useRef<Set<string>>(new Set());
+  const rosterRefreshRef = useRef<RefreshScheduler | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const scheduler = createRefreshScheduler(async () => {
+      const fetchFile = fetchLatestGameRef.current;
+      if (fetchFile === undefined) return;
+      const file = await fetchFile();
+      if (!alive || file === null || file.id !== game.id) return;
+      const res = syncRosterWithFile(
+        rosterRef.current,
+        applyReleases(file, loadReleases(file.id)),
+        loadRosterSource(file.id),
+        false,
+      );
+      if (res === null) return;
+      saveRosterSource(file.id, res.source);
+      if (JSON.stringify(res.roster) === JSON.stringify(rosterRef.current)) return;
+      debugLog('game', 'שמות המשתתפים עודכנו מהבונה', { players: res.roster.players.length });
+      rosterRef.current = res.roster;
+      setRoster(res.roster);
+      saveRoster(game.id, res.roster);
+    }, 10_000);
+    rosterRefreshRef.current = scheduler;
+    if (fetchLatestGameRef.current !== undefined) scheduler.request();
+    return () => {
+      alive = false;
+      scheduler.dispose();
+      if (rosterRefreshRef.current === scheduler) rosterRefreshRef.current = null;
+    };
+  }, [game.id]);
   // כל שינוי במרשם (לחיצה, שמות שנוספו, רענון) — אולי נקשר שלט לשם מהבונה.
   useEffect(() => {
     onRosterChange?.();
@@ -2167,7 +2219,17 @@ export function GameHost({
       adapter.onPlayerIdentified((phone, name) =>
         setServerNames((prev) => (prev[phone] === name ? prev : { ...prev, [phone]: name })),
       );
-      adapter.onPlayerJoined((phone, name) => addConnected(phone, name));
+      adapter.onPlayerJoined((phone, name) => {
+        addConnected(phone, name);
+        // מצביע שאין לו שם במרשם — אולי השם נוסף בבונה אחרי שהקובץ נטען.
+        if (
+          fetchLatestGameRef.current !== undefined &&
+          shouldRefreshForVoter(rosterRef.current, phone, name, askedVotersRef.current)
+        ) {
+          askedVotersRef.current.add(phone.trim());
+          rosterRefreshRef.current?.request();
+        }
+      });
       // אירועי ההקשה הגולמיים מהטלפון — שני שימושים:
       //   1. שלט המנחה: כל לחיצה של המנחה היא פקודה (0–6), בכל שלב במשחק —
       //      גם כשאין חלון הצבעה פתוח, וגם לחיצות חוזרות על אותו מקש.
