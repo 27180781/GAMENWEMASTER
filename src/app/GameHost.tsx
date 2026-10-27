@@ -40,6 +40,7 @@ import {
   canSaveReport,
   desktopSaveReport,
   desktopOpenReports,
+  desktopQueueResult,
   canQuit,
   desktopQuit,
   onClickerEvent,
@@ -1036,13 +1037,28 @@ export function GameHost({
             groupBonusRef.current,
           );
           await saveDiskBackup(diskBackupKey(engine.getGame()), payload, true);
+          // והתוצאות למערכת, כדי שיופיעו ב«האירועים שלי» כמו משחק טלפונים: לתור
+          // בדיסק, ומשם כשיש רשת (electron/resultUpload.cjs). לא בהרצת דמה, ולא
+          // במשחק שנבנה במחשב (אין לו מזהה במערכת — התור דוחה אותו). המזהה של
+          // ההפעלה הוא זמן ההתחלה, ולכן המשך מגיבוי שהגיע שוב לסוף אינו כפילות.
+          if (!syntheticCrowd) {
+            void desktopQueueResult({
+              gameId: engine.getGame().id,
+              runId: `exe-${startedAtRef.current}`,
+              startedAt: startedAtRef.current,
+              endedAt: Date.now(),
+              gameState: { users: payload.users, questions: payload.questions, groups: payload.groups, meta: payload.meta },
+            }).then((queued) => {
+              if (queued) debugLog('game', 'התוצאות נכנסו לתור השליחה למערכת');
+            });
+          }
         }
         debugLog('game', 'המשחק הסתיים — הגיבוי ננעל והועבר לתוצאות');
       } catch (err) {
         debugLog('game', `סיום משחק (game-over) נכשל (${String(err)})`);
       }
     })();
-  }, [backupCfg, diskBackup, stage, game.id, engine, nameOf]);
+  }, [backupCfg, diskBackup, syntheticCrowd, stage, game.id, engine, nameOf]);
 
   // סוף משחק → קובץ אקסל סיכום (משתתפים/שאלות/קבוצות). פעם אחת בלבד, ורק במסך
   // המנצחים האמיתי (לא תצוגה מקדימה של W). אופליין (EXE): שמירה לדיסק בתיקיית
@@ -1064,13 +1080,13 @@ export function GameHost({
     const g = engine.getGame();
     if (canReportToDisk) {
       void buildGameReportBytes(g, engine.getState(), rosterRef.current, nameOf, groupBonusRef.current)
-        .then((bytes) => desktopSaveReport(reportFilename(g), bytes))
+        .then((bytes) => desktopSaveReport(reportFilename(g, new Date(startedAtRef.current)), bytes))
         .then((saved) => {
           if (saved !== null) debugLog('game', `קובץ תוצאות נשמר: ${saved}`);
         })
         .catch((err) => debugLog('game', `שמירת קובץ תוצאות נכשלה (${String(err)})`));
     } else {
-      void downloadGameReport(g, engine.getState(), rosterRef.current, nameOf, groupBonusRef.current).catch((err) =>
+      void downloadGameReport(g, engine.getState(), rosterRef.current, nameOf, groupBonusRef.current, startedAtRef.current).catch((err) =>
         debugLog('game', `יצירת קובץ סיכום נכשלה (${String(err)})`),
       );
     }
@@ -1078,7 +1094,7 @@ export function GameHost({
 
   /** הורדת קובץ התוצאות כמו שהוא עכשיו — מתפריט המפעיל (אונליין). */
   const downloadReportNow = useCallback(() => {
-    void downloadGameReport(engine.getGame(), engine.getState(), rosterRef.current, nameOf, groupBonusRef.current).catch(
+    void downloadGameReport(engine.getGame(), engine.getState(), rosterRef.current, nameOf, groupBonusRef.current, startedAtRef.current).catch(
       (err) => debugLog('game', `יצירת קובץ סיכום נכשלה (${String(err)})`),
     );
   }, [engine, nameOf]);
@@ -1096,7 +1112,7 @@ export function GameHost({
     try {
       const g = engine.getGame();
       const bytes = await buildGameReportBytes(g, engine.getState(), rosterRef.current, nameOf, groupBonusRef.current);
-      const saved = await desktopSaveReport(reportFilename(g), bytes);
+      const saved = await desktopSaveReport(reportFilename(g, new Date(startedAtRef.current)), bytes);
       if (saved !== null) {
         setReportSavedAt(Date.now());
         return true;
@@ -2001,7 +2017,7 @@ export function GameHost({
           const g = engine.getGame();
           void buildGameReportBytes(g, engine.getState(), rosterRef.current, (id) => nameOfRef.current(id), groupBonusRef.current)
             .then((bytes) =>
-              controlRef.current?.post({ t: 'reportFile', id: msg.id, name: reportFilename(g), bytes }),
+              controlRef.current?.post({ t: 'reportFile', id: msg.id, name: reportFilename(g, new Date(startedAtRef.current)), bytes }),
             )
             .catch((err) => debugLog('game', `יצירת קובץ סיכום נכשלה (${String(err)})`));
           break;

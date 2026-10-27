@@ -59,7 +59,9 @@ import {
   gameLibraryDelete,
   downloadGameByCode,
   onDownloadProgress,
+  canSaveReport,
   canStreamMedia,
+  desktopOpenReports,
   desktopMediaClear,
   desktopLoadSavedGame,
   desktopCheckGameSignature,
@@ -1810,6 +1812,11 @@ export function App() {
                   onClick={() => setShowSeal(true)}
                 >
                   🔏 חתום EXE — סגירת משחק לקובץ בודד
+                </button>
+              )}
+              {canSaveReport() && (
+                <button type="button" className="offline-open-clear" onClick={() => desktopOpenReports()}>
+                  📊 תוצאות של משחקים קודמים
                 </button>
               )}
               {canStreamMedia() && (
