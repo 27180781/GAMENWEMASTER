@@ -36,6 +36,7 @@ import { SchemaFields } from './SchemaFields.tsx';
 import { describeObject } from '../app/schemaForm.ts';
 import { functionConfigSchema } from '../engine/schema.ts';
 import type { SlideType } from '../engine/index.ts';
+import { askConfirm } from './ConfirmDialog.tsx';
 
 /** שדות ההגדרה של שקופית "פעולת מערכת" — נגזרים מהסכימה פעם אחת. */
 const FUNCTION_FIELDS = describeObject(functionConfigSchema);
@@ -416,7 +417,11 @@ export function SlideList({
                     className="se-del"
                     disabled={game.questions.length <= 1 || lockedAt(i)}
                     onClick={() => {
-                      if (window.confirm('למחוק את השקופית?')) onChange(removeSlide(game, i));
+                      void askConfirm('למחוק את השקופית?', { confirmLabel: 'מחיקה', danger: true }).then(
+                        (ok) => {
+                          if (ok) onChange(removeSlide(game, i));
+                        },
+                      );
                     }}
                   >
                     🗑

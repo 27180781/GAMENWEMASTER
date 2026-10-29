@@ -33,6 +33,7 @@ import { insertImportedQuestions, type ImportedQuestion } from '../app/questionI
 import { ImportExcelDialog } from './ImportExcelDialog.tsx';
 import { LicenseFields } from './NewGameDialog.tsx';
 import { applyLicense, licenseFromGame, licenseProblem } from '../app/gameLicense.ts';
+import { askConfirm } from './ConfirmDialog.tsx';
 
 /** עץ השדות נגזר פעם אחת — הסכימה קבועה לאורך חיי התוכנה. */
 const SETTING_FIELDS = describeObject(globalSettingsSchema);
@@ -73,12 +74,12 @@ function GameTools({ game, onChange }: { game: GameFile; onChange: (g: GameFile)
   const [score, setScore] = useState('');
   const votable = game.questions.filter((q) => VOTABLE_TYPES.has(q.type)).length;
 
-  const applyAll = () => {
+  const applyAll = async () => {
     const values: { timeForQue?: number; scoreForQue?: number } = {};
     if (time.trim() !== '') values.timeForQue = Number(time);
     if (score.trim() !== '') values.scoreForQue = Number(score);
     if (values.timeForQue === undefined && values.scoreForQue === undefined) return;
-    if (!window.confirm(`להחיל על ${votable} השקופיות המצביעות? הערכים הקיימים יידרסו.`)) return;
+    if (!(await askConfirm(`להחיל על ${votable} השקופיות המצביעות? הערכים הקיימים יידרסו.`))) return;
     onChange(applyToAllSlides(game, values));
     setTime('');
     setScore('');
@@ -91,9 +92,9 @@ function GameTools({ game, onChange }: { game: GameFile; onChange: (g: GameFile)
         className="ge-tool"
         disabled={votable < 2}
         onClick={() => {
-          if (window.confirm('לערבב את סדר השאלות? אי אפשר לבטל.')) {
-            onChange(shuffleSlides(game));
-          }
+          void askConfirm('לערבב את סדר השאלות? אי אפשר לבטל.').then((ok) => {
+            if (ok) onChange(shuffleSlides(game));
+          });
         }}
       >
         🔀 ערבוב סדר השאלות
@@ -121,7 +122,7 @@ function GameTools({ game, onChange }: { game: GameFile; onChange: (g: GameFile)
           type="button"
           className="ge-tool"
           disabled={votable === 0 || (time.trim() === '' && score.trim() === '')}
-          onClick={applyAll}
+          onClick={() => void applyAll()}
         >
           החל על כל השקופיות
         </button>
@@ -215,8 +216,13 @@ export function GameEditor({ game, onApply, onClose, licenseEditable = false }: 
     onApply(draft); // מהרגע הזה גם המשחק שבזיכרון הוא המעודכן
   };
 
-  const close = () => {
-    if (dirty && !window.confirm('יש שינויים שלא נשמרו. לצאת בלי לשמור?')) return;
+  const close = async () => {
+    if (
+      dirty &&
+      !(await askConfirm('יש שינויים שלא נשמרו. לצאת בלי לשמור?', { confirmLabel: 'יציאה בלי לשמור' }))
+    ) {
+      return;
+    }
     onClose();
   };
 
@@ -274,7 +280,7 @@ export function GameEditor({ game, onApply, onClose, licenseEditable = false }: 
         >
           {save.kind === 'saving' ? 'שומר…' : '💾 שמור לקובץ המשחק'}
         </button>
-        <button type="button" className="editor-close" onClick={close}>
+        <button type="button" className="editor-close" onClick={() => void close()}>
           ✕ סגירה
         </button>
       </header>
