@@ -28,6 +28,7 @@ import { SealScreen } from '../render/SealScreen.tsx';
 import { GameEditor } from '../render/GameEditor.tsx';
 import { GuideButton, GuideScreen } from '../render/GuideScreen.tsx';
 import { GateChange, GateSetup, GateUnlock } from '../render/GateDialog.tsx';
+import { askConfirm } from '../render/ConfirmDialog.tsx';
 import { NewGameDialog } from '../render/NewGameDialog.tsx';
 import { DeviceNotices, DevicePanel, type DeviceNotice } from '../render/DevicePanel.tsx';
 import { DeviceLockScreen } from '../render/DeviceLockScreen.tsx';
@@ -930,7 +931,9 @@ export function App() {
     const question = g.local
       ? `למחוק את המשחק "${g.name || 'ללא שם'}"? הוא נבנה במחשב הזה ואין לו עותק באתר, ולכן אי אפשר יהיה לשחזר אותו.`
       : `למחוק את המשחק ${g.code} מהמחשב? אפשר יהיה להוריד אותו שוב עם הקוד.`;
-    if (!window.confirm(question)) return;
+    if (!(await askConfirm(question, { title: 'מחיקת משחק', confirmLabel: 'מחיקה', danger: true }))) {
+      return;
+    }
     await gameLibraryDelete(g.code);
     refreshLibrary();
   };
@@ -1349,13 +1352,14 @@ export function App() {
   }, [game]);
 
   /** "עדכון" / "הורדה" / "טעינת העדכון" שהמפעיל ביקש — כמו קוד שהוקלד. */
-  const loadDelivered = (item: DeliveryItem) => {
+  const loadDelivered = async (item: DeliveryItem) => {
     if (item.game.code === null) return;
     if (
       (item.edited || (item.targetOnScreen && item.screenEdited)) &&
-      !window.confirm(
+      !(await askConfirm(
         `העותק של "${item.game.name || 'המשחק'}" במחשב נערך כאן. טעינת העדכון תחליף אותו, והשינויים שנעשו במחשב יימחקו. להמשיך?`,
-      )
+        { confirmLabel: 'טעינת העדכון', danger: true },
+      ))
     ) {
       return;
     }
@@ -1533,7 +1537,7 @@ export function App() {
                       void openFromLibrary(code);
                     }}
                     onOpen={(item) => guard('החלפת המשחק', () => void openDelivered(item, false))}
-                    onLoad={loadDelivered}
+                    onLoad={(item) => void loadDelivered(item)}
                     onCancel={stopDeviceDownload}
                   />
                 ),
@@ -1867,7 +1871,7 @@ export function App() {
               onSync={() => void deviceSyncNow()}
               onRename={(name) => guard('שינוי שם המחשב', () => void deviceRename(name))}
               onOpen={(item) => guard('החלפת המשחק', () => void openDelivered(item, false))}
-              onLoad={loadDelivered}
+              onLoad={(item) => void loadDelivered(item)}
               onCancel={stopDeviceDownload}
             />
           )}

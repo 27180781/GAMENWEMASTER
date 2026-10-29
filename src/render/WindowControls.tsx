@@ -17,6 +17,7 @@ import {
   setWindowFullscreen,
 } from '../app/clickerBridge.ts';
 import { canMinimize, windowMode } from '../app/windowMode.ts';
+import { askConfirm } from './ConfirmDialog.tsx';
 
 /** מצב מסך-מלא + הפעולות עליו, לפי הסביבה שבה רצים. */
 export function useWindowMode() {
@@ -101,7 +102,9 @@ export function FloatingWindowControls() {
           className="win-btn win-btn--close"
           title="סגירת התוכנה"
           onClick={() => {
-            if (window.confirm('לסגור את התוכנה?')) desktopQuit();
+            void askConfirm('לסגור את התוכנה?', { confirmLabel: 'סגירה' }).then((ok) => {
+              if (ok) desktopQuit();
+            });
           }}
         >
           ✕

@@ -165,6 +165,7 @@ import { DebugOverlay } from '../render/DebugOverlay.tsx';
 import { debugLog } from './debugLog.ts';
 import { useEngineState } from './useEngineState.ts';
 import { betResultsCloseDelayMs, narrationSafeDelayMs } from './narrationWait.ts';
+import { askConfirm } from '../render/ConfirmDialog.tsx';
 
 type HostStage = 'opening' | 'playing' | 'winners' | 'scoreboard';
 
@@ -3098,9 +3099,12 @@ export function GameHost({
         goBack();
       } else if (event.key === 'Backspace') {
         event.preventDefault();
-        if (stage === 'playing' && window.confirm('לחזור שקופית שלמה אחורה?')) {
-          debugLog('command', 'BACK — שקופית שלמה אחורה');
-          engine.dispatch({ type: 'BACK', at: Date.now() });
+        if (stage === 'playing') {
+          void askConfirm('לחזור שקופית שלמה אחורה?').then((ok) => {
+            if (!ok) return;
+            debugLog('command', 'BACK — שקופית שלמה אחורה');
+            engine.dispatch({ type: 'BACK', at: Date.now() });
+          });
         }
       } else if (event.code === 'KeyR' || event.key === 'r' || event.key === 'R') {
         event.preventDefault();

@@ -24,6 +24,7 @@ import { readSheet } from '../app/xlsxRead.ts';
 import { SheetFileError } from '../app/xlsRead.ts';
 import { buildXlsxBlob, downloadBlob } from '../app/xlsx.ts';
 import { desktopSaveFileAs } from '../app/clickerBridge.ts';
+import { askConfirm } from './ConfirmDialog.tsx';
 
 interface ImportExcelDialogProps {
   game: GameFile;
@@ -59,10 +60,12 @@ export function ImportExcelDialog({ game, selected, onImport, onClose }: ImportE
   const canInsertAfter = selected < game.questions.length - 1;
 
   /** סגירה בלי יבוא — כמו בבונה, שואלים קודם אם כבר נטענו שאלות. */
-  const requestClose = useCallback(() => {
+  const requestClose = useCallback(async () => {
     if (
       questions.length > 0 &&
-      !window.confirm(`טענת ${questions.length} שאלות שלא יובאו. לסגור ולאבד את הקובץ?`)
+      !(await askConfirm(`טענת ${questions.length} שאלות שלא יובאו. לסגור ולאבד את הקובץ?`, {
+        confirmLabel: 'סגירה',
+      }))
     ) {
       return;
     }
@@ -73,7 +76,7 @@ export function ImportExcelDialog({ game, selected, onImport, onClose }: ImportE
   useEffect(() => {
     closeRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') requestClose();
+      if (e.key === 'Escape') void requestClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -124,7 +127,7 @@ export function ImportExcelDialog({ game, selected, onImport, onClose }: ImportE
   return (
     <div
       className="sa-backdrop"
-      onClick={requestClose}
+      onClick={() => void requestClose()}
       role="presentation"
       // קובץ שנזרק ליד אזור הגרירה לא אמור לפתוח אותו בחלון התוכנה במקום העורך
       onDragOver={(e) => e.preventDefault()}
@@ -148,7 +151,7 @@ export function ImportExcelDialog({ game, selected, onImport, onClose }: ImportE
             ref={closeRef}
             type="button"
             className="sa-close"
-            onClick={requestClose}
+            onClick={() => void requestClose()}
             title="סגירה"
           >
             ✕

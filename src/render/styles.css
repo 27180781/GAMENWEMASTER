@@ -3451,6 +3451,10 @@ body {
 .gate-plain { border: 2px solid #cfd4e2; background: #fff; color: #4b5165; }
 .gate-plain:hover { border-color: #6c5ce7; color: #6c5ce7; }
 .gate-note { margin: 2px 0 0; font-size: 12.5px; line-height: 1.55; color: #7a8095; }
+/* askConfirm (ConfirmDialog.tsx): מעל כל חלון אחר, כי הוא נפתח גם מתוך העורך ומתוך המשחק. */
+.gate-backdrop:has(> .confirm-box) { z-index: 100; }
+.confirm-message { white-space: pre-line; font-size: 16px; color: #2f3446; }
+.gate-primary.confirm-danger { background: #d33a4e; }
 
 /* ---- משחק חדש מאפס (NewGameDialog) ושדות הרישיון שלו ---- */
 .offline-open-new {

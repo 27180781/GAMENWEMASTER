@@ -34,6 +34,7 @@ import { groupBonusOf, normalizeDelta } from '../engine/scoreAdjust.ts';
 import { importSheet, summaryText, type ImportMode } from '../app/rosterImport.ts';
 import { readSheetRows } from '../app/xlsxRead.ts';
 import { clickerSaveLines, type ClickerSaveView } from '../app/clickerSave.ts';
+import { askConfirm } from './ConfirmDialog.tsx';
 
 interface RosterPanelProps {
   roster: RosterData;
@@ -199,7 +200,7 @@ export function RosterPanel({
   const canReassign =
     onReassign !== undefined && roster.players.some((p) => p.pressed !== undefined || p.name.trim() === '');
 
-  const confirmReassign = () => {
+  const confirmReassign = async () => {
     const preview = reassignRoster(roster);
     if (preview.cleared === 0 || onReassign === undefined) return;
     const unnamed = preview.cleared - preview.returned;
@@ -214,7 +215,7 @@ export function RosterPanel({
     if (preview.released.length > 0) {
       lines.push('מספרים שנשמרו במערכת מהלחיצות יימחקו גם שם. מספרים שהוקלדו במערכת לא ישתנו.');
     }
-    if (!window.confirm(`שיוך מחדש\n\n${lines.join('\n')}\n\nלהמשיך?`)) return;
+    if (!(await askConfirm(`${lines.join('\n')}\n\nלהמשיך?`, { title: 'שיוך מחדש' }))) return;
     onReassign();
     setImportMsg({
       ok: true,
@@ -290,7 +291,7 @@ export function RosterPanel({
                     className="roster-reassign-btn"
                     onClick={(e) => {
                       e.currentTarget.blur();
-                      confirmReassign();
+                      void confirmReassign();
                     }}
                     title="מחזיר לתור את השמות שקיבלו שלט בלחיצה, כדי לשייך מההתחלה"
                   >
