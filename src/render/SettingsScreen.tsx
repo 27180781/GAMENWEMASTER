@@ -19,6 +19,7 @@ import {
 } from '../app/clickerBridge.ts';
 import { hostConsoleUrl, openHostConsole } from '../app/hostConsoleWindow.ts';
 import { MediaCachePanel } from './MediaCachePanel.tsx';
+import { phonesExpired, phonesUntilText } from '../app/gameLicense.ts';
 import { GuideButton } from './GuideScreen.tsx';
 
 interface SettingsScreenProps {
@@ -103,8 +104,14 @@ export function SettingsScreen({
   // עליו — רק דמה.
   const realSources = demoOnly === undefined;
   const canPickClickers = realSources && (sealConfig?.allowClickers ?? true) && (sources?.clickers ?? true);
+  // רישיון הטלפונים פג: החדר חזר למאגר ועלול להיות של לקוח אחר (gameLicense.ts).
+  const roomExpired = (game.room ?? '') !== '' && phonesExpired(game);
   const canPickPhones =
-    realSources && (game.room ?? '') !== '' && (sealConfig?.allowPhones ?? true) && (sources?.phones ?? true);
+    realSources &&
+    (game.room ?? '') !== '' &&
+    !roomExpired &&
+    (sealConfig?.allowPhones ?? true) &&
+    (sources?.phones ?? true);
   const [voterCount, setVoterCount] = useState(initial.voterCount);
   const [intervalMs, setIntervalMs] = useState(initial.intervalMs);
   const [hostVoterId, setHostVoterId] = useState(initial.hostVoterId);
@@ -628,6 +635,12 @@ export function SettingsScreen({
                 🔒 {demoOnly}
               </p>
             )}
+            {demoOnly === undefined && roomExpired && (sealConfig?.allowPhones ?? true) && (sources?.phones ?? true) && (
+              <p className="clicker-intro-locked" role="note">
+                📱 רישיון הטלפונים של המשחק הסתיים{phonesUntilText(game) ? ` ב-${phonesUntilText(game)}` : ''}, ולכן
+                אין כאן הצבעה מהטלפון. כדי לשחק עם טלפונים, חדשו את הרישיון והורידו את המשחק מחדש.
+              </p>
+            )}
 
             <div className="clicker-intro-actions">
               {canPickClickers && (
@@ -673,7 +686,6 @@ export function SettingsScreen({
               {advancedButton}
               {hostScreenLink}
               {pickAnotherLink}
-        {pastResultsLink}
               {pastResultsLink}
             </div>
           </div>

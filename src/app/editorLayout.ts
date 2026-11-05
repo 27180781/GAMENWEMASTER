@@ -36,9 +36,9 @@ export interface SettingsSection {
  * במקום הנכון — תפריט המפעיל (ESC).
  *
  * `hostVideo` (וידאו המנחה בחלון הצפייה) ו-`hostVideoStage` («במה») מגיעים
- * מהרישיון ואינם הגדרות של המשחק.
+ * מהרישיון ואינם הגדרות של המשחק, וכך גם `phonesUntil` (עד מתי החדר של המשחק).
  */
-export const HIDDEN_SETTINGS = ['limit', 'narration', 'hostVideo', 'hostVideoStage'];
+export const HIDDEN_SETTINGS = ['limit', 'narration', 'hostVideo', 'hostVideoStage', 'phonesUntil'];
 
 /**
  * הקבוצות, בסדר ובשמות של העורך המקוון. `titleThroughoutGame` ו-`logo` יושבים

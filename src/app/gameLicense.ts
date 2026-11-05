@@ -49,6 +49,37 @@ export function suggestRoomCode(rand: () => number = Math.random): string {
   return String(10000 + Math.floor(rand() * 90000));
 }
 
+/**
+ * רישיון הטלפונים של משחק שהורד מהמערכת פג (`setting.phonesUntil`): החדר כבר
+ * אינו של המשחק, ועלול להיות של לקוח אחר, ולכן אין להצביע אליו מהטלפון. חסר
+ * או לא תאריך = לא פג. `now` מוזרק לבדיקות.
+ */
+export function phonesExpired(game: Pick<GameFile, 'setting'>, now: number = Date.now()): boolean {
+  const until = game.setting.phonesUntil;
+  if (typeof until !== 'string' || until === '') return false;
+  const t = Date.parse(until);
+  return Number.isFinite(t) && now >= t;
+}
+
+/** התאריך שבו רישיון הטלפונים פג, לתצוגה (שעון ישראל), או null. */
+export function phonesUntilText(game: Pick<GameFile, 'setting'>): string | null {
+  const until = game.setting.phonesUntil;
+  const t = typeof until === 'string' ? Date.parse(until) : NaN;
+  if (!Number.isFinite(t)) return null;
+  try {
+    return new Intl.DateTimeFormat('he-IL', {
+      timeZone: 'Asia/Jerusalem',
+      day: 'numeric',
+      month: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(t));
+  } catch {
+    return new Date(t).toLocaleString('he-IL');
+  }
+}
+
 /** הרישיון כפי שהוא כתוב במשחק. ערך לא מוכר נקרא כקליקרים, כמו במנוע. */
 export function licenseFromGame(game: GameFile): GameLicense {
   const type = game.setting.limit.type;
