@@ -3773,7 +3773,8 @@ export function GameHost({
         )}
         {/* חיווי הריסיבר — רק כשהשלטים הם מקור הצבעות; במצב טלפונים/דמה ב-EXE
             תג "ממתין לריסיבר" היה מטעה. */}
-        {useClicker && <ClickerDiagnostic />}
+        {/* הודעת הלחיצות רק בלובי: בזמן השאלות היא מוקרנת מול הקהל. */}
+        {useClicker && <ClickerDiagnostic showPresses={stage === 'opening'} />}
       </Stage>
       </MediaPauseContext.Provider>
     </div>
