@@ -89,6 +89,7 @@ import {
 import { decodeSlideMedia } from './mediaDecode.ts';
 import { extractHostVote } from './hostRemote.ts';
 import { autoSkipDelayMs } from './autoSkip.ts';
+import { phonesExpired } from './gameLicense.ts';
 import { autoLeaderboardStep, completedQuestionCount } from './leaderboardSchedule.ts';
 import { questionSoundCovered, replayQuestionSound } from './questionSound.ts';
 import {
@@ -315,7 +316,11 @@ export function GameHost({
   // זמינים רק ב-EXE (`offline && isDesktopClicker`), כך שהמשחק האונליין —
   // שבו useClicker תמיד false — נשאר בדיוק כפי שהיה.
   const clickersAvailable = offline && isDesktopClicker();
-  const phonesAvailable = hasRoom;
+  // חדר של רישיון טלפונים שפג (setting.phonesUntil) כבר אינו של המשחק ועלול
+  // להיות של לקוח אחר: בלי טלפונים, גם כשההגדרות השמורות מבקשות אותם. נקבע
+  // פעם אחת כשהמשחק עולה, כדי שמשחק שרץ לא יאבד את הטלפונים באמצע.
+  const [roomExpired] = useState(() => phonesExpired(game));
+  const phonesAvailable = hasRoom && !roomExpired;
   const crowdEnabled = demoOnly || settings.crowdEnabled;
   const useClicker = !crowdEnabled && settings.voteClickers && clickersAvailable;
   const useSocket = !crowdEnabled && settings.votePhones && phonesAvailable;
