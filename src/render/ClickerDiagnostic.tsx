@@ -19,7 +19,12 @@ interface LastPress {
   at: number;
 }
 
-export function ClickerDiagnostic() {
+/**
+ * `showPresses` — הודעת "קליקר N · כפתור M" לכל לחיצה. במסכים שלפני המשחק
+ * (הגדרות, לובי) היא עוזרת לבדוק שהריסיבר קולט; בזמן השאלות היא רק מוקרנת
+ * מול הקהל, ולכן GameHost מכבה אותה אחרי הלובי (בקשת נסים 2026-11-05).
+ */
+export function ClickerDiagnostic({ showPresses = true }: { showPresses?: boolean } = {}) {
   // שני מקורות נפרדים במכוון: סטטוס הדונגל (rf317:event) וחיבור תוכנת הקליטה
   // לסוקט (rf317:client). הם מגיעים בזרמים נפרדים ובסדר לא מובטח — במיוחד
   // בשידור החוזר למנוי חדש — ולכן כל אחד נשמר בנפרד והטקסט נגזר משניהם, במקום
@@ -73,12 +78,16 @@ export function ClickerDiagnostic() {
   }, [last]);
 
   if (!isDesktopClicker()) return null;
+  // "מחוברת" אינה מוצגת: כשהשרשרת שבורה יש אזהרה אדומה, ולכן התג מופיע רק
+  // כשמשהו עדיין לא בסדר (ממתין / מנותקת). בקשת נסים 2026-11-05.
   return (
     <>
-      <div className={`clicker-badge${connected ? ' clicker-badge--on' : ''}`} dir="rtl">
-        🎯 {status}
-      </div>
-      {last !== null && (
+      {!connected && (
+        <div className="clicker-badge" dir="rtl">
+          🎯 {status}
+        </div>
+      )}
+      {showPresses && last !== null && (
         <div className="clicker-toast" dir="rtl">
           קליקר <b>{last.remoteId}</b> · כפתור <b>{last.button}</b>
         </div>
