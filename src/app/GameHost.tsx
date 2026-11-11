@@ -159,7 +159,7 @@ import { downloadGameReport, buildGameReportBytes, reportFilename } from './game
 import { buildFunctionPayload, sendFunctionApi } from './functionApi.ts';
 import { useConnectionHealth } from './useConnectionHealth.ts';
 import { planCrowdVotes, snapshotAt } from './syntheticVotes.ts';
-import { joinQrUrl, JOIN_DIAL_DISPLAY, type GameSettings } from './urlParams.ts';
+import { joinQrUrl, joinDialDisplay, type GameSettings } from './urlParams.ts';
 import { hostKeyHints } from './hostHints.ts';
 import { QrCode } from '../render/QrCode.tsx';
 import { DebugOverlay } from '../render/DebugOverlay.tsx';
@@ -333,6 +333,7 @@ export function GameHost({
   const qrAvailable = useSocket;
   const showQrCode = settings.showQr && qrAvailable;
   const qrUrl = joinQrUrl(roomId);
+  const joinDial = joinDialDisplay(game.setting.joinDial);
   const adapter = useMemo<VoteAdapter>(() => {
     if (isComposite)
       return new CompositeVoteAdapter([
@@ -3226,7 +3227,7 @@ export function GameHost({
       nameOf,
       roster,
       groupBonus,
-      join: { show: showJoinBanner, code: roomId, qrUrl: showQrCode ? qrUrl : null },
+      join: { show: showJoinBanner, code: roomId, qrUrl: showQrCode ? qrUrl : null, dial: joinDial },
       overlays: {
         leaders: leadersOverlay,
         votes: votesOverlay,
@@ -3287,7 +3288,7 @@ export function GameHost({
             הלובי (ראו LobbyScreen) כדי שיהיה ברור וגדול לקריאה. */}
         {showJoinBanner && stage !== 'opening' && (
           <div className="join-banner">
-            📞 להצטרפות למשחק חייגו <b>{JOIN_DIAL_DISPLAY}</b> והקישו את קוד המשחק:{' '}
+            📞 להצטרפות למשחק חייגו <b>{joinDial}</b> והקישו את קוד המשחק:{' '}
             <b className="join-banner-code">{roomId}</b>
             {showQrCode && <QrCode value={qrUrl} size={40} className="qr-banner" />}
           </div>
@@ -3367,7 +3368,7 @@ export function GameHost({
             engine={engine}
             players={connectedPlayers}
             {...(showQrCode ? { qrUrl } : {})}
-            {...(showJoinBanner ? { joinInfo: { dial: JOIN_DIAL_DISPLAY, code: roomId } } : {})}
+            {...(showJoinBanner ? { joinInfo: { dial: joinDial, code: roomId } } : {})}
           />
         )}
         {/* מקש X באמצע המשחק — אותו מסך התחברות, מאופס. תצוגה בלבד: המשחק
@@ -3378,7 +3379,7 @@ export function GameHost({
               engine={engine}
               players={connectedPlayers}
               {...(showQrCode ? { qrUrl } : {})}
-              {...(showJoinBanner ? { joinInfo: { dial: JOIN_DIAL_DISPLAY, code: roomId } } : {})}
+              {...(showJoinBanner ? { joinInfo: { dial: joinDial, code: roomId } } : {})}
             />
             <div className="lobby-overlay-hint">
               X — איפוס הרשימה · רווח — חזרה למשחק מאותה נקודה

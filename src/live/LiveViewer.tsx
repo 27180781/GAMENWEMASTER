@@ -24,7 +24,7 @@ import {
   type ReactNode,
 } from 'react';
 import { AudioManager, type SoundChannel } from '../app/AudioManager.ts';
-import { JOIN_DIAL_DISPLAY } from '../app/urlParams.ts';
+import { joinDialDisplay } from '../app/urlParams.ts';
 import { EMPTY_ROSTER, type RosterData } from '../app/roster.ts';
 import type { GameState } from '../engine/index.ts';
 import { setAvatarColorOverrides } from '../render/avatar.ts';
@@ -674,6 +674,7 @@ function LiveScreen({
   const stage = snap.stage;
   const overlays = snap.overlays;
   const join = snap.join;
+  const joinDial = joinDialDisplay(join.dial);
   const slide = engine.getCurrentSlide();
   const mediaStartedAt = snap.mediaAt === null ? null : toLocal(snap.mediaAt);
 
@@ -690,7 +691,7 @@ function LiveScreen({
               <Stage fit="parent">
                 {join.show && stage !== 'opening' && (
                   <div className="join-banner">
-                    📞 להצטרפות למשחק חייגו <b>{JOIN_DIAL_DISPLAY}</b> והקישו את קוד המשחק:{' '}
+                    📞 להצטרפות למשחק חייגו <b>{joinDial}</b> והקישו את קוד המשחק:{' '}
                     <b className="join-banner-code">{join.code}</b>
                     {join.qr !== '' && <QrCode value={join.qr} size={40} className="qr-banner" />}
                   </div>
@@ -701,7 +702,7 @@ function LiveScreen({
                     players={snap.lobby}
                     {...(join.qr !== '' ? { qrUrl: join.qr } : {})}
                     {...(join.show
-                      ? { joinInfo: { dial: JOIN_DIAL_DISPLAY, code: join.code } }
+                      ? { joinInfo: { dial: joinDial, code: join.code } }
                       : {})}
                   />
                 )}
@@ -712,7 +713,7 @@ function LiveScreen({
                       players={snap.lobby}
                       {...(join.qr !== '' ? { qrUrl: join.qr } : {})}
                       {...(join.show
-                        ? { joinInfo: { dial: JOIN_DIAL_DISPLAY, code: join.code } }
+                        ? { joinInfo: { dial: joinDial, code: join.code } }
                         : {})}
                     />
                   </div>

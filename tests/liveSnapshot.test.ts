@@ -166,6 +166,15 @@ describe('מצב המסך למסך הצפייה', () => {
     const snap = builder.build(input(engine));
     expect(snap.players.map((p) => p.name)).toEqual(['054••••567', '052••••543', '050••••233']);
     expect(snap.join).toEqual({ show: true, code: '2047', qr: 'https://join.example/?room=2047' });
+    // מספר החיוג של המסך הראשי עובר לקישור הצפייה, רק כשהבאנר מוצג
+    const withDial = builder.build(
+      input(engine, { join: { show: true, code: '2047', qrUrl: null, dial: '1700-111-948' } }),
+    );
+    expect(withDial.join).toEqual({ show: true, code: '2047', qr: '', dial: '1700-111-948' });
+    const hidden = builder.build(
+      input(engine, { join: { show: false, code: '2047', qrUrl: null, dial: '1700-111-948' } }),
+    );
+    expect(hidden.join).toEqual({ show: false, code: '', qr: '' });
   });
 
   it('בזמן ההצבעה: התשובה הנכונה, המונים ומי צדק — מוסתרים', () => {
