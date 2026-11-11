@@ -136,8 +136,8 @@ export function joinQrUrl(room: string): string {
 }
 
 /** מספר החיוג להצטרפות למשחקי טלפונים — גולמי (לחיוג) ותצוגה (מקובץ לקריאוּת). */
-export const JOIN_DIAL_NUMBER = '033064361';
-export const JOIN_DIAL_DISPLAY = '03-306-4361';
+export const JOIN_DIAL_NUMBER = '1700111948';
+export const JOIN_DIAL_DISPLAY = '1700-111-948';
 
 export const DEFAULT_AUTO_TRANSITION: AutoTransition = {
   showAnswersAfterQuestion: false,
