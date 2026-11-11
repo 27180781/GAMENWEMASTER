@@ -136,8 +136,23 @@ export function joinQrUrl(room: string): string {
 }
 
 /** מספר החיוג להצטרפות למשחקי טלפונים — גולמי (לחיוג) ותצוגה (מקובץ לקריאוּת). */
-export const JOIN_DIAL_NUMBER = '033064361';
-export const JOIN_DIAL_DISPLAY = '03-306-4361';
+export const JOIN_DIAL_NUMBER = '1700111948';
+export const JOIN_DIAL_DISPLAY = '1700-111-948';
+
+/**
+ * מספר החיוג שמוצג במשחק: `setting.joinDial` כשמערכת יצירת המשחקים שולחת אותו
+ * (ההגדרה «מספר החיוג להצטרפות» ב«הגדרות מערכת» שם, כך שמחליפים את המספר במקום
+ * אחד בלי גרסת מנוע חדשה), ואחרת המספר הקבוע למעלה. חבילת אופליין אינה נושאת
+ * אותו, ולכן תוכנת ההרצה מציגה את המספר שבגרסה שלה. ערך שאינו מספר טלפון (7–15
+ * ספרות, עם מקפים או רווחים בלבד) נזרק.
+ */
+export function joinDialDisplay(joinDial: unknown): string {
+  if (typeof joinDial !== 'string') return JOIN_DIAL_DISPLAY;
+  const value = joinDial.trim();
+  if (!/^[0-9][0-9 -]*[0-9]$/.test(value)) return JOIN_DIAL_DISPLAY;
+  const digits = value.replace(/\D/g, '').length;
+  return digits >= 7 && digits <= 15 ? value : JOIN_DIAL_DISPLAY;
+}
 
 export const DEFAULT_AUTO_TRANSITION: AutoTransition = {
   showAnswersAfterQuestion: false,

@@ -577,6 +577,13 @@ export const globalSettingsSchema = z.object({
    */
   phonesUntil: z.string().optional().catch(undefined),
   /**
+   * מספר החיוג להצטרפות למשחקי טלפונים, לתצוגה («1700-111-948»). מערכת יצירת
+   * המשחקים שולחת אותו ב-JSON של משחק עם חדר, מתוך הגדרה אחת שם, כדי שהחלפת
+   * הקו לא תחכה לגרסת מנוע. חסר או פגום = JOIN_DIAL_DISPLAY (joinDialDisplay
+   * ב-src/app/urlParams.ts).
+   */
+  joinDial: z.string().optional().catch(undefined),
+  /**
    * סוג המשחק. חסר/לא מוכר = 'classic' — המשחק הרגיל, בדיוק כפי שהיה. סוגים
    * נוספים מוסיפים שכבת חוויה מעל אותו מנוע שאלות (ראו gameTypeSettings).
    */

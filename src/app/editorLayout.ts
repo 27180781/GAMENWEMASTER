@@ -37,8 +37,9 @@ export interface SettingsSection {
  *
  * `hostVideo` (וידאו המנחה בחלון הצפייה) ו-`hostVideoStage` («במה») מגיעים
  * מהרישיון ואינם הגדרות של המשחק, וכך גם `phonesUntil` (עד מתי החדר של המשחק).
+ * `joinDial` (מספר החיוג להצטרפות) מגיע מהגדרה כללית של מערכת יצירת המשחקים.
  */
-export const HIDDEN_SETTINGS = ['limit', 'narration', 'hostVideo', 'hostVideoStage', 'phonesUntil'];
+export const HIDDEN_SETTINGS = ['limit', 'narration', 'hostVideo', 'hostVideoStage', 'phonesUntil', 'joinDial'];
 
 /**
  * הקבוצות, בסדר ובשמות של העורך המקוון. `titleThroughoutGame` ו-`logo` יושבים

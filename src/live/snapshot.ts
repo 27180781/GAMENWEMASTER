@@ -67,7 +67,8 @@ export interface LiveHostInput {
   nameOf: (voterId: string) => string;
   roster: RosterData;
   groupBonus: Record<string, number>;
-  join: { show: boolean; code: string; qrUrl: string | null };
+  /** dial: מספר החיוג שהמסך הראשי מציג (setting.joinDial), כדי שקישור הצפייה יציג את אותו מספר. */
+  join: { show: boolean; code: string; qrUrl: string | null; dial?: string };
   overlays: {
     leaders: boolean;
     votes: boolean;
@@ -516,6 +517,7 @@ export class LiveSnapshotBuilder {
         show: input.join.show,
         code: input.join.show ? input.join.code : '',
         qr: input.join.show && input.join.qrUrl !== null ? input.join.qrUrl : '',
+        ...(input.join.show && input.join.dial !== undefined ? { dial: input.join.dial } : {}),
       },
       overlays,
       winnersRevealed: input.winnersRevealed,

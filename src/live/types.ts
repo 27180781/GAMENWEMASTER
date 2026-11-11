@@ -131,7 +131,8 @@ export interface LiveSnapshot {
   players: RailPlayer[];
   leaders: RailPlayer[];
   lobby: RailPlayer[];
-  join: { show: boolean; code: string; qr: string };
+  /** dial: מספר החיוג של המסך הראשי; חסר (מסך ראשי ישן) = JOIN_DIAL_DISPLAY. */
+  join: { show: boolean; code: string; qr: string; dial?: string };
   overlays: LiveOverlays;
   winnersRevealed: number;
   scoresPage: number;
