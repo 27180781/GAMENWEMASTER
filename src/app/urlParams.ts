@@ -182,49 +182,104 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
 };
 
 /**
- * דריסת המעברים האוטומטיים נשמרת ב-localStorage לפי מזהה המשחק — כך שהעדפת
- * המפעיל נשמרת בין רענונים, ומשחק חדש (id אחר) חוזר לברירת המחדל שלו מה-JSON.
+ * דריסת המעברים האוטומטיים של המפעיל נשמרת ב-localStorage לפי מזהה המשחק, כדי
+ * שבחירה שעשה במסך ההגדרות תישמר בין רענונים.
+ *
+ * לצד הבחירה נשמר גם מה שהיה בקובץ המשחק באותו רגע (`file`). כשההגדרה בבונה
+ * משתנה אחר כך, הקובץ כבר אינו זהה ל-`file` והדריסה נמחקת: שינוי בבונה תמיד
+ * מגיע להפעלה. עד 2026-11 כל «התחל» שמר עותק של ההגדרות גם כשהמפעיל לא נגע בהן,
+ * בלי `file`, ומאותו רגע ההגדרה מהבונה לא הגיעה יותר לאותו דפדפן (המשחק «שבת
+ * התאחדות», 2026-11-12). לכן הדריסות הישנות (המפתח בלי `v2`) נמחקות, ושמירה של
+ * ערך שזהה לקובץ מוחקת את הדריסה במקום לשמור אותה.
  */
-const AUTO_TRANSITION_KEY = (gameId: string) => `trivia:autoTransition:${gameId}`;
+const LEGACY_AUTO_TRANSITION_KEY = (gameId: string) => `trivia:autoTransition:${gameId}`;
+const AUTO_TRANSITION_KEY = (gameId: string) => `trivia:autoTransition:v2:${gameId}`;
 
+/** צורה קבועה (סדר מפתחות וטיפוסים) — להשוואה ולשמירה. */
+function normalizeAutoTransition(
+  raw: Partial<AutoTransition> | undefined,
+  defaults: AutoTransition = DEFAULT_AUTO_TRANSITION,
+): AutoTransition {
+  const r = raw ?? {};
+  const media = r.media === undefined ? defaults.media : r.media;
+  return {
+    showAnswersAfterQuestion: Boolean(r.showAnswersAfterQuestion),
+    startTimerAfterLastAnswer: Boolean(r.startTimerAfterLastAnswer),
+    showCorrectAnswerAfterTimer: Boolean(r.showCorrectAnswerAfterTimer),
+    nextSlide: {
+      active: Boolean(r.nextSlide?.active),
+      seconds: Number(r.nextSlide?.seconds) || 6,
+    },
+    media: {
+      image: {
+        active: Boolean(media?.image?.active),
+        seconds: Number(media?.image?.seconds) || 5,
+      },
+      video: {
+        playToEnd: Boolean(media?.video?.playToEnd),
+      },
+    },
+  };
+}
+
+function sameAutoTransition(a: AutoTransition, b: AutoTransition): boolean {
+  return JSON.stringify(normalizeAutoTransition(a)) === JSON.stringify(normalizeAutoTransition(b));
+}
+
+function removeKey(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    /* localStorage לא זמין — מתעלמים */
+  }
+}
+
+/**
+ * הדריסה של המפעיל למשחק הזה, או null כשאין (ואז חלה ההגדרה מהקובץ). דריסה
+ * שנשמרה מול הגדרה אחרת בקובץ (הבונה שונה מאז) נמחקת ומחזירה null.
+ */
 export function loadAutoTransition(
   gameId: string,
-  defaults: AutoTransition = DEFAULT_AUTO_TRANSITION,
+  fileValue: AutoTransition = DEFAULT_AUTO_TRANSITION,
 ): AutoTransition | null {
+  removeKey(LEGACY_AUTO_TRANSITION_KEY(gameId));
   try {
     const raw = localStorage.getItem(AUTO_TRANSITION_KEY(gameId));
     if (raw === null) return null;
-    const parsed = JSON.parse(raw) as Partial<AutoTransition>;
-    return {
-      showAnswersAfterQuestion: Boolean(parsed.showAnswersAfterQuestion),
-      startTimerAfterLastAnswer: Boolean(parsed.startTimerAfterLastAnswer),
-      showCorrectAnswerAfterTimer: Boolean(parsed.showCorrectAnswerAfterTimer),
-      nextSlide: {
-        active: Boolean(parsed.nextSlide?.active),
-        seconds: Number(parsed.nextSlide?.seconds) || 6,
-      },
-      // דריסה שנשמרה לפני שנוסף מעבר-מדיה — לא "מכבים" את מה שהוגדר בקובץ
-      // המשחק, אלא נופלים לברירת המחדל שלו (defaults).
-      media: parsed.media === undefined
-        ? defaults.media
-        : {
-            image: {
-              active: Boolean(parsed.media.image?.active),
-              seconds: Number(parsed.media.image?.seconds) || 5,
-            },
-            video: {
-              playToEnd: Boolean(parsed.media.video?.playToEnd),
-            },
-          },
-    };
+    const parsed = JSON.parse(raw) as { file?: Partial<AutoTransition>; value?: Partial<AutoTransition> };
+    if (parsed === null || typeof parsed !== 'object' || parsed.file === undefined || parsed.value === undefined) {
+      removeKey(AUTO_TRANSITION_KEY(gameId));
+      return null;
+    }
+    if (!sameAutoTransition(normalizeAutoTransition(parsed.file), fileValue)) {
+      removeKey(AUTO_TRANSITION_KEY(gameId));
+      return null;
+    }
+    return normalizeAutoTransition(parsed.value, fileValue);
   } catch {
     return null;
   }
 }
 
-export function saveAutoTransition(gameId: string, value: AutoTransition): void {
+/**
+ * שמירת הבחירה של המפעיל. ערך שזהה למה שבקובץ אינו דריסה, ולכן מוחק את מה
+ * שנשמר — כך «התחל» בלי שינוי לא נועל את ההגדרה מהבונה.
+ */
+export function saveAutoTransition(
+  gameId: string,
+  value: AutoTransition,
+  fileValue: AutoTransition = DEFAULT_AUTO_TRANSITION,
+): void {
+  removeKey(LEGACY_AUTO_TRANSITION_KEY(gameId));
+  if (sameAutoTransition(value, fileValue)) {
+    removeKey(AUTO_TRANSITION_KEY(gameId));
+    return;
+  }
   try {
-    localStorage.setItem(AUTO_TRANSITION_KEY(gameId), JSON.stringify(value));
+    localStorage.setItem(
+      AUTO_TRANSITION_KEY(gameId),
+      JSON.stringify({ file: normalizeAutoTransition(fileValue), value: normalizeAutoTransition(value, fileValue) }),
+    );
   } catch {
     /* localStorage לא זמין — מתעלמים */
   }
