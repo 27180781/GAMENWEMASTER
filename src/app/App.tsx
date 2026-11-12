@@ -599,8 +599,8 @@ export function App() {
   );
 
   // בטעינת משחק — טוענים את המעברים האוטומטיים מברירת המחדל שב-JSON, אלא אם
-  // נשמרה דריסה ב-localStorage למשחק הזה (id). כך ההעדפה נשמרת בין רענונים,
-  // ומשחק חדש חוזר לברירת המחדל שלו.
+  // המפעיל שינה אותם במסך ההגדרות למשחק הזה (id) וההגדרה בקובץ לא השתנתה מאז.
+  // כך ההעדפה נשמרת בין רענונים, ושינוי בבונה תמיד מגיע להפעלה.
   useEffect(() => {
     if (pendingGame === null) return;
     const at =
@@ -644,8 +644,10 @@ export function App() {
   /** עדכון הגדרות + שמירת דריסת המעברים האוטומטיים ל-localStorage (פעולת מפעיל). */
   const persistAndSetSettings = useCallback(
     (next: GameSettings) => {
-      const id = game?.id ?? pendingGame?.id;
-      if (id !== undefined) saveAutoTransition(id, next.autoTransition);
+      const current = game ?? pendingGame;
+      if (current !== null) {
+        saveAutoTransition(current.id, next.autoTransition, current.setting.autoTransition);
+      }
       setSettings(next);
     },
     [game, pendingGame],
