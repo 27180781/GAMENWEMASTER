@@ -289,7 +289,7 @@ describe('טופס הפעולה נגזר מהסכימה', () => {
     const action = nodes.find((n) => n.key === 'action');
     expect(action?.kind).toBe('enum');
     const options = action?.kind === 'enum' ? action.options : [];
-    expect(options.map((o) => o.value)).toEqual(['api', 'screen', 'score', 'players']);
+    expect(options.map((o) => o.value)).toEqual(['api', 'screen', 'score', 'players', 'restore_players']);
     // התוויות בעברית — לא שמות השדות באנגלית
     for (const o of options) expect(o.label).not.toBe(o.value);
   });

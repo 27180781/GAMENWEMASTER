@@ -107,6 +107,11 @@ export interface BackupMeta {
    */
   removedIds?: string[];
   /**
+   * הניקוד שהיה לכל אחד מהם ברגע ההסרה — איתו הוא חוזר בשקופית «החזרת כל
+   * המשתתפים» (function · restore_players). best-effort כמו removedIds.
+   */
+  removedScores?: Record<string, number>;
+  /**
    * בונוסים ידניים לקבוצות (ראו scoreAdjust.ts) — כדי שתיקון שהמנחה עשה
    * באמצע אירוע ישרוד קריסה. best-effort, כמו removedIds: שרת שמשמיט את
    * ה-meta פשוט מאבד אותם, ולא נופל.

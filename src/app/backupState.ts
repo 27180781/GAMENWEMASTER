@@ -32,6 +32,7 @@ export function buildBackupPayload(
   startedAt: number,
   removedIds: readonly string[] = [],
   groupBonus: Readonly<Record<string, number>> = {},
+  removedScores: Readonly<Record<string, number>> = {},
 ): BackupPayload {
   const correctBySlide = correctAnswersBySlide(game);
   const votesBySlide = state.votesBySlide;
@@ -116,6 +117,7 @@ export function buildBackupPayload(
       phase: state.phase,
       startedAt,
       ...(removedIds.length > 0 ? { removedIds: [...removedIds] } : {}),
+      ...(Object.keys(removedScores).length > 0 ? { removedScores: { ...removedScores } } : {}),
       ...(Object.keys(groupBonus).length > 0 ? { groupBonus: { ...groupBonus } } : {}),
       // הימורים והכרעות "הרוב קובע" — כדי ששחזור אחרי קריסה ידע גם אותם
       ...(Object.keys(state.betStakes).length > 0 ? { betStakes: structuredClone(state.betStakes) } : {}),
