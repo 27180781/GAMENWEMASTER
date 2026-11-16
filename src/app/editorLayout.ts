@@ -79,7 +79,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     id: 'scoring',
     title: 'ניקוד ומנצחים',
     icon: '🏆',
-    keys: ['multiWinners', 'winnersListCount', 'showWinnersListAfter'],
+    keys: ['multiWinners', 'winnersListCount', 'showWinnersListAfter', 'showAllCorrect'],
   },
   {
     id: 'advanced',

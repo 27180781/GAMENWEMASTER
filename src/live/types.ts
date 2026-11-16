@@ -98,6 +98,11 @@ export interface LiveOverlays {
   lobby: boolean;
   /** תוצאות ההימור. */
   bet: { title: string } | null;
+  /**
+   * «כל מי שענה נכון» (setting.showAllCorrect): הכינויים של מי שצדק, המהיר
+   * ראשון. חסר בצילום ממנוע ישן = לא מוצג.
+   */
+  correct?: string[] | null;
   /** דירוג הקבוצות (מקש 4). */
   groups: { categoryIndex: number } | null;
   /** לוח סולמות וחבלים. */

@@ -136,6 +136,29 @@ function votingOnFirst(): GameEngine {
 }
 
 describe('מצב המסך למסך הצפייה', () => {
+  it('«כל מי שענה נכון» עובר לצופים רק אחרי החשיפה, בכינויים ובלי מספרי טלפון', () => {
+    const engine = votingOnFirst();
+    engine.dispatch({ type: 'ADVANCE', at: T0 + 2000 });
+    const builder = new LiveSnapshotBuilder();
+    const correct = [PHONES[2]!, PHONES[0]!];
+    const open = { ...input(engine).overlays, correct };
+    const before = builder.build(input(engine, { overlays: open }));
+    expect(before.overlays.correct).toBeNull();
+    const after = builder.build(
+      input(engine, {
+        overlays: open,
+        reveal: { questionShown: true, answersShown: 4, revealCorrect: true },
+      }),
+    );
+    expect(after.overlays.correct).toHaveLength(2);
+    expect(after.overlays.correct!.map((a) => after.names[a])).toEqual(['050••••233', '054••••567']);
+    expectNoSecrets(JSON.stringify(after));
+    const closed = builder.build(
+      input(engine, { reveal: { questionShown: true, answersShown: 4, revealCorrect: true } }),
+    );
+    expect(closed.overlays.correct).toBeNull();
+  });
+
   it('הסתרת מספר טלפון: 3 ראשונות ו-3 אחרונות', () => {
     expect(maskPhoneLike('0541234567')).toBe('054••••567');
     expect(maskPhoneLike('+972-54-123-4567')).toBe('972••••••567');

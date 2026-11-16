@@ -12,6 +12,7 @@ import { AllScoresScreen, LobbyScreen, WinnersListScreen, WinnersScreen } from '
 import { VotesBreakdown } from '../render/VotesBreakdown.tsx';
 import { GroupStandingsOverlay } from '../render/GroupStandingsOverlay.tsx';
 import { BetResultsOverlay } from '../render/BetResultsOverlay.tsx';
+import { CorrectListOverlay } from '../render/CorrectListOverlay.tsx';
 import { RaffleOverlay } from '../render/RaffleOverlay.tsx';
 import { SnakesLaddersBoard } from '../render/SnakesLaddersBoard.tsx';
 import { GroupConnectScreen } from '../render/GroupConnectScreen.tsx';
@@ -560,6 +561,42 @@ export const SCREENS: ScreenDef[] = [
               title={BET.que ?? ''}
               onClose={noop}
             />
+          </>
+        ),
+      };
+    },
+  },
+  {
+    id: 'correct-list',
+    label: 'כל מי שענה נכון (מעטים)',
+    settleMs: 1200,
+    build: (ctx) => {
+      const game = makeGame(ctx, [Q4]);
+      const engine = engineAt(game, 1, 'results', { votes: votesBy([2, 6, 1, 1], 10) });
+      return {
+        game,
+        node: (
+          <>
+            {playing(engine, { reveal: revealDone(4), leaders: railPlayers(5) })}
+            <CorrectListOverlay ids={VOTER_IDS.slice(0, 6)} nameOf={nameOfFor(makeRoster(false))} onClose={noop} />
+          </>
+        ),
+      };
+    },
+  },
+  {
+    id: 'correct-list-many',
+    label: 'כל מי שענה נכון (הרבה)',
+    settleMs: 2400,
+    build: (ctx) => {
+      const game = makeGame(ctx, [Q4]);
+      const engine = engineAt(game, 1, 'results', { votes: votesBy([4, 30, 3, 3], 40) });
+      return {
+        game,
+        node: (
+          <>
+            {playing(engine, { reveal: revealDone(4), leaders: railPlayers(5) })}
+            <CorrectListOverlay ids={VOTER_IDS} nameOf={nameOfFor(makeRoster(false))} onClose={noop} />
           </>
         ),
       };

@@ -7071,6 +7071,61 @@ body {
 .bet-big-delta { font-size: 40px; font-weight: 900; color: #2ec94f; font-variant-numeric: tabular-nums; }
 .bet-foot { text-align: center; font-size: 20px; opacity: 0.6; }
 
+/* «כל מי שענה נכון» (setting.showAllCorrect) — צעד ברווח אחרי חשיפת התשובה */
+.correct-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 56;
+  background: rgba(4, 2, 10, 0.86);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  animation: screen-fade 0.3s ease;
+}
+.correct-panel {
+  width: 1640px;
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, rgb(var(--main-rgb, 34, 43, 69)) 62%, #05030c),
+    color-mix(in srgb, rgb(var(--main-rgb, 34, 43, 69)) 30%, #05030c)
+  );
+  border: 2px solid rgba(46, 201, 79, 0.45);
+  border-radius: 26px;
+  padding: 26px 32px;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.6);
+  color: #fff;
+}
+.correct-head { display: flex; align-items: center; gap: 20px; }
+.correct-title { flex: 1 1 auto; margin: 0; font-size: 46px; font-weight: 900; color: #2ec94f; }
+.correct-count { font-size: 28px; font-weight: 800; background: rgba(255, 255, 255, 0.1); border-radius: 999px; padding: 8px 24px; font-variant-numeric: tabular-nums; }
+.correct-close { width: 54px; height: 54px; border-radius: 50%; border: none; background: rgba(255, 255, 255, 0.14); color: #fff; font-size: 24px; cursor: pointer; }
+.correct-close:hover { background: rgba(255, 255, 255, 0.26); }
+.correct-empty { margin: 30px 0; text-align: center; font-size: 34px; font-weight: 700; opacity: 0.85; }
+.correct-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-flow: column; gap: 10px 18px; min-height: 0; }
+.correct-row { display: flex; align-items: center; gap: 14px; min-width: 0; padding: 8px 16px; border-radius: 14px; background: rgba(0, 0, 0, 0.28); border: 2px solid rgba(46, 201, 79, 0.18); animation: leaderIn 0.4s ease both; }
+.correct-row--top { border-color: rgba(245, 197, 24, 0.7); background: rgba(245, 197, 24, 0.12); }
+.correct-rank { flex: 0 0 auto; min-width: 44px; text-align: center; font-weight: 900; color: #2ec94f; font-variant-numeric: tabular-nums; }
+.correct-row--top .correct-rank { color: #f5c518; }
+.correct-name { flex: 1 1 auto; min-width: 0; font-weight: 800; white-space: nowrap; overflow: hidden; }
+.correct-grid--xl .correct-row { padding: 12px 26px; }
+.correct-grid--xl .correct-rank { font-size: 38px; }
+.correct-grid--xl .correct-name { font-size: 46px; }
+.correct-grid--lg .correct-rank { font-size: 30px; }
+.correct-grid--lg .correct-name { font-size: 36px; }
+.correct-grid--md .correct-rank { font-size: 26px; }
+.correct-grid--md .correct-name { font-size: 30px; }
+.correct-grid--sm .correct-rank { font-size: 22px; min-width: 36px; }
+.correct-grid--sm .correct-name { font-size: 24px; }
+.correct-grid--xl { width: 900px; max-width: 100%; align-self: center; }
+.correct-foot { display: flex; justify-content: center; gap: 28px; font-size: 20px; opacity: 0.65; }
+.correct-page { font-weight: 800; }
+
 /* העורך המקומי — הגדרות ההימור */
 .se-bet { display: flex; flex-direction: column; gap: 8px; }
 .se-bet-row { display: flex; align-items: center; gap: 8px; min-width: 0; }

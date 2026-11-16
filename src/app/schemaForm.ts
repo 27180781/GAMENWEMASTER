@@ -104,6 +104,7 @@ const LABELS: Record<string, string> = {
   allowChangeVote: 'אפשר שינוי הצבעה בזמן הטיימר',
   multiWinners: 'מספר הזוכים במסך הסיום',
   showWinnersListAfter: 'הצגת טבלת מובילים כל N שאלות',
+  showAllCorrect: 'אחרי כל שאלה: מסך עם כל מי שענה נכון (לפי המהירות)',
   winnersListCount: 'כמה מובילים בטבלה',
   mainColor: 'צבע ראשי',
   secondaryColor: 'צבע משני',

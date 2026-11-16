@@ -56,6 +56,13 @@ describe('hostKeyHints — פעולת הרווח לפי שלב', () => {
     // בלי הימור ממתין — כרגיל
     expect(space({ phase: 'results', revealCorrect: true, betPending: false })).toBe('השקופית הבאה');
   });
+  it('★ «כל מי שענה נכון» ממתין → הרווח פותח אותו; פתוח → סוגר (ולתוצאות ההימור אם יש)', () => {
+    const r = { phase: 'results', revealCorrect: true } as const;
+    expect(space({ ...r, correctPending: true })).toBe('כל מי שענה נכון');
+    expect(space({ ...r, correctPending: true, betPending: true })).toBe('כל מי שענה נכון');
+    expect(space({ ...r, correctOverlay: true })).toBe('המשך (סגירת «ענו נכון»)');
+    expect(space({ ...r, correctOverlay: true, betPending: true })).toBe('תוצאות ההימור');
+  });
   it('★ שקופית הימור — הניסוח מדבר על הימור ולא על שאלה', () => {
     const bet = { slideType: 'bet', votable: true };
     expect(space({ ...bet, questionShown: false })).toBe('הצגת ההימור');
