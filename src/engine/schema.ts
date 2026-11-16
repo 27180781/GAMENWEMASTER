@@ -515,6 +515,12 @@ export const globalSettingsSchema = z.object({
    * נשארות תמיד: הן אומרות למשתתפים מה על הכף ומי עונה.
    */
   showQuestionTypeLabel: z.preprocess((v) => v !== false, z.boolean()),
+  /**
+   * «כל מי שענה נכון»: אחרי חשיפת התשובה הנכונה, רווח נוסף פותח מסך עם השמות
+   * של כל מי שצדק לפי סדר המהירות (ראו src/app/correctList.ts). רק `true` מדליק;
+   * חסר או כל ערך אחר = כבוי, כך שקבצים ישנים מתנהגים בדיוק כמו קודם.
+   */
+  showAllCorrect: z.preprocess((v) => v === true, z.boolean()),
   // שינוי הצבעה בזמן הטיימר לכל המשחק (ההצבעה האחרונה קובעת) — הגדרה גלובלית
   // שחלה על *כל* השקופיות. חסר/false = כבוי גלובלית, וכל שקופית נקבעת לפי
   // slide.setting.allowChangeVote שלה (התנהגות קודמת). true = כל המשחק מאפשר.

@@ -74,6 +74,8 @@ export interface LiveHostInput {
     votes: boolean;
     lobby: boolean;
     bet: boolean;
+    /** «כל מי שענה נכון» פתוח: מי שצדק, המהיר ראשון; null = סגור. */
+    correct?: readonly string[] | null;
     groups: { categoryIndex: number } | null;
     board: { board: BoardState; groups: Group[]; progression: 'dice' | 'percent' } | null;
     connect: {
@@ -458,6 +460,11 @@ export class LiveSnapshotBuilder {
       bet:
         playing && input.overlays.bet
           ? { title: armedBetTitle(game, state.currentSlideIndex) }
+          : null,
+      // מוצג רק אחרי החשיפה, כמו פס המובילים — לפני כן הוא היה מגלה מה התשובה.
+      correct:
+        playing && revealed && input.overlays.correct != null
+          ? input.overlays.correct.map((id) => alias(id))
           : null,
       groups: groupsOverlayShown ? input.overlays.groups : null,
       board: boardShown ? input.overlays.board : null,

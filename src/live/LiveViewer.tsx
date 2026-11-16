@@ -29,6 +29,7 @@ import { EMPTY_ROSTER, type RosterData } from '../app/roster.ts';
 import type { GameState } from '../engine/index.ts';
 import { setAvatarColorOverrides } from '../render/avatar.ts';
 import { BetResultsOverlay } from '../render/BetResultsOverlay.tsx';
+import { CorrectListOverlay } from '../render/CorrectListOverlay.tsx';
 import { GroupConnectScreen } from '../render/GroupConnectScreen.tsx';
 import { GroupStandingsOverlay } from '../render/GroupStandingsOverlay.tsx';
 import {
@@ -773,6 +774,9 @@ function LiveScreen({
                     nameOf={nameOf}
                     title={overlays.bet.title}
                   />
+                )}
+                {stage === 'playing' && overlays.correct != null && (
+                  <CorrectListOverlay ids={overlays.correct} nameOf={nameOf} />
                 )}
                 {/* גם מעל מסכי הסיום, כמו במסך הראשי (מקש 4 במנצחים ובניקוד של כולם) */}
                 {stage !== 'opening' && overlays.groups !== null && (

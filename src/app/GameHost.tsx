@@ -52,7 +52,9 @@ import { OperatorMenu } from '../render/OperatorMenu.tsx';
 import { RaffleOverlay, type RaffleEntry } from '../render/RaffleOverlay.tsx';
 import type { RailPlayer, RevealState } from '../render/QuestionSlide.tsx';
 import { revealBoard } from './revealBoard.ts';
+import { correctListApplies, correctListCloseDelayMs, correctListOrder } from './correctList.ts';
 import { BetResultsOverlay } from '../render/BetResultsOverlay.tsx';
+import { CorrectListOverlay } from '../render/CorrectListOverlay.tsx';
 import { RosterPanel } from '../render/RosterPanel.tsx';
 import { SlideView } from '../render/SlideView.tsx';
 import { VotesBreakdown } from '../render/VotesBreakdown.tsx';
@@ -673,6 +675,21 @@ export function GameHost({
   const betOverlayRef = useRef(false);
   betOverlayRef.current = betOverlay;
   const betShownForRef = useRef<number | null>(null);
+  /**
+   * מסך «כל מי שענה נכון» (setting.showAllCorrect, ראו correctList.ts) — צעד
+   * משלו ברווח אחרי חשיפת התשובה, כמו תוצאות ההימור. correctShownForRef זוכר
+   * לאיזו שקופית הוא כבר הוצג, כדי שהרווח הבא ימשיך הלאה ולא יפתח אותו שוב.
+   */
+  const [correctOverlay, setCorrectOverlay] = useState(false);
+  const correctOverlayRef = useRef(false);
+  correctOverlayRef.current = correctOverlay;
+  const correctShownForRef = useRef<number | null>(null);
+  /**
+   * סדר ההגעה של כל המצביעים בשקופית הנוכחית (המהיר ראשון), בלי תקרה — למסך
+   * «כל מי שענה נכון». נפרד מ-correctAnswerers כי ב«הרוב קובע» התשובה הנכונה
+   * ידועה רק בסגירה, ועם שינוי הצבעה מי שצדק נקבע לפי ההצבעה שנרשמה.
+   */
+  const voteOrderRef = useRef<{ ids: string[]; seen: Set<string> }>({ ids: [], seen: new Set() });
   groupsOverlayRef.current = groupsOverlay;
   /** איזה סוג קבוצות (קטגוריה) מוצג במסך הקבוצות — מקש 5 מחליף (מודולו). */
   const [groupsCatIndex, setGroupsCatIndex] = useState(0);
@@ -909,6 +926,38 @@ export function GameHost({
   stageRef.current = stage;
   const revealRef = useRef<RevealState>(reveal);
   revealRef.current = reveal;
+
+  /**
+   * «כל מי שענה נכון» של השקופית הנוכחית, המהיר ראשון (ריק כשההגדרה כבויה או
+   * כשההצבעה עוד לא נסגרה). ראו correctList.ts.
+   */
+  const correctList = useMemo<string[]>(() => {
+    const s = engine.getGame().questions[state.currentSlideIndex];
+    if (s === undefined || state.phase !== 'results') return [];
+    if (!correctListApplies(engine.getGame().setting, s)) return [];
+    const correctIds = new Set(s.question.answers.filter((a) => a.correct).map((a) => a.id));
+    return correctListOrder(
+      voteOrderRef.current.ids,
+      state.votesBySlide[state.currentSlideId] ?? {},
+      correctIds,
+      removedRef.current,
+    );
+    // voteOrderRef מתמלא לפני הסגירה (flushVotes רץ לפני ADVANCE), ולכן כשהשלב
+    // הופך ל-results הוא כבר שלם.
+  }, [engine, state]);
+  const correctListRef = useRef(correctList);
+  correctListRef.current = correctList;
+  /** האם הצעד הבא ברווח הוא «כל מי שענה נכון» (התשובה כבר נחשפה, ועוד לא הוצג). */
+  const correctPendingRef = useRef<() => boolean>(() => false);
+  correctPendingRef.current = () => {
+    const now = engine.getState();
+    return (
+      now.phase === 'results' &&
+      revealRef.current.revealCorrect &&
+      correctShownForRef.current !== now.currentSlideId &&
+      correctListRef.current.length > 0
+    );
+  };
   /** תצוגה מקדימה של מסך המנצחים (מקש W): השלב לחזור אליו, או null אם לא פעיל. */
   const winnersPreviewRef = useRef<HostStage | null>(null);
   /**
@@ -1356,12 +1405,18 @@ export function GameHost({
     setCorrectAnswerers([]);
     lastHostAnswerRef.current = null;
     setBetOverlay(false);
+    setCorrectOverlay(false);
+    voteOrderRef.current = { ids: [], seen: new Set() };
   }, [state.currentSlideId, state.slideEntry, engine, audio]);
 
   // תוצאות ההימור מוצגות פעם אחת לכל סגירה: יציאה משלב התוצאות (חזרה להצבעה,
   // שקופית אחרת) מאפסת את הזיכרון, כך שהכרעה מחדש תוצג שוב.
   useEffect(() => {
-    if (state.phase !== 'results') betShownForRef.current = null;
+    if (state.phase !== 'results') {
+      betShownForRef.current = null;
+      correctShownForRef.current = null;
+      setCorrectOverlay(false);
+    }
   }, [state.phase, state.currentSlideId]);
 
   // דיבוג: רישום מעברי שלב/שקופית/מדיה
@@ -1469,6 +1524,13 @@ export function GameHost({
     }
     const voters = snapshot.voters;
     if (voters) {
+      const order = voteOrderRef.current;
+      for (const id of Object.keys(voters)) {
+        if (!order.seen.has(id)) {
+          order.seen.add(id);
+          order.ids.push(id);
+        }
+      }
       setAnswerers((prev) => {
         const seen = new Set(prev);
         const additions = Object.keys(voters).filter((id) => !seen.has(id));
@@ -1709,6 +1771,13 @@ export function GameHost({
         audio.play('inShowAns', sounds.inShowAnsMediaSound.src);
         return;
       }
+      // «כל מי שענה נכון» — צעד משלו אחרי חשיפת התשובה, פעם אחת לשקופית, לפני
+      // תוצאות ההימור (קודם מי צדק בשאלה, ואז מה זה עשה להימורים).
+      if (correctPendingRef.current()) {
+        correctShownForRef.current = current.currentSlideId;
+        setCorrectOverlay(true);
+        return;
+      }
       // תוצאות ההימור — צעד משלו אחרי חשיפת התשובה, פעם אחת לשקופית: מי זכה,
       // מי הפסיד, ההימור הגדול. רק כשהשאלה הזאת הכריעה הימור.
       const outcomes = current.betOutcomes[current.currentSlideId];
@@ -1754,6 +1823,11 @@ export function GameHost({
     // תוצאות ההימור פתוחות — אחורה סוגר אותן (החשיפה נשארת)
     if (betOverlayRef.current) {
       setBetOverlay(false);
+      return;
+    }
+    // «כל מי שענה נכון» פתוח — אחורה סוגר אותו (החשיפה נשארת)
+    if (correctOverlayRef.current) {
+      setCorrectOverlay(false);
       return;
     }
     const current = engine.getState();
@@ -1880,6 +1954,11 @@ export function GameHost({
     // תוצאות ההימור פתוחות — רווח סוגר וממשיך (הצעד הבא הוא השקופית הבאה).
     if (betOverlayRef.current) {
       setBetOverlay(false);
+      return;
+    }
+    // «כל מי שענה נכון» פתוח — רווח סוגר וממשיך (לתוצאות ההימור או לשקופית הבאה).
+    if (correctOverlayRef.current) {
+      setCorrectOverlay(false);
       return;
     }
     // לוח המרוץ (סולמות וחבלים) פתוח — רווח סוגר אותו וממשיך לשקופית הבאה.
@@ -2455,6 +2534,7 @@ export function GameHost({
     votesOverlay ||
     groupsOverlay ||
     betOverlay || // תוצאות ההימור — המשחק ממתין עד רווח
+    correctOverlay || // «כל מי שענה נכון» — המשחק ממתין עד רווח
     boardOverlay ||
     boardPending !== null || // הלוח מחושב וממתין לרווח — לא מדלגים עליו אוטומטית
     raffle !== null ||
@@ -2484,6 +2564,7 @@ export function GameHost({
           : boardOverlay
             ? 'board'
             : votesOverlay ||
+                correctOverlay ||
                 boardPending !== null ||
                 connectCategory !== null ||
                 settingsOpen ||
@@ -2734,7 +2815,15 @@ export function GameHost({
         };
       } else if (autoT.nextSlide.active && reveal.revealCorrect) {
         const outcomes = state.betOutcomes[state.currentSlideId];
-        if (
+        if (correctPendingRef.current()) {
+          // קודם «כל מי שענה נכון» (נסגר לבד, ראו למטה), ואחריו ההימור או השקופית הבאה
+          label = 'כל מי שענה נכון';
+          action = () => {
+            correctShownForRef.current = state.currentSlideId;
+            setCorrectOverlay(true);
+          };
+          delayMs = Math.max(1, autoT.nextSlide.seconds) * 1000;
+        } else if (
           outcomes !== undefined &&
           Object.keys(outcomes).length > 0 &&
           betShownForRef.current !== state.currentSlideId
@@ -2816,6 +2905,25 @@ export function GameHost({
     );
     return () => window.clearTimeout(timeout);
   }, [stage, betOverlay, autoT, narrationActive, narrationSpeaking]);
+
+  // «כל מי שענה נכון» במעבר אוטומטי (של המשחק או של השקופית): נסגר לבד אחרי
+  // זמן קריאה, ולפחות עמוד שלם לכל עמוד של שמות, ואז המעבר ממשיך כרגיל.
+  const correctAutoSeconds = autoT.nextSlide.active
+    ? autoT.nextSlide.seconds
+    : slide.setting.automaticSkip.active
+      ? slide.setting.automaticSkip.seconds
+      : null;
+  useEffect(() => {
+    if (stage !== 'playing' || !correctOverlay || correctAutoSeconds === null) return;
+    const timeout = window.setTimeout(
+      () => setCorrectOverlay(false),
+      correctListCloseDelayMs(
+        betResultsCloseDelayMs(correctAutoSeconds, narrationActive && narrationSpeaking),
+        correctListRef.current.length,
+      ),
+    );
+    return () => window.clearTimeout(timeout);
+  }, [stage, correctOverlay, correctAutoSeconds, narrationActive, narrationSpeaking]);
 
   // מעבר אוטומטי של מדיה חוסמת (openMedia/endMedia + מסכי מדיה עצמאיים):
   //   • תמונה — מעבר אחרי autoT.media.image.seconds (אם image.active דלוק).
@@ -3248,6 +3356,7 @@ export function GameHost({
         votes: votesOverlay,
         lobby: lobbyOverlay,
         bet: betOverlay,
+        correct: correctOverlay ? correctList : null,
         groups: groupsOverlay ? { categoryIndex: groupsCatIndex } : null,
         board: boardOverlay
           ? {
@@ -3284,6 +3393,12 @@ export function GameHost({
     betOutcomesNow !== undefined &&
     Object.keys(betOutcomesNow).length > 0 &&
     betShownForRef.current !== state.currentSlideId;
+  // «כל מי שענה נכון» ממתין — הרווח הבא פותח אותו (לרמז בפס ההנחיות)
+  const correctPending =
+    state.phase === 'results' &&
+    reveal.revealCorrect &&
+    correctList.length > 0 &&
+    correctShownForRef.current !== state.currentSlideId;
 
   // קליק עכבר אינו מקדם שלבים — קידום רק ברווח/0 (בקשת המנחה).
   // מה שהקהל רואה כאן משוכפל במסך הצפייה (src/live/LiveViewer.tsx) — שינוי
@@ -3327,6 +3442,8 @@ export function GameHost({
               hasGroups: hasGroupData(roster),
               betPending,
               betOverlay,
+              correctPending,
+              correctOverlay,
               ...(railAvailable ? { groupRail: !groupRailHidden } : {}),
             }).map((h) => (
               <span key={h.key} className="host-hint">
@@ -3354,6 +3471,8 @@ export function GameHost({
               hasGroups: hasGroupData(roster),
               betPending,
               betOverlay,
+              correctPending,
+              correctOverlay,
               ...(railAvailable ? { groupRail: !groupRailHidden } : {}),
             })}
             onRun={runHintKey}
@@ -3475,6 +3594,11 @@ export function GameHost({
             title={betSlideFor(engine.getGame(), state.currentSlideIndex)?.question.que ?? ''}
             onClose={() => setBetOverlay(false)}
           />
+        )}
+
+        {/* «כל מי שענה נכון» (setting.showAllCorrect) — אחרי חשיפת התשובה; רווח סוגר וממשיך */}
+        {stage === 'playing' && correctOverlay && (
+          <CorrectListOverlay ids={correctList} nameOf={nameOf} onClose={() => setCorrectOverlay(false)} />
         )}
 
         {/* דירוג הקבוצות (פקודת מנחה 4) — קבוצה מובילה + מובילים בכל קבוצה; מקש 5 מחליף סוג.

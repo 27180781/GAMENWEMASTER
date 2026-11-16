@@ -103,7 +103,7 @@
 
 .game-root[data-visual-theme='studio'] :is(
   .screen, .q-screen, .leaders-overlay, .raffle-overlay, .votes-overlay, .gs-overlay,
-  .bet-overlay, .sl-overlay, .join-banner, .gconn-screen
+  .bet-overlay, .correct-overlay, .sl-overlay, .join-banner, .gconn-screen
 ) {
   font-family: 'VT Suez One', 'Kanuba', 'Heebo', sans-serif;
   font-synthesis: none;
@@ -165,7 +165,7 @@
 
 /* לוחות כהים ושורות בטבלאות: כחול לילה עם שוליים מוזהבים */
 .game-root[data-visual-theme='studio'] :is(
-  .votes-panel, .gs-panel, .bet-panel, .raffle-box, .sl-side
+  .votes-panel, .gs-panel, .bet-panel, .correct-panel, .raffle-box, .sl-side
 ) {
   background: linear-gradient(180deg, rgba(27, 20, 80, 0.96), rgba(9, 6, 34, 0.96));
   border-color: #e8b84a;
@@ -173,7 +173,7 @@
 }
 .game-root[data-visual-theme='studio'] :is(
   .leader-card:not(.leader-card--top), .score-cell, .group-list li, .gs-card:not(.gs-card--lead),
-  .votes-col:not(.votes-col--correct), .bet-row, .sl-result, .lobby-count, .q-answered-pill, .q-live,
+  .votes-col:not(.votes-col--correct), .bet-row, .correct-row, .sl-result, .lobby-count, .q-answered-pill, .q-live,
   .gr-head, .gr-row
 ) {
   background: linear-gradient(180deg, rgba(30, 22, 88, 0.82), rgba(10, 7, 38, 0.82));
@@ -213,7 +213,7 @@
 
 .game-root[data-visual-theme='glass'] :is(
   .screen, .q-screen, .leaders-overlay, .raffle-overlay, .votes-overlay, .gs-overlay,
-  .bet-overlay, .sl-overlay, .join-banner, .gconn-screen
+  .bet-overlay, .correct-overlay, .sl-overlay, .join-banner, .gconn-screen
 ) {
   font-family: 'VT Assistant', 'Kanuba', 'Heebo', sans-serif;
 }
@@ -252,7 +252,7 @@
 .game-root[data-visual-theme='glass'] .q-answers--images .q-card { background-color: transparent; }
 
 .game-root[data-visual-theme='glass'] :is(
-  .votes-panel, .gs-panel, .bet-panel, .raffle-box, .sl-side
+  .votes-panel, .gs-panel, .bet-panel, .correct-panel, .raffle-box, .sl-side
 ) {
   background: linear-gradient(160deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.05)), rgba(13, 11, 31, 0.62);
   backdrop-filter: blur(22px) saturate(1.3);
@@ -263,7 +263,7 @@
 }
 .game-root[data-visual-theme='glass'] :is(
   .leader-card:not(.leader-card--top), .score-cell, .group-list li, .gs-card:not(.gs-card--lead),
-  .votes-col:not(.votes-col--correct), .bet-row, .sl-result, .lobby-count, .q-answered-pill, .q-live,
+  .votes-col:not(.votes-col--correct), .bet-row, .correct-row, .sl-result, .lobby-count, .q-answered-pill, .q-live,
   .gr-head, .gr-row
 ) {
   background: linear-gradient(160deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04)), rgba(13, 11, 31, 0.4);
@@ -305,7 +305,7 @@
 
 .game-root[data-visual-theme='scroll'] :is(
   .screen, .q-screen, .leaders-overlay, .raffle-overlay, .votes-overlay, .gs-overlay,
-  .bet-overlay, .sl-overlay, .join-banner, .gconn-screen
+  .bet-overlay, .correct-overlay, .sl-overlay, .join-banner, .gconn-screen
 ) {
   font-family: 'VT Frank Ruhl Libre', 'Kanuba', 'David', serif;
 }
@@ -361,7 +361,7 @@
 }
 
 .game-root[data-visual-theme='scroll'] :is(
-  .votes-panel, .gs-panel, .bet-panel, .raffle-box, .sl-side
+  .votes-panel, .gs-panel, .bet-panel, .correct-panel, .raffle-box, .sl-side
 ) {
   background: linear-gradient(180deg, rgba(66, 38, 16, 0.97), rgba(38, 21, 8, 0.97));
   border-color: #e8c25c;
@@ -372,7 +372,7 @@
 }
 .game-root[data-visual-theme='scroll'] :is(
   .leader-card:not(.leader-card--top), .score-cell, .group-list li, .gs-card:not(.gs-card--lead),
-  .votes-col:not(.votes-col--correct), .bet-row, .sl-result, .lobby-count, .q-answered-pill, .q-live,
+  .votes-col:not(.votes-col--correct), .bet-row, .correct-row, .sl-result, .lobby-count, .q-answered-pill, .q-live,
   .gr-head, .gr-row
 ) {
   background: linear-gradient(180deg, rgba(74, 44, 18, 0.86), rgba(43, 24, 10, 0.86));

@@ -123,6 +123,7 @@ interface GlobalSettings {
   visualTheme?: 'classic' | 'studio' | 'glass' | 'scroll'; // ערכת נושא חזותית (src/engine/visualThemes.ts): מראה בלבד, לא פריסה ולא צבעים; חסר/לא מוכר = 'classic'
   multiWinners: number;            // כמה זוכים להציג (1 / 5...)
   showWinnersListAfter: number | null;
+  showAllCorrect?: boolean;        // «כל מי שענה נכון»: אחרי חשיפת התשובה, רווח נוסף פותח מסך עם כל מי שצדק לפי המהירות (src/app/correctList.ts); רק true מדליק, חסר = כבוי
   mainColor: string;               // ⚠️ HEX עם אלפא: "#FECC39FF" (8 ספרות) — לתמוך גם ב-6
   secondaryColor: string;
   gameMedia: { src: string };      // רקע מסך פתיחה/התחברות
