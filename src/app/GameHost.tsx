@@ -975,6 +975,7 @@ export function GameHost({
       startedAtRef.current,
       [...removedRef.current], // הסרות משתתפים שורדות קריסה/רענון
       groupBonusRef.current, // ובונוסים ידניים לקבוצות
+      engine.getRemovedScores(), // והניקוד של מי שהוסר, להחזרה
     );
     if (backupCfg !== null) await saveBackup(backupCfg, engine.getGame().id, payload);
     else await saveDiskBackup(diskBackupKey(engine.getGame()), payload, false); // אופליין → דיסק
@@ -1018,6 +1019,8 @@ export function GameHost({
         startedAtRef.current = data.meta.startedAt || Date.now();
         // שחזור המשתתפים שהוסרו (שקופית players) — שההסרה תמשיך להיאכף
         removedRef.current = new Set(data.meta.removedIds ?? []);
+        // והניקוד שהיה להם, כדי ש«החזרת כל המשתתפים» תחזיר אותם איתו גם אחרי קריסה
+        engine.setRemovedScores([...removedRef.current], data.meta.removedScores ?? {});
         setGroupBonus({ ...(data.meta.groupBonus ?? {}) }); // בונוסים קבוצתיים ידניים
         // מסנכרנים את מונה טבלת המובילים למצב המשוחזר, כדי שלא תקפוץ מיד בשחזור.
         autoLeadersShownAtRef.current = completedQuestionCount(game, engine.getState().slidesCompleted);
@@ -1101,6 +1104,7 @@ export function GameHost({
             startedAtRef.current,
             [...removedRef.current],
             groupBonusRef.current,
+            engine.getRemovedScores(),
           );
           await saveDiskBackup(diskBackupKey(engine.getGame()), payload, true);
           // והתוצאות למערכת, כדי שיופיעו ב«האירועים שלי» כמו משחק טלפונים: לתור
@@ -1269,6 +1273,17 @@ export function GameHost({
       setFunctionDetail(`${removedCount} שחקנים הוסרו מהמשחק`);
       setFunctionDetailSlide(s.id);
       debugLog('game', `שקופית פונקציה — עדכון משתתפים (${cfg.mode}/${cfg.selection}) · הוסרו ${removedCount}`);
+      return;
+    }
+    // פעולת "restore_players" — כל מי שהוסר חוזר, עם הניקוד שהיה לו (engine.restoreVoters).
+    if (action === 'restore_players') {
+      const ids = [...removedRef.current];
+      removedRef.current = new Set();
+      engine.restoreVoters(ids);
+      setFunctionStatus('sent');
+      setFunctionDetail(ids.length > 0 ? `${ids.length} שחקנים חזרו למשחק` : 'אין שחקנים שהוסרו');
+      setFunctionDetailSlide(s.id);
+      debugLog('game', `שקופית פונקציה — החזרת משתתפים · חזרו ${ids.length}`);
       return;
     }
     // פעולת "api" — שליחת נתוני המשחק ל-webhook.

@@ -77,6 +77,18 @@ export function countsOfVotes(votes: Record<string, number>): Record<string, num
   return counts;
 }
 
+/** מה שנמחק למשתתף בהסרה (removeVoters), לפי שקופית. */
+interface ParkedVoter {
+  score: number | undefined;
+  answerTime: GameState['answerTimes'][string] | undefined;
+  votes: Record<number, number>;
+  awarded: Record<number, number>;
+  time: Record<number, number>;
+  betDelta: Record<number, number>;
+  betStakes: Record<number, number>;
+  betOutcomes: Record<number, GameState['betOutcomes'][number][string]>;
+}
+
 export class GameEngine {
   private game: GameFile;
   private readonly surveyParticipationScoring: boolean;
@@ -92,6 +104,11 @@ export class GameEngine {
   private timeBySlide: Record<number, Record<string, number>> = {};
   /** שינויי הניקוד מהימורים שהוכרעו בשקופית — voterId → delta; מקוזז בחזרה עליה. */
   private betDeltaBySlide: Record<number, Record<string, number>> = {};
+  /**
+   * משתתפים שהוסרו (removeVoters), עם מה שנמחק להם — כדי ש-restoreVoters
+   * יחזיר אותם בדיוק כמו שהיו. רק הניקוד נשמר בגיבוי (getRemovedScores).
+   */
+  private parked: Record<string, ParkedVoter> = {};
   private saveSeq = 0;
   /** כמה כניסות לשקופית היו עד עכשיו (GameState.slideEntry). */
   private slideEntries = 0;
@@ -271,6 +288,8 @@ export class GameEngine {
     this.awardedBySlide = {};
     this.timeBySlide = {};
     this.betDeltaBySlide = {};
+    // הניקוד של מי שהוסר מגיע מהגיבוי בנפרד (setRemovedScores)
+    this.parked = {};
 
     const slide = index !== -1 ? this.game.questions[index] : undefined;
     const showOpenMedia = snapshot.phase === 'showing' && slide?.openMedia.src !== '';
@@ -314,6 +333,7 @@ export class GameEngine {
    * ל"התחלת המשחק מחדש" מתוך מסך ההגדרות באמצע משחק.
    */
   reset(): void {
+    this.parked = {};
     this.awardedBySlide = {};
     this.timeBySlide = {};
     this.betDeltaBySlide = {};
@@ -341,6 +361,16 @@ export class GameEngine {
     this.timeBySlide = {};
     // הימורים פתוחים מתבטלים יחד עם הניקוד — אין ממה להמר.
     this.betDeltaBySlide = {};
+    // גם מי שהוסר יחזור (אם יחזור) עם 0, כמו כל השאר. ההצבעות שלו נשמרות, כמו של כולם.
+    for (const p of Object.values(this.parked)) {
+      p.score = undefined;
+      p.answerTime = undefined;
+      p.awarded = {};
+      p.time = {};
+      p.betDelta = {};
+      p.betStakes = {};
+      p.betOutcomes = {};
+    }
     this.setState({ scores: {}, answerTimes: {}, betStakes: {}, betOutcomes: {} });
   }
 
@@ -366,6 +396,7 @@ export class GameEngine {
   removeVoters(ids: readonly string[]): number {
     const remove = new Set(ids);
     if (remove.size === 0) return 0;
+    for (const id of remove) this.park(id);
     const scores = { ...this.state.scores };
     const answerTimes = { ...this.state.answerTimes };
     for (const id of remove) {
@@ -397,6 +428,104 @@ export class GameEngine {
     }
     this.setState({ scores, answerTimes, votesBySlide, betStakes, betOutcomes });
     return remove.size;
+  }
+
+  /** שומר בצד את מה ש-removeVoters עומד למחוק למשתתף (פעם אחת לכל הסרה). */
+  private park(id: string): void {
+    if (this.parked[id] !== undefined) return;
+    const pick = <T>(bySlide: Readonly<Record<number, Readonly<Record<string, T>>>>): Record<number, T> => {
+      const out: Record<number, T> = {};
+      for (const [slideId, byVoter] of Object.entries(bySlide)) {
+        if (Object.prototype.hasOwnProperty.call(byVoter, id)) out[Number(slideId)] = byVoter[id] as T;
+      }
+      return out;
+    };
+    this.parked[id] = {
+      score: this.state.scores[id],
+      answerTime: this.state.answerTimes[id],
+      votes: pick(this.state.votesBySlide),
+      awarded: pick(this.awardedBySlide),
+      time: pick(this.timeBySlide),
+      betDelta: pick(this.betDeltaBySlide),
+      betStakes: pick(this.state.betStakes),
+      betOutcomes: structuredClone(pick(this.state.betOutcomes)),
+    };
+  }
+
+  /**
+   * החזרת משתתפים שהוסרו (שקופית function · restore_players) — עם הניקוד,
+   * הזמנים וההצבעות שהיו להם ברגע ההסרה. ניקוד שנצבר להם בינתיים (לא אמור
+   * לקרות — ה-host מסנן את ההצבעות שלהם) מתווסף ולא נדרס. מחזיר כמה מהם
+   * היו שמורים כאן; את רשימת המוסרים עצמה מנהל ה-host.
+   */
+  restoreVoters(ids: readonly string[]): number {
+    const back = [...new Set(ids)].filter((id) => this.parked[id] !== undefined);
+    if (back.length === 0) return 0;
+    const scores = { ...this.state.scores };
+    const answerTimes = { ...this.state.answerTimes };
+    const votesBySlide: GameState['votesBySlide'] = { ...this.state.votesBySlide };
+    const betStakes: GameState['betStakes'] = { ...this.state.betStakes };
+    const betOutcomes: GameState['betOutcomes'] = { ...this.state.betOutcomes };
+    const putBack = <T>(
+      target: Record<number, Record<string, T>>,
+      id: string,
+      saved: Readonly<Record<number, T>>,
+    ): void => {
+      for (const [key, value] of Object.entries(saved)) {
+        const slideId = Number(key);
+        const current = target[slideId] ?? {};
+        if (Object.prototype.hasOwnProperty.call(current, id)) continue; // לא דורסים מה שכבר יש
+        target[slideId] = { ...current, [id]: value };
+      }
+    };
+    for (const id of back) {
+      const p = this.parked[id]!;
+      delete this.parked[id];
+      if (p.score !== undefined) scores[id] = (scores[id] ?? 0) + p.score;
+      if (p.answerTime !== undefined) {
+        const now = answerTimes[id];
+        answerTimes[id] = now === undefined
+          ? p.answerTime
+          : { totalMs: now.totalMs + p.answerTime.totalMs, count: now.count + p.answerTime.count };
+      }
+      putBack(votesBySlide, id, p.votes);
+      putBack(this.awardedBySlide, id, p.awarded);
+      putBack(this.timeBySlide, id, p.time);
+      putBack(this.betDeltaBySlide, id, p.betDelta);
+      putBack(betStakes, id, p.betStakes);
+      putBack(betOutcomes, id, p.betOutcomes);
+    }
+    this.setState({ scores, answerTimes, votesBySlide, betStakes, betOutcomes });
+    return back.length;
+  }
+
+  /** הניקוד של מי שהוסר ועוד לא הוחזר — לגיבוי (meta.removedScores). */
+  getRemovedScores(): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const [id, p] of Object.entries(this.parked)) if (p.score !== undefined) out[id] = p.score;
+    return out;
+  }
+
+  /**
+   * שחזור מגיבוי: מי שהוסר והניקוד שהיה לו. אחרי קריסה רק הניקוד חוזר איתו
+   * (ההצבעות והזמנים שלו לא נשמרים בגיבוי). מזהה שכבר מופיע בניקוד — מדלגים.
+   */
+  setRemovedScores(ids: readonly string[], scores: Readonly<Record<string, number>>): void {
+    this.parked = {};
+    for (const id of ids) {
+      if (Object.prototype.hasOwnProperty.call(this.state.scores, id)) continue;
+      const score = scores[id];
+      this.parked[id] = {
+        score: typeof score === 'number' && Number.isFinite(score) ? score : undefined,
+        answerTime: undefined,
+        votes: {},
+        awarded: {},
+        time: {},
+        betDelta: {},
+        betStakes: {},
+        betOutcomes: {},
+      };
+    }
   }
 
   // -------------------------------------------------------------------------

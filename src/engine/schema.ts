@@ -197,6 +197,11 @@ const VOTABLE_TYPES = new Set(['trivia', 'survey', 'ans_images', 'bet']);
  *                        לאיפוס ניקוד כל המשתתפים; פתוח להרחבה).
  *   • action "players"— הסרת/השארת משתתפים (function.players: mode/unit/
  *                        amount/selection) כך שלא ישתתפו יותר.
+ *   • action "restore_players" — החזרת כל מי שהוסר ב-"players" למשחק, עם הניקוד
+ *                        שהיה לו ברגע ההסרה. בלי תת-קונפיג. פעולה נפרדת ולא
+ *                        mode של players בכוונה: מנוע ישן נופל בפעולה לא מוכרת
+ *                        ל-"api" בלי כתובת (לא עושה כלום), ואילו mode לא מוכר
+ *                        היה מתפרש אצלו כ-"remove" ומסיר שחקנים.
  * הקונפיג נשמר ברמת השקופית תחת `function` (לא בתוך setting). כל השדות
  * סלחניים כדי לתמוך בקבצים שנוצרו לפני שהוגדרו כל האפשרויות.
  */
@@ -217,6 +222,7 @@ export const functionConfigSchema = z.object({
       screen: 'הצגת מסך (מנצחים / מובילים)',
       score: 'פעולה על הניקוד',
       players: 'הסרת משתתפים מהמשחק',
+      restore_players: 'החזרת כל המשתתפים שהוסרו',
     },
     'api',
   ),

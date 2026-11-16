@@ -68,6 +68,9 @@ function FunctionScreen({
   } else if (action === 'players') {
     icon = '👋';
     text = status === 'error' ? '⚠ פעולת משתתפים לא תקינה' : detail || '✓ עודכנו המשתתפים';
+  } else if (action === 'restore_players') {
+    icon = '🙌';
+    text = detail || '✓ כל המשתתפים חזרו למשחק';
   } else if (status === 'error') {
     icon = '⛔';
     text = 'השליחה נכשלה';
