@@ -9,9 +9,13 @@
  *
  * הכללים עצמם ב-src/render/themes.css (שלוש הראשונות) וב-src/render/themes/<id>.css, תחת ‎.game-root[data-visual-theme="…"]‎. 'classic' אינו
  * מקבל אף כלל — הוא המראה של styles.css כפי שהוא.
+ *
+ * 'neondraw' («ניאון מצטייר») היא החריגה היחידה בכלל המילוי: הקפסולות שלה זכוכית
+ * שקופה (גוון עדין של mainColor) שהרקע נראה דרכה, וקו ניאון כחול-מג'נטה מצטייר
+ * סביבן מ-0 ל-100% בכל חשיפה (NeonRing). הגופן Kanuba — הגופן של חוויה בקליק.
  */
 
-export const VISUAL_THEMES = ['classic', 'studio', 'glass', 'scroll', 'neon', 'gala', 'comic', 'chalk', 'led'] as const;
+export const VISUAL_THEMES = ['classic', 'studio', 'glass', 'scroll', 'neon', 'gala', 'comic', 'chalk', 'led', 'neondraw'] as const;
 export type VisualTheme = (typeof VISUAL_THEMES)[number];
 
 export const VISUAL_THEME_LABELS: Record<VisualTheme, string> = {
@@ -24,6 +28,7 @@ export const VISUAL_THEME_LABELS: Record<VisualTheme, string> = {
   comic: 'קומיקס',
   chalk: 'לוח גיר',
   led: 'לוח תוצאות',
+  neondraw: 'ניאון מצטייר',
 };
 
 /** ערך חסר/לא מוכר (כולל ערכות שעוד לא נבנו במנוע הזה) = 'classic'. */

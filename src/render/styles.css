@@ -1256,6 +1256,20 @@ body {
 /* חשיפה מדורגת: אלמנט שמור-מקום אך בלתי-נראה עד שלב החשיפה שלו */
 .reveal-hidden { visibility: hidden; }
 
+/* קו הניאון של ערכת 'neondraw' (NeonRing.tsx) — מוסתר בכל ערכה אחרת. כשהוא מוצג
+   (src/render/themes/neondraw.css) זו שכבה אבסולוטית על תיבת הריפוד של ההורה,
+   מתחת לתוכן ובלי שום השפעה על הפריסה. */
+.neon-ring {
+  display: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 0;
+}
+
 .question-header,
 .answer { transition: opacity 0.35s ease; }
 

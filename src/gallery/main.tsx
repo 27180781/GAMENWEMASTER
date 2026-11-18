@@ -16,6 +16,7 @@ import '../render/themes/gala.css';
 import '../render/themes/comic.css';
 import '../render/themes/chalk.css';
 import '../render/themes/led.css';
+import '../render/themes/neondraw.css';
 import './gallery.css';
 
 const params = readParams(window.location.search);
