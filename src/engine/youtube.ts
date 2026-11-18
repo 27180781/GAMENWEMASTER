@@ -113,3 +113,78 @@ export function youtubeEmbedUrl(src: string): string | null {
   const query = params.toString();
   return `https://www.youtube.com/embed/${id}${query === '' ? '' : `?${query}`}`;
 }
+
+/**
+ * פרמטרי הנגן שהמנוע מטמיע: ניגון אוטומטי בלבד, בלי שום פקד ובלי כתוביות.
+ *
+ * ‎cc_load_policy=0‎ מבקש מיוטיוב לא להציג כתוביות, אבל יוטיוב מכבד אותו רק
+ * כשאין לצופה העדפה אחרת: מחשב שהחשבון שלו ביוטיוב (או הדפדפן) מוגדר "תמיד
+ * להציג כתוביות", או סרטון שבעל הערוץ הגדיר לו כתוביות כברירת מחדל, יציג
+ * אותן בכל זאת. לכן הוא רק השכבה הראשונה, וראו YOUTUBE_CAPTIONS_OFF_COMMANDS.
+ * ‎controls=0‎ ו-‎disablekb=1‎ מסירים גם את כפתור ה-CC ואת המקש C.
+ */
+export const YOUTUBE_PLAYER_PARAMS = [
+  'enablejsapi=1',
+  'autoplay=1',
+  'controls=0',
+  'disablekb=1',
+  'fs=0',
+  'modestbranding=1',
+  'iv_load_policy=3',
+  'cc_load_policy=0',
+  'rel=0',
+  'playsinline=1',
+] as const;
+
+/** כתובת ה-iframe המלאה של הנגן. */
+export function youtubePlayerUrl(src: string, opts: { muted?: boolean } = {}): string {
+  // קישור שלא זוהה נשאר כמו שהוא (עם אותם פרמטרים), כמו קודם: הנגן כבר יודע
+  // לומר שהוא לא עונה (ALIVE_TIMEOUT_MS).
+  const embed = youtubeEmbedUrl(src) ?? src;
+  const params = [...YOUTUBE_PLAYER_PARAMS, ...(opts.muted === true ? ['mute=1'] : [])].join('&');
+  return `${embed}${embed.includes('?') ? '&' : '?'}${params}`;
+}
+
+/**
+ * פקודות שמכבות כתוביות בנגן שכבר רץ (דרך ה-postMessage של ‎enablejsapi=1‎,
+ * אותו ערוץ של ‎pauseVideo‎). פורקים את מודול הכתוביות (‎captions‎, ובנגנים
+ * ישנים ‎cc‎) ומאפסים את הרצועה הנבחרת. יוטיוב טוען את המודול מחדש כשהסרטון
+ * מתחיל לנגן, כשעוברים לסרטון הבא ברשימת השמעה ולפעמים אחרי טעינה מחדש, ולכן
+ * הן נשלחות שוב בכל אחד מהאירועים האלה (ראו shouldResendCaptionsOff).
+ *
+ * ‎unloadModule‎ ו-‎setOption('captions', …)‎ אינם חלק מהתיעוד הרשמי של יוטיוב:
+ * הם עובדים היום, ופקודה שהנגן לא מכיר פשוט נבלעת בלי נזק.
+ */
+export const YOUTUBE_CAPTIONS_OFF_COMMANDS: readonly { func: string; args: unknown[] }[] = [
+  { func: 'unloadModule', args: ['captions'] },
+  { func: 'unloadModule', args: ['cc'] },
+  { func: 'setOption', args: ['captions', 'track', {}] },
+];
+
+/**
+ * האם הודעה מהנגן היא רגע שבו כדאי לכבות שוב את הכתוביות: הנגן מוכן, מצב
+ * הנגינה השתנה (מתנגן, נטען, סרטון חדש מוכן), או שמודול נטען (‎apiInfoDelivery‎
+ * בערוץ ה-postMessage, ‎onApiChange‎ ב-IFrame API: כך יוטיוב מודיע שמודול
+ * הכתוביות עלה; נצפה בהרצה מול יוטיוב, עם ‎"namespaces":["captions"]‎). ‎infoDelivery‎ נשלחת כמה פעמים בשנייה
+ * עם הזמן הנוכחי, ולכן היא נחשבת רק כשהיא נושאת מצב נגינה של התחלה.
+ */
+export function shouldResendCaptionsOff(data: unknown): boolean {
+  if (typeof data !== 'object' || data === null) return false;
+  const msg = data as { event?: unknown; info?: unknown };
+  switch (msg.event) {
+    case 'onReady':
+    case 'initialDelivery':
+    case 'onApiChange':
+    case 'apiInfoDelivery':
+      return true;
+    case 'onStateChange':
+      return msg.info === 1 || msg.info === 3 || msg.info === 5 || msg.info === -1;
+    case 'infoDelivery': {
+      const info = msg.info as { playerState?: unknown; videoData?: unknown } | null | undefined;
+      if (info === null || typeof info !== 'object') return false;
+      return info.playerState === 1 || info.playerState === 3 || info.videoData !== undefined;
+    }
+    default:
+      return false;
+  }
+}

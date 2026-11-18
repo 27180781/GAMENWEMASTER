@@ -13,7 +13,10 @@ import { describe, expect, it } from 'vitest';
 import {
   classifyMediaUrl,
   isYoutubeUrl,
+  shouldResendCaptionsOff,
+  YOUTUBE_CAPTIONS_OFF_COMMANDS,
   youtubeEmbedUrl,
+  youtubePlayerUrl,
   youtubeStartSeconds,
   youtubeVideoId,
 } from '../src/engine/index.ts';
@@ -190,8 +193,73 @@ describe('★ היחס בין הסיווג הרחב למנתח הצר', () => {
   });
 
   it('מארח אחר אינו יוטיוב בשום אופן', () => {
-    for (const url of ['https://vimeo.com/123', 'https://notyoutube.com/watch?v=x', 'Assets/x.jpg']) {
+    for (const url of [
+      'https://vimeo.com/123',
+      'https://notyoutube.com/watch?v=x',
+      'Assets/x.jpg',
+    ]) {
       expect(isYoutubeUrl(url), url).toBe(false);
+    }
+  });
+});
+
+describe('בלי כתוביות אוטומטיות (בקשת נסים 2026-11-18)', () => {
+  it('★ הכתובת מבקשת בלי כתוביות, בלי פקדים ובלי מקלדת', () => {
+    const url = new URL(youtubePlayerUrl(`https://www.youtube.com/watch?v=${ID}&t=90`));
+    expect(url.pathname).toBe(`/embed/${ID}`);
+    expect(url.searchParams.get('cc_load_policy')).toBe('0');
+    expect(url.searchParams.get('controls')).toBe('0');
+    expect(url.searchParams.get('disablekb')).toBe('1');
+    expect(url.searchParams.get('enablejsapi')).toBe('1');
+    expect(url.searchParams.get('start')).toBe('90');
+    expect(url.searchParams.get('mute')).toBeNull();
+    expect(
+      new URL(youtubePlayerUrl(`https://youtu.be/${ID}`, { muted: true })).searchParams.get('mute'),
+    ).toBe('1');
+  });
+
+  it('קישור שלא זוהה נשאר עם אותם פרמטרים', () => {
+    const url = youtubePlayerUrl('https://www.youtube.com/watch?v=bad');
+    expect(url.startsWith('https://www.youtube.com/watch?v=bad&')).toBe(true);
+    expect(url).toContain('cc_load_policy=0');
+  });
+
+  it('★ הפקודות פורקות את מודול הכתוביות ומאפסות את הרצועה', () => {
+    expect(YOUTUBE_CAPTIONS_OFF_COMMANDS).toEqual([
+      { func: 'unloadModule', args: ['captions'] },
+      { func: 'unloadModule', args: ['cc'] },
+      { func: 'setOption', args: ['captions', 'track', {}] },
+    ]);
+  });
+
+  it('★ נשלחות שוב כשהנגן מוכן, מתחיל לנגן, עובר סרטון או טוען מודול', () => {
+    for (const msg of [
+      { event: 'onReady' },
+      { event: 'initialDelivery', info: {} },
+      { event: 'onApiChange' },
+      { event: 'apiInfoDelivery', info: { namespaces: ['captions'] } },
+      { event: 'onStateChange', info: 1 },
+      { event: 'onStateChange', info: 3 },
+      { event: 'onStateChange', info: 5 },
+      { event: 'onStateChange', info: -1 },
+      { event: 'infoDelivery', info: { playerState: 1 } },
+      { event: 'infoDelivery', info: { videoData: { video_id: ID } } },
+    ]) {
+      expect(shouldResendCaptionsOff(msg), JSON.stringify(msg)).toBe(true);
+    }
+  });
+
+  it('לא על כל עדכון זמן, עצירה או סיום', () => {
+    for (const msg of [
+      { event: 'infoDelivery', info: { currentTime: 3.2 } },
+      { event: 'infoDelivery', info: { playerState: 2 } },
+      { event: 'onStateChange', info: 0 },
+      { event: 'onStateChange', info: 2 },
+      { event: 'onError', info: 150 },
+      null,
+      'listening',
+    ]) {
+      expect(shouldResendCaptionsOff(msg), JSON.stringify(msg)).toBe(false);
     }
   });
 });
