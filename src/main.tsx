@@ -13,6 +13,7 @@ import './render/themes/gala.css';
 import './render/themes/comic.css';
 import './render/themes/chalk.css';
 import './render/themes/led.css';
+import './render/themes/neondraw.css';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('אלמנט root לא נמצא');

@@ -1,0 +1,251 @@
+/* ערכת נושא 'neondraw' («ניאון מצטייר») — ראו כללי הברזל בראש src/render/themes.css. */
+/*
+ * ניאון מצטייר — קפסולות זכוכית שקופות שמדיית המשחק נראית דרכן, וקו ניאון
+ * כחול → סגול → מג'נטה שמצטייר סביב כל קפסולה מ-0 ל-100% ברגע החשיפה שלה
+ * (NeonRing.tsx: השאלה, כל תשובה, וכותרת המשחק), ואחריו הילה שמתפשטת.
+ * טקסט לבן-זוהר בגופן Kanuba — הגופן של חוויה בקליק, שכבר ארוז במנוע
+ * (styles.css), ולכן אין כאן ‎@font-face‎.
+ *
+ * החריגה המכוונת מכלל 2: מילוי התיבות אינו ‎var(--pill)‎ אטום אלא זכוכית — גוון
+ * של mainColor מעל כהה שקוף. הטקסט נשאר secondaryColor, והתשובה הנכונה נשארת
+ * ההיפוך של styles.css (מילוי אטום בצבע המשני). אין שינוי גאומטריה: position
+ * ו-isolation רק כדי שהקו (‎.neon-ring‎) יישב מתחת לטקסט.
+ */
+
+@keyframes vt-nd-draw {
+  from { stroke-dashoffset: 100; }
+  to { stroke-dashoffset: 0; }
+}
+/* כמו qpop, בשם משלה — כדי שתרוץ ברגע החשיפה ולא ברגע שהכרטיס נוצר מוסתר */
+@keyframes vt-nd-pop {
+  0% { transform: translateY(16px) scale(0.98); opacity: 0; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+/* ההילה מתפרצת כשהקו נסגר, ונרגעת לזוהר הקבוע */
+@keyframes vt-nd-bloom {
+  0% {
+    box-shadow: 0 0 0 0 rgba(122, 61, 255, 0), 0 0 0 0 rgba(255, 63, 207, 0), 0 14px 34px rgba(0, 0, 0, 0.45);
+  }
+  35% {
+    box-shadow: 0 0 28px 6px rgba(160, 90, 255, 0.85), 0 0 72px 16px rgba(255, 63, 207, 0.45), 0 14px 34px rgba(0, 0, 0, 0.45);
+  }
+  100% { box-shadow: var(--vt-nd-glow); }
+}
+@keyframes vt-nd-buzz {
+  0%, 100% { filter: brightness(1) saturate(1); }
+  46% { filter: brightness(1.18) saturate(1.15); }
+  48% { filter: brightness(0.92) saturate(1); }
+  50% { filter: brightness(1.2) saturate(1.15); }
+}
+@keyframes vt-nd-streaks {
+  0% { background-position: -60% 18%, 160% 34%, -40% 8%, 0 0, 0 0, 0 0, 0 100%, 0 0; }
+  100% { background-position: 160% 18%, -60% 34%, 160% 8%, 0 0, 0 0, 0 0, 0 100%, 0 0; }
+}
+
+.game-root[data-visual-theme='neondraw'] {
+  /* צבעי הקו קבועים — זו החתימה של הערכה (כמו בסרטון: כחול משמאל-למטה, מג'נטה מימין-למעלה) */
+  --vt-neon: #8f45ff;
+  --vt-neon-a: rgba(143, 69, 255, 0.6);
+  --vt-neon-core: #d9c6ff;
+  /* זכוכית: צבע המשחק עצמו, שקוף למחצה — הרקע נראה דרכה, והבהירות נשארת של
+     mainColor, כך שהניגודיות מול secondaryColor נשמרת בכל בחירת צבעים
+     (מילוי בהיר + טקסט כהה, או להפך) */
+  --vt-nd-glass:
+    radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.1), transparent 66%),
+    linear-gradient(180deg, rgba(var(--main-rgb, 58, 14, 134), 0.58), rgba(var(--main-rgb, 58, 14, 134), 0.72));
+  --vt-nd-glow: 0 0 14px 2px rgba(122, 61, 255, 0.55), 0 0 38px 6px rgba(255, 63, 207, 0.22), 0 14px 34px rgba(0, 0, 0, 0.45);
+}
+
+.game-root[data-visual-theme='neondraw'] :is(
+  .screen, .q-screen, .leaders-overlay, .raffle-overlay, .votes-overlay, .gs-overlay,
+  .bet-overlay, .sl-overlay, .join-banner, .gconn-screen
+) {
+  font-family: 'Kanuba', 'Heebo', sans-serif;
+  font-synthesis: none;
+}
+
+/* ---- הקפסולות של מסך השאלה: זכוכית + קו מצטייר ---- */
+.game-root[data-visual-theme='neondraw'] :is(.q-question, .q-title-pill) { position: relative; }
+.game-root[data-visual-theme='neondraw'] :is(.q-question, .q-title-pill, .q-card) { isolation: isolate; }
+
+.game-root[data-visual-theme='neondraw'] :is(.q-question, .q-title-pill),
+.game-root[data-visual-theme='neondraw'] .q-card:not(.q-card--correct) {
+  background: var(--vt-nd-glass);
+  border-color: transparent;
+  box-shadow: var(--vt-nd-glow);
+  /* טשטוש קל של מה שמאחורי הזכוכית: החלקיקים נשארים גלויים, הטקסט נשאר קריא */
+  -webkit-backdrop-filter: blur(4px) saturate(1.2);
+  backdrop-filter: blur(4px) saturate(1.2);
+}
+
+/* הכרטיס/השאלה נחשפים: קופצים, הקו מצטייר, וההילה מתפרצת כשהוא נסגר */
+.game-root[data-visual-theme='neondraw'] :is(.q-card, .q-question):not(.reveal-hidden) {
+  animation: vt-nd-pop 0.45s ease both, vt-nd-bloom 0.9s 0.95s ease-out both;
+}
+.game-root[data-visual-theme='neondraw'] .q-title-pill { animation: vt-nd-bloom 0.9s 0.95s ease-out both; }
+
+.game-root[data-visual-theme='neondraw'] .neon-ring {
+  display: block;
+  z-index: -1;
+  filter:
+    drop-shadow(0 0 2px rgba(255, 255, 255, 0.55))
+    drop-shadow(0 0 6px rgba(160, 90, 255, 0.95))
+    drop-shadow(0 0 14px rgba(255, 63, 207, 0.55));
+}
+.game-root[data-visual-theme='neondraw'] :is(.neon-ring-line, .neon-ring-core) {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 100 100;
+  stroke-dashoffset: 100;
+}
+.game-root[data-visual-theme='neondraw'] .neon-ring-line { stroke-width: 4px; }
+.game-root[data-visual-theme='neondraw'] .neon-ring-core { stroke: #fff; stroke-width: 1.4px; opacity: 0.85; }
+/* מ-0 ל-100% ברגע החשיפה (ההורה מאבד את reveal-hidden) — מחדש בכל שאלה ובכל תשובה */
+.game-root[data-visual-theme='neondraw'] :is(.q-card, .q-question):not(.reveal-hidden) > .neon-ring :is(.neon-ring-line, .neon-ring-core),
+.game-root[data-visual-theme='neondraw'] .q-title-pill > .neon-ring :is(.neon-ring-line, .neon-ring-core) {
+  animation: vt-nd-draw 1.05s cubic-bezier(0.6, 0.05, 0.3, 1) both;
+}
+
+/* טקסט על הזכוכית: הילה בצבע הטקסט עצמו עם נגיעת מג'נטה — טקסט לבן זוהר ורוד
+   כמו בסרטון, וטקסט כהה (על מילוי בהיר) מקבל רק הילה כהה עדינה */
+.game-root[data-visual-theme='neondraw'] :is(
+  .q-question-text, .q-card-text, .q-title-pill, .subject-text, .function-card
+) {
+  text-shadow:
+    0 0 2px color-mix(in srgb, currentColor 45%, transparent),
+    0 0 14px color-mix(in srgb, color-mix(in srgb, currentColor 50%, #ff4fd8) 55%, transparent);
+}
+.game-root[data-visual-theme='neondraw'] .q-coin {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px rgba(4, 2, 12, 0.7), 0 0 12px rgba(255, 255, 255, 0.55), 0 6px 14px rgba(0, 0, 0, 0.45);
+}
+
+/* הנכונה: ההיפוך של styles.css (מילוי אטום בצבע המשני) וזוהר חזק סביבו */
+.game-root[data-visual-theme='neondraw'] .q-card.q-card--correct:not(.reveal-hidden) {
+  border-color: #fff;
+  box-shadow:
+    inset 0 0 20px rgba(255, 255, 255, 0.35),
+    0 0 0 3px rgba(4, 2, 12, 0.9),
+    0 0 0 6px var(--text),
+    0 0 34px 8px color-mix(in srgb, var(--text) 80%, transparent),
+    0 0 90px 22px rgba(255, 63, 207, 0.4);
+  animation: vt-nd-pop 0.4s ease both, vt-nd-buzz 1.6s linear infinite;
+}
+.game-root[data-visual-theme='neondraw'] .q-card--correct .q-card-text { text-shadow: none; }
+.game-root[data-visual-theme='neondraw'] .q-card--dim { opacity: 0.72; }
+
+/* ---- שאר התיבות בצבע המשחק (לובי, פילוח, לוח): צינור ניאון סגול ---- */
+.game-root[data-visual-theme='neondraw'] :is(
+  .subject-text, .function-card, .lobby-join-dial, .q-score-drop, .q-survey-legend-item,
+  .q-board-name, .bet-summary-chip, .q-mode-pill, .q-group-pill
+) {
+  background-image:
+    radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.14), transparent 62%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.12));
+  box-shadow:
+    inset 0 0 0 2px var(--vt-neon-core),
+    inset 0 0 18px rgba(143, 69, 255, 0.45),
+    0 0 0 3px rgba(4, 2, 12, 0.88),
+    0 0 0 5px var(--vt-neon),
+    0 0 22px 4px var(--vt-neon-a),
+    0 18px 40px rgba(0, 0, 0, 0.5);
+}
+
+.game-root[data-visual-theme='neondraw'] :is(.lobby-join-code, .q-count-num, .q-count-track) {
+  border-color: var(--vt-neon-core);
+  box-shadow:
+    0 0 0 3px rgba(4, 2, 12, 0.88),
+    0 0 0 5px var(--vt-neon),
+    0 0 20px 3px var(--vt-neon-a),
+    0 14px 34px rgba(0, 0, 0, 0.5);
+}
+.game-root[data-visual-theme='neondraw'] .q-count-fill {
+  box-shadow: 0 0 14px var(--vt-neon-a), inset 0 0 0 1.5px rgba(255, 255, 255, 0.4);
+}
+
+/* ---- לוחות כהים ושורות טבלה: שחור עם קצה ניאון ---- */
+.game-root[data-visual-theme='neondraw'] :is(
+  .votes-panel, .gs-panel, .bet-panel, .raffle-box, .sl-side
+) {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(143, 69, 255, 0.18), transparent 60%),
+    linear-gradient(180deg, rgba(10, 6, 24, 0.97), rgba(3, 2, 10, 0.97));
+  border-color: var(--vt-neon-core);
+  box-shadow:
+    inset 0 0 26px rgba(143, 69, 255, 0.3),
+    0 0 0 3px rgba(4, 2, 12, 0.9),
+    0 0 0 5px var(--vt-neon),
+    0 0 30px 6px var(--vt-neon-a),
+    0 30px 90px rgba(0, 0, 0, 0.6);
+}
+.game-root[data-visual-theme='neondraw'] :is(
+  .leader-card:not(.leader-card--top), .score-cell, .group-list li, .gs-card:not(.gs-card--lead),
+  .votes-col:not(.votes-col--correct), .bet-row, .sl-result, .lobby-count, .q-answered-pill, .q-live,
+  .gr-head, .gr-row
+) {
+  background: linear-gradient(180deg, rgba(14, 9, 32, 0.86), rgba(4, 2, 12, 0.86));
+  border-color: color-mix(in srgb, var(--vt-neon-core) 75%, transparent);
+}
+.game-root[data-visual-theme='neondraw'] :is(.leader-card, .score-cell, .gs-card, .votes-col, .bet-col, .sl-result, .gr-head, .gr-row) {
+  border-color: var(--vt-neon-core);
+  box-shadow: inset 0 0 14px rgba(143, 69, 255, 0.28), 0 0 14px 1px var(--vt-neon-a);
+}
+.game-root[data-visual-theme='neondraw'] :is(.leader-card--top, .gs-card--lead, .votes-col--correct) {
+  box-shadow: 0 0 0 2px #fff, 0 0 26px 5px var(--vt-neon-a), 0 0 60px 10px rgba(255, 63, 207, 0.35);
+}
+.game-root[data-visual-theme='neondraw'] :is(.raffle-title, .bet-title) {
+  color: #fff;
+  text-shadow: 0 0 4px var(--vt-neon-core), 0 0 12px var(--vt-neon), 0 0 28px #ff3fcf;
+}
+
+/* כותרות חופשיות: לבן עם הילה */
+.game-root[data-visual-theme='neondraw'] :is(.podium-name, .podium-score, .raffle-name) {
+  text-shadow: 0 0 2px #000, 0 4px 14px rgba(0, 0, 0, 0.8), 0 0 22px var(--vt-neon-a);
+}
+.game-root[data-visual-theme='neondraw'] .q-flyer-av {
+  box-shadow: 0 0 0 2px rgba(4, 2, 12, 0.7), 0 0 14px rgba(255, 255, 255, 0.6), 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+.game-root[data-visual-theme='neondraw'] .q-flyer--bubble .q-flyer-nm {
+  box-shadow: 0 0 0 2px var(--vt-neon), 0 0 16px var(--vt-neon-a), 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+/* ---- רקע הגיבוי (כשאין מדיה): חלל סגול-שחור, בוקה ורודה ופסי אור נודדים ---- */
+.game-root[data-visual-theme='neondraw'] :is(.slide-screen, .leaders-overlay, .sl-overlay) {
+  background:
+    linear-gradient(90deg, transparent, rgba(255, 120, 235, 0.75) 50%, transparent) no-repeat,
+    linear-gradient(90deg, transparent, rgba(120, 140, 255, 0.7) 50%, transparent) no-repeat,
+    linear-gradient(90deg, transparent, rgba(200, 90, 255, 0.6) 50%, transparent) no-repeat,
+    radial-gradient(circle at 14% 22%, rgba(255, 47, 208, 0.32) 0 46px, transparent 48px) no-repeat,
+    radial-gradient(circle at 86% 30%, rgba(196, 60, 255, 0.3) 0 64px, transparent 66px) no-repeat,
+    radial-gradient(circle at 78% 82%, rgba(255, 79, 216, 0.26) 0 38px, transparent 40px) no-repeat,
+    radial-gradient(ellipse 120% 60% at 50% 100%, rgba(122, 61, 255, 0.22), transparent 70%) no-repeat,
+    radial-gradient(ellipse 70% 55% at 50% 45%, #2a0a52, #0b0220 62%, #030008);
+  background-size: 34% 2px, 26% 2px, 30% 2px, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: -60% 18%, 160% 34%, -40% 8%, 0 0, 0 0, 0 0, 0 100%, 0 0;
+  animation: vt-nd-streaks 9s linear infinite;
+}
+.game-root[data-visual-theme='neondraw'] .sl-board {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 38px, rgba(143, 69, 255, 0.22) 38px 40px),
+    repeating-linear-gradient(90deg, transparent 0 38px, rgba(143, 69, 255, 0.22) 38px 40px),
+    linear-gradient(160deg, #0c0720, #030108);
+  border-color: var(--vt-neon-core);
+  box-shadow: 0 0 0 3px rgba(4, 2, 12, 0.9), 0 0 0 5px var(--vt-neon), 0 0 30px 6px var(--vt-neon-a);
+}
+.game-root[data-visual-theme='neondraw'] .sl-cell {
+  box-shadow: inset 0 0 10px rgba(143, 69, 255, 0.3);
+}
+/* צבעי הסולם/הנחש/הסיום נשארים */
+.game-root[data-visual-theme='neondraw'] .sl-cell:not(.sl-cell--ladder, .sl-cell--snake, .sl-cell--end) {
+  border-color: color-mix(in srgb, var(--vt-neon-core) 55%, transparent);
+}
+
+/* ---- תנועה מופחתת: הקו מוצג שלם, בלי הצטיירות והבהובים ---- */
+@media (prefers-reduced-motion: reduce) {
+  .game-root[data-visual-theme='neondraw'] :is(.neon-ring-line, .neon-ring-core) { animation: none !important; stroke-dashoffset: 0; }
+  .game-root[data-visual-theme='neondraw'] :is(.q-card, .q-question):not(.reveal-hidden) { animation: qpop 0.45s ease both; }
+  .game-root[data-visual-theme='neondraw'] .q-title-pill { animation: none; }
+  .game-root[data-visual-theme='neondraw'] .q-card.q-card--correct:not(.reveal-hidden) { animation: none; }
+  .game-root[data-visual-theme='neondraw'] :is(.slide-screen, .leaders-overlay, .sl-overlay) { animation: none; }
+}

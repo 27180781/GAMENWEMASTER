@@ -34,6 +34,7 @@ import { FitText } from './FitText.tsx';
 import { GroupRail } from './GroupRail.tsx';
 import { LiveMirrorContext } from './mediaPause.ts';
 import { displayText } from './multiline.ts';
+import { NeonRing } from './NeonRing.tsx';
 import { DENSE_ROWS, fitQuestionScreen } from './questionFit.ts';
 import type { TimerView } from './TimerRing.tsx';
 
@@ -546,7 +547,12 @@ export function QuestionSlide({
                 <img src={logo} alt="" />
               </div>
             )}
-            {title !== '' && <div className="q-title-pill">{title}</div>}
+            {title !== '' && (
+              <div className="q-title-pill">
+                {title}
+                <NeonRing />
+              </div>
+            )}
             {/* סקר — עד 2026-10 רק אייקון עוגה קטן ליד השאלה הבדיל אותו משאלה רגילה,
                 ומשתתפים לא הבינו שאין כאן תשובה נכונה (משוב לקוח, 2026-10-11). משחק
                 שלא רוצה את התווית מכבה אותה (showTypeLabel), והאייקון נשאר. */}
@@ -595,6 +601,7 @@ export function QuestionSlide({
           )}
 
           <div className={`q-question${revealState.questionShown ? '' : ' reveal-hidden'}`} ref={questionRef}>
+            <NeonRing />
             <div className="q-question-row">
               {isSurvey && <SurveyIcon />}
               {imageQuestion ? (
@@ -665,6 +672,7 @@ export function QuestionSlide({
                       <small>{percent}%</small>
                     </span>
                   )}
+                  <NeonRing />
                 </li>
               );
             })}

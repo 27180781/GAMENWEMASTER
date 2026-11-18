@@ -22,6 +22,7 @@ import {
 import { slideGroupRestriction } from '../app/groupRestriction.ts';
 import { FitText } from './FitText.tsx';
 import { displayText } from './multiline.ts';
+import { NeonRing } from './NeonRing.tsx';
 import {
   ANSWER_LETTERS,
   COIN_COLORS,
@@ -97,7 +98,12 @@ export function BetSlide({
                 <img src={logo} alt="" />
               </div>
             )}
-            {title !== '' && <div className="q-title-pill">{title}</div>}
+            {title !== '' && (
+              <div className="q-title-pill">
+                {title}
+                <NeonRing />
+              </div>
+            )}
             <div className="q-mode-pill q-mode-pill--bet">🎲 הימור — חל על השאלה הבאה</div>
             {restrictedGroup !== null && (
               <div className="q-group-pill">🔒 הימור לקבוצת {restrictedGroup} בלבד</div>
@@ -118,6 +124,7 @@ export function BetSlide({
           )}
 
           <div className={`q-question${reveal.questionShown ? '' : ' reveal-hidden'}`}>
+            <NeonRing />
             <div className="q-question-row">
               <span className="bet-dice" aria-hidden="true">
                 🎲
@@ -163,6 +170,7 @@ export function BetSlide({
                       <small>{percent}%</small>
                     </span>
                   )}
+                  <NeonRing />
                 </li>
               );
             })}
