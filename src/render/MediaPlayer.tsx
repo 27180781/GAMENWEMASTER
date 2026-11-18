@@ -5,7 +5,14 @@
  */
 
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { classifyMediaUrl, isYoutubeUrl, youtubeEmbedUrl, youtubeVideoId } from '../engine/index.ts';
+import {
+  classifyMediaUrl,
+  isYoutubeUrl,
+  shouldResendCaptionsOff,
+  YOUTUBE_CAPTIONS_OFF_COMMANDS,
+  youtubePlayerUrl,
+  youtubeVideoId,
+} from '../engine/index.ts';
 import { MediaClockContext, MediaMutedContext, MediaPauseContext } from './mediaPause.ts';
 import { startYoutubeHandshake } from './youtubeHandshake.ts';
 
@@ -192,7 +199,15 @@ export function MediaPlayer({ src, onEnded, asBackground = false, className }: M
 
   switch (kind) {
     case 'image':
-      return <img key={loadSrc} className={className ?? 'media-fill'} src={loadSrc} alt="" onError={fail} />;
+      return (
+        <img
+          key={loadSrc}
+          className={className ?? 'media-fill'}
+          src={loadSrc}
+          alt=""
+          onError={fail}
+        />
+      );
     case 'video':
       return (
         <>
@@ -286,12 +301,40 @@ function YouTubeEmbed({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const endedRef = useRef(false);
   /** פקודה לנגן דרך ה-postMessage שלו (enablejsapi=1). */
-  const command = useCallback((func: string) => {
+  const command = useCallback((func: string, args: unknown[] = []) => {
     iframeRef.current?.contentWindow?.postMessage(
-      JSON.stringify({ event: 'command', func, args: [] }),
+      JSON.stringify({ event: 'command', func, args }),
       '*',
     );
   }, []);
+  /**
+   * כיבוי הכתוביות האוטומטיות של יוטיוב (בקשת נסים 2026-11-18: «בשום אופן»).
+   * ‎cc_load_policy=0‎ בכתובת אינו מספיק כשהחשבון של המחשב מוגדר להציג
+   * כתוביות, ולכן מודול הכתוביות נפרק בכל פעם שהנגן עלול לטעון אותו מחדש.
+   * מוגבל לפעם בחצי שנייה, כי infoDelivery מגיעה בצרורות; בקשה שנפלה בתוך
+   * החלון נשלחת בסופו, כדי שהנגינה שמתחילה רגע אחרי "מוכן" לא תפוספס.
+   */
+  const captionsOffAtRef = useRef(0);
+  const captionsOffTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const captionsOff = useCallback(() => {
+    const wait = captionsOffAtRef.current + 500 - Date.now();
+    if (wait > 0) {
+      captionsOffTimerRef.current ??= setTimeout(() => {
+        captionsOffTimerRef.current = null;
+        captionsOffAtRef.current = Date.now();
+        for (const c of YOUTUBE_CAPTIONS_OFF_COMMANDS) command(c.func, c.args);
+      }, wait);
+      return;
+    }
+    captionsOffAtRef.current = Date.now();
+    for (const c of YOUTUBE_CAPTIONS_OFF_COMMANDS) command(c.func, c.args);
+  }, [command]);
+  useEffect(
+    () => () => {
+      if (captionsOffTimerRef.current !== null) clearTimeout(captionsOffTimerRef.current);
+    },
+    [],
+  );
   // שכבה חוסמת (טבלה, תפריט, הגדרות...): נעצר מתחתיה וממשיך כשהיא יורדת, כמו
   // וידאו רגיל. עד עכשיו יוטיוב המשיך לרוץ עם קול מתחת לכל השכבות.
   const pausedByOverlay = useContext(MediaPauseContext) && pauseUnderCover;
@@ -355,6 +398,7 @@ function YouTubeEmbed({
       handshake.markAlive();
       try {
         const data: unknown = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        if (shouldResendCaptionsOff(data)) captionsOff();
         const info = (data as { event?: string; info?: { playerState?: number } }) ?? {};
         if (info.event === 'onStateChange' || info.event === 'infoDelivery') {
           const playerState =
@@ -387,28 +431,12 @@ function YouTubeEmbed({
       iframe.removeEventListener('load', handshake.sendNow);
       handshake.dispose();
     };
-  }, [src, command]);
+  }, [src, command, captionsOff]);
 
   // ‎youtube.com/watch‎ מסרב להיות ממוסגר (X-Frame-Options), ולכן כל צורה של
   // קישור מומרת ל-‎/embed/<id>‎. בלי זה המסך הראה ריבוע אפור עם סמל עמוד שבור.
-  const embed = youtubeEmbedUrl(src) ?? src;
-  const separator = embed.includes('?') ? '&' : '?';
-  // ניגון אוטומטי בלבד, בלי שום פקד אינטראקטיבי:
-  // controls=0 (בלי פס בקרה), disablekb=1 (בלי מקלדת), fs=0 (בלי מסך מלא),
-  // modestbranding=1, iv_load_policy=3 (בלי הערות), rel=0, playsinline=1.
-  const params = [
-    'enablejsapi=1',
-    'autoplay=1',
-    'controls=0',
-    'disablekb=1',
-    'fs=0',
-    'modestbranding=1',
-    'iv_load_policy=3',
-    'rel=0',
-    'playsinline=1',
-    ...(mutedAtLoad ? ['mute=1'] : []),
-  ].join('&');
-  const url = `${embed}${separator}${params}`;
+  // ניגון אוטומטי בלבד, בלי שום פקד ובלי כתוביות: ראו YOUTUBE_PLAYER_PARAMS.
+  const url = youtubePlayerUrl(src, { muted: mutedAtLoad });
 
   return (
     // עטיפה עם שכבת חסימה שקופה מעל ה-iframe — בולעת כל קליק כדי שלא ניתן
