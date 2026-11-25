@@ -35,6 +35,10 @@ export interface HostHintInput {
   correctPending?: boolean;
   /** מסך «כל מי שענה נכון» פתוח — הרווח סוגר אותו וממשיך. */
   correctOverlay?: boolean;
+  /** «תוצאת הדאבל» ממתינה (שאלת דאבל של הגרלת הווילה, אחרי החשיפה) — הרווח הבא פותח אותה. */
+  doublePending?: boolean;
+  /** מסך «תוצאת הדאבל» פתוח — הרווח סוגר אותו וממשיך. */
+  doubleOverlay?: boolean;
   /**
    * פס הקבוצות בצד מסך השאלה (groupRail.ts): האם הוא מוצג. חסר = אין למשחק
    * קבוצות, ואז אין רמז למקש G.
@@ -48,7 +52,11 @@ const RAIL_HINT_SLIDES = new Set(['trivia', 'survey', 'ans_images']);
 /** מה עושה הרווח (מקש 0) בשלב הנוכחי. */
 function spaceAction(a: HostHintInput): string {
   if (a.betOverlay) return 'המשך (סגירת תוצאות ההימור)';
-  if (a.correctOverlay) return a.betPending ? 'תוצאות ההימור' : 'המשך (סגירת «ענו נכון»)';
+  if (a.doubleOverlay) return a.betPending ? 'תוצאות ההימור' : 'המשך (סגירת תוצאת הדאבל)';
+  if (a.correctOverlay) {
+    if (a.doublePending) return 'תוצאת הדאבל';
+    return a.betPending ? 'תוצאות ההימור' : 'המשך (סגירת «ענו נכון»)';
+  }
   if (a.activeMedia !== null) return 'המשך (סיום המדיה)';
   const bet = a.slideType === 'bet';
   if (a.phase === 'showing' && a.votable) {
@@ -64,6 +72,7 @@ function spaceAction(a: HostHintInput): string {
       return a.slideType === 'trivia' ? 'חשיפת התשובה הנכונה' : 'חשיפת התוצאות';
     }
     if (a.correctPending) return 'כל מי שענה נכון';
+    if (a.doublePending) return 'תוצאת הדאבל';
     if (a.betPending) return 'תוצאות ההימור';
     return a.hasNextSlide ? 'השקופית הבאה' : 'סיום המשחק';
   }

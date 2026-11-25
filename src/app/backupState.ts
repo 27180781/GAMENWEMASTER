@@ -7,7 +7,8 @@ import { isVotableSlide, type GameFile } from '../engine/index.ts';
 import type { BetOutcome } from '../engine/types.ts';
 import type { GamePhase, GameSnapshot, GameState } from '../engine/types.ts';
 import type { RosterData } from './roster.ts';
-import type { BackupData, BackupGroup, BackupPayload, BackupQuestion, BackupUser } from './backup.ts';
+import type { BackupData, BackupGroup, BackupMeta, BackupPayload, BackupQuestion, BackupUser } from './backup.ts';
+import { villaDoublesMeta, villaSlideIds } from './villaDouble.ts';
 
 /** קבוצת התשובות הנכונות לכל שקופית trivia. */
 function correctAnswersBySlide(game: GameFile): Map<number, Set<number>> {
@@ -125,8 +126,22 @@ export function buildBackupPayload(
       ...(Object.keys(state.majorityBySlide).length > 0
         ? { majorityBySlide: structuredClone(state.majorityBySlide) }
         : {}),
+      // שאלות הדאבל של הגרלת הווילה: השרת סופר מכאן את הכרטיסים (villaDouble.ts)
+      ...villaBackupMeta(game, state, removedIds),
     },
   };
+}
+
+/** `villaDoubles` ו-`villaSlides` למטא של הגיבוי — רק במשחק שיש בו שאלות דאבל. */
+function villaBackupMeta(
+  game: GameFile,
+  state: GameState,
+  removedIds: readonly string[],
+): Pick<BackupMeta, 'villaDoubles' | 'villaSlides'> {
+  const villaSlides = villaSlideIds(game);
+  if (villaSlides.length === 0) return {};
+  const villaDoubles = villaDoublesMeta(game, state, new Set(removedIds));
+  return { villaSlides, ...(villaDoubles.length > 0 ? { villaDoubles } : {}) };
 }
 
 /** מפה שמפתחותיה מזהי שקופיות (מחרוזות ב-JSON) — רק לשקופיות שקיימות בקובץ. */

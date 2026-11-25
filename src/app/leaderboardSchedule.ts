@@ -9,8 +9,12 @@ import { isVotableSlide, type GameFile } from '../engine/index.ts';
 /** כמה שאלות (שקופיות מצביעות) כבר הושלמו, לפי slidesCompleted מהמנוע. */
 export function completedQuestionCount(game: GameFile, slidesCompleted: number[]): number {
   const done = new Set(slidesCompleted);
-  // הימור מצביע אבל אינו שאלה — לא מזיז את הספירה.
-  return game.questions.filter((q) => isVotableSlide(q) && q.type !== 'bet' && done.has(q.id)).length;
+  // הימור מצביע אבל אינו שאלה — לא מזיז את הספירה. גם שאלת דאבל של הגרלת הווילה
+  // (villaDouble.ts) אינה נספרת: השרת מוסיף אותה למשחק, וספירה שלה הייתה מזיזה את
+  // «טבלה אחרי כל N שאלות» שהבונה קבע.
+  return game.questions.filter(
+    (q) => isVotableSlide(q) && q.type !== 'bet' && q.double === undefined && done.has(q.id),
+  ).length;
 }
 
 /**

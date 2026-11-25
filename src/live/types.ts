@@ -20,6 +20,7 @@ import type { RaffleEntry } from '../render/RaffleOverlay.tsx';
 import type { BoardState } from '../app/snakesLadders.ts';
 import type { Category, Group } from '../app/roster.ts';
 import type { GroupRailData } from '../app/groupRail.ts';
+import type { DoubleView } from '../app/villaDouble.ts';
 import type { LiveVideo } from './video/api.ts';
 
 /** גרסת המבנה. מסך צפייה שמקבל גרסה אחרת מבקש מהצופה לרענן. */
@@ -103,6 +104,11 @@ export interface LiveOverlays {
    * ראשון. חסר בצילום ממנוע ישן = לא מוצג.
    */
   correct?: string[] | null;
+  /**
+   * «תוצאת הדאבל» (שאלת דאבל של הגרלת הווילה, src/app/villaDouble.ts). חסר
+   * בצילום ממנוע ישן = לא מוצג.
+   */
+  double?: DoubleView | null;
   /** דירוג הקבוצות (מקש 4). */
   groups: { categoryIndex: number } | null;
   /** לוח סולמות וחבלים. */

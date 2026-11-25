@@ -70,6 +70,45 @@ export const slideNarrationSchema = z
   .passthrough();
 
 // ---------------------------------------------------------------------------
+// שאלות הדאבל של הגרלת הווילה (חנוכה 2026; החוזה: INTEGRATION.md)
+// ---------------------------------------------------------------------------
+
+/**
+ * מה שקרה לשאלת דאבל בכל הארץ, כפי שמערכת יצירת המשחקים ספרה כשהמשחק נטען:
+ * כמה משפחות כבר ענו עליה בהפעלה שנספרה, הממוצע של אחוז המשפחה שצדק (0–100),
+ * ו-`atLeast[k]` = כמה מהן קיבלו בה לפחות k כרטיסים (k = 0..10).
+ */
+export const villaDoubleStatsSchema = z.object({
+  families: z.number().int().min(0),
+  avg: z.number().min(0).max(100),
+  atLeast: z.array(z.number().int().min(0)).max(11),
+});
+
+/**
+ * שקופית trivia שהיא שאלת דאבל: מערכת יצירת המשחקים הכניסה אותה למשחק של
+ * הזמנה שנכנסה להגרלה. `tickets` = ההפעלה הזאת עוד יכולה לזכות בכרטיסים (false
+ * אחרי שהכרטיסים כבר נספרו, אחרי ההגרלה, ובמשחק בדיקה שאינו נספר).
+ */
+export const villaDoubleSchema = z
+  .object({
+    n: z.number().int().min(1),
+    of: z.number().int().min(1),
+    poolId: z.string(),
+    tickets: z.boolean().optional().default(false),
+    stats: villaDoubleStatsSchema.optional().catch(undefined),
+  })
+  .passthrough();
+
+/** שקופית subject שמכריזה על שאלת הדאבל שאחריה. */
+export const villaDoubleIntroSchema = z
+  .object({
+    n: z.number().int().min(1),
+    of: z.number().int().min(1),
+    tickets: z.boolean().optional().default(false),
+  })
+  .passthrough();
+
+// ---------------------------------------------------------------------------
 // שקופית (SPEC 3.2 + 3.3)
 // ---------------------------------------------------------------------------
 
@@ -370,6 +409,12 @@ export const slideSchema = z
      * מתנהגת כאילו אין לה קריינות.
      */
     narration: slideNarrationSchema.optional().catch(undefined),
+    /**
+     * שאלת דאבל של הגרלת הווילה, ומסך ההכרזה שלפניה (אופציונליים לגמרי; ראו
+     * INTEGRATION.md). כמו בקריינות, אובייקט פגום נזרק בלי להפיל את השקופית.
+     */
+    double: villaDoubleSchema.optional().catch(undefined),
+    doubleIntro: villaDoubleIntroSchema.optional().catch(undefined),
   })
   // כמו ב-question: לא מוחקים שדות שאיננו מכירים.
   .passthrough()
@@ -736,6 +781,9 @@ export const gameFileSchema = z.object({
 export type Answer = z.infer<typeof answerSchema>;
 export type NarrationSetting = z.infer<typeof narrationSettingSchema>;
 export type SlideNarration = z.infer<typeof slideNarrationSchema>;
+export type VillaDouble = z.infer<typeof villaDoubleSchema>;
+export type VillaDoubleIntro = z.infer<typeof villaDoubleIntroSchema>;
+export type VillaDoubleStats = z.infer<typeof villaDoubleStatsSchema>;
 export type SlideSettings = z.infer<typeof slideSettingsSchema>;
 export type SlideType = z.infer<typeof slideTypeSchema>;
 export type Slide = z.infer<typeof slideSchema>;

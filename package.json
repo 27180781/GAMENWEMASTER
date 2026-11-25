@@ -21,7 +21,8 @@
     "e2e:stage": "node tools/live-stage-e2e.mjs",
     "e2e:sound": "node tools/sound-e2e.mjs",
     "e2e:roster": "node tools/roster-refresh-e2e.mjs",
-    "e2e:signature": "node tools/signature-e2e.mjs"
+    "e2e:signature": "node tools/signature-e2e.mjs",
+    "e2e:villa": "node tools/villa-double-e2e.mjs"
   },
   "dependencies": {
     "electron-updater": "^6.8.9",

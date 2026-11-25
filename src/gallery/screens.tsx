@@ -13,6 +13,8 @@ import { VotesBreakdown } from '../render/VotesBreakdown.tsx';
 import { GroupStandingsOverlay } from '../render/GroupStandingsOverlay.tsx';
 import { BetResultsOverlay } from '../render/BetResultsOverlay.tsx';
 import { CorrectListOverlay } from '../render/CorrectListOverlay.tsx';
+import { DoubleResultOverlay } from '../render/DoubleResultOverlay.tsx';
+import { doubleView } from '../app/villaDouble.ts';
 import { RaffleOverlay } from '../render/RaffleOverlay.tsx';
 import { SnakesLaddersBoard } from '../render/SnakesLaddersBoard.tsx';
 import { GroupConnectScreen } from '../render/GroupConnectScreen.tsx';
@@ -187,6 +189,38 @@ const SUBJECT: SlideSpec = {
   score: '',
 };
 
+/** מסך ההכרזה שלפני שאלת דאבל (הגרלת הווילה, villaDouble.ts). */
+const DOUBLE_INTRO: SlideSpec = {
+  id: 1,
+  type: 'subject',
+  que: 'שאלת דאבל',
+  score: '',
+  extra: { doubleIntro: { n: 3, of: 10, tickets: true } },
+};
+
+/** שאלת דאבל: ניקוד כפול (השרת קובע אותו), ונתוני ההשוואה מהארץ. */
+const DOUBLE_Q: SlideSpec = {
+  id: 2,
+  type: 'trivia',
+  que: 'באיזו שנה, לפי המקובל, נחנך מחדש בית המקדש בימי החשמונאים?',
+  answers: [
+    ['332 לפני הספירה', false],
+    ['164 לפני הספירה', true],
+    ['70 לספירה', false],
+    ['586 לפני הספירה', false],
+  ],
+  score: 20,
+  extra: {
+    double: {
+      n: 3,
+      of: 10,
+      poolId: 'gallery',
+      tickets: true,
+      stats: { families: 214, avg: 38, atLeast: [214, 190, 160, 131, 102, 77, 51, 30, 14, 5, 1] },
+    },
+  },
+};
+
 const FUNCTION: SlideSpec = {
   id: 1,
   type: 'function',
@@ -308,6 +342,23 @@ function withResults(
 }
 
 const noop = () => undefined;
+
+/** שאלת דאבל אחרי החשיפה, ומעליה «תוצאת הדאבל» בדיוק כמו ב-GameHost. */
+function doubleResultScreen(ctx: GalleryContext, votes: Record<string, number>): BuiltScreen {
+  const game = makeGame(ctx, [DOUBLE_INTRO, DOUBLE_Q]);
+  const engine = engineAt(game, 2, 'results', { votes, scores: scoresFor(15) });
+  const state = engine.getState();
+  const view = doubleView(game, state.currentSlideIndex, state.votesBySlide);
+  return {
+    game,
+    node: (
+      <>
+        {playing(engine, { reveal: revealDone(4), leaders: railPlayers(5, 1) })}
+        {view !== null && <DoubleResultOverlay view={view} onClose={noop} />}
+      </>
+    ),
+  };
+}
 
 /** פס הקבוצות בדיוק כמו ש-GameHost בונה אותו (src/app/groupRail.ts). 26 מחוברים. */
 function railFor(engine: GameEngine, roster: RosterData, reveal: RevealState, categoryIndex = 0): GroupRailData | null {
@@ -601,6 +652,36 @@ export const SCREENS: ScreenDef[] = [
         ),
       };
     },
+  },
+  {
+    id: 'double-intro',
+    label: 'שאלת דאבל — מסך ההכרזה',
+    settleMs: 1200,
+    build: (ctx) => {
+      const game = makeGame(ctx, [DOUBLE_INTRO, DOUBLE_Q]);
+      return { game, node: playing(engineAt(game, 1, 'showing'), { reveal: revealVoting(0) }) };
+    },
+  },
+  {
+    id: 'double-question',
+    label: 'שאלת דאבל — בזמן ההצבעה',
+    build: (ctx) => {
+      const game = makeGame(ctx, [DOUBLE_INTRO, DOUBLE_Q]);
+      const engine = engineAt(game, 2, 'voting', { votes: votesBy([5, 9, 4, 3], 21) });
+      return { game, node: playing(engine, { timer: midTimer(), reveal: revealVoting(4) }) };
+    },
+  },
+  {
+    id: 'double-result',
+    label: 'תוצאת הדאבל',
+    settleMs: 2200,
+    build: (ctx) => doubleResultScreen(ctx, votesBy([3, 9, 4, 2], 15)),
+  },
+  {
+    id: 'double-result-rehearsal',
+    label: 'תוצאת הדאבל — הפעלת ניסיון',
+    settleMs: 2200,
+    build: (ctx) => doubleResultScreen(ctx, votesBy([1, 2, 1], 3)),
   },
   {
     id: 'votes-breakdown',

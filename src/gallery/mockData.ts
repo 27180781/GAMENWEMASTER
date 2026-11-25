@@ -124,6 +124,8 @@ export interface SlideSpec {
   settings?: Record<string, unknown>;
   fn?: Record<string, unknown>;
   bet?: Record<string, unknown>;
+  /** שדות נוספים על השקופית עצמה (למשל double / doubleIntro של הגרלת הווילה). */
+  extra?: Record<string, unknown>;
 }
 
 export function rawSlide(spec: SlideSpec): Record<string, unknown> {
@@ -158,6 +160,7 @@ export function rawSlide(spec: SlideSpec): Record<string, unknown> {
     },
     ...(spec.fn ? { function: spec.fn } : {}),
     ...(spec.bet ? { bet: spec.bet } : {}),
+    ...(spec.extra ?? {}),
   };
 }
 
