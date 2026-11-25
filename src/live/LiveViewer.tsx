@@ -30,6 +30,7 @@ import type { GameState } from '../engine/index.ts';
 import { setAvatarColorOverrides } from '../render/avatar.ts';
 import { BetResultsOverlay } from '../render/BetResultsOverlay.tsx';
 import { CorrectListOverlay } from '../render/CorrectListOverlay.tsx';
+import { DoubleResultOverlay } from '../render/DoubleResultOverlay.tsx';
 import { GroupConnectScreen } from '../render/GroupConnectScreen.tsx';
 import { GroupStandingsOverlay } from '../render/GroupStandingsOverlay.tsx';
 import {
@@ -778,6 +779,7 @@ function LiveScreen({
                 {stage === 'playing' && overlays.correct != null && (
                   <CorrectListOverlay ids={overlays.correct} nameOf={nameOf} />
                 )}
+                {stage === 'playing' && overlays.double != null && <DoubleResultOverlay view={overlays.double} />}
                 {/* גם מעל מסכי הסיום, כמו במסך הראשי (מקש 4 במנצחים ובניקוד של כולם) */}
                 {stage !== 'opening' && overlays.groups !== null && (
                   <GroupStandingsOverlay

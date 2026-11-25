@@ -12,6 +12,7 @@
  * דרך פרמטר הכתובת ‎?backupUrl=‎ (לבדיקות מול שרת מקומי).
  */
 
+import type { VillaDoubleMeta } from './villaDouble.ts';
 import { debugLog } from './debugLog.ts';
 import type { BetOutcome } from '../engine/types.ts';
 
@@ -123,6 +124,14 @@ export interface BackupMeta {
   betOutcomes?: Record<string, Record<string, BetOutcome>>;
   /** "הרוב קובע": שאלה → התשובות שנקבעו כנכונות (ראו majority.ts). */
   majorityBySlide?: Record<string, number[]>;
+  /**
+   * שאלות הדאבל של הגרלת הווילה (ראו villaDouble.ts ו-INTEGRATION.md): התוצאה
+   * של כל שאלה שההצבעה בה נסגרה. השרת סופר מהגיבוי של סוף המשחק את הכרטיסים.
+   * נגזר מההצבעות, ולכן שחזור מתעלם ממנו.
+   */
+  villaDoubles?: VillaDoubleMeta[];
+  /** כל השקופיות שנוספו בשביל הדאבל (הכרזות ושאלות) — לדוח התוצאות, שממספר את שאר השקופיות בלעדיהן. */
+  villaSlides?: number[];
 }
 
 /** המטען שנשמר (POST /save-backup). האובייקטים ממורים ל-JSON לפני השליחה. */

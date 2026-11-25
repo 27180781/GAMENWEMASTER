@@ -55,6 +55,8 @@ import { revealBoard } from './revealBoard.ts';
 import { correctListApplies, correctListCloseDelayMs, correctListOrder } from './correctList.ts';
 import { BetResultsOverlay } from '../render/BetResultsOverlay.tsx';
 import { CorrectListOverlay } from '../render/CorrectListOverlay.tsx';
+import { DoubleResultOverlay } from '../render/DoubleResultOverlay.tsx';
+import { doubleView, doubleWinsTickets, type DoubleView } from './villaDouble.ts';
 import { RosterPanel } from '../render/RosterPanel.tsx';
 import { SlideView } from '../render/SlideView.tsx';
 import { VotesBreakdown } from '../render/VotesBreakdown.tsx';
@@ -255,6 +257,8 @@ const RAIL_MAX = 9;
 const VOTE_THROTTLE_MS = 140;
 /** השהיה בין שלבי מעבר אוטומטי (הצגת שאלה/תשובה · פתיחת הצבעה · חשיפת תשובה). */
 const AUTO_STEP_MS = 1000;
+/** «תוצאת הדאבל» במעבר אוטומטי נשארת יותר מתוצאות ההימור, כדי שיספיקו לקרוא את שורת ההשוואה. */
+const DOUBLE_EXTRA_READ_MS = 3000;
 
 interface GameHostProps {
   game: GameFile;
@@ -685,6 +689,15 @@ export function GameHost({
   correctOverlayRef.current = correctOverlay;
   const correctShownForRef = useRef<number | null>(null);
   /**
+   * «תוצאת הדאבל» (שאלת דאבל של הגרלת הווילה, ראו villaDouble.ts) — צעד משלו
+   * ברווח אחרי חשיפת התשובה, אחרי «כל מי שענה נכון» ולפני תוצאות ההימור.
+   * doubleShownForRef זוכר לאיזו שקופית היא כבר הוצגה.
+   */
+  const [doubleOverlay, setDoubleOverlay] = useState(false);
+  const doubleOverlayRef = useRef(false);
+  doubleOverlayRef.current = doubleOverlay;
+  const doubleShownForRef = useRef<number | null>(null);
+  /**
    * סדר ההגעה של כל המצביעים בשקופית הנוכחית (המהיר ראשון), בלי תקרה — למסך
    * «כל מי שענה נכון». נפרד מ-correctAnswerers כי ב«הרוב קובע» התשובה הנכונה
    * ידועה רק בסגירה, ועם שינוי הצבעה מי שצדק נקבע לפי ההצבעה שנרשמה.
@@ -956,6 +969,27 @@ export function GameHost({
       revealRef.current.revealCorrect &&
       correctShownForRef.current !== now.currentSlideId &&
       correctListRef.current.length > 0
+    );
+  };
+  /**
+   * «תוצאת הדאבל» של השקופית הנוכחית: null כשאינה שאלת דאבל, כשההצבעה עוד לא
+   * נסגרה, או כשאיש עוד לא שיחק. ראו villaDouble.ts.
+   */
+  const doubleViewNow = useMemo<DoubleView | null>(() => {
+    if (state.phase !== 'results') return null;
+    return doubleView(engine.getGame(), state.currentSlideIndex, state.votesBySlide, removedRef.current);
+  }, [engine, state]);
+  const doubleViewRef = useRef(doubleViewNow);
+  doubleViewRef.current = doubleViewNow;
+  /** האם הצעד הבא ברווח הוא «תוצאת הדאבל» (התשובה כבר נחשפה, ועוד לא הוצגה). */
+  const doublePendingRef = useRef<() => boolean>(() => false);
+  doublePendingRef.current = () => {
+    const now = engine.getState();
+    return (
+      now.phase === 'results' &&
+      revealRef.current.revealCorrect &&
+      doubleShownForRef.current !== now.currentSlideId &&
+      doubleViewRef.current !== null
     );
   };
   /** תצוגה מקדימה של מסך המנצחים (מקש W): השלב לחזור אליו, או null אם לא פעיל. */
@@ -1406,6 +1440,7 @@ export function GameHost({
     lastHostAnswerRef.current = null;
     setBetOverlay(false);
     setCorrectOverlay(false);
+    setDoubleOverlay(false);
     voteOrderRef.current = { ids: [], seen: new Set() };
   }, [state.currentSlideId, state.slideEntry, engine, audio]);
 
@@ -1415,7 +1450,9 @@ export function GameHost({
     if (state.phase !== 'results') {
       betShownForRef.current = null;
       correctShownForRef.current = null;
+      doubleShownForRef.current = null;
       setCorrectOverlay(false);
+      setDoubleOverlay(false);
     }
   }, [state.phase, state.currentSlideId]);
 
@@ -1778,6 +1815,13 @@ export function GameHost({
         setCorrectOverlay(true);
         return;
       }
+      // «תוצאת הדאבל» — אחרי מי צדק ולפני ההימור: כמה מהמשפחה צדקו ומה זה שווה.
+      if (doublePendingRef.current()) {
+        doubleShownForRef.current = current.currentSlideId;
+        setDoubleOverlay(true);
+        if (doubleWinsTickets(doubleViewRef.current)) audio.playCue('fanfare');
+        return;
+      }
       // תוצאות ההימור — צעד משלו אחרי חשיפת התשובה, פעם אחת לשקופית: מי זכה,
       // מי הפסיד, ההימור הגדול. רק כשהשאלה הזאת הכריעה הימור.
       const outcomes = current.betOutcomes[current.currentSlideId];
@@ -1828,6 +1872,11 @@ export function GameHost({
     // «כל מי שענה נכון» פתוח — אחורה סוגר אותו (החשיפה נשארת)
     if (correctOverlayRef.current) {
       setCorrectOverlay(false);
+      return;
+    }
+    // «תוצאת הדאבל» פתוחה — אחורה סוגר אותה (החשיפה נשארת)
+    if (doubleOverlayRef.current) {
+      setDoubleOverlay(false);
       return;
     }
     const current = engine.getState();
@@ -1956,9 +2005,14 @@ export function GameHost({
       setBetOverlay(false);
       return;
     }
-    // «כל מי שענה נכון» פתוח — רווח סוגר וממשיך (לתוצאות ההימור או לשקופית הבאה).
+    // «כל מי שענה נכון» פתוח — רווח סוגר וממשיך (לתוצאת הדאבל, לתוצאות ההימור או לשקופית הבאה).
     if (correctOverlayRef.current) {
       setCorrectOverlay(false);
+      return;
+    }
+    // «תוצאת הדאבל» פתוחה — רווח סוגר וממשיך (לתוצאות ההימור או לשקופית הבאה).
+    if (doubleOverlayRef.current) {
+      setDoubleOverlay(false);
       return;
     }
     // לוח המרוץ (סולמות וחבלים) פתוח — רווח סוגר אותו וממשיך לשקופית הבאה.
@@ -2535,6 +2589,7 @@ export function GameHost({
     groupsOverlay ||
     betOverlay || // תוצאות ההימור — המשחק ממתין עד רווח
     correctOverlay || // «כל מי שענה נכון» — המשחק ממתין עד רווח
+    doubleOverlay || // «תוצאת הדאבל» — המשחק ממתין עד רווח
     boardOverlay ||
     boardPending !== null || // הלוח מחושב וממתין לרווח — לא מדלגים עליו אוטומטית
     raffle !== null ||
@@ -2565,6 +2620,7 @@ export function GameHost({
             ? 'board'
             : votesOverlay ||
                 correctOverlay ||
+                doubleOverlay ||
                 boardPending !== null ||
                 connectCategory !== null ||
                 settingsOpen ||
@@ -2823,6 +2879,15 @@ export function GameHost({
             setCorrectOverlay(true);
           };
           delayMs = Math.max(1, autoT.nextSlide.seconds) * 1000;
+        } else if (doublePendingRef.current()) {
+          // קודם «תוצאת הדאבל» (נסגרת לבד, ראו למטה), ואחריה ההימור או השקופית הבאה
+          label = 'תוצאת הדאבל';
+          action = () => {
+            doubleShownForRef.current = state.currentSlideId;
+            setDoubleOverlay(true);
+            if (doubleWinsTickets(doubleViewRef.current)) audio.playCue('fanfare');
+          };
+          delayMs = Math.max(1, autoT.nextSlide.seconds) * 1000;
         } else if (
           outcomes !== undefined &&
           Object.keys(outcomes).length > 0 &&
@@ -2924,6 +2989,17 @@ export function GameHost({
     );
     return () => window.clearTimeout(timeout);
   }, [stage, correctOverlay, correctAutoSeconds, narrationActive, narrationSpeaking]);
+
+  // «תוצאת הדאבל» במעבר אוטומטי: נסגרת לבד כמו תוצאות ההימור, ועוד כמה שניות
+  // לקריאת שורת ההשוואה, ואז המעבר ממשיך כרגיל.
+  useEffect(() => {
+    if (stage !== 'playing' || !doubleOverlay || correctAutoSeconds === null) return;
+    const timeout = window.setTimeout(
+      () => setDoubleOverlay(false),
+      betResultsCloseDelayMs(correctAutoSeconds, narrationActive && narrationSpeaking) + DOUBLE_EXTRA_READ_MS,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [stage, doubleOverlay, correctAutoSeconds, narrationActive, narrationSpeaking]);
 
   // מעבר אוטומטי של מדיה חוסמת (openMedia/endMedia + מסכי מדיה עצמאיים):
   //   • תמונה — מעבר אחרי autoT.media.image.seconds (אם image.active דלוק).
@@ -3357,6 +3433,7 @@ export function GameHost({
         lobby: lobbyOverlay,
         bet: betOverlay,
         correct: correctOverlay ? correctList : null,
+        double: doubleOverlay ? doubleViewNow : null,
         groups: groupsOverlay ? { categoryIndex: groupsCatIndex } : null,
         board: boardOverlay
           ? {
@@ -3399,6 +3476,12 @@ export function GameHost({
     reveal.revealCorrect &&
     correctList.length > 0 &&
     correctShownForRef.current !== state.currentSlideId;
+  // «תוצאת הדאבל» ממתינה — הרווח הבא פותח אותה (לרמז בפס ההנחיות)
+  const doublePending =
+    state.phase === 'results' &&
+    reveal.revealCorrect &&
+    doubleViewNow !== null &&
+    doubleShownForRef.current !== state.currentSlideId;
 
   // קליק עכבר אינו מקדם שלבים — קידום רק ברווח/0 (בקשת המנחה).
   // מה שהקהל רואה כאן משוכפל במסך הצפייה (src/live/LiveViewer.tsx) — שינוי
@@ -3444,6 +3527,8 @@ export function GameHost({
               betOverlay,
               correctPending,
               correctOverlay,
+              doublePending,
+              doubleOverlay,
               ...(railAvailable ? { groupRail: !groupRailHidden } : {}),
             }).map((h) => (
               <span key={h.key} className="host-hint">
@@ -3473,6 +3558,8 @@ export function GameHost({
               betOverlay,
               correctPending,
               correctOverlay,
+              doublePending,
+              doubleOverlay,
               ...(railAvailable ? { groupRail: !groupRailHidden } : {}),
             })}
             onRun={runHintKey}
@@ -3599,6 +3686,11 @@ export function GameHost({
         {/* «כל מי שענה נכון» (setting.showAllCorrect) — אחרי חשיפת התשובה; רווח סוגר וממשיך */}
         {stage === 'playing' && correctOverlay && (
           <CorrectListOverlay ids={correctList} nameOf={nameOf} onClose={() => setCorrectOverlay(false)} />
+        )}
+
+        {/* «תוצאת הדאבל» (הגרלת הווילה) — אחרי חשיפת התשובה בשאלת דאבל; רווח סוגר וממשיך */}
+        {stage === 'playing' && doubleOverlay && doubleViewNow !== null && (
+          <DoubleResultOverlay view={doubleViewNow} onClose={() => setDoubleOverlay(false)} />
         )}
 
         {/* דירוג הקבוצות (פקודת מנחה 4) — קבוצה מובילה + מובילים בכל קבוצה; מקש 5 מחליף סוג.

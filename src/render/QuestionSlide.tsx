@@ -29,6 +29,7 @@ import {
   type Slide,
 } from '../engine/index.ts';
 import { slideGroupRestriction } from '../app/groupRestriction.ts';
+import { doubleTitle } from '../app/villaDouble.ts';
 import type { GroupRailData } from '../app/groupRail.ts';
 import { FitText } from './FitText.tsx';
 import { GroupRail } from './GroupRail.tsx';
@@ -558,6 +559,13 @@ export function QuestionSlide({
                 שלא רוצה את התווית מכבה אותה (showTypeLabel), והאייקון נשאר. */}
             {showTypeLabel && isSurvey && <div className="q-mode-pill q-mode-pill--survey">📊 סקר · אין תשובה נכונה</div>}
             {showTypeLabel && majority && <div className="q-mode-pill q-mode-pill--majority">🗳 הרוב קובע את התשובה</div>}
+            {/* שאלת דאבל של הגרלת הווילה (villaDouble.ts): השרת מוסיף אותה, והיא שווה
+                ניקוד כפול. מוצגת תמיד, גם כשהתווית של סוג השאלה כבויה. */}
+            {slide.double !== undefined && (
+              <div className="q-mode-pill q-mode-pill--double">
+                🎫 {doubleTitle(slide.double.n, slide.double.of)} · ניקוד כפול
+              </div>
+            )}
             {betPill !== null && (
               <div className="q-mode-pill q-mode-pill--bet">
                 🎲 הימור פעיל · {betPill.bettors} מהמרים · {betPill.total.toLocaleString('en-US')} נק׳ על הכף

@@ -32,6 +32,7 @@ import { avatarColor } from '../render/avatar.ts';
 import type { BoardState } from '../app/snakesLadders.ts';
 import { hasGroupData } from '../app/groupScore.ts';
 import type { GroupRailData } from '../app/groupRail.ts';
+import type { DoubleView } from '../app/villaDouble.ts';
 import type { Group, RosterData } from '../app/roster.ts';
 import { AliasTable } from './aliases.ts';
 import {
@@ -76,6 +77,8 @@ export interface LiveHostInput {
     bet: boolean;
     /** «כל מי שענה נכון» פתוח: מי שצדק, המהיר ראשון; null = סגור. */
     correct?: readonly string[] | null;
+    /** «תוצאת הדאבל» פתוחה (הגרלת הווילה, villaDouble.ts); null = סגורה. */
+    double?: DoubleView | null;
     groups: { categoryIndex: number } | null;
     board: { board: BoardState; groups: Group[]; progression: 'dice' | 'percent' } | null;
     connect: {
@@ -215,6 +218,14 @@ function liveSlide(slide: Slide, view: SlideVisibility | null): Slide {
     },
     setting: liveSlideSetting(slide),
   };
+  // שאלת דאבל ומסך ההכרזה שלה (הגרלת הווילה): המסך צריך רק את המספור ואם יש
+  // כרטיסים. מזהה השאלה במאגר והסטטיסטיקה הארצית נשארים אצל המנחה.
+  if (slide.double !== undefined) {
+    out.double = { n: slide.double.n, of: slide.double.of, poolId: '', tickets: slide.double.tickets };
+  }
+  if (slide.doubleIntro !== undefined) {
+    out.doubleIntro = { n: slide.doubleIntro.n, of: slide.doubleIntro.of, tickets: slide.doubleIntro.tickets };
+  }
   if (slide.function !== undefined) {
     // כתובת ה-API ופרטי הפעולה נשארים אצל המנחה; המסך צריך רק את סוג המסך.
     out.function = {
@@ -466,6 +477,8 @@ export class LiveSnapshotBuilder {
         playing && revealed && input.overlays.correct != null
           ? input.overlays.correct.map((id) => alias(id))
           : null,
+      // מספרים בלבד (כמה צדקו, כרטיסים, שורת ההשוואה), ורק אחרי החשיפה.
+      double: playing && revealed && input.overlays.double != null ? { ...input.overlays.double } : null,
       groups: groupsOverlayShown ? input.overlays.groups : null,
       board: boardShown ? input.overlays.board : null,
       connect: input.overlays.connect,
