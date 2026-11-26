@@ -18,6 +18,8 @@
  *   • כששכבה חוסמת פתוחה (טבלת מובילים, פירוט הצבעות, תפריט…) — המשחק
  *     ממתין מתחתיה, כמו המעברים האוטומטיים של המנוע, והספירה מתחילה מחדש
  *     כשהיא נסגרת.
+ *   • ב«מסך מנצחים» של שקופית פונקציה, כל עוד יש מקומות לחשוף — הם נחשפים לבד,
+ *     והספירה מתחילה מהרגע שהמקום הראשון על המסך (screenWinners.ts).
  * ובזמן שהקריין מדבר — ממתינים לסוף המשפט, עם אותה תקרה כמו המעברים
  * האוטומטיים (narrationWait.ts).
  */
@@ -35,6 +37,16 @@ export interface AutoSkipScreen {
   covered: boolean;
   /** הקריין באמצע משפט. */
   narratorSpeaking: boolean;
+  /**
+   * «מסך מנצחים» בשקופית פונקציה (screenWinners.ts) שעוד חושף מקומות: לא מדלגים
+   * עד שכולם על המסך (החשיפה עצמה ממשיכה לבד). חסר = לא.
+   */
+  revealPending?: boolean;
+  /**
+   * זמן שנוסף לפני ההשהיה: במסך המנצחים, עד שהמקום הראשון על המסך (אחרי התיפוף),
+   * כך שההשהיה שהוגדרה נספרת משם. חסר = 0.
+   */
+  holdMs?: number;
 }
 
 /**
@@ -48,12 +60,15 @@ export function autoSkipDelayMs(
   phase: GamePhase,
   screen: AutoSkipScreen,
 ): number | null {
-  if (screen.mediaPlaying || screen.covered) return null;
+  if (screen.mediaPlaying || screen.covered || screen.revealPending === true) return null;
   const skip = slide.setting.automaticSkip;
   if (!skip.active) return null;
   const done =
     (phase === 'results' && screen.answerRevealed) ||
     (phase === 'showing' && !isVotableSlide(slide));
   if (!done) return null;
-  return narrationSafeDelayMs(Math.max(1, skip.seconds) * 1000, screen.narratorSpeaking);
+  return narrationSafeDelayMs(
+    Math.max(1, skip.seconds) * 1000 + Math.max(0, screen.holdMs ?? 0),
+    screen.narratorSpeaking,
+  );
 }

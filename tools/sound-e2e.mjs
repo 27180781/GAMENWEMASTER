@@ -63,6 +63,13 @@
  *   host-console         מסך המנחה בלשונית נפרדת מריץ את המשחק, ושותק בעצמו.
  *   live-viewer          מסך הצפייה (‎?view=‎) שומע מה שהאולם שומע, כולל מחיאות כפיים
  *                        מעל הטיימר (#235).
+ *   screen-winners       «מסך מנצחים» בשקופית פונקציה: רווח חושף אחד-אחד מהמקום האחרון,
+ *                        לחיצה כפולה לא קוטעת את התיפוף, 2 מסתיר עד הסוף ואז חוזר
+ *                        לשקופית הקודמת, כל כניסה מתחילה בלי חשופים, ומוזיקת המנצחים
+ *                        לא מתנגנת באמצע המשחק.
+ *   screen-winners-auto  אותו מסך במעבר אוטומטי של השקופית: החשיפה ממשיכה לבד, וההשהיה
+ *                        נספרת מהרגע שהמקום הראשון על המסך.
+ *   screen-winners-viewer  מסך הצפייה חושף יחד עם המסך הראשי (וגם מסתיר ב-2).
  *
  * דפדפן: playwright-core עם Chromium המותקן (/opt/pw-browsers/chromium אם קיים,
  * אחרת CHROMIUM_PATH או ערוץ chrome), מושתק (‎--mute-audio‎: הניגון והאירועים
@@ -213,6 +220,20 @@ function videoSlide(id, open) {
 }
 
 /**
+ * שקופית פונקציה «מסך» (מנצחים או טבלת מובילים), כמו שהבונה שולח אותה; autoSkip —
+ * «מעבר אוטומטי» של השקופית.
+ */
+function screenSlide(id, type, { autoSkip } = {}) {
+  const slide = trivia(id, { autoSkip });
+  return {
+    ...slide,
+    question: { que: '', queMode: 'text', scoreForQue: '', timeForQue: '', src: '', answers: [] },
+    type: 'function',
+    function: { action: 'screen', screen: { type } },
+  };
+}
+
+/**
  * משתתפים בקבוצות (users בקובץ המשחק, כמו שהבונה שולח): שניים בכל קבוצה. המספרים
  * הם של שחקני הדמה (‎«משתתף N»‎), כך שלקבוצות יש ניקוד אמיתי.
  */
@@ -228,7 +249,8 @@ function groupUsers(groups) {
 }
 
 /**
- * קובץ המשחק של תרחיש. spec: slides (לכל שאלה time / open / autoSkip),
+ * קובץ המשחק של תרחיש. spec: slides (לכל שאלה time / open / autoSkip; video — שקופית
+ * וידאו; screen: 'winners' | 'leaderboard' — שקופית פונקציה «מסך», עם autoSkip),
  * leadersEvery (setting.showWinnersListAfter), backgrounds (סרטון רקע למסך
  * הפתיחה, לטבלת המובילים ולמסך המנצחים), noQuestionSound, room (מצב טלפונים), autoTransition
  * (setting.autoTransition), groups (שמות קבוצות: שני משתתפים בכל אחת, ב-users).
@@ -262,7 +284,11 @@ function gameFile(name, spec) {
       ...(spec.autoTransition === undefined ? {} : { autoTransition: spec.autoTransition }),
     },
     questions: spec.slides.map((s, i) =>
-      s.video ? videoSlide(i + 1, url(s.video)) : trivia(i + 1, { ...s, open: url(s.open) }),
+      s.screen
+        ? screenSlide(i + 1, s.screen, s)
+        : s.video
+          ? videoSlide(i + 1, url(s.video))
+          : trivia(i + 1, { ...s, open: url(s.open) }),
     ),
     users: spec.groups === undefined ? '{}' : JSON.stringify(groupUsers(spec.groups)),
     ...(spec.room === undefined ? {} : { room: spec.room }),
@@ -801,6 +827,24 @@ const slideVideo = (s) => s.media.find((m) => m.tag === 'video' && m.src === 'cl
 // ---------------------------------------------------------------------------
 
 const Q = (extra = {}) => extra;
+/** שלושה טלפונים (שרת ההצבעות המדומה), כך שבמסך המנצחים יש בדיוק שלושה מקומות. */
+const THREE_PHONES = ['0500000011', '0500000012', '0500000013'];
+
+/** שאלה מהתשובות ועד החשיפה, כשהטלפונים האלה עונים נכון בזמן ההצבעה. */
+async function playWithVotes(t, votes, room, label, phones) {
+  await t.step(`${label}: התשובות`, t.space(3));
+  await t.step(`${label}: הצבעה`, t.space());
+  await t.step(
+    `${label}: ${phones.length} טלפונים עונים נכון`,
+    async () => {
+      for (const phone of phones) votes.vote(room, phone, 1);
+    },
+    { check: (s) => s.answered === phones.length || `ענו ${s.answered} במקום ${phones.length}` },
+    700,
+  );
+  await t.step(`${label}: סגירה וחשיפה`, t.space(2));
+}
+
 const SCENARIOS = [
   {
     name: 'question-sound',
@@ -1903,6 +1947,129 @@ const SCENARIOS = [
           LIVE,
         );
       } finally {
+        await relay.close();
+      }
+    },
+  },
+  {
+    name: 'screen-winners',
+    title: '«מסך מנצחים» בשקופית פונקציה: חשיפה אחד-אחד',
+    async run(t) {
+      const votes = await startVoteServer();
+      try {
+        const room = 4323;
+        await t.open(
+          { room, slides: [Q({ time: 30 }), Q(), Q({ screen: 'winners' }), Q()] },
+          { voteServer: votes.url },
+        );
+        await t.step('שאלה 1', t.space());
+        await playWithVotes(t, votes, room, 'שאלה 1', THREE_PHONES);
+        await t.step('שאלה 2', t.space());
+        await t.playToReveal('שאלה 2');
+        const noMusic = (s) =>
+          s.sound.every((x) => x.src !== WINNERS_FILE) || 'מוזיקת המנצחים התנגנה במסך באמצע המשחק';
+        const shown = (n, counter = '3/4') => (s) => [
+          onSlide(counter)(s),
+          s.winners || 'מסך המנצחים לא מוצג',
+          s.winnersCount === 3 || `${s.winnersCount} מנצחים במסך במקום 3`,
+          s.podium === n || `נחשפו ${s.podium} מקומות במקום ${n}`,
+          noMusic(s),
+        ];
+        await t.step('המסך נכנס — אף מקום עוד לא חשוף', t.space(), { check: shown(0) });
+        await t.step('רווח — מקום 3', t.space(), { check: shown(1) });
+        await t.step('רווח — מקום 2', t.space(), { check: shown(2) });
+        await t.step('רווח — המקום הראשון (תיפוף)', t.space(), { check: shown(3) });
+        await t.step('לחיצה כפולה מיד אחרי המקום הראשון — לא קוטעת את התיפוף', t.space(), {
+          check: shown(3),
+        });
+        await t.step('2 — מסתיר את המקום הראשון', t.key('2'), { check: shown(2) });
+        await t.step('2 — מסתיר את מקום 2', t.key('2'), { check: shown(1) });
+        await t.step('2 — מסתיר את מקום 3', t.key('2'), { check: shown(0) });
+        await t.step('2 בלי חשופים — השקופית הקודמת', t.key('2'), {
+          check: (s) => [onSlide('2/4')(s), !s.winners || 'מסך המנצחים עדיין מוצג'],
+        });
+        await t.playToReveal('שאלה 2 שוב');
+        await t.step('המסך שוב — כניסה חדשה, בלי חשופים', t.space(), { check: shown(0) });
+        await t.step('שלושה רווחים — כולם על המסך', t.space(3), { check: shown(3) });
+        await t.step('אחרי התיפוף — רווח עובר לשקופית הבאה', t.wait(2700), { check: shown(3) });
+        await t.step('השקופית הבאה, עם צליל השאלה', t.space(), {
+          started: { 'q-sound.wav': 1 },
+          check: (s) => [onSlide('4/4')(s), !s.winners || 'מסך המנצחים עדיין מוצג'],
+        });
+      } finally {
+        await votes.close();
+      }
+    },
+  },
+  {
+    name: 'screen-winners-auto',
+    title: '«מסך מנצחים» בשקופית פונקציה במעבר אוטומטי',
+    async run(t) {
+      const votes = await startVoteServer();
+      try {
+        const room = 4324;
+        await t.open(
+          { room, slides: [Q({ time: 30 }), Q({ screen: 'winners', autoSkip: 2 }), Q()] },
+          { voteServer: votes.url },
+        );
+        await t.step('שאלה 1', t.space());
+        await playWithVotes(t, votes, room, 'שאלה 1', THREE_PHONES);
+        const at = (n, counter = '2/3') => (s) => [
+          onSlide(counter)(s),
+          s.winnersCount === 3 || `${s.winnersCount} מנצחים במסך במקום 3`,
+          s.podium === n || `נחשפו ${s.podium} מקומות במקום ${n}`,
+        ];
+        await t.step('המסך נכנס — אף מקום עוד לא חשוף', t.space(), { check: at(0) });
+        // החשיפה הראשונה אחרי SCREEN_AUTO_FIRST_MS (1.5 שניות), ואז אחת בכל 2.2 שניות
+        await t.step('מקום 3 נחשף לבד', t.wait(1400), { check: at(1) });
+        await t.step('מקום 2', t.wait(1830), { check: at(2) });
+        await t.step('המקום הראשון', t.wait(1830), { check: at(3) });
+        // ההשהיה (2 שניות) נספרת מהרגע ששם המקום הראשון על המסך (2.4 שניות אחרי החשיפה)
+        await t.step('כולם על המסך — עוד לא עוברים', t.wait(2500), { check: at(3) });
+        await t.step('אחרי ההשהיה — השקופית הבאה', t.wait(1500), {
+          started: { 'q-sound.wav': 1 },
+          check: (s) => [onSlide('3/3')(s), !s.winners || 'מסך המנצחים עדיין מוצג'],
+        });
+      } finally {
+        await votes.close();
+      }
+    },
+  },
+  {
+    name: 'screen-winners-viewer',
+    title: '«מסך מנצחים» בשקופית פונקציה: מסך הצפייה חושף יחד',
+    async run(t, { newContext }) {
+      const relay = startRelay({ port: 0 });
+      const votes = await startVoteServer();
+      try {
+        const address = await relay.ready;
+        const relayBase = `http://127.0.0.1:${address.port}/live`;
+        const room = 4322;
+        const game = await t.open(
+          { room, slides: [Q({ time: 30 }), Q({ screen: 'winners' }), Q()] },
+          { relayBase, voteServer: votes.url },
+        );
+        const publishKey = createHash('sha256')
+          .update(`trivia-live-pub:v1:${game.id}:${room}`)
+          .digest('hex');
+        const viewUrl = `${BASE}/?view=${viewTokenFor(publishKey)}&liveRelay=${encodeURIComponent(relayBase)}`;
+        await t.openViewer(await newContext(), viewUrl);
+        const LIVE = 900; // הצופה מקבל את העדכונים דרך הממסר
+        const podium = (n) => (s) => [
+          onSlide('2/3')(s),
+          s.winners || 'מסך המנצחים לא מוצג',
+          s.podium === n || `נחשפו ${s.podium} מקומות במקום ${n}`,
+        ];
+        const both = (n) => ({ check: podium(n), viewer: { check: podium(n) } });
+        await t.step('שאלה 1', t.space(), {}, LIVE);
+        await playWithVotes(t, votes, room, 'שאלה 1', THREE_PHONES);
+        await t.step('המסך נכנס — אצל כולם בלי חשופים', t.space(), both(0), LIVE);
+        await t.step('רווח — מקום 3, אצל כולם', t.space(), both(1), LIVE);
+        await t.step('רווח — מקום 2', t.space(), both(2), LIVE);
+        await t.step('רווח — המקום הראשון', t.space(), both(3), LIVE);
+        await t.step('2 — מסתיר אותו גם אצל הצופה', t.key('2'), both(2), LIVE);
+      } finally {
+        await votes.close();
         await relay.close();
       }
     },

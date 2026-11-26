@@ -146,6 +146,11 @@ export interface LiveSnapshot {
   join: { show: boolean; code: string; qr: string; dial?: string };
   overlays: LiveOverlays;
   winnersRevealed: number;
+  /**
+   * «מסך מנצחים» בשקופית פונקציה: כמה מקומות נחשפו (מהאחרון לראשון). חסר — כולם
+   * יחד: השקופית אינה מסך כזה, או מסך ראשי מגרסה שבה המנצחים עלו שם יחד.
+   */
+  screenRevealed?: number;
   scoresPage: number;
   fn: { status: 'idle' | 'sending' | 'sent' | 'error'; detail: string };
   /** שכבה חוסמת פתוחה במסך הראשי — המדיה שם עצורה. */
