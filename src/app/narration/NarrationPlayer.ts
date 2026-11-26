@@ -9,6 +9,9 @@
  *   נשמעים בין קטעי מספר מורכב.
  * - `cancel` עוצר מיד — "הקריינות נגררת אחרי המסך": כל שינוי במה שמוצג מבטל
  *   את מה שמתנגן.
+ * - "עסוק" (`onBusyChange`) מתחיל ברגע ש-`say` נקרא, גם כשהקטעים עוד נטענים,
+ *   ונגמר כשהמשפט נגמר, בוטל או נזנח. המעבר האוטומטי ממתין לו (narrationWait.ts).
+ *   "מדבר" (`onSpeakingChange`) הוא רק הקול עצמו, להנמכת סאונד המשחק.
  * - קטע שלא נטען (404/רשת) נשמר במטמון כ-null ומדולג בשקט; הוא לעולם לא חוסם
  *   את שאר המשפט ולא את המשחק.
  * - נעילת autoplay: עד האינטראקציה הראשונה של המפעיל הדפדפן לא משמיע כלום.
@@ -22,6 +25,7 @@
  */
 
 import { debugLog } from '../debugLog.ts';
+import { NARRATION_END_SLACK_MS, NARRATION_LOAD_WAIT_MS, type NarrationBusy } from '../narrationWait.ts';
 
 /** קיצור כתובת לתצוגה בלוג (בלי query ארוך). */
 function shortUrl(url: string): string {
@@ -51,6 +55,8 @@ export class NarrationPlayer {
   private readonly sources = new Set<AudioBufferSourceNode>();
   private readonly speakingListeners = new Set<(speaking: boolean) => void>();
   private speaking = false;
+  private readonly busyListeners = new Set<(busy: NarrationBusy | null) => void>();
+  private busy: NarrationBusy | null = null;
   private volume = 1;
   private muted = false;
   /** מזהה הרצה: כל `say`/`cancel` מקדם אותו, וכך תוצאות ישנות נזרקות. */
@@ -187,6 +193,28 @@ export class NarrationPlayer {
     for (const listener of this.speakingListeners) listener(speaking);
   }
 
+  /** עסוק עכשיו (טוען או אומר משפט), עם התקרה שלו; null = שקט. */
+  getBusy(): NarrationBusy | null {
+    return this.busy;
+  }
+
+  /**
+   * מנוי על "עסוק": מהרגע ש-`say` נקרא ועד שהמשפט נגמר, בוטל או נזנח. כל שינוי
+   * בתקרה (הטעינה הסתיימה והקטעים שובצו) הוא הודעה נוספת עם `until` חדש.
+   */
+  onBusyChange(listener: (busy: NarrationBusy | null) => void): () => void {
+    this.busyListeners.add(listener);
+    return () => {
+      this.busyListeners.delete(listener);
+    };
+  }
+
+  private setBusy(busy: NarrationBusy | null): void {
+    if (busy === null && this.busy === null) return;
+    this.busy = busy;
+    for (const listener of this.busyListeners) listener(busy);
+  }
+
   /** טוען ומפענח קטע בודד; כישלון נשמר כ-null ולא נזרק החוצה לעולם. */
   private load(url: string): Promise<AudioBuffer | null> {
     const cached = this.cache.get(url);
@@ -261,14 +289,25 @@ export class NarrationPlayer {
     if (ctx.state === 'suspended') void ctx.resume().catch(() => {});
 
     const run = this.run;
+    // עסוק כבר מעכשיו, לפני שהקטעים נטענו: אחרת מעבר אוטומטי (שנייה אחת) חושף
+    // את הצעד הבא בזמן שהמשפט עוד יורד מהרשת, והמשפט נזרק.
+    this.setBusy({ until: Date.now() + NARRATION_LOAD_WAIT_MS });
+    /** המשפט נזנח בלי להתנגן — כבר לא עסוקים (אלא אם משפט חדש כבר החליף אותו). */
+    const drop = (): void => {
+      if (this.run === run) this.setBusy(null);
+    };
     void (async () => {
       const buffers = await Promise.all(clips.map((url) => this.load(url)));
       if (this.disposed || this.run !== run) return; // בוטל בזמן הטעינה
       const ready = buffers.filter((b): b is AudioBuffer => b !== null);
-      if (ready.length === 0) return;
+      if (ready.length === 0) {
+        drop();
+        return;
+      }
       if (ctx.state === 'suspended') {
         if (!this.unlocked) {
           debugLog('narration', 'האודיו עדיין נעול — מדלגים על המשפט');
+          drop();
           return;
         }
         // המקש שפתח את האודיו הוא בדרך כלל גם זה שהחליף את המסך, והמשפט של
@@ -276,9 +315,11 @@ export class NarrationPlayer {
         await ctx.resume().catch(() => {});
         if (this.disposed || this.run !== run) return; // המסך השתנה בינתיים
       }
-      if (ctx.state !== 'running') return;
       const master = this.master;
-      if (master === null) return;
+      if (ctx.state !== 'running' || master === null) {
+        drop();
+        return;
+      }
       // שיבוץ על שעון ה-AudioContext: תחילת כל קטע = סוף הקודם (+ הרווח
       // המוגדר), כך שאין "מדרגות" בין קטעי מספר מורכב.
       let at = ctx.currentTime + 0.02;
@@ -289,14 +330,22 @@ export class NarrationPlayer {
         source.connect(master);
         source.onended = () => {
           this.sources.delete(source);
-          if (this.run === run && this.sources.size === 0) this.setSpeaking(false);
+          if (this.run === run && this.sources.size === 0) {
+            this.setSpeaking(false);
+            this.setBusy(null);
+          }
         };
         this.sources.add(source);
         source.start(at);
         at += buffer.duration + gapMs / 1000;
         last = source;
       }
-      if (last !== null) this.setSpeaking(true);
+      if (last !== null) {
+        this.setSpeaking(true);
+        // התקרה עכשיו היא האורך האמיתי של המשפט (ועוד מרווח), לא זמן קבוע.
+        const leftMs = Math.max(0, at - ctx.currentTime) * 1000;
+        this.setBusy({ until: Date.now() + Math.ceil(leftMs) + NARRATION_END_SLACK_MS });
+      }
       debugLog('narration', `אומר ${ready.length} קטעים`, {
         clips: clips.map(shortUrl),
         skipped: clips.length - ready.length,
@@ -322,6 +371,7 @@ export class NarrationPlayer {
     }
     this.sources.clear();
     this.setSpeaking(false);
+    this.setBusy(null);
   }
 
   /** ניקוי מלא בעזיבת המשחק — עצירה, הסרת מאזינים וסגירת ה-AudioContext. */
@@ -330,6 +380,7 @@ export class NarrationPlayer {
     this.disposed = true;
     this.disarmUnlockListeners();
     this.speakingListeners.clear();
+    this.busyListeners.clear();
     this.unlockListeners.clear();
     const ctx = this.context;
     this.context = null;

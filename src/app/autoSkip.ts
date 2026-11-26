@@ -20,8 +20,8 @@
  *     כשהיא נסגרת.
  *   • ב«מסך מנצחים» של שקופית פונקציה, כל עוד יש מקומות לחשוף — הם נחשפים לבד,
  *     והספירה מתחילה מהרגע שהמקום הראשון על המסך (screenWinners.ts).
- * ובזמן שהקריין מדבר — ממתינים לסוף המשפט, עם אותה תקרה כמו המעברים
- * האוטומטיים (narrationWait.ts).
+ * ובזמן שהקריין עסוק (טוען משפט או אומר אותו) — ממתינים לסוף המשפט, עם אותה
+ * תקרה כמו המעברים האוטומטיים (narrationWait.ts).
  */
 
 import { isVotableSlide, type GamePhase, type Slide } from '../engine/index.ts';
@@ -35,8 +35,8 @@ export interface AutoSkipScreen {
   answerRevealed: boolean;
   /** שכבה חוסמת פתוחה מעל השקופית. */
   covered: boolean;
-  /** הקריין באמצע משפט. */
-  narratorSpeaking: boolean;
+  /** כמה זמן, לכל היותר, הקריין עוד צריך (narratorWaitMs); 0 = שקט. */
+  narratorWaitMs: number;
   /**
    * «מסך מנצחים» בשקופית פונקציה (screenWinners.ts) שעוד חושף מקומות: לא מדלגים
    * עד שכולם על המסך (החשיפה עצמה ממשיכה לבד). חסר = לא.
@@ -69,6 +69,6 @@ export function autoSkipDelayMs(
   if (!done) return null;
   return narrationSafeDelayMs(
     Math.max(1, skip.seconds) * 1000 + Math.max(0, screen.holdMs ?? 0),
-    screen.narratorSpeaking,
+    screen.narratorWaitMs,
   );
 }
