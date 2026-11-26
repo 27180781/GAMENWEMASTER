@@ -86,9 +86,22 @@ export const villaDoubleStatsSchema = z.object({
 });
 
 /**
+ * `run` של שאלות הדאבל: ההפעלה (ה-`startedAt` שלה, במילישניות) שהשאלות כבר
+ * הופיעו בה. הן מופיעות פעם אחת בכל משחק, ולכן השרת מחזיר אותן אחרי זה רק לרענון
+ * של אותה הפעלה, עם המספר שלה (villaDouble.ts › villaResume). ערך שאינו מספר
+ * שלם תקין הופך ל-1-, שאף הפעלה אינה מתאימה לו: השרת התכוון להפעלה מסוימת, ולכן
+ * בספק הן לא מוצגות.
+ */
+const villaRunSchema = z
+  .union([z.number().int().min(0), z.string().regex(/^\d{1,16}$/).transform(Number)])
+  .optional()
+  .catch(-1);
+
+/**
  * שקופית trivia שהיא שאלת דאבל: מערכת יצירת המשחקים הכניסה אותה למשחק של
  * הזמנה שנכנסה להגרלה. `tickets` = ההפעלה הזאת עוד יכולה לזכות בכרטיסים (false
- * אחרי שהכרטיסים כבר נספרו, אחרי ההגרלה, ובמשחק בדיקה שאינו נספר).
+ * אחרי שהכרטיסים כבר נספרו, אחרי ההגרלה, ובמשחק בדיקה שאינו נספר). `run` = רק
+ * ההפעלה הזאת מקבלת אותן (ראו villaRunSchema).
  */
 export const villaDoubleSchema = z
   .object({
@@ -97,6 +110,7 @@ export const villaDoubleSchema = z
     poolId: z.string(),
     tickets: z.boolean().optional().default(false),
     stats: villaDoubleStatsSchema.optional().catch(undefined),
+    run: villaRunSchema,
   })
   .passthrough();
 
@@ -106,6 +120,7 @@ export const villaDoubleIntroSchema = z
     n: z.number().int().min(1),
     of: z.number().int().min(1),
     tickets: z.boolean().optional().default(false),
+    run: villaRunSchema,
   })
   .passthrough();
 

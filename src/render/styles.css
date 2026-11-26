@@ -5095,6 +5095,26 @@ body {
 }
 .resume-actions .resume-new:hover { background: rgba(255, 255, 255, 0.12); }
 
+/* שאלות הדאבל מופיעות פעם אחת: חלון הבחירה בפתיחה, ושורה כשההפעלה בלעדיהן.
+   השורה בתחתית: בראש מסך הפתיחה יושבת «חייגו למספר», ובצדדים התחתונים תג הדמו ונורית החיבור. */
+.villa-once-box { max-width: 860px; }
+.villa-once-actions { flex-direction: column; align-self: stretch; }
+.villa-once-actions button { margin-top: 0; }
+.villa-off-badge {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  max-width: calc(100% - 48px);
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(250, 204, 21, 0.6);
+  border-radius: 999px;
+  padding: 6px 20px;
+  font-size: 18px;
+  text-align: center;
+}
+
 /* ---- אזהרות איכות חיבור ---- */
 
 .conn-warnings {
