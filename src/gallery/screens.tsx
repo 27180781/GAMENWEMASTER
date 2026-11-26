@@ -743,6 +743,20 @@ export const SCREENS: ScreenDef[] = [
       )),
   },
   {
+    id: 'leaderboard-10',
+    label: 'טבלת מובילים (10)',
+    build: (ctx) =>
+      withResults(
+        ctx,
+        (engine) => (
+          <div className="leaders-overlay">
+            <WinnersListScreen engine={engine} nameOf={nameOfFor(makeRoster(false))} roster={makeRoster(false)} />
+          </div>
+        ),
+        { setting: { winnersListCount: 10 } },
+      ),
+  },
+  {
     id: 'leaderboard-groups',
     label: 'טבלת מובילים + קבוצות',
     build: (ctx) => {
@@ -755,6 +769,22 @@ export const SCREENS: ScreenDef[] = [
           </div>
         ),
         { roster },
+      );
+    },
+  },
+  {
+    id: 'leaderboard-groups-10',
+    label: 'טבלת מובילים (10) + קבוצות',
+    build: (ctx) => {
+      const roster = makeRoster(true);
+      return withResults(
+        ctx,
+        (engine) => (
+          <div className="leaders-overlay">
+            <WinnersListScreen engine={engine} nameOf={nameOfFor(roster)} roster={roster} groupBonus={{ g3: 15 }} />
+          </div>
+        ),
+        { roster, setting: { winnersListCount: 10 } },
       );
     },
   },

@@ -15,6 +15,9 @@
  * הבדיקות:
  *   overflow — אלמנט גלוי שחורג מגבולות הבמה (1920×1080) אחרי חיתוך ההורים.
  *              אלמנט שכולו מחוץ לבמה נחשב "מחוץ לבמה בכוונה" ואינו נספר.
+ *   clip     — שורה בטבלת המובילים או בדירוג הקבוצות שהורה או קצה הבמה מסתירים
+ *              ממנה חלק. overflow אינו רואה אותה, כי אחרי החיתוך היא בתוך הבמה:
+ *              כך השורה העשירית בטבלת מובילים של 10 נחתכה בכל הערכות (2026-11).
  *   overlap  — טקסט/תמונת שאלה או כרטיס תשובה שמכוסים ע"י אלמנט אחר באותו מסך
  *              שאלה (באג פריסה; כיסוי ע"י שכבת overlay אינו נספר).
  *   fit      — FitText (‎[data-fit-text]‎) שהתוכן שלו עדיין גולש מהקופסה.
@@ -70,10 +73,10 @@ function resolveBg(value, allow) {
 // בדיקות בתוך הדף
 // ---------------------------------------------------------------------------
 
-/** רץ בדף: חריגה מהבמה + FitText שגולש. */
+/** רץ בדף: חריגה מהבמה, שורות טבלה חתוכות, FitText שגולש ושאלה מכוסה. */
 function pageChecks() {
   const stage = document.querySelector('.stage');
-  if (!stage) return { overflow: ['אין .stage בדף'], fit: [] };
+  if (!stage) return { overflow: ['אין .stage בדף'], clip: [], fit: [], overlap: [] };
   const sr = stage.getBoundingClientRect();
   const tol = 2;
   const visible = (el) =>
@@ -120,6 +123,34 @@ function pageChecks() {
     );
   }
 
+  // שורות של טבלה שחלק מהן מוסתר. השורות נבדקות מול כל הורה שחותך וגם מול הבמה.
+  const clip = [];
+  for (const el of stage.querySelectorAll('.leader-card, .group-list > li')) {
+    if (!visible(el)) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) continue;
+    let l = Math.max(r.left, sr.left);
+    let t = Math.max(r.top, sr.top);
+    let rr = Math.min(r.right, sr.right);
+    let b = Math.min(r.bottom, sr.bottom);
+    for (let a = el.parentElement; a && a !== stage; a = a.parentElement) {
+      const cs = getComputedStyle(a);
+      const ar = a.getBoundingClientRect();
+      if (cs.overflowX !== 'visible') {
+        l = Math.max(l, ar.left);
+        rr = Math.min(rr, ar.right);
+      }
+      if (cs.overflowY !== 'visible') {
+        t = Math.max(t, ar.top);
+        b = Math.min(b, ar.bottom);
+      }
+    }
+    const shownW = Math.max(0, rr - l);
+    const shownH = Math.max(0, b - t);
+    if (shownW >= r.width - tol && shownH >= r.height - tol) continue;
+    clip.push(`${describe(el)} נראה ${Math.round(shownW)}×${Math.round(shownH)} מתוך ${Math.round(r.width)}×${Math.round(r.height)}`);
+  }
+
   const fit = [];
   for (const el of stage.querySelectorAll('[data-fit-text]')) {
     if (!visible(el)) continue;
@@ -147,7 +178,7 @@ function pageChecks() {
       break;
     }
   }
-  return { overflow, fit, overlap };
+  return { overflow, clip, fit, overlap };
 }
 
 const CONTRAST_SELECTOR = ':is(.q-question-text, .q-card-text, .subject-text)';
@@ -270,7 +301,7 @@ async function shoot(page, baseUrl, job) {
       }
     }
 
-    const { overflow, fit, overlap } = await page.evaluate(pageChecks);
+    const { overflow, clip, fit, overlap } = await page.evaluate(pageChecks);
     mkdirSync(dirname(job.file), { recursive: true });
     await page.screenshot({ path: job.file });
 
@@ -282,9 +313,9 @@ async function shoot(page, baseUrl, job) {
       await page.evaluate(() => document.documentElement.classList.remove('__contrast-probe'));
       contrast = await page.evaluate(contrastCheck, { png, selector: CONTRAST_SELECTOR, textColors });
     }
-    return { ...job, overflow, fit, overlap, contrast, errors };
+    return { ...job, overflow, clip, fit, overlap, contrast, errors };
   } catch (err) {
-    return { ...job, overflow: [], fit: [], overlap: [], contrast: [], errors: [...errors, `shot failed: ${err.message}`] };
+    return { ...job, overflow: [], clip: [], fit: [], overlap: [], contrast: [], errors: [...errors, `shot failed: ${err.message}`] };
   } finally {
     page.off('console', onConsole);
     page.off('pageerror', onPageError);
@@ -295,7 +326,8 @@ function verdict(r) {
   const ratios = r.contrast.map((c) => c.ratio).filter((x) => x !== null);
   const minRatio = ratios.length > 0 ? Math.min(...ratios) : null;
   const contrastFail = minRatio !== null && minRatio < CONTRAST_MIN;
-  const fail = r.overflow.length > 0 || r.fit.length > 0 || r.overlap.length > 0 || contrastFail || r.errors.length > 0;
+  const fail =
+    r.overflow.length > 0 || r.clip.length > 0 || r.fit.length > 0 || r.overlap.length > 0 || contrastFail || r.errors.length > 0;
   return { minRatio, contrastFail, fail };
 }
 
@@ -432,7 +464,7 @@ async function main() {
     process.stdout.write('\n\n');
 
     // טבלה
-    const header = `${pad('theme', 8)} ${pad('colors', 15)} ${pad('screen', 30)} ${pad('overflow', 9)} ${pad('fit', 5)} ${pad('overlap', 8)} ${pad('contrast', 9)} ${pad('console', 8)} result`;
+    const header = `${pad('theme', 8)} ${pad('colors', 15)} ${pad('screen', 30)} ${pad('overflow', 9)} ${pad('clip', 5)} ${pad('fit', 5)} ${pad('overlap', 8)} ${pad('contrast', 9)} ${pad('console', 8)} result`;
     console.log(header);
     console.log('-'.repeat(header.length + 4));
     const details = [];
@@ -441,9 +473,9 @@ async function main() {
       if (v.fail) exitCode = 1;
       console.log(
         `${pad(r.theme, 8)} ${pad(r.colors, 15)} ${pad(r.screen, 30)} ${pad(r.overflow.length || 'ok', 9)} ${pad(
-          r.fit.length || 'ok',
+          r.clip.length || 'ok',
           5,
-        )} ${pad(r.overlap.length || 'ok', 8)} ${pad(v.minRatio === null ? 'n/a' : v.minRatio.toFixed(2) + (v.contrastFail ? '!' : ''), 9)} ${pad(
+        )} ${pad(r.fit.length || 'ok', 5)} ${pad(r.overlap.length || 'ok', 8)} ${pad(v.minRatio === null ? 'n/a' : v.minRatio.toFixed(2) + (v.contrastFail ? '!' : ''), 9)} ${pad(
           r.errors.length || 'ok',
           8,
         )} ${v.fail ? 'FAIL' : 'pass'}`,
@@ -451,6 +483,7 @@ async function main() {
       if (v.fail) {
         const lines = [
           ...r.overflow.slice(0, 4).map((x) => `overflow: ${x}`),
+          ...r.clip.slice(0, 4).map((x) => `clip: ${x}`),
           ...r.fit.slice(0, 4).map((x) => `fit: ${x}`),
           ...r.overlap.slice(0, 4).map((x) => `overlap: ${x}`),
           ...r.contrast
