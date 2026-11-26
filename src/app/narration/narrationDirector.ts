@@ -123,6 +123,12 @@ export interface DisplayedState {
   winners: number[];
   /** כמה מקומות פודיום כבר נחשפו (החשיפה מהאחרון לראשון). */
   winnersRevealed: number;
+  /**
+   * שם המקום הראשון כבר על המסך. מסך המנצחים חושף אותו רק אחרי תיפוף משלו, ולכן הלחיצה
+   * שחושפת אותו עדיין לא מראה אותו: ה-host מדליק את הדגל WINNERS_CHAMPION_SPEAK_MS אחריה,
+   * ומכבה אותו בכל צעד אחורה או יציאה מהמסך.
+   */
+  championShown: boolean;
   /** שקופית פונקציה: הפעולה שהיא מבצעת (null בכל שקופית אחרת). */
   functionAction: 'api' | 'screen' | 'score' | 'players' | null;
   /** האם פעולת הפונקציה כבר בוצעה (ה-host כתב functionDetail). */
@@ -290,6 +296,7 @@ function signatureOf(s: DisplayedState): string {
     s.revealCorrect ? 'c' : '-',
     s.overlay,
     s.winnersRevealed,
+    s.championShown ? 'w' : '-',
     s.timer === null ? '-' : s.timer.paused ? 'p' : 'r',
     s.functionDone ? 'f' : '-',
   ].join('|');
@@ -595,12 +602,18 @@ function candidates(s: DisplayedState, memory: NarrationMemory): NarrationEvent[
       if (rank > 3) continue;
       const points = s.winners[rank - 1];
       if (points === undefined) continue;
-      // רולאדת תופים רק לפני המקום הראשון: לפני כל חשיפה זה אותו קטע שלוש
-      // פעמים בחצי דקה.
-      const parts: NarrationPart[] = rank === 1 ? ['amb_drumroll', 'lb_winner'] : [];
-      parts.push(`lb_place_${rank}`, ...pointsClipKeys(points));
-      if (rank === 1) parts.push({ variants: AMB_CONGRATS });
-      events.push({ key: `winner:${rank}`, parts });
+      if (rank !== 1) {
+        events.push({ key: `winner:${rank}`, parts: [`lb_place_${rank}`, ...pointsClipKeys(points)] });
+        continue;
+      }
+      // המקום הראשון: המסך מתופף משלו ומעלה את השם רק בסוף התיפוף. הקריין שותק עד
+      // שהשם על המסך, ולכן גם `amb_drumroll` («רולאדת תופים») כבר לא נאמר: מעל
+      // התופים של המסך הוא היה כפול, והמקום והניקוד הקדימו את השם.
+      if (!s.championShown) continue;
+      events.push({
+        key: 'winner:1',
+        parts: ['lb_winner', 'lb_place_1', ...pointsClipKeys(points), { variants: AMB_CONGRATS }],
+      });
     }
     return events;
   }
