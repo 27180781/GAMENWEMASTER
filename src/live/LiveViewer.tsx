@@ -53,6 +53,7 @@ import { Stage } from '../render/Stage.tsx';
 import { themeRootProps } from '../render/theme.ts';
 import type { TimerView } from '../render/TimerRing.tsx';
 import { VotesBreakdown } from '../render/VotesBreakdown.tsx';
+import { WinnersSoundContext } from '../render/winners/soundContext.ts';
 import { mirrorEngine } from './mirrorEngine.ts';
 import { JoinCard, VotePad } from './VotePad.tsx';
 import {
@@ -480,6 +481,8 @@ function ViewerChrome({
   const [fullscreen, setFullscreen] = useState(false);
   const hideTimer = useRef<number | null>(null);
   const audioRef = useRef<AudioManager | null>(null);
+  /** מסך המנצחים מנגן את האפקטים שלו רק אחרי שהצופה הפעיל צליל (ובאותו AudioManager). */
+  const [winnersSink, setWinnersSink] = useState<AudioManager | null>(null);
   const seqRef = useRef({ sound: -1, cue: -1, applause: -1 });
 
   const showControls = useCallback(() => {
@@ -516,6 +519,7 @@ function ViewerChrome({
     if (soundOn) {
       audioRef.current?.stopAll();
       setSoundOn(false);
+      setWinnersSink(null);
       return;
     }
     // נוצר בתוך הלחיצה — כך הדפדפן מתיר לו לנגן.
@@ -523,6 +527,7 @@ function ViewerChrome({
     // הסאונד הנוכחי (מוזיקת רקע בלולאה) מתחיל מיד; אפקטים שעברו — לא.
     seqRef.current = { ...seqRef.current, sound: -1 };
     setSoundOn(true);
+    setWinnersSink(audioRef.current);
   };
 
   // שיקוף הסאונד של המסך הראשי.
@@ -607,7 +612,7 @@ function ViewerChrome({
       className={`live-viewer${hasSide ? ' has-side' : ''}${video !== null || side !== null ? ' has-video' : ''}`}
     >
       <div className="live-screen-area">
-        {children(soundOn)}
+        <WinnersSoundContext.Provider value={winnersSink}>{children(soundOn)}</WinnersSoundContext.Provider>
         {notice !== null && (
           <div className="live-notice" role="status" dir="rtl">
             {notice}
@@ -743,7 +748,12 @@ function LiveScreen({
                   </>
                 )}
                 {stage === 'winners' && (
-                  <WinnersScreen engine={engine} nameOf={nameOf} revealed={snap.winnersRevealed} />
+                  <WinnersScreen
+                    engine={engine}
+                    nameOf={nameOf}
+                    revealed={snap.winnersRevealed}
+                    covered={overlays.groups !== null}
+                  />
                 )}
                 {stage === 'scoreboard' && (
                   <AllScoresScreen engine={engine} nameOf={nameOf} page={snap.scoresPage} />

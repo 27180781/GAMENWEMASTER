@@ -27,6 +27,9 @@ import {
   type GameFile,
   type VoteAdapter,
   type VoteSnapshot,
+  WINNERS_CHAMPION_GUARD_MS,
+  WINNERS_MAX,
+  winnersShownCount,
 } from '../engine/index.ts';
 import { SocketVoteAdapter, isLiveVoteAdapter, type RawVote } from './socketAdapter.ts';
 import { CompositeVoteAdapter } from './compositeAdapter.ts';
@@ -134,6 +137,7 @@ import {
 } from './snakesLadders.ts';
 import { SnakesLaddersBoard } from '../render/SnakesLaddersBoard.tsx';
 import { MediaPauseContext } from '../render/mediaPause.ts';
+import { WinnersSoundContext } from '../render/winners/soundContext.ts';
 import {
   HOST_HEARTBEAT_MS,
   openControlChannel,
@@ -727,6 +731,8 @@ export function GameHost({
   const [scoresPageBump, setScoresPageBump] = useState(0);
   const winnersRevealedRef = useRef(0);
   winnersRevealedRef.current = winnersRevealed;
+  /** מתי נחשף המקום הראשון (performance.now) — רווח מיד אחריו לא קוטע את התיפוף. */
+  const championAtRef = useRef(-Infinity);
   /** חלונית דיבוג (F12) — מוצגת מעל הכל; ‏?debug=1 פותח אותה מראש. */
   const [debugOpen, setDebugOpen] = useState(
     () => new URLSearchParams(window.location.search).get('debug') === '1',
@@ -1979,9 +1985,11 @@ export function GameHost({
     }
     if (stage === 'winners') {
       // חשיפת המנצחים אחד-אחד; אחרי שכולם נחשפו — מעבר למסך ניקוד כל המשתתפים.
-      const podiumTotal = Math.min(engine.getWinners(engine.getGame().setting.multiWinners).length, 5);
+      // רווח בתוך WINNERS_CHAMPION_GUARD_MS מחשיפת המקום הראשון לא עושה כלום:
+      // התיפוף והחבטה לא נקטעים בלחיצה כפולה (גם 0 בשלט המנחה עובר כאן).
+      const podiumTotal = winnersShownCount(engine.getWinners(engine.getGame().setting.multiWinners).length);
       if (winnersRevealedRef.current < podiumTotal) setWinnersRevealed((n) => n + 1);
-      else setStage('scoreboard');
+      else if (performance.now() - championAtRef.current >= WINNERS_CHAMPION_GUARD_MS) setStage('scoreboard');
       return;
     }
     if (stage === 'scoreboard') {
@@ -2525,6 +2533,13 @@ export function GameHost({
     if (stage === 'winners') setWinnersRevealed(0);
   }, [stage]);
 
+  // הרגע שבו המקום הראשון נחשף (המקום האחרון בסדר החשיפה) — לשמירה על התיפוף שלו.
+  useEffect(() => {
+    if (stage !== 'winners') return;
+    const total = winnersShownCount(engine.getWinners(engine.getGame().setting.multiWinners).length);
+    championAtRef.current = total > 0 && winnersRevealed >= total ? performance.now() : -Infinity;
+  }, [stage, winnersRevealed, engine]);
+
   // קהל סינתטי: מזרים snapshots מצטברים בזמן הצבעה, לפי קונפיגורציית הדמו
   useEffect(() => {
     if (!votingActive || !syntheticCrowd) return;
@@ -2731,7 +2746,7 @@ export function GameHost({
         stage === 'winners'
           ? engine
               .getWinners(g.setting.multiWinners)
-              .slice(0, 5)
+              .slice(0, WINNERS_MAX)
               .map((w) => w.score)
           : [],
       winnersRevealed,
@@ -3495,6 +3510,7 @@ export function GameHost({
       {/* שכבה חוסמת פתוחה = המשחק עצור, וזה כולל את המדיה: וידאו/סאונד נעצרים
           וממשיכים מאותה נקודה כשהיא נסגרת (הטיימר כבר קפא כך ממילא). */}
       <MediaPauseContext.Provider value={overlayActive}>
+      <WinnersSoundContext.Provider value={audio}>
       <Stage>
         {/* באנר הצטרפות עליון — משחק אונליין עם קוד חדר, לכל אורך המשחק. במסך
             הלובי (opening) הוא מוסתר, ובמקומו מוצג מספר גדול+קוד בשליש העליון של
@@ -3631,7 +3647,7 @@ export function GameHost({
           </>
         )}
         {stage === 'winners' && (
-          <WinnersScreen engine={engine} nameOf={nameOf} revealed={winnersRevealed} />
+          <WinnersScreen engine={engine} nameOf={nameOf} revealed={winnersRevealed} covered={groupsOverlay} />
         )}
         {stage === 'scoreboard' && (
           <AllScoresScreen
@@ -4008,6 +4024,7 @@ export function GameHost({
         {/* הודעת הלחיצות רק בלובי: בזמן השאלות היא מוקרנת מול הקהל. */}
         {useClicker && <ClickerDiagnostic showPresses={stage === 'opening'} />}
       </Stage>
+      </WinnersSoundContext.Provider>
       </MediaPauseContext.Provider>
     </div>
   );

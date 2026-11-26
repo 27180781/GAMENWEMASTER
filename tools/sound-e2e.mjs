@@ -20,7 +20,8 @@
  *
  * כללים שנבדקים בכל צעד: AudioManager מנגן ערוץ אחד בכל רגע — שני צלילים יחד הם
  * כישלון, חוץ ממחיאות כפיים, שמתנגנות מעל הצליל. בזמן המחיאות הצליל מונמך, ובלעדיהן
- * כל צליל בווליום מלא.
+ * כל צליל בווליום מלא — חוץ מצליל המנצחים במסך המנצחים בקוד, שהוא שם מוזיקת רקע
+ * (WINNERS_BED) מתחת לאפקטים המסונתזים, ומתכופף עוד בכל חשיפה.
  *
  * התרחישים:
  *   question-sound       צליל השאלה: שאלה 1 אחרי מסך הפתיחה, כניסה רגילה, אחרי טבלת
@@ -153,6 +154,13 @@ const SOUNDS = {
   genericMediaSound: ['applause.wav', APPLAUSE_S], // מחיאות הכפיים (מקש 3)
 };
 const APPLAUSE_FILE = SOUNDS.genericMediaSound[0];
+const WINNERS_FILE = SOUNDS.winnersMediaSound[0];
+/**
+ * מסך המנצחים בקוד (src/render/winners/): צליל המנצחים של המשחק הוא שם מוזיקת רקע
+ * ב-WINNERS_BED_LEVEL (src/app/winnersSynth.ts, 0.62 × 0.92) מתחת לאפקטים המסונתזים,
+ * ובכל חשיפה הוא מתכופף עוד (תוכנית ה-duck של הסגנון), ואז חוזר לרמה הזאת.
+ */
+const WINNERS_BED = 0.57;
 
 /** שאלת טריוויה: שלוש תשובות, הראשונה נכונה. */
 function trivia(id, { time = 15, open = '', autoSkip } = {}) {
@@ -241,6 +249,7 @@ function gameFile(name, spec) {
       gameMedia: { src: url(spec.backgrounds ? 'bg-game.webm' : '') },
       logo: { src: '' },
       triviaMedia: { src: '' },
+      // הבונה עדיין שולח את רקע המנצחים הישן בשביל מנועים ישנים; המסך בקוד מתעלם ממנו
       winnersMedia: { src: url(spec.backgrounds ? 'bg-winners.webm' : '') },
       winnersListMedia: { src: url(spec.backgrounds ? 'bg-leaders.webm' : '') },
       sound: Object.fromEntries(
@@ -463,11 +472,14 @@ function readScreen() {
     media: window.__pageMedia(),
     counter: q('.slide-counter')?.textContent?.trim() ?? '',
     leaders: q('.leaders-overlay') !== null,
-    winners: q('.winners-podium-screen') !== null,
+    winners: q('.winners-show') !== null,
     scoreboard: q('.all-scores-screen') !== null,
     /** דירוג הקבוצות (מקש 4) פתוח. */
     groups: q('.gs-overlay') !== null,
-    podium: document.querySelectorAll('.podium-slot.is-shown').length,
+    /** כמה מקומות נחשפו במסך המנצחים (data-revealed). */
+    podium: Number(q('.winners-show')?.getAttribute('data-revealed') ?? 0),
+    /** כמה מנצחים במסך המנצחים (data-count; 0 = «אין משתתפים עם ניקוד», בלי אפקטים). */
+    winnersCount: Number(q('.winners-show')?.getAttribute('data-count') ?? 0),
     question: q('.q-question:not(.reveal-hidden)') !== null,
     answers: document.querySelectorAll('.q-card:not(.reveal-hidden)').length,
     correct: document.querySelectorAll('.q-card--correct').length,
@@ -567,6 +579,15 @@ function judge(expect, events, screen) {
   const claps = screen.sound.length - channels.length;
   if (channels.length > 1 || claps > 1) problems.push(`שני צלילים יחד: ${listText(now)}`);
   for (const s of channels) {
+    if (screen.winners && screen.winnersCount > 0 && s.src === WINNERS_FILE) {
+      // מוזיקת הרקע של מסך המנצחים: לעולם לא מעל רמת הרקע, ומתחת למחיאות כפיים — נמוך ממנה.
+      // בלי מנצחים אין אפקטים, והצליל בווליום מלא כמו כל צליל.
+      if (s.v > WINNERS_BED + 0.01)
+        problems.push(`${s.src} מעל רמת הרקע של מסך המנצחים (${s.v} במקום ${WINNERS_BED} לכל היותר)`);
+      if (claps > 0 && s.v >= WINNERS_BED) problems.push(`${s.src} לא הונמך מתחת למחיאות הכפיים`);
+      if (claps === 0 && s.v < 0.1) problems.push(`${s.src} כמעט לא נשמע במסך המנצחים (${s.v})`);
+      continue;
+    }
     if (claps > 0 && s.v >= 1) problems.push(`${s.src} לא הונמך מתחת למחיאות הכפיים`);
     if (claps === 0 && s.v < 1) problems.push(`${s.src} נשאר מונמך (${s.v}) בלי מחיאות כפיים`);
   }
@@ -722,6 +743,15 @@ function makeTester(scenario, context, result) {
         }
       },
     space: (times = 1) => t.key('Space', times),
+    /**
+     * Backspace (שקופית שלמה אחורה) ו-Enter בחלון «לחזור שקופית שלמה אחורה?». מאז #251
+     * זה חלון בתוך הדף (ConfirmDialog), ולא window.confirm שהמאזין ל-'dialog' מאשר.
+     */
+    backSlide: () => async () => {
+      await page.keyboard.press('Backspace');
+      await page.locator('.confirm-box').waitFor({ timeout: 5000 });
+      await page.keyboard.press('Enter');
+    },
     /** כמה מקשים ברצף, למשל ['Space', '1', 'KeyW']. */
     keys: (list) => async () => {
       for (const k of list) {
@@ -1103,9 +1133,15 @@ const SCENARIOS = [
         1000,
       );
       await t.step(
-        'תצוגת המנצחים (W) — הרקע שלה מתנגן',
+        'תצוגת המנצחים (W) — המסך בקוד, בלי רקע הווידאו הישן',
         t.key('KeyW'),
-        { sound: ['winners.wav'], check: bgPlays('bg-winners.webm') },
+        {
+          sound: ['winners.wav'],
+          check: (s) => [
+            s.winners || 'מסך המנצחים לא מוצג',
+            !s.media.some((m) => m.src === 'bg-winners.webm') || 'רקע המנצחים הישן (winnersMedia) מוצג',
+          ],
+        },
         1500,
       );
       await t.step(
@@ -1249,7 +1285,7 @@ const SCENARIOS = [
       await t.step('שאלה 4', t.space(), { check: onSlide('4/5') });
       await t.step(
         'Backspace — חזרה לשאלה 3, בלי הטבלה שוב',
-        t.key('Backspace'),
+        t.backSlide(),
         {
           started: { 'q-sound.wav': 1 },
           sound: ['q-sound.wav'],
@@ -1574,7 +1610,8 @@ const SCENARIOS = [
       await t.step(
         'רווח עד מסך הניקוד',
         async () => {
-          for (let i = 0; i < 8; i++) {
+          // אחרי חשיפת המקום הראשון רווח לא עושה כלום כ-2.5 שניות (התיפוף והחבטה)
+          for (let i = 0; i < 30; i++) {
             if ((await t.page.locator('.all-scores-screen').count()) > 0) break;
             await t.page.keyboard.press('Space');
             await sleep(STEP);
@@ -1656,7 +1693,7 @@ const SCENARIOS = [
       });
       await t.step(
         'Backspace בשאלה הראשונה — היא מתחילה נקייה, עם הצליל',
-        t.key('Backspace'),
+        t.backSlide(),
         {
           started: { 'q-sound.wav': 1 },
           sound: ['q-sound.wav'],

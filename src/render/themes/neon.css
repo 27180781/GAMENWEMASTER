@@ -164,7 +164,7 @@
 }
 
 /* כותרות חופשיות: לבן עם הילת צינור */
-.game-root[data-visual-theme='neon'] :is(.podium-name, .podium-score, .raffle-name) {
+.game-root[data-visual-theme='neon'] :is(.raffle-name) {
   text-shadow: 0 0 2px #000, 0 4px 14px rgba(0, 0, 0, 0.8), 0 0 22px var(--vt-neon-a);
 }
 .game-root[data-visual-theme='neon'] .q-flyer-av {

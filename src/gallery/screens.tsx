@@ -6,7 +6,7 @@
  */
 
 import type { ReactNode } from 'react';
-import type { GameEngine, GameFile } from '../engine/index.ts';
+import { WINNERS_STYLE_LABELS, type GameEngine, type GameFile, type WinnersStyle } from '../engine/index.ts';
 import { SlideView } from '../render/SlideView.tsx';
 import { AllScoresScreen, LobbyScreen, WinnersListScreen, WinnersScreen } from '../render/screens.tsx';
 import { VotesBreakdown } from '../render/VotesBreakdown.tsx';
@@ -427,6 +427,38 @@ function railScreen(
 // המסכים
 // ---------------------------------------------------------------------------
 
+
+// ---------------------------------------------------------------------------
+// מסך המנצחים הסופי — כל סגנון בכמה מספרי מנצחים, אחרי שכולם נחשפו
+// ---------------------------------------------------------------------------
+
+const WINNERS_SHOTS: readonly (readonly [WinnersStyle, number])[] = [
+  ['stage', 5],
+  ['stage', 3],
+  ['stage', 1],
+  ['cards', 5],
+  ['cards', 2],
+  ['medals', 5],
+  ['medals', 4],
+];
+
+function winnersShot(style: WinnersStyle, count: number): ScreenDef {
+  return {
+    id: `winners-${style}-${count}`,
+    label: `מסך המנצחים «${WINNERS_STYLE_LABELS[style]}» — ${count === 1 ? 'מנצח אחד' : `${count} מנצחים`}`,
+    // הכניסה (תאורה, כותרת) נמשכת כשתי שניות; המקומות עצמם כבר "נחתו"
+    settleMs: 2600,
+    build: (ctx) => {
+      const game = makeGame(ctx, [Q4], { multiWinners: count, winnersStyle: style });
+      const engine = engineAt(game, 1, 'showing', { scores: scoresFor(24) });
+      return {
+        game,
+        node: <WinnersScreen engine={engine} nameOf={nameOfFor(makeRoster(false))} revealed={count} />,
+      };
+    },
+  };
+}
+
 export const SCREENS: ScreenDef[] = [
   {
     id: 'lobby',
@@ -781,18 +813,30 @@ export const SCREENS: ScreenDef[] = [
       );
     },
   },
+  ...WINNERS_SHOTS.map(([style, count]) => winnersShot(style, count)),
   {
-    id: 'winners-podium',
-    label: 'פודיום — 5 מנצחים',
+    id: 'winners-slide',
+    label: 'מסך המנצחים — שקופית «מסך» באמצע המשחק (כולם יחד)',
+    settleMs: 3600,
     build: (ctx) => {
-      const game = makeGame(ctx, [Q4]);
+      const game = makeGame(ctx, [Q4], { multiWinners: 4 });
       const engine = engineAt(game, 1, 'showing', { scores: scoresFor(24) });
       return { game, node: <WinnersScreen engine={engine} nameOf={nameOfFor(makeRoster(false))} /> };
     },
   },
   {
+    id: 'winners-empty',
+    label: 'מסך המנצחים — אין משתתפים עם ניקוד',
+    build: (ctx) => {
+      const game = makeGame(ctx, [Q4]);
+      const engine = engineAt(game, 1, 'showing');
+      return { game, node: <WinnersScreen engine={engine} nameOf={nameOfFor(makeRoster(false))} revealed={0} /> };
+    },
+  },
+  {
     id: 'winners-groups',
-    label: 'פודיום + דירוג הקבוצות (מקש 4)',
+    label: 'מסך המנצחים + דירוג הקבוצות (מקש 4)',
+    settleMs: 1500,
     build: (ctx) => {
       const roster = makeRoster(true);
       const game = makeGame(ctx, [Q4]);
@@ -802,7 +846,7 @@ export const SCREENS: ScreenDef[] = [
         game,
         node: (
           <>
-            <WinnersScreen engine={engine} nameOf={nameOfFor(roster)} />
+            <WinnersScreen engine={engine} nameOf={nameOfFor(roster)} revealed={0} covered />
             <GroupStandingsOverlay
               roster={roster}
               scores={state.scores}

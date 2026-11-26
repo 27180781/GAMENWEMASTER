@@ -241,11 +241,10 @@
   text-shadow: 0 0 2px var(--led-amber), 0 0 14px rgba(255, 182, 39, 0.75);
 }
 
-/* כותרות חופשיות על הפודיום ובהגרלה: זוהר LED ענבר בנוסף לצל הכהה */
-.game-root[data-visual-theme='led'] :is(.podium-name, .podium-score, .raffle-name) {
+/* כותרות חופשיות בהגרלה: זוהר LED ענבר בנוסף לצל הכהה */
+.game-root[data-visual-theme='led'] :is(.raffle-name) {
   text-shadow: 0 4px 16px rgba(0, 0, 0, 0.85), 0 0 4px rgba(0, 0, 0, 0.8), 0 0 24px rgba(255, 182, 39, 0.5);
 }
-.game-root[data-visual-theme='led'] .podium-score { font-variant-numeric: tabular-nums; }
 
 /* ---- רקע גיבוי (כשאין מדיה): מסך LED שחור עם מטריצת נקודות ופס סריקה שיורד ---- */
 .game-root[data-visual-theme='led'] :is(.slide-screen, .leaders-overlay, .sl-overlay) {

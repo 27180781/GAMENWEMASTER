@@ -1682,34 +1682,7 @@ body {
   flex: none;
 }
 
-/* מסך המנצחים — פודיום: רק שם + ניקוד מעל רקע הפודיום (winnersMedia). כל מנצח
-   ממוקם במקומו הקבוע (left/top ב-inline), ונחשף אחד-אחד מהאחרון לראשון. */
-.podium-slot {
-  position: absolute;
-  width: 340px;
-  text-align: center;
-  transform: translate(-50%, 14px);
-  opacity: 0;
-  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
-  pointer-events: none;
-}
-.podium-slot.is-shown { opacity: 1; transform: translate(-50%, 0); }
-
-.podium-name {
-  font-weight: 900;
-  font-size: 42px;
-  line-height: 1.05;
-  color: #fff;
-  text-shadow: 0 3px 10px rgba(0, 0, 0, 0.8), 0 0 6px rgba(0, 0, 0, 0.7);
-}
-.podium-score {
-  display: block;
-  margin-top: 8px;
-  font-weight: 900;
-  font-size: 36px;
-  color: #fff;
-  text-shadow: 0 3px 10px rgba(0, 0, 0, 0.8), 0 0 6px rgba(0, 0, 0, 0.7);
-}
+/* מסך המנצחים הסופי: src/render/winners/ (winners.css). */
 
 .winners-empty {
   font-size: 44px;

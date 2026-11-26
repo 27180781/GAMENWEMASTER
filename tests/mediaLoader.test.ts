@@ -7,7 +7,7 @@ import { orderedMediaUrls, preloadMediaList } from '../src/app/mediaLoader.ts';
 import { fourAnswers, makeGame, rawSlide } from './helpers.ts';
 
 describe('orderedMediaUrls', () => {
-  it('סדר: לובי → שקופיות → זוכים → סאונדים; בלי כפילויות/YouTube/blob/data', () => {
+  it('סדר: לובי → שקופיות → טבלת מובילים → סאונדים; בלי כפילויות/YouTube/blob/data', () => {
     const game = makeGame([
       rawSlide({
         id: 1,
@@ -26,6 +26,8 @@ describe('orderedMediaUrls', () => {
     ]);
     game.setting.gameMedia = { src: 'https://cdn/lobby.png' };
     game.setting.logo = { src: 'https://cdn/logo.png' };
+    game.setting.winnersListMedia = { src: 'https://cdn/leaders.png' };
+    // רקע מסך המנצחים הישן: המסך כולו בקוד ומתעלם ממנו, ולכן לא נטען מראש
     game.setting.winnersMedia = { src: 'https://cdn/podium.png' };
     game.setting.sound.timerMediaSound = { src: 'https://cdn/timer.mp3' };
     game.setting.sound.showQuestionMediaSound = { src: 'https://cdn/lobby.png' }; // כפילות
@@ -36,16 +38,17 @@ describe('orderedMediaUrls', () => {
     expect(urls[1]).toBe('https://cdn/logo.png');
     expect(urls).toContain('https://cdn/q1.png');
     expect(urls).toContain('https://cdn/open1.mp4');
-    expect(urls).toContain('https://cdn/podium.png');
+    expect(urls).toContain('https://cdn/leaders.png');
+    expect(urls).not.toContain('https://cdn/podium.png');
     expect(urls).toContain('https://cdn/timer.mp3');
     // דילוגים
     expect(urls).not.toContain('https://youtu.be/x');
     expect(urls).not.toContain('blob:xyz');
     // dedup — lobby.png פעם אחת בלבד
     expect(urls.filter((u) => u === 'https://cdn/lobby.png')).toHaveLength(1);
-    // סדר עדיפות: שקופית לפני זוכים לפני סאונד
-    expect(urls.indexOf('https://cdn/podium.png')).toBeGreaterThan(urls.indexOf('https://cdn/q1.png'));
-    expect(urls.indexOf('https://cdn/timer.mp3')).toBeGreaterThan(urls.indexOf('https://cdn/podium.png'));
+    // סדר עדיפות: שקופית לפני טבלת המובילים לפני סאונד
+    expect(urls.indexOf('https://cdn/leaders.png')).toBeGreaterThan(urls.indexOf('https://cdn/q1.png'));
+    expect(urls.indexOf('https://cdn/timer.mp3')).toBeGreaterThan(urls.indexOf('https://cdn/leaders.png'));
   });
 
   it('ans_images — כולל את תמונות התשובות', () => {
