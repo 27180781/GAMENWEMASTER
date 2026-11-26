@@ -173,7 +173,7 @@
 .game-root[data-visual-theme='chalk'] :is(.raffle-title, .bet-title) { color: var(--vt-chalk); }
 
 /* טקסט חופשי שעומד על הרקע: צל כהה רך כמו גיר על לוח — נוסף על ההילה בצבע הראשי */
-.game-root[data-visual-theme='chalk'] :is(.podium-name, .podium-score, .raffle-name) {
+.game-root[data-visual-theme='chalk'] :is(.raffle-name) {
   text-shadow: 0 0 2px rgba(20, 36, 27, 0.95), 0 0 8px rgba(20, 36, 27, 0.85), 0 4px 16px rgba(0, 0, 0, 0.7);
 }
 

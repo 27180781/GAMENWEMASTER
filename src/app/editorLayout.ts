@@ -38,8 +38,19 @@ export interface SettingsSection {
  * `hostVideo` (וידאו המנחה בחלון הצפייה) ו-`hostVideoStage` («במה») מגיעים
  * מהרישיון ואינם הגדרות של המשחק, וכך גם `phonesUntil` (עד מתי החדר של המשחק).
  * `joinDial` (מספר החיוג להצטרפות) מגיע מהגדרה כללית של מערכת יצירת המשחקים.
+ *
+ * `winnersMedia` הוא רקע מסך המנצחים הישן. מסך המנצחים כולו בקוד ומתעלם ממנו
+ * (במקומו יש `winnersStyle`), והשדה נשאר בקובץ רק בשביל מנועים ישנים.
  */
-export const HIDDEN_SETTINGS = ['limit', 'narration', 'hostVideo', 'hostVideoStage', 'phonesUntil', 'joinDial'];
+export const HIDDEN_SETTINGS = [
+  'limit',
+  'narration',
+  'hostVideo',
+  'hostVideoStage',
+  'phonesUntil',
+  'joinDial',
+  'winnersMedia',
+];
 
 /**
  * הקבוצות, בסדר ובשמות של העורך המקוון. `titleThroughoutGame` ו-`logo` יושבים
@@ -62,9 +73,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       'voterNameStyle',
       'showQuestionTypeLabel',
       'visualTheme',
+      'winnersStyle',
       'gameMedia',
       'triviaMedia',
-      'winnersMedia',
       'winnersListMedia',
       'sound',
     ],

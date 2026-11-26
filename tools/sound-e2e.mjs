@@ -241,6 +241,7 @@ function gameFile(name, spec) {
       gameMedia: { src: url(spec.backgrounds ? 'bg-game.webm' : '') },
       logo: { src: '' },
       triviaMedia: { src: '' },
+      // הבונה עדיין שולח את רקע המנצחים הישן בשביל מנועים ישנים; המסך בקוד מתעלם ממנו
       winnersMedia: { src: url(spec.backgrounds ? 'bg-winners.webm' : '') },
       winnersListMedia: { src: url(spec.backgrounds ? 'bg-leaders.webm' : '') },
       sound: Object.fromEntries(
@@ -463,11 +464,12 @@ function readScreen() {
     media: window.__pageMedia(),
     counter: q('.slide-counter')?.textContent?.trim() ?? '',
     leaders: q('.leaders-overlay') !== null,
-    winners: q('.winners-podium-screen') !== null,
+    winners: q('.winners-show') !== null,
     scoreboard: q('.all-scores-screen') !== null,
     /** דירוג הקבוצות (מקש 4) פתוח. */
     groups: q('.gs-overlay') !== null,
-    podium: document.querySelectorAll('.podium-slot.is-shown').length,
+    /** כמה מקומות נחשפו במסך המנצחים (data-revealed). */
+    podium: Number(q('.winners-show')?.getAttribute('data-revealed') ?? 0),
     question: q('.q-question:not(.reveal-hidden)') !== null,
     answers: document.querySelectorAll('.q-card:not(.reveal-hidden)').length,
     correct: document.querySelectorAll('.q-card--correct').length,
@@ -1103,9 +1105,15 @@ const SCENARIOS = [
         1000,
       );
       await t.step(
-        'תצוגת המנצחים (W) — הרקע שלה מתנגן',
+        'תצוגת המנצחים (W) — המסך בקוד, בלי רקע הווידאו הישן',
         t.key('KeyW'),
-        { sound: ['winners.wav'], check: bgPlays('bg-winners.webm') },
+        {
+          sound: ['winners.wav'],
+          check: (s) => [
+            s.winners || 'מסך המנצחים לא מוצג',
+            !s.media.some((m) => m.src === 'bg-winners.webm') || 'רקע המנצחים הישן (winnersMedia) מוצג',
+          ],
+        },
         1500,
       );
       await t.step(
@@ -1574,7 +1582,8 @@ const SCENARIOS = [
       await t.step(
         'רווח עד מסך הניקוד',
         async () => {
-          for (let i = 0; i < 8; i++) {
+          // אחרי חשיפת המקום הראשון רווח לא עושה כלום כ-2.5 שניות (התיפוף והחבטה)
+          for (let i = 0; i < 30; i++) {
             if ((await t.page.locator('.all-scores-screen').count()) > 0) break;
             await t.page.keyboard.press('Space');
             await sleep(STEP);

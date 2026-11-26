@@ -11,6 +11,18 @@
  */
 
 import { debugLog } from './debugLog.ts';
+import {
+  duckEnd,
+  duckLevelAt,
+  makeEffectsBus,
+  prepareWinnersBuffers,
+  scheduleCue,
+  WINNERS_BED_LEVEL,
+  WINNERS_FX_LEVEL,
+  type DuckSpec,
+  type EffectsBus,
+  type SoundPlan,
+} from './winnersSynth.ts';
 
 /** קיצור מקור סאונד לתצוגה בלוג (בלי query/base64 ארוך). */
 function shortSrc(src: string): string {
@@ -70,6 +82,15 @@ export class AudioManager {
   /** מאזין הפתיחה (unlock) — נשמר כדי שאפשר יהיה להסירו ב-dispose. */
   private readonly unlockFn: () => void;
   private observer: ((event: AudioEvent) => void) | null = null;
+  /**
+   * מסך המנצחים בקוד (src/render/winners/): צליל המנצחים של המשחק מתנגן כמוזיקת
+   * רקע ב-WINNERS_BED_LEVEL, ומתכופף (winnersDuck) לפי התוכנית של כל חשיפה.
+   */
+  private winnersScreen = false;
+  private winnersDuck = 1;
+  private winnersDuckTimer: ReturnType<typeof setInterval> | null = null;
+  /** ערוץ האפקטים המסונתזים של המסך (תיפוף, תרועה, מחיאות...). נוצר בניגון הראשון. */
+  private winnersBus: EffectsBus | null = null;
 
   constructor() {
     // אם ל-document כבר הייתה אינטראקציה (sticky activation) — למשל הקליק על
@@ -135,16 +156,26 @@ export class AudioManager {
     this.volume = Math.min(1, Math.max(0, volume));
     this.applyChannelVolume();
     if (this.applauseAudio) this.applauseAudio.volume = this.volume;
+    if (this.winnersBus && this.context) {
+      try {
+        this.winnersBus.master.gain.setTargetAtTime(this.volume * WINNERS_FX_LEVEL, this.context.currentTime, 0.05);
+      } catch {
+        /* הקשר סגור */
+      }
+    }
   }
 
-  /** הווליום של הערוצים: של המפעיל, ובזמן מחיאות כפיים — מונמך. */
-  private channelVolume(): number {
-    return this.ducked ? this.volume * APPLAUSE_DUCK : this.volume;
+  /**
+   * הווליום של ערוץ: של המפעיל, ובזמן מחיאות כפיים — מונמך. צליל המנצחים, כשמסך
+   * המנצחים בקוד מוצג, הוא מוזיקת רקע: מעט נמוך יותר ומתכופף בכל חשיפה.
+   */
+  private channelVolume(channel: SoundChannel): number {
+    const base = this.ducked ? this.volume * APPLAUSE_DUCK : this.volume;
+    return channel === 'winners' && this.winnersScreen ? base * WINNERS_BED_LEVEL * this.winnersDuck : base;
   }
 
   private applyChannelVolume(): void {
-    const volume = this.channelVolume();
-    for (const audio of this.active.values()) audio.volume = volume;
+    for (const [channel, audio] of this.active) audio.volume = this.channelVolume(channel);
   }
 
   /** מנגן src בערוץ נתון; קודם עוצר כל סאונד אחר שמתנגן. src ריק/null עוצר בלבד. */
@@ -161,7 +192,7 @@ export class AudioManager {
     }
     const audio = new Audio(src);
     audio.loop = loop;
-    audio.volume = this.channelVolume();
+    audio.volume = this.channelVolume(channel);
     audio.addEventListener('ended', () => {
       if (this.active.get(channel) === audio) this.active.delete(channel);
     });
@@ -242,6 +273,108 @@ export class AudioManager {
     this.emit({ type: 'stopAll' });
     this.stopActiveSounds();
     this.pending.clear();
+    this.stopWinnersSound();
+  }
+
+  // -------------------------------------------------------------------------
+  // מסך המנצחים (WinnersSoundSink ב-src/render/winners/soundContext.ts). האפקטים
+  // אינם עוברים למסך הצפייה כאירוע: המסך שם מריץ את אותה תוכנית בעצמו. play()
+  // של ערוץ אחר לא עוצר אותם (הם שכבה מעל), stopAll כן.
+  // -------------------------------------------------------------------------
+
+  /** הקשר האודיו לאפקטים — רק אחרי שהדפדפן התיר צליל (אחרת הזמן שלו עומד). */
+  private effectsContext(): AudioContext | null {
+    if (!this.unlocked) return null;
+    try {
+      this.context ??= new AudioContext();
+      if (this.context.state === 'suspended') void this.context.resume();
+      return this.context;
+    } catch {
+      return null;
+    }
+  }
+
+  setWinnersScreen(active: boolean): void {
+    if (this.winnersScreen === active) return;
+    this.winnersScreen = active;
+    if (!active) this.stopWinnersDuck();
+    this.applyChannelVolume();
+  }
+
+  prepareWinnersSound(): void {
+    const ctx = this.effectsContext();
+    if (ctx === null) return;
+    try {
+      prepareWinnersBuffers(ctx);
+    } catch {
+      /* סביבה בלי אודיו */
+    }
+  }
+
+  playWinnersSound(plan: SoundPlan, delay = 0): void {
+    if (plan.duck && this.winnersScreen) this.startWinnersDuck(plan.duck, delay);
+    const ctx = this.effectsContext();
+    if (ctx === null) {
+      debugLog('audio', 'אפקטי מסך המנצחים דולגו (האודיו עדיין נעול עד אינטראקציה, או שאין Web Audio)');
+      return;
+    }
+    try {
+      this.winnersBus ??= makeEffectsBus(ctx, ctx.destination, this.volume * WINNERS_FX_LEVEL);
+      const t0 = ctx.currentTime + Math.max(0, delay);
+      for (const cue of plan.cues) scheduleCue(ctx, this.winnersBus.input, cue.name, t0 + cue.at, cue.opts);
+    } catch {
+      /* סביבה בלי אודיו — המסך ממשיך בלי צליל */
+    }
+  }
+
+  stopWinnersSound(): void {
+    this.stopWinnersDuck();
+    const bus = this.winnersBus;
+    this.winnersBus = null;
+    if (bus === null || this.context === null) return;
+    try {
+      const at = this.context.currentTime;
+      bus.master.gain.cancelScheduledValues(at);
+      bus.master.gain.setValueAtTime(bus.master.gain.value, at);
+      bus.master.gain.linearRampToValueAtTime(0, at + 0.3);
+    } catch {
+      /* הקשר סגור */
+    }
+    // אפקטים שתוזמנו להמשך מחוברים לערוץ הזה — הניתוק משתיק גם אותם
+    setTimeout(() => {
+      try {
+        bus.output.disconnect();
+      } catch {
+        /* כבר נותק */
+      }
+    }, 360);
+  }
+
+  /** הנמכת צליל המנצחים לפי התוכנית, מהרמה הנוכחית (גם באמצע הנמכה קודמת). */
+  private startWinnersDuck(duck: DuckSpec, delay: number): void {
+    this.stopWinnersDuck(false);
+    const from = this.winnersDuck;
+    const started = performance.now();
+    const end = duckEnd(duck);
+    const step = () => {
+      const s = (performance.now() - started) / 1000 - delay;
+      this.winnersDuck = duckLevelAt(duck, s, from);
+      this.applyChannelVolume();
+      if (s >= end) this.stopWinnersDuck();
+    };
+    this.winnersDuckTimer = setInterval(step, 40);
+    step();
+  }
+
+  private stopWinnersDuck(reset = true): void {
+    if (this.winnersDuckTimer !== null) {
+      clearInterval(this.winnersDuckTimer);
+      this.winnersDuckTimer = null;
+    }
+    if (reset && this.winnersDuck !== 1) {
+      this.winnersDuck = 1;
+      this.applyChannelVolume();
+    }
   }
 
   /**

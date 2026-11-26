@@ -237,7 +237,7 @@
 
 /* טקסט חופשי לבן על הרקע: קו מתאר דיו + צל קשיח, קריא גם על הבמה הצהובה */
 .game-root[data-visual-theme='comic'] :is(
-  .q-flyer:not(.q-flyer--bubble) .q-flyer-nm, .podium-name, .podium-score, .raffle-name,
+  .q-flyer:not(.q-flyer--bubble) .q-flyer-nm, .raffle-name,
   .slide-counter
 ) {
   text-shadow:

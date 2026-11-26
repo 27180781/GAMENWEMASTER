@@ -209,7 +209,7 @@
 /* טקסט חופשי שעומד ישירות על הרקע: הילה כחולה-לילה צפופה סביב האותיות ונגיעת זהב
    חמה — הסריף הדק נשאר קריא גם על רקע בהיר ועמוס שהבעלים העלה */
 .game-root[data-visual-theme='gala'] :is(
-  .podium-name, .podium-score, .raffle-name, .opening-hint, .lobby-join-label,
+  .raffle-name, .opening-hint, .lobby-join-label,
   .q-flyer:not(.q-flyer--bubble) .q-flyer-nm, .slide-counter, .leaders-empty, .winners-empty, .lobby-empty
 ) {
   text-shadow:

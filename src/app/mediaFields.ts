@@ -6,7 +6,7 @@
  * שדה מדיה חדש שמתווסף למשחק מתווסף כאן פעם אחת ומכוסה בשלושתם.
  *
  * הסדר קבוע והוא גם סדר העדיפות לטעינה: מדיית הלובי (פתיחה/לוגו/רקע שאלות) →
- * שקופיות לפי סדרן → מסכי הזוכים → סאונדים.
+ * שקופיות לפי סדרן → רקע טבלת המובילים → סאונדים.
  */
 
 import type { GameFile } from '../engine/index.ts';
@@ -70,7 +70,9 @@ export function mediaFields(game: GameFile): MediaField[] {
     }
   });
 
-  push(s.winnersMedia, 'רקע זוכים');
+  // setting.winnersMedia (רקע מסך המנצחים הישן) אינו כאן בכוונה: מסך המנצחים כולו
+  // בקוד ומתעלם ממנו, ולכן הוא לא נטען מראש, לא נבדק ולא מדווח כחסר בחבילה. השדה
+  // נשאר בקובץ כמו שהוא, בשביל מנועים ישנים (src/engine/winnersStyles.ts).
   push(s.winnersListMedia, 'רקע טבלת זוכים');
 
   for (const [key, channel] of Object.entries(s.sound)) {

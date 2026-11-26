@@ -167,7 +167,7 @@ export function rawSlide(spec: SlideSpec): Record<string, unknown> {
 export interface GalleryContext {
   theme: string;
   colors: { main: string; secondary: string };
-  /** מדיית רקע לכל המסכים (gameMedia/triviaMedia/winnersMedia/winnersListMedia); '' = גיבוי המנוע. */
+  /** מדיית רקע לכל המסכים (gameMedia/triviaMedia/winnersListMedia); '' = גיבוי המנוע. */
   bg: string;
 }
 
@@ -195,7 +195,6 @@ export function makeGame(
       logo: { src: logo },
       triviaMedia: bg,
       winnersListMedia: bg,
-      winnersMedia: bg,
       sound: {
         playersConnectingMediaSound: { src: null },
         showQuestionMediaSound: { src: null },

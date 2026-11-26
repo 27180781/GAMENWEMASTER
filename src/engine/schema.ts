@@ -11,6 +11,7 @@
  */
 
 import { normalizeVisualTheme, VISUAL_THEME_LABELS } from './visualThemes.ts';
+import { normalizeWinnersStyle, WINNERS_STYLE_LABELS } from './winnersStyles.ts';
 import { z } from 'zod';
 
 // ---------------------------------------------------------------------------
@@ -554,6 +555,17 @@ export const globalSettingsSchema = z.object({
       `choice:${JSON.stringify(VISUAL_THEME_LABELS)}`,
     ),
   /**
+   * סגנון מסך המנצחים בסוף המשחק (ובשקופית «מסך מנצחים» באמצע), כולו בקוד ובצבעי
+   * המשחק (src/engine/winnersStyles.ts, src/render/winners/). חסר/לא מוכר = 'stage'
+   * («הבמה»), כך שגם קובץ ישן מקבל את המסך החדש.
+   */
+  winnersStyle: z
+    .unknown()
+    .transform((v) => normalizeWinnersStyle(v))
+    .describe(
+      `choice:${JSON.stringify(WINNERS_STYLE_LABELS)}`,
+    ),
+  /**
    * תווית סוג השאלה בראש מסך השאלה: «📊 סקר · אין תשובה נכונה» מעל סקר, ו«🗳 הרוב
    * קובע את התשובה» מעל שקופית «הרוב קובע». רק `false` מסתיר אותן; חסר או כל ערך
    * אחר = מוצגות, כך שקבצים ישנים נראים בדיוק כמו קודם. תוויות ההימור והקבוצה
@@ -587,7 +599,12 @@ export const globalSettingsSchema = z.object({
   logo: mediaRef,
   triviaMedia: mediaRef,
   winnersListMedia: mediaRef,
-  winnersMedia: mediaRef,
+  /**
+   * רקע מסך המנצחים הישן (וידאו או תמונה שהשמות הונחו מעליו). מסך המנצחים החדש
+   * כולו בקוד ומתעלם ממנו, והוא לא נטען מראש. השדה נשאר בקובץ (ברירת מחדל
+   * `{src:''}`) רק כדי שמנועים ישנים, שדורשים אותו, ימשיכו לפתוח קבצים שנשמרו כאן.
+   */
+  winnersMedia: mediaRef.default({ src: '' }),
   sound: z.object({
     playersConnectingMediaSound: soundRef,
     showQuestionMediaSound: soundRef,

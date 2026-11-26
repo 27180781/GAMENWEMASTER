@@ -185,7 +185,7 @@
 .game-root[data-visual-theme='studio'] :is(.raffle-title, .bet-title) { color: #ffd977; }
 
 /* כותרות חופשיות: הילת זהב בנוסף לצל הכהה */
-.game-root[data-visual-theme='studio'] :is(.podium-name, .podium-score, .raffle-name) {
+.game-root[data-visual-theme='studio'] :is(.raffle-name) {
   text-shadow: 0 4px 18px rgba(0, 0, 0, 0.75), 0 0 26px rgba(255, 200, 80, 0.45);
 }
 
@@ -387,7 +387,7 @@
 /* טקסט חופשי שעומד ישירות על הרקע: קלף בהיר במקום לילה כהה, לכן הילה כהה
    חזקה סביב האותיות — קריא גם על קלף וגם על כל רקע אחר שהבעלים העלה */
 .game-root[data-visual-theme='scroll'] :is(
-  .opening-hint, .lobby-join-label, .podium-name, .podium-score,
+  .opening-hint, .lobby-join-label,
   .q-flyer:not(.q-flyer--bubble) .q-flyer-nm, .slide-counter, .leaders-empty, .winners-empty, .lobby-empty
 ) {
   text-shadow: 0 0 2px #2b180a, 0 0 6px #2b180a, 0 2px 12px rgba(43, 24, 10, 0.9);

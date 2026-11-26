@@ -101,6 +101,7 @@ const LABELS: Record<string, string> = {
   voterNameStyle: 'שמות המצביעים שעולים בצד',
   showQuestionTypeLabel: 'סימון סוג השאלה בראש המסך (סקר, הרוב קובע)',
   visualTheme: 'ערכת נושא חזותית',
+  winnersStyle: 'סגנון מסך המנצחים',
   allowChangeVote: 'אפשר שינוי הצבעה בזמן הטיימר',
   multiWinners: 'מספר הזוכים במסך הסיום',
   showWinnersListAfter: 'הצגת טבלת מובילים כל N שאלות',
