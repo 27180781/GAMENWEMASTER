@@ -37,7 +37,10 @@ const MAX_PODIUM = 5;
 function leadersDensity(count: number): 'xl' | 'lg' | 'md' | 'sm' {
   if (count <= 3) return 'xl';
   if (count <= 6) return 'lg';
-  if (count <= 10) return 'md';
+  // עמודה אחת ב-md: 8 שורות נגמרות כ-120 פיקסלים מעל תחתית המסך, 9 כבר צמודות אליה
+  // (כ-30 פיקסלים) ו-10 נחתכות. עד 2026-11 גם 9–10 קיבלו md, והשורה העשירית נחתכה
+  // בכל הערכות, גם בעמודה האישית שליד הדירוג הקבוצתי. מ-9 שורות: שתי עמודות.
+  if (count <= 8) return 'md';
   return 'sm';
 }
 
