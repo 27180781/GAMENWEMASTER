@@ -2,11 +2,13 @@
  * נגן הקריינות — שכבה נפרדת מ-AudioManager (ENGINE-narration.md סעיף 2).
  * הבדיקות מדמות AudioContext/fetch מלאים (סביבת Node) ומוודאות את ההתנהגויות
  * שהמשחק החי תלוי בהן: שיבוץ רציף של הקטעים, ביטול מיידי כשהמסך משתנה, קטע
- * שנכשל שמדולג בשקט, השתקה, ונעילת autoplay שאינה מייצרת תור.
+ * שנכשל שמדולג בשקט, השתקה, נעילת autoplay שאינה מייצרת תור, ו"עסוק" — מה
+ * שהמעברים האוטומטיים ממתינים לו.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NarrationPlayer } from '../src/app/narration/NarrationPlayer.ts';
+import { NARRATION_END_SLACK_MS, NARRATION_LOAD_WAIT_MS } from '../src/app/narrationWait.ts';
 
 /** אורך "הקובץ" לכל כתובת (שניות) — נקבע לכל בדיקה. */
 let durations: Record<string, number> = {};
@@ -441,6 +443,124 @@ describe('NarrationPlayer — סביבה בלי Web Audio', () => {
     expect(() => player.say(['a.mp3'])).not.toThrow();
     await flush();
     expect(player.isSpeaking()).toBe(false);
+    player.dispose();
+  });
+});
+
+describe('NarrationPlayer — עסוק (המעברים האוטומטיים ממתינים לו)', () => {
+  const T = 1_000_000;
+  afterEach(() => vi.restoreAllMocks());
+  /** נגן עם שעון קיר קבוע, ורשימת ההודעות על "עסוק". */
+  const busyPlayer = () => {
+    const player = setup();
+    vi.spyOn(Date, 'now').mockReturnValue(T);
+    const seen: (number | null)[] = [];
+    player.onBusyChange((busy) => seen.push(busy === null ? null : busy.until));
+    return { player, seen };
+  };
+
+  it('★ עסוק כבר ברגע ההחלטה, עוד לפני שהקטעים נטענו (ובלי קול עדיין)', () => {
+    const { player, seen } = busyPlayer();
+    player.say(['a.mp3', 'b.mp3']);
+    // עד 2026-11 "ממתינים לקריין" התחיל רק כשהקול התחיל: קטעים שעוד ירדו מהרשת
+    // לא עיכבו את המעבר של שנייה, והתשובה הבאה נחשפה לפני שהשאלה נאמרה.
+    expect(player.getBusy()).toEqual({ until: T + NARRATION_LOAD_WAIT_MS });
+    expect(player.isSpeaking()).toBe(false);
+    expect(seen).toEqual([T + NARRATION_LOAD_WAIT_MS]);
+  });
+
+  it('★ אחרי השיבוץ התקרה היא הסוף המתוכנן של המשפט ועוד מרווח', async () => {
+    const { player, seen } = busyPlayer();
+    player.say(['a.mp3', 'b.mp3']); // 1 + 2 שניות, מתחילים 0.02 אחרי עכשיו
+    await flush();
+    expect(player.getBusy()).toEqual({ until: T + 3020 + NARRATION_END_SLACK_MS });
+    expect(seen).toEqual([T + NARRATION_LOAD_WAIT_MS, T + 3020 + NARRATION_END_SLACK_MS]);
+  });
+
+  it('★ משפט ארוך מ-15 שניות — התקרה היא האורך שלו (עד 2026-11 נחתך ב-15)', async () => {
+    const { player } = busyPlayer();
+    durations['long.mp3'] = 17;
+    player.say(['long.mp3']);
+    await flush();
+    expect(player.getBusy()!.until - T).toBe(17_020 + NARRATION_END_SLACK_MS);
+  });
+
+  it('★ נגמר כשהמשפט נגמר', async () => {
+    const { player, seen } = busyPlayer();
+    player.say(['a.mp3', 'c.mp3']);
+    await flush();
+    ctx().sources[0]!.onended?.();
+    expect(player.getBusy()).not.toBeNull(); // עוד קטע באוויר
+    ctx().sources[1]!.onended?.();
+    expect(player.getBusy()).toBeNull();
+    expect(seen.at(-1)).toBeNull();
+  });
+
+  it('★ cancel (המסך השתנה) — כבר לא עסוק, גם באמצע הטעינה', async () => {
+    const { player } = busyPlayer();
+    player.say(['a.mp3']);
+    player.cancel();
+    expect(player.getBusy()).toBeNull();
+    await flush();
+    expect(player.getBusy()).toBeNull(); // הטעינה שהסתיימה אחר כך לא מחזירה אותו
+  });
+
+  it('★ say חדש מחליף את התקרה, ומשפט שנזנח לא מנקה את החדש', async () => {
+    const { player } = busyPlayer();
+    broken.add('a.mp3');
+    player.say(['a.mp3']); // ייכשל בטעינה — אבל כבר הוחלף
+    player.say(['b.mp3']);
+    await flush();
+    expect(player.getBusy()).toEqual({ until: T + 2020 + NARRATION_END_SLACK_MS });
+  });
+
+  it('★ משפט שאף קטע שלו לא נטען — לא נשאר "עסוק" עד התקרה', async () => {
+    const { player } = busyPlayer();
+    broken.add('a.mp3');
+    player.say(['a.mp3']);
+    expect(player.getBusy()).not.toBeNull();
+    await flush();
+    expect(player.getBusy()).toBeNull();
+  });
+
+  it('★ אודיו נעול (עוד לא הייתה אינטראקציה) — המשפט נזרק וכבר לא עסוק', async () => {
+    const { player } = busyPlayer();
+    FakeContext.initialState = 'suspended';
+    FakeContext.resumeWorks = false;
+    await player.preload(['a.mp3']); // יוצר את ההקשר — נעול
+    expect(player.isUnlocked()).toBe(false);
+    player.say(['a.mp3']);
+    await flush();
+    expect(ctx().sources).toHaveLength(0);
+    expect(player.getBusy()).toBeNull();
+  });
+
+  it('★ ההקשר לא חזר לפעול אחרי resume — המשפט נזרק וכבר לא עסוק', async () => {
+    const { player } = busyPlayer();
+    player.say(['a.mp3']);
+    FakeContext.resumeWorks = false;
+    ctx().state = 'suspended';
+    await flush();
+    expect(ctx().sources).toHaveLength(0);
+    expect(player.getBusy()).toBeNull();
+  });
+
+  it('השתקה — לא עסוק, וגם לא באמירה הבאה', async () => {
+    const { player } = busyPlayer();
+    player.say(['a.mp3']);
+    await flush();
+    player.setMuted(true);
+    expect(player.getBusy()).toBeNull();
+    player.say(['b.mp3']);
+    expect(player.getBusy()).toBeNull();
+  });
+
+  it('בלי Web Audio — לעולם לא עסוק', () => {
+    vi.stubGlobal('window', { addEventListener: () => {}, removeEventListener: () => {} });
+    vi.stubGlobal('AudioContext', undefined);
+    const player = new NarrationPlayer();
+    player.say(['a.mp3']);
+    expect(player.getBusy()).toBeNull();
     player.dispose();
   });
 });

@@ -198,7 +198,12 @@ import { QrCode } from '../render/QrCode.tsx';
 import { DebugOverlay } from '../render/DebugOverlay.tsx';
 import { debugLog } from './debugLog.ts';
 import { useEngineState } from './useEngineState.ts';
-import { betResultsCloseDelayMs, narrationSafeDelayMs } from './narrationWait.ts';
+import {
+  betResultsCloseDelayMs,
+  narrationSafeDelayMs,
+  narratorWaitMs,
+  type NarrationBusy,
+} from './narrationWait.ts';
 import { askConfirm } from '../render/ConfirmDialog.tsx';
 
 type HostStage = 'opening' | 'playing' | 'winners' | 'scoreboard';
@@ -688,8 +693,15 @@ export function GameHost({
   const narrationQuestionTotal = useMemo(() => questionTotal(game), [game]);
   const [narrationMuted, setNarrationMuted] = useState(() => readNarrationMuted());
   const [narrationVolume, setNarrationVolume] = useState(() => readNarrationVolume());
-  /** הקריין מדבר כרגע — מנמיך את סאונד המשחק (duck) ומעכב מעבר אוטומטי. */
+  /** הקריין מדבר כרגע (הקול עצמו) — מנמיך את סאונד המשחק (duck). */
   const [narrationSpeaking, setNarrationSpeaking] = useState(false);
+  /**
+   * הקריין עסוק: החליט לומר משפט ועוד טוען אותו, או אומר אותו — עם התקרה של
+   * ההמתנה לו. כל המעברים האוטומטיים ממתינים לו (narrationWait.ts); null = שקט.
+   */
+  const [narrationBusy, setNarrationBusy] = useState<NarrationBusy | null>(null);
+  /** מה שהמעברים האוטומטיים ממתינים לו — רק במשחק עם קריינות. */
+  const narratorBusy = narrationActive ? narrationBusy : null;
   /**
    * האודיו של הקריין נפתח (אינטראקציה ראשונה, או autoplay מותר). עד אז הבמאי
    * דוחה את משפטי ה"פעם אחת למשחק", והפתיחה עצמה מריצה צעד — כך "ברוכים
@@ -1092,7 +1104,7 @@ export function GameHost({
   const winnersPreviewRef = useRef<HostStage | null>(null);
   /**
    * דגל שמורה ל-effect איפוס-השקופית לחשוף אותה במלואה (שאלה + כל התשובות,
-   * בלי צליל) במקום לאפס: הרצה מהירה (מקש N), וחזרה להצבעה (reenterAtAnswers).
+   * בלי צליל) במקום לאפס: חזרה להצבעה (reenterAtAnswers).
    */
   const fastRevealRef = useRef(false);
 
@@ -1545,8 +1557,8 @@ export function GameHost({
   // איפוס שלבי חשיפה + מסילת המצטרפים + זיהוי הקשת שלט המנחה, בכל כניסה
   // לשקופית — גם כניסה חוזרת לאותה שקופית (slideEntry), למשל חזרה בשאלה
   // הראשונה או בחירה בשקופית הנוכחית: היא מתחילה נקייה, עם צליל השאלה ובלי
-  // התשובה הנכונה מסומנת. בהרצה מהירה (מקש N) ובחזרה להצבעה חושפים את
-  // השקופית במלואה במקום לאפס.
+  // התשובה הנכונה מסומנת. דילוג במקש N נכנס כך גם הוא. בחזרה להצבעה
+  // (reenterAtAnswers) חושפים את השקופית במלואה במקום לאפס.
   useEffect(() => {
     const s = engine.getCurrentSlide();
     if (fastRevealRef.current) {
@@ -2138,8 +2150,11 @@ export function GameHost({
   }, [engine, reenterAtAnswers, stepScreen]);
 
   /**
-   * הרצה מהירה (מקש N): לחיצה אחת מדלגת לשקופית הבאה ומציגה אותה במלואה
-   * (שאלה + כל התשובות), בלי לעבור שלב-שלב. בשקופית האחרונה — סיום המשחק.
+   * דילוג לשקופית הבאה (מקש N, וגם «⏭ דילוג לשקופית הבאה» במסך המנחה): לחיצה
+   * אחת עוברת לשקופית הבאה ונוחתת עליה כמו בכניסה רגילה — השאלה עם הצליל שלה,
+   * והתשובות לפי המעבר האוטומטי של המשחק או ברווח. בשקופית האחרונה — סיום המשחק.
+   * עד 2026-11 הדילוג חשף את כל התשובות בבת אחת, והקריין (שמקריא חשיפה מלאה
+   * כתשובה האחרונה בלבד) דילג על כל השאר, וגם על חשיפה אוטומטית אחת-אחת.
    */
   const fastNextSlide = useCallback(() => {
     const now = Date.now();
@@ -2153,13 +2168,9 @@ export function GameHost({
       return;
     }
     const target = questions[nextIndex]!;
-    engine.dispatch({ type: 'GOTO', slideId: target.id, at: now });
     // אם לשקופית יש מדיית פתיחה (סרטון/תמונה) — נוחתים על *תחילת* השקופית ונותנים
     // למדיה להתנגן; רווח ייכנס לשאלה כרגיל ו-N ימשיך לשקופית הבאה. לא מדלגים עליה.
-    if (engine.getState().activeMedia === 'open') return;
-    // אין מדיית פתיחה — דגל שגורם ל-effect איפוס-השקופית לחשוף את השקופית במלואה
-    // (שאלה + כל התשובות) במקום לאפס, כדי שהרצה מהירה תנחת על שאלה חשופה.
-    fastRevealRef.current = true;
+    engine.dispatch({ type: 'GOTO', slideId: target.id, at: now });
   }, [engine]);
   const fastNextSlideRef = useRef(fastNextSlide);
   fastNextSlideRef.current = fastNextSlide;
@@ -2665,6 +2676,12 @@ export function GameHost({
   useEffect(() => narration.onSpeakingChange(setNarrationSpeaking), [narration]);
 
   useEffect(() => {
+    const off = narration.onBusyChange(setNarrationBusy);
+    setNarrationBusy(narration.getBusy());
+    return off;
+  }, [narration]);
+
+  useEffect(() => {
     const off = narration.onUnlock(() => setNarrationUnlocked(true));
     // ייתכן שנפתח בין הרינדור הראשון למנוי (הקשר שרץ מיד בטעינה המוקדמת).
     if (narration.isUnlocked()) setNarrationUnlocked(true);
@@ -3059,9 +3076,10 @@ export function GameHost({
 
   useEffect(() => {
     if (stage !== 'playing' || state.activeMedia !== null || overlayActive) return;
-    // הקריין באמצע משפט — המעבר האוטומטי הבא ממתין לסיומו (חשיפת תשובה,
-    // פתיחת הצבעה, חשיפת התשובה הנכונה). בלי זה מצב אוטומטי היה חותך כל
-    // משפט באמצע. לחיצה ידנית של המנחה עדיין מקדמת מיד. קטע שלא מדווח שנגמר
+    // הקריין עסוק — טוען משפט או אומר אותו — והמעבר האוטומטי הבא ממתין לסיומו
+    // (חשיפת תשובה, פתיחת הצבעה, חשיפת התשובה הנכונה). בלי זה מצב אוטומטי היה
+    // חותך כל משפט באמצע, או חושף את התשובה הבאה לפני שהמשפט הקודם בכלל נטען.
+    // לחיצה ידנית של המנחה עדיין מקדמת מיד. קטע שלא נטען או לא מדווח שנגמר
     // אינו עוצר את המשחק לנצח — יש תקרה (ראו narrationWait.ts).
     const s = engine.getCurrentSlide();
     const votable = isVotableSlide(s);
@@ -3144,7 +3162,7 @@ export function GameHost({
     }
 
     if (action === null) return;
-    delayMs = narrationSafeDelayMs(delayMs, narrationActive && narrationSpeaking);
+    delayMs = narrationSafeDelayMs(delayMs, narratorWaitMs(narratorBusy, Date.now()));
     const fire = action;
     const desc = label;
     const timeout = window.setTimeout(() => {
@@ -3152,7 +3170,7 @@ export function GameHost({
       fire();
     }, delayMs);
     return () => window.clearTimeout(timeout);
-  }, [stage, state.phase, state.currentSlideId, state.activeMedia, state.betOutcomes, reveal, autoT, overlayActive, engine, audio, sounds, narrationActive, narrationSpeaking, screenRevealPending, screenHoldMs]);
+  }, [stage, state.phase, state.currentSlideId, state.activeMedia, state.betOutcomes, reveal, autoT, overlayActive, engine, audio, sounds, narratorBusy, screenRevealPending, screenHoldMs]);
 
   // מעבר אוטומטי של השקופית (setting.automaticSkip, ראו autoSkip.ts): X שניות
   // אחרי שהשקופית סיימה את תפקידה — בשאלה, מחשיפת התשובה — ולא מתחת לשכבה
@@ -3164,7 +3182,7 @@ export function GameHost({
       mediaPlaying: state.activeMedia !== null,
       answerRevealed: reveal.revealCorrect,
       covered: overlayActive,
-      narratorSpeaking: narrationActive && narrationSpeaking,
+      narratorWaitMs: narratorWaitMs(narratorBusy, Date.now()),
       revealPending: screenRevealPending,
       holdMs: screenHoldMs,
     });
@@ -3187,8 +3205,7 @@ export function GameHost({
     slide,
     reveal.revealCorrect,
     overlayActive,
-    narrationActive,
-    narrationSpeaking,
+    narratorBusy,
     engine,
     screenRevealPending,
     screenHoldMs,
@@ -3211,7 +3228,7 @@ export function GameHost({
         debugLog('auto', 'מעבר אוטומטי: חשיפת מקום במסך המנצחים', { place: screenTotal - screenShown });
         stepScreen(1);
       },
-      narrationSafeDelayMs(delay, narrationActive && narrationSpeaking),
+      narrationSafeDelayMs(delay, narratorWaitMs(narratorBusy, Date.now())),
     );
     return () => window.clearTimeout(timeout);
   }, [
@@ -3223,8 +3240,7 @@ export function GameHost({
     state.currentSlideId,
     state.slideEntry,
     overlayActive,
-    narrationActive,
-    narrationSpeaking,
+    narratorBusy,
     engine,
     stepScreen,
   ]);
@@ -3238,10 +3254,10 @@ export function GameHost({
     // קטע שלא מדווח שנגמר לא משאיר את המסך לנצח — ראו narrationWait.ts.
     const timeout = window.setTimeout(
       () => setBetOverlay(false),
-      betResultsCloseDelayMs(autoT.nextSlide.seconds, narrationActive && narrationSpeaking),
+      betResultsCloseDelayMs(autoT.nextSlide.seconds, narratorWaitMs(narratorBusy, Date.now())),
     );
     return () => window.clearTimeout(timeout);
-  }, [stage, betOverlay, autoT, narrationActive, narrationSpeaking]);
+  }, [stage, betOverlay, autoT, narratorBusy]);
 
   // «כל מי שענה נכון» במעבר אוטומטי (של המשחק או של השקופית): נסגר לבד אחרי
   // זמן קריאה, ולפחות עמוד שלם לכל עמוד של שמות, ואז המעבר ממשיך כרגיל.
@@ -3255,12 +3271,12 @@ export function GameHost({
     const timeout = window.setTimeout(
       () => setCorrectOverlay(false),
       correctListCloseDelayMs(
-        betResultsCloseDelayMs(correctAutoSeconds, narrationActive && narrationSpeaking),
+        betResultsCloseDelayMs(correctAutoSeconds, narratorWaitMs(narratorBusy, Date.now())),
         correctListRef.current.length,
       ),
     );
     return () => window.clearTimeout(timeout);
-  }, [stage, correctOverlay, correctAutoSeconds, narrationActive, narrationSpeaking]);
+  }, [stage, correctOverlay, correctAutoSeconds, narratorBusy]);
 
   // «תוצאת הדאבל» במעבר אוטומטי: נסגרת לבד כמו תוצאות ההימור, ועוד כמה שניות
   // לקריאת שורת ההשוואה, ואז המעבר ממשיך כרגיל.
@@ -3268,10 +3284,11 @@ export function GameHost({
     if (stage !== 'playing' || !doubleOverlay || correctAutoSeconds === null) return;
     const timeout = window.setTimeout(
       () => setDoubleOverlay(false),
-      betResultsCloseDelayMs(correctAutoSeconds, narrationActive && narrationSpeaking) + DOUBLE_EXTRA_READ_MS,
+      betResultsCloseDelayMs(correctAutoSeconds, narratorWaitMs(narratorBusy, Date.now())) +
+        DOUBLE_EXTRA_READ_MS,
     );
     return () => window.clearTimeout(timeout);
-  }, [stage, doubleOverlay, correctAutoSeconds, narrationActive, narrationSpeaking]);
+  }, [stage, doubleOverlay, correctAutoSeconds, narratorBusy]);
 
   // מעבר אוטומטי של מדיה חוסמת (openMedia/endMedia + מסכי מדיה עצמאיים):
   //   • תמונה — מעבר אחרי autoT.media.image.seconds (אם image.active דלוק).
@@ -3607,9 +3624,9 @@ export function GameHost({
           setStage('winners');
         }
       } else if (event.code === 'KeyN' || event.key === 'n' || event.key === 'N') {
-        // הרצה מהירה — כל לחיצה מדלגת לשקופית הבאה, חשופה במלואה (מיקום פיזי)
+        // דילוג — כל לחיצה עוברת לשקופית הבאה ונוחתת על השאלה, כמו כניסה רגילה (מיקום פיזי)
         event.preventDefault();
-        debugLog('command', 'N — הרצה מהירה');
+        debugLog('command', 'N — דילוג לשקופית הבאה');
         if (stage === 'playing') fastNextSlideRef.current();
       } else if (event.code === 'KeyG' || event.key === 'g' || event.key === 'G') {
         // G — הסתרה/הצגה של פס הקבוצות שבצד מסך השאלה (מיקום פיזי, גם בעברית).

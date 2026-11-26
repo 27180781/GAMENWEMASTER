@@ -5,7 +5,6 @@
 
 import { describe, expect, it } from 'vitest';
 import { autoSkipDelayMs, type AutoSkipScreen } from '../src/app/autoSkip.ts';
-import { NARRATION_SAFETY_MS } from '../src/app/narrationWait.ts';
 import type { Slide } from '../src/engine/index.ts';
 import { makeGame, rawSlide } from './helpers.ts';
 
@@ -35,7 +34,7 @@ const free: AutoSkipScreen = {
   mediaPlaying: false,
   answerRevealed: true,
   covered: false,
-  narratorSpeaking: false,
+  narratorWaitMs: 0,
 };
 const screen = (patch: Partial<AutoSkipScreen>): AutoSkipScreen => ({ ...free, ...patch });
 
@@ -101,13 +100,13 @@ describe('מעבר אוטומטי — לא לפני שהחדר ראה, ולא מ
     ).toBeNull();
   });
 
-  it('הקריין מדבר — ממתינים לסוף המשפט, עם התקרה של המעברים האוטומטיים', () => {
+  it('הקריין עסוק — ממתינים לסוף המשפט (לכל היותר עד התקרה שלו)', () => {
     expect(
-      autoSkipDelayMs(slideOf('trivia', on(3)), 'results', screen({ narratorSpeaking: true })),
-    ).toBe(NARRATION_SAFETY_MS);
-    // זמן ארוך מהתקרה נשאר כמו שהוא
+      autoSkipDelayMs(slideOf('trivia', on(3)), 'results', screen({ narratorWaitMs: 9_500 })),
+    ).toBe(9_500);
+    // השהיה ארוכה ממה שהקריין עוד צריך נשארת כמו שהיא
     expect(
-      autoSkipDelayMs(slideOf('subject', on(60)), 'showing', screen({ narratorSpeaking: true })),
+      autoSkipDelayMs(slideOf('subject', on(60)), 'showing', screen({ narratorWaitMs: 9_500 })),
     ).toBe(60_000);
   });
 });
