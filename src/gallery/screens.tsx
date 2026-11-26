@@ -710,8 +710,8 @@ export const SCREENS: ScreenDef[] = [
     build: (ctx) => doubleResultScreen(ctx, votesBy([3, 9, 4, 2], 15)),
   },
   {
-    id: 'double-result-rehearsal',
-    label: 'תוצאת הדאבל — הפעלת ניסיון',
+    id: 'double-result-small',
+    label: 'תוצאת הדאבל — הפעלה קטנה (נספרת גם היא)',
     settleMs: 2200,
     build: (ctx) => doubleResultScreen(ctx, votesBy([1, 2, 1], 3)),
   },

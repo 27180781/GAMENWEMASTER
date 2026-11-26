@@ -42,7 +42,7 @@ export function DoubleResultOverlay({ view, onClose }: DoubleResultOverlayProps)
         {ticketLines !== null && (
           <>
             <div
-              className={`double-meter${view.counts ? '' : ' double-meter--rehearsal'}`}
+              className="double-meter"
               aria-label={`${view.tickets} מתוך ${VILLA_DOUBLE_MAX_TICKETS}`}
             >
               {Array.from({ length: VILLA_DOUBLE_MAX_TICKETS }, (_, i) => (
@@ -55,7 +55,7 @@ export function DoubleResultOverlay({ view, onClose }: DoubleResultOverlayProps)
                 </span>
               ))}
             </div>
-            <div className={`double-tickets${view.counts ? '' : ' double-tickets--rehearsal'}`}>
+            <div className="double-tickets">
               {ticketLines.main}
             </div>
             {ticketLines.note !== null && <div className="double-note">{ticketLines.note}</div>}

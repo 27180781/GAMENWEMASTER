@@ -7275,13 +7275,11 @@ body {
   opacity: 0.45;
 }
 .double-ticket--on { filter: none; opacity: 1; animation: double-ticket-in 0.45s cubic-bezier(0.2, 1.5, 0.4, 1) both; }
-.double-meter--rehearsal .double-ticket--on { filter: grayscale(0.6); opacity: 0.75; }
 @keyframes double-ticket-in {
   from { transform: translateY(30px) scale(0.3); opacity: 0; }
   to { transform: none; opacity: 1; }
 }
 .double-tickets { font-size: 52px; font-weight: 900; color: #f5c518; line-height: 1.2; animation: qpop 0.5s ease 0.9s both; }
-.double-tickets--rehearsal { font-size: 36px; color: #ffe680; }
 .double-note { font-size: 30px; font-weight: 700; opacity: 0.8; }
 .double-compare {
   font-size: 36px;
