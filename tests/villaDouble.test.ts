@@ -196,12 +196,12 @@ describe('doubleResult — כמה מהמשפחה צדקו', () => {
     });
   });
 
-  it('מי שהמנחה הסיר לא נספר; עם 4 משתתפים זו הפעלת ניסיון', () => {
+  it('מי שהמנחה הסיר לא נספר; גם 4 משתתפים נספרים (בחירת נסים: «גם הפעלה קטנה נספרת»)', () => {
     const r = doubleResult(game, 2, votes, new Set(['e']))!;
     expect(r.base).toBe(4);
     expect(r.correct).toBe(2);
     expect(r.tickets).toBe(5);
-    expect(r.counts).toBe(false);
+    expect(r.counts).toBe(true);
     // מי שהוסר וצדק לא נספר גם בין הצודקים
     expect(doubleResult(game, 2, votes, new Set(['a']))!.correct).toBe(1);
   });
@@ -319,14 +319,13 @@ describe('doubleView ו-doubleTicketLines — מה שמסך «תוצאת הדא�
     expect(doubleTicketLines(view({ n: 2, tickets: 0, soFar: 0 }))!.note).toBeNull();
   });
 
-  it('עד 4 משתתפים: כמה זה היה שווה, והסבר (בלי «הפעלת ניסיון»: שאלות הדאבל מופיעות פעם אחת)', () => {
-    const note = 'כשמשתתפים עד 4, הכרטיסים להגרלת הווילה לא נספרים';
-    expect(doubleTicketLines(view({ counts: false, base: 4, tickets: 5 }))).toEqual({
-      main: 'עם יותר מ-4 משתתפים זה היה שווה 5 כרטיסים',
-      note,
-    });
-    expect(doubleTicketLines(view({ counts: false, tickets: 1 }))!.main).toContain('שווה כרטיס אחד');
-    expect(doubleTicketLines(view({ counts: false, tickets: 0 }))!.main).toContain('שווה אף כרטיס');
+  it('הפעלה קטנה נספרת כמו כל הפעלה: משתתף אחד שצדק מקבל 10 כרטיסים, בתרועה', () => {
+    const solo = doubleView(villaGame(), 2, { 1: { a: 1 }, 3: { a: 2 } })!;
+    expect(solo).toMatchObject({ base: 1, correct: 1, tickets: 10, counts: true });
+    expect(doubleTicketLines(solo)!.main).toBe('קיבלתם עוד 10 כרטיסים להגרלת הווילה!');
+    expect(doubleWinsTickets(solo)).toBe(true);
+    // תוצאה שאינה נספרת (לא קורה במנוע: בלי אף משתתף אין מסך) לא מדברת על כרטיסים
+    expect(doubleTicketLines(view({ counts: false, tickets: 5 }))).toBeNull();
   });
 
   it('תרועה רק כשהכרטיסים באמת נוספים', () => {

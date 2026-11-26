@@ -5,8 +5,9 @@
  * במיוחד, כל אחת אחרי מסך הכרזה (`doubleIntro` על שקופית subject). שאלת הדאבל
  * עצמה היא trivia רגילה עם `double`. אחרי חשיפת התשובה, הרווח הבא פותח את
  * «תוצאת הדאבל»: כמה מבני המשפחה צדקו, כמה כרטיסים זה שווה, והשוואה לשאר
- * המשפחות בארץ. הכרטיסים עצמם נספרים בשרת, מתוך ההצבעות בגיבוי, ורק על שאלה
- * שהמשפחה בה גדולה מ-4.
+ * המשפחות בארץ. הכרטיסים עצמם נספרים בשרת, מתוך ההצבעות בגיבוי, בכל גודל
+ * משפחה, גם של אדם אחד (בחירת נסים, 2026-11-26: «גם הפעלה קטנה נספרת»; עד אז
+ * רק שאלה שהמשפחה בה גדולה מ-4).
  *
  * פעם אחת (בקשת נסים, 2026-11-26: «מספיק לי שיראו אפילו איש אחד את שאלות הדאבל
  * בשביל להרוס»): ההפעלה הראשונה שמגיעה לשאלת דאבל משתמשת בהן, גם עם אדם אחד.
@@ -27,8 +28,6 @@ import type { GamePhase } from '../engine/types.ts';
 
 /** הכי הרבה כרטיסים ששאלת דאבל אחת נותנת. */
 export const VILLA_DOUBLE_MAX_TICKETS = 10;
-/** שאלת דאבל שהמשפחה בה (מי ששיחק עד אליה) גדולה מזה נותנת כרטיסים; עד זה היא לא נספרת (villa_double_tally בשרת). */
-export const VILLA_REHEARSAL_MAX_PLAYERS = 4;
 /** פחות משפחות מזה, וההשוואה הארצית עוד לא אומרת כלום. */
 export const VILLA_MIN_FAMILIES_FOR_COMPARISON = 5;
 
@@ -70,7 +69,7 @@ export interface DoubleResult {
   tickets: number;
   /** ההפעלה הזאת יכולה לזכות בכרטיסים (`double.tickets` מהשרת). */
   ticketsOpen: boolean;
-  /** הכרטיסים באמת נספרים: ההפעלה יכולה לזכות, ויש בה יותר מ-4 משתתפים. */
+  /** הכרטיסים באמת נספרים: ההפעלה יכולה לזכות, ומישהו שיחק עד השאלה (כמו villa_double_tally בשרת). */
   counts: boolean;
 }
 
@@ -113,7 +112,7 @@ export function doubleResult(
     share,
     tickets,
     ticketsOpen,
-    counts: ticketsOpen && base > VILLA_REHEARSAL_MAX_PLAYERS,
+    counts: ticketsOpen && base > 0,
   };
 }
 
@@ -174,7 +173,7 @@ export function doubleView(
   };
 }
 
-/** התוצאה באמת מוסיפה כרטיסים (ואז המסך נפתח בתרועה): לא בהפעלת ניסיון ולא במשחק שכבר אינו יכול לזכות. */
+/** התוצאה באמת מוסיפה כרטיסים (ואז המסך נפתח בתרועה): לא כשאיש לא צדק, ולא במשחק שכבר אינו יכול לזכות. */
 export function doubleWinsTickets(view: DoubleView | null): boolean {
   return view !== null && view.counts && view.tickets > 0;
 }
@@ -199,15 +198,7 @@ export function doubleIntroLines(intro: { n: number; of: number; tickets: boolea
 
 /** שורת הכרטיסים במסך התוצאה, לפי המצב (null = לא מדברים על כרטיסים). */
 export function doubleTicketLines(view: DoubleView): { main: string; note: string | null } | null {
-  if (!view.ticketsOpen) return null;
-  const worth =
-    view.tickets === 0 ? 'אף כרטיס' : view.tickets === 1 ? 'כרטיס אחד' : `${view.tickets} כרטיסים`;
-  if (!view.counts) {
-    return {
-      main: `עם יותר מ-${VILLA_REHEARSAL_MAX_PLAYERS} משתתפים זה היה שווה ${worth}`,
-      note: `כשמשתתפים עד ${VILLA_REHEARSAL_MAX_PLAYERS}, הכרטיסים להגרלת הווילה לא נספרים`,
-    };
-  }
+  if (!view.ticketsOpen || !view.counts) return null;
   const main =
     view.tickets === 0
       ? view.n < view.of
