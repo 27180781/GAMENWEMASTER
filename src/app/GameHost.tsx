@@ -181,6 +181,19 @@ import { useConnectionHealth } from './useConnectionHealth.ts';
 import { planCrowdVotes, snapshotAt } from './syntheticVotes.ts';
 import { joinQrUrl, joinDialDisplay, type GameSettings } from './urlParams.ts';
 import { hostKeyHints } from './hostHints.ts';
+import {
+  isWinnersScreenSlide,
+  NO_SCREEN_REVEAL,
+  screenAutoHoldMs,
+  screenAutoRevealMs,
+  screenBack,
+  screenForward,
+  screenNextPlace,
+  screenRevealFor,
+  screenRevealStep,
+  screenWinnersTotal,
+  type ScreenReveal,
+} from './screenWinners.ts';
 import { QrCode } from '../render/QrCode.tsx';
 import { DebugOverlay } from '../render/DebugOverlay.tsx';
 import { debugLog } from './debugLog.ts';
@@ -785,6 +798,15 @@ export function GameHost({
   const [scoresPageBump, setScoresPageBump] = useState(0);
   const winnersRevealedRef = useRef(0);
   winnersRevealedRef.current = winnersRevealed;
+  /**
+   * «מסך מנצחים» בשקופית פונקציה (screenWinners.ts): כמה מקומות נחשפו בכניסה
+   * הנוכחית לשקופית. הרשומה זוכרת לאיזו שקופית ולאיזו כניסה היא שייכת, ולכן כל
+   * כניסה מתחילה בלי אף מקום חשוף. ה-ref מתעדכן מיד בכל צעד, כדי שלחיצה כפולה
+   * מהירה תראה את הצעד הקודם (ולא תדלג על התיפוף לשקופית הבאה).
+   */
+  const [screenReveal, setScreenReveal] = useState<ScreenReveal>(NO_SCREEN_REVEAL);
+  const screenRevealRef = useRef(screenReveal);
+  screenRevealRef.current = screenReveal;
   /** מתי נחשף המקום הראשון (performance.now) — רווח מיד אחריו לא קוטע את התיפוף. */
   const championAtRef = useRef(-Infinity);
   /** שם המקום הראשון כבר על המסך, אחרי התיפוף של מסך המנצחים (הקריין ממתין לו). */
@@ -934,6 +956,18 @@ export function GameHost({
   // רענון תוכן באמצע שאלה לא מאפס בטעות את שלבי החשיפה.
   const soundsRef = useRef(sounds);
   soundsRef.current = sounds;
+
+  // «מסך מנצחים» בשקופית פונקציה (screenWinners.ts): כמה מקומות במסך וכמה כבר
+  // נחשפו — למסך עצמו, למסך הצפייה, לפס ההנחיות ולמעברים האוטומטיים.
+  const screenSlideOn = stage === 'playing' && isWinnersScreenSlide(slide);
+  const screenTotal = screenSlideOn ? screenWinnersTotal(engine.getWinners(setting.multiWinners).length) : 0;
+  const screenShown = screenSlideOn
+    ? Math.min(screenTotal, screenRevealFor(screenReveal, state.currentSlideId, state.slideEntry).shown)
+    : 0;
+  /** עוד מקומות לחשוף: המעבר האוטומטי לשקופית הבאה ממתין עד שכולם על המסך. */
+  const screenRevealPending = screenSlideOn && screenShown < screenTotal;
+  /** אחרי החשיפה האחרונה: ההשהיה של המעבר האוטומטי נספרת מהרגע שהמקום הראשון על המסך. */
+  const screenHoldMs = screenSlideOn ? screenAutoHoldMs(screenTotal) : 0;
 
   /**
    * פס הקבוצות בצד מסך השאלה (groupRail.ts) — מופיע מעצמו בכל משחק עם קבוצות.
@@ -1883,6 +1917,25 @@ export function GameHost({
   // זרימת השלבים: קדימה (רווח / 0) ואחורה (2)
   // -------------------------------------------------------------------------
 
+  /** צעד במסך המנצחים של שקופית פונקציה: 1 חושף את המקום הבא, ‎-1 מסתיר את האחרון. */
+  const stepScreen = useCallback(
+    (delta: 1 | -1) => {
+      const st = engine.getState();
+      const total = screenWinnersTotal(engine.getWinners(engine.getGame().setting.multiWinners).length);
+      const next = screenRevealStep(
+        screenRevealRef.current,
+        st.currentSlideId,
+        st.slideEntry,
+        delta,
+        total,
+        performance.now(),
+      );
+      screenRevealRef.current = next;
+      setScreenReveal(next);
+    },
+    [engine],
+  );
+
   /** הצעד הבא במחזור השקופית — רווח במקלדת או 0 בשלט המנחה. */
   const advanceStep = useCallback(() => {
     const current = engine.getState();
@@ -1971,9 +2024,23 @@ export function GameHost({
       return;
     }
 
+    // «מסך מנצחים» בשקופית פונקציה: חושפים אחד-אחד, מהמקום האחרון לראשון (כמו
+    // במסך הסיום), ורק אחרי שכולם על המסך, ובלי לקטוע את התיפוף של המקום הראשון,
+    // עוברים לשקופית הבאה (screenWinners.ts).
+    if (isWinnersScreenSlide(s)) {
+      const total = screenWinnersTotal(engine.getWinners(engine.getGame().setting.multiWinners).length);
+      const mine = screenRevealFor(screenRevealRef.current, current.currentSlideId, current.slideEntry);
+      const step = screenForward(mine.shown, total, performance.now() - mine.championAt);
+      if (step === 'reveal') {
+        stepScreen(1);
+        return;
+      }
+      if (step === 'wait') return;
+    }
+
     // showing של שקופית מדיה/טקסט: מדיית פתיחה → השקופית הבאה
     engine.dispatch({ type: 'ADVANCE', at: now });
-  }, [engine, audio, sounds, releaseHeldVotes]);
+  }, [engine, audio, sounds, releaseHeldVotes, stepScreen]);
 
   /**
    * כניסה מחדש לשקופית במצב "כל התשובות חשופות, טיימר טרם הופעל" — בלי
@@ -2055,11 +2122,20 @@ export function GameHost({
         return;
       }
     }
+    // «מסך מנצחים» בשקופית פונקציה: מסתירים את המקום האחרון שנחשף; בלי חשופים —
+    // לשקופית הקודמת, כמו קודם.
+    if (isWinnersScreenSlide(s)) {
+      const mine = screenRevealFor(screenRevealRef.current, current.currentSlideId, current.slideEntry);
+      if (screenBack(mine.shown) === 'hide') {
+        stepScreen(-1);
+        return;
+      }
+    }
     // בשקופית הראשונה אין קודמת: BACK היה מתחיל אותה מחדש, והכניסה מציגה שוב
     // את השאלה עם הצליל — «אחורה» שמקדם. יש לאן לחזור רק כשיש מדיית פתיחה.
     if (current.currentSlideIndex === 0 && s.openMedia.src === '') return;
     engine.dispatch({ type: 'BACK', at: now });
-  }, [engine, reenterAtAnswers]);
+  }, [engine, reenterAtAnswers, stepScreen]);
 
   /**
    * הרצה מהירה (מקש N): לחיצה אחת מדלגת לשקופית הבאה ומציגה אותה במלואה
@@ -3010,10 +3086,12 @@ export function GameHost({
         action = () => engine.dispatch({ type: 'OPEN_VOTING', at: Date.now() });
       }
     } else if (state.phase === 'showing' && !votable) {
-      if (autoT.nextSlide.active) {
+      // «מסך מנצחים» שעוד חושף מקומות: החשיפה האוטומטית (אפקט נפרד, למטה) קודמת
+      // למעבר, וההשהיה נספרת מהרגע שהמקום הראשון על המסך (screenWinners.ts).
+      if (autoT.nextSlide.active && !screenRevealPending) {
         label = 'שקופית הבאה';
         action = () => engine.dispatch({ type: 'ADVANCE', at: Date.now() });
-        delayMs = Math.max(1, autoT.nextSlide.seconds) * 1000;
+        delayMs = Math.max(1, autoT.nextSlide.seconds) * 1000 + screenHoldMs;
       }
     } else if (state.phase === 'results') {
       // חשיפת הפילוח/התשובה הנכונה אוטומטית לאחר הטיימר — לכל סוגי השקופיות
@@ -3074,7 +3152,7 @@ export function GameHost({
       fire();
     }, delayMs);
     return () => window.clearTimeout(timeout);
-  }, [stage, state.phase, state.currentSlideId, state.activeMedia, state.betOutcomes, reveal, autoT, overlayActive, engine, audio, sounds, narrationActive, narrationSpeaking]);
+  }, [stage, state.phase, state.currentSlideId, state.activeMedia, state.betOutcomes, reveal, autoT, overlayActive, engine, audio, sounds, narrationActive, narrationSpeaking, screenRevealPending, screenHoldMs]);
 
   // מעבר אוטומטי של השקופית (setting.automaticSkip, ראו autoSkip.ts): X שניות
   // אחרי שהשקופית סיימה את תפקידה — בשאלה, מחשיפת התשובה — ולא מתחת לשכבה
@@ -3087,6 +3165,8 @@ export function GameHost({
       answerRevealed: reveal.revealCorrect,
       covered: overlayActive,
       narratorSpeaking: narrationActive && narrationSpeaking,
+      revealPending: screenRevealPending,
+      holdMs: screenHoldMs,
     });
     if (delay === null) return;
     const slideId = state.currentSlideId;
@@ -3110,6 +3190,43 @@ export function GameHost({
     narrationActive,
     narrationSpeaking,
     engine,
+    screenRevealPending,
+    screenHoldMs,
+  ]);
+
+  // «מסך מנצחים» בשקופית פונקציה במעבר אוטומטי (של המשחק או של השקופית): החשיפה
+  // ממשיכה לבד, אחד בכל SCREEN_AUTO_REVEAL_MS, ושני המעברים שלמעלה ממתינים עד
+  // שכולם על המסך. לחיצה של המנחה פשוט מקדימה את החשיפה הבאה.
+  const screenAuto = autoT.nextSlide.active || slide.setting.automaticSkip.active;
+  useEffect(() => {
+    if (!screenSlideOn || !screenAuto || state.activeMedia !== null || overlayActive) return;
+    const delay = screenAutoRevealMs(screenShown, screenTotal);
+    if (delay === null) return;
+    const slideId = state.currentSlideId;
+    const entry = state.slideEntry;
+    const timeout = window.setTimeout(
+      () => {
+        const now = engine.getState();
+        if (now.currentSlideId !== slideId || now.slideEntry !== entry || now.activeMedia !== null) return;
+        debugLog('auto', 'מעבר אוטומטי: חשיפת מקום במסך המנצחים', { place: screenTotal - screenShown });
+        stepScreen(1);
+      },
+      narrationSafeDelayMs(delay, narrationActive && narrationSpeaking),
+    );
+    return () => window.clearTimeout(timeout);
+  }, [
+    screenSlideOn,
+    screenAuto,
+    screenShown,
+    screenTotal,
+    state.activeMedia,
+    state.currentSlideId,
+    state.slideEntry,
+    overlayActive,
+    narrationActive,
+    narrationSpeaking,
+    engine,
+    stepScreen,
   ]);
 
   // במעבר אוטומטי — מסך תוצאות ההימור נסגר לבד אחרי זמן קריאה (ההשהיה של
@@ -3620,6 +3737,7 @@ export function GameHost({
         raffle,
       },
       winnersRevealed,
+      ...(screenSlideOn ? { screenRevealed: screenShown } : {}),
       functionStatus,
       functionDetail,
       paused: overlayActive,
@@ -3696,6 +3814,7 @@ export function GameHost({
               correctOverlay,
               doublePending,
               doubleOverlay,
+              screenNextPlace: screenSlideOn ? screenNextPlace(screenShown, screenTotal) : null,
               ...(railAvailable ? { groupRail: !groupRailHidden } : {}),
             }).map((h) => (
               <span key={h.key} className="host-hint">
@@ -3727,6 +3846,7 @@ export function GameHost({
               correctOverlay,
               doublePending,
               doubleOverlay,
+              screenNextPlace: screenSlideOn ? screenNextPlace(screenShown, screenTotal) : null,
               ...(railAvailable ? { groupRail: !groupRailHidden } : {}),
             })}
             onRun={runHintKey}
@@ -3800,6 +3920,7 @@ export function GameHost({
               groupBonus={groupBonus}
               onBlockingMediaEnded={onBlockingMediaEnded}
               groupRail={groupRail}
+              {...(screenSlideOn ? { screenRevealed: screenShown } : {})}
             />
             {/* מיקום במשחק: שקופית נוכחית מתוך סה"כ */}
             <span className="slide-counter" dir="ltr">

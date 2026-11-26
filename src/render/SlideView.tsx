@@ -46,6 +46,11 @@ interface SlideViewProps {
   liveCorrectCount?: number | null;
   /** פס הקבוצות בצד מסך השאלה (src/app/groupRail.ts); null = אין. */
   groupRail?: GroupRailData | null;
+  /**
+   * «מסך מנצחים» בשקופית פונקציה: כמה מקומות נחשפו (מהאחרון לראשון, src/app/screenWinners.ts).
+   * בלי — כולם יחד (למשל מסך צפייה של מסך ראשי ישן).
+   */
+  screenRevealed?: number;
 }
 
 /** מסך שקופית "פונקציה" — פעולת מערכת (API / ניקוד / משתתפים) עם חיווי מצב. */
@@ -128,6 +133,7 @@ export function SlideView({
   onBlockingMediaEnded,
   liveCorrectCount = null,
   groupRail = null,
+  screenRevealed,
 }: SlideViewProps) {
   const slide = engine.getCurrentSlide();
   const game = engine.getGame();
@@ -155,7 +161,11 @@ export function SlideView({
           {...(groupBonus ? { groupBonus } : {})}
         />
       ) : (
-        <WinnersScreen engine={engine} {...(nameOf ? { nameOf } : {})} />
+        <WinnersScreen
+          engine={engine}
+          {...(nameOf ? { nameOf } : {})}
+          {...(screenRevealed !== undefined ? { revealed: screenRevealed } : {})}
+        />
       );
     }
     return <FunctionScreen action={fn?.action ?? 'api'} status={functionStatus} detail={functionDetail} />;

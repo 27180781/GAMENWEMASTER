@@ -327,6 +327,16 @@ describe('מצב המסך למסך הצפייה', () => {
     expectNoSecrets(JSON.stringify(snap));
   });
 
+  it('«מסך מנצחים» בשקופית פונקציה: כמה מקומות נחשפו עובר לצופים; בלי השדה — כולם יחד', () => {
+    const engine = votingOnFirst();
+    const builder = new LiveSnapshotBuilder();
+    const revealing = builder.build(input(engine, { screenRevealed: 2 }));
+    expect(revealing.screenRevealed).toBe(2);
+    expect(builder.build(input(engine, { screenRevealed: 0 })).screenRevealed).toBe(0);
+    // שקופית אחרת, או מסך ראשי מגרסה קודמת: השדה לא נשלח בכלל
+    expect('screenRevealed' in builder.build(input(engine))).toBe(false);
+  });
+
   it('תמונה דינמית שהכתובת שלה מכילה את מזהה המשחק — לא נשלחת', () => {
     const engine = new GameEngine(liveGame());
     const state = {

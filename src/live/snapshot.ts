@@ -90,6 +90,11 @@ export interface LiveHostInput {
     raffle: { entries: RaffleEntry[]; winner: RaffleEntry; run: number } | null;
   };
   winnersRevealed: number;
+  /**
+   * «מסך מנצחים» בשקופית פונקציה (src/app/screenWinners.ts): כמה מקומות נחשפו.
+   * חסר — השקופית הנוכחית אינה מסך כזה.
+   */
+  screenRevealed?: number;
   scoresPage: number;
   functionStatus: 'idle' | 'sending' | 'sent' | 'error';
   functionDetail: string;
@@ -541,6 +546,7 @@ export class LiveSnapshotBuilder {
       },
       overlays,
       winnersRevealed: input.winnersRevealed,
+      ...(input.screenRevealed !== undefined ? { screenRevealed: input.screenRevealed } : {}),
       scoresPage: input.scoresPage,
       fn: { status: input.functionStatus, detail: input.functionDetail },
       paused: input.paused,

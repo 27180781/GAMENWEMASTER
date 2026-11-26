@@ -741,6 +741,7 @@ function LiveScreen({
                       groupBonus={snap.groupBonus}
                       liveCorrectCount={snap.liveCorrectCount}
                       groupRail={snap.groupRail ?? null}
+                      {...(snap.screenRevealed !== undefined ? { screenRevealed: snap.screenRevealed } : {})}
                     />
                     <span className="slide-counter" dir="ltr">
                       {state.currentSlideIndex + 1}/{snap.game.slideCount}

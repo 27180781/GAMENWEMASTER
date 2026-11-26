@@ -82,7 +82,7 @@ const FONT_SAMPLE = 'אבגד 123';
 let instances = 0;
 
 export interface RunnerOptions {
-  /** כמה מקומות חשופים; undefined = כולם יחד (שקופית «מסך» באמצע המשחק). */
+  /** כמה מקומות חשופים; undefined = כולם יחד (מסך צפייה של מסך ראשי ישן, הגלריה). */
   revealed: number | undefined;
   sink: WinnersSoundSink | null;
   /** שכבה אחרת (דירוג הקבוצות) מעל המסך — הכניסה מתחילה רק כשהיא יורדת. */

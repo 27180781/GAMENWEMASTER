@@ -74,6 +74,22 @@ describe('hostKeyHints — פעולת הרווח לפי שלב', () => {
   });
 });
 
+describe('hostKeyHints — «מסך מנצחים» בשקופית פונקציה', () => {
+  const screen = { phase: 'showing', votable: false, slideType: 'function' } as const;
+  it('★ הרווח חושף את המקומות מהאחרון לראשון', () => {
+    expect(space({ ...screen, screenNextPlace: 3 })).toBe('חשיפת מקום 3');
+    expect(space({ ...screen, screenNextPlace: 2 })).toBe('חשיפת מקום 2');
+    expect(space({ ...screen, screenNextPlace: 1 })).toBe('חשיפת המקום הראשון');
+  });
+  it('כולם על המסך — השקופית הבאה (או סיום המשחק בשקופית האחרונה)', () => {
+    expect(space({ ...screen, screenNextPlace: null })).toBe('השקופית הבאה');
+    expect(space({ ...screen, screenNextPlace: null, hasNextSlide: false })).toBe('סיום המשחק');
+  });
+  it('מדיה חוסמת קודמת לחשיפה, כמו ב-advanceStep', () => {
+    expect(space({ ...screen, screenNextPlace: 3, activeMedia: 'open' })).toBe('המשך (סיום המדיה)');
+  });
+});
+
 describe('hostKeyHints — מקשי מספרים לפי הקשר', () => {
   it('בזמן הצבעה מציג 4/5 ו-6', () => {
     expect(keys({ phase: 'voting' })).toEqual(['רווח', '4/5', '6', '1', '2', '3', 'N']);

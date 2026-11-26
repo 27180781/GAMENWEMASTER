@@ -44,6 +44,11 @@ export interface HostHintInput {
    * קבוצות, ואז אין רמז למקש G.
    */
   groupRail?: boolean;
+  /**
+   * «מסך מנצחים» בשקופית פונקציה (screenWinners.ts): המקום שהרווח הבא חושף
+   * (3, 2, 1…); null או חסר — אין מה לחשוף, והרווח עובר לשקופית הבאה.
+   */
+  screenNextPlace?: number | null;
 }
 
 /** השקופיות שפס הקבוצות מופיע בהן (מסך השאלה) — רק בהן רמז המקש G. */
@@ -63,6 +68,9 @@ function spaceAction(a: HostHintInput): string {
     if (!a.questionShown) return bet ? 'הצגת ההימור' : 'הצגת השאלה';
     if (a.answersShown < a.totalAnswers) return bet ? 'הצגת אפשרות הימור' : 'הצגת תשובה';
     return bet ? 'פתיחת ההימור + טיימר' : 'פתיחת ההצבעה + טיימר';
+  }
+  if (a.phase === 'showing' && typeof a.screenNextPlace === 'number' && a.screenNextPlace > 0) {
+    return a.screenNextPlace === 1 ? 'חשיפת המקום הראשון' : `חשיפת מקום ${a.screenNextPlace}`;
   }
   if (a.phase === 'showing') return a.hasNextSlide ? 'השקופית הבאה' : 'סיום המשחק';
   if (a.phase === 'voting') return bet ? 'סגירת ההימור' : 'סיום ההצבעה';
