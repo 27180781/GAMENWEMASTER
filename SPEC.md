@@ -415,7 +415,7 @@ interface BackupTarget {
 | מה מוצג | קטעים |
 |---|---|
 | מסך פתיחה (פעם אחת למשחק) | `flow_welcome`, ומיד אחריו הוראות ההצבעה לפי מקורות ההצבעה **הפעילים** (לא `limit.type`, שבחבילת אופליין תמיד `"clickers"`): `flow_howto_clickers` · `flow_howto_phones` · `flow_howto_both`; בלי מקור אמיתי (קהל מדומה) — בלי הוראות |
-| השאלה מוצגת | [`flow_question_number` + מספר בנקבה] + `narration.question`; בשאלת סקר `misc_poll_intro` לפני `narration.question` |
+| השאלה מוצגת | [`flow_question_number` + מספר בנקבה] + `narration.question`; בשאלת סקר `misc_poll_intro` לפני `narration.question`. המספר סופר רק את השאלות של המשחק: הימור ושאלת דאבל של הווילה (`double`) אינם נספרים, ובשאלת דאבל לא מוכרז מספר |
 | שקופית הימור מוצגת | `bet_round` + `narration.question` |
 | תשובה k נחשפה | `flow_answer_number` + k + `narration.answers[k-1]` |
 | ההצבעה נפתחה | `flow_vote_open` |

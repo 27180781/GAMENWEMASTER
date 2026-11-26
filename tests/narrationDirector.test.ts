@@ -15,8 +15,11 @@ import {
   type NarrationMemory,
 } from '../src/app/narration/narrationDirector.ts';
 import {
+  narrationAnswers,
   narrationRevealMatches,
   playableGroupClips,
+  questionOrdinal,
+  questionTotal,
 } from '../src/app/narration/gameNarration.ts';
 import { AMB_LOBBY, AMB_START, AMB_VOTING } from '../src/app/narration/ambience.ts';
 import { parseGameFile } from '../src/engine/index.ts';
@@ -1816,5 +1819,55 @@ describe('★ סקר, הוראות הצבעה ו«מוכנים?»', () => {
     expect(AMB_START).toContain('amb_start_5');
     expect(AMB_LOBBY).toContain('amb_lobby_6');
     expect(AMB_LOBBY).toContain('amb_lobby_7');
+  });
+});
+
+describe('שאלת דאבל של הגרלת הווילה — לא נספרת במספר השאלה', () => {
+  // 1 שאלה · 2 מסך הכרזה · 3 שאלת דאבל (נכונה 3) · 4 שאלה. השרת מוסיף את 2 ו-3
+  // (get-game-json), והבונה לא רואה אותן: הן לא מזיזות את מספרי השאלות, כמו
+  // בטבלת המובילים (leaderboardSchedule.ts).
+  const game = parseGameFile(
+    rawGame([
+      rawSlide({ id: 1, type: 'trivia', answers: fourAnswers(1) }),
+      {
+        ...rawSlide({ id: 2, type: 'subject', que: 'שאלת דאבל' }),
+        doubleIntro: { n: 1, of: 1, tickets: true },
+      },
+      {
+        ...rawSlide({ id: 3, type: 'trivia', answers: fourAnswers(3) }),
+        double: { n: 1, of: 1, poolId: 'q-a', tickets: true },
+      },
+      rawSlide({ id: 4, type: 'trivia', answers: fourAnswers(2) }),
+    ]),
+  );
+
+  it('★ השאלה שאחרי הדאבל מוכרזת כשאלה 2, והיא «השאלה האחרונה»', () => {
+    expect([1, 2, 3, 4].map((id) => questionOrdinal(game, id))).toEqual([1, 0, 0, 2]);
+    expect(questionTotal(game)).toBe(2);
+  });
+
+  it('★ בדאבל עצמו: בלי «שאלה מספר», מספר התשובה, ו«התשובה הנכונה היא תשובה מספר 3»', () => {
+    // לשאלת הדאבל אין קטעי קריינות (השרת לא מקליט אותה), כמו לשקופית שנערכה אחרי ההקלטה.
+    const slide = game.questions.find((q) => q.id === 3)!;
+    const at = (over: Partial<DisplayedState>) =>
+      base({
+        slideId: 3,
+        questionOrdinal: questionOrdinal(game, 3),
+        questionTotal: questionTotal(game),
+        answers: narrationAnswers(slide),
+        questionClip: null,
+        questionShown: true,
+        ...over,
+      });
+    const clips = clipsOf([
+      at({}),
+      at({ answersShown: 1 }),
+      at({ answersShown: 4, phase: 'results' }),
+      at({ answersShown: 4, phase: 'results', revealCorrect: true }),
+    ]);
+    expect(clips[0]).toEqual([]);
+    expect(clips[1]).toEqual(['flow_answer_number.mp3', 'num_f_1.mp3']);
+    expect(clips[3]).toEqual(['score_correct_number.mp3', 'num_f_3.mp3']);
+    expect(clips.flat()).not.toContain('flow_question_number.mp3');
   });
 });
