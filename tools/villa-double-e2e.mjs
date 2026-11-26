@@ -4,7 +4,10 @@
  * המשחק האמיתי (dist, אחרי npm run build) ב-Chromium, עם המקלדת, שרת הצבעות מדומה
  * (טלפונים שעונים), ממסר מסך הצפייה ושרת גיבוי מדומה. בודק את מסך ההכרזה, התג מעל
  * השאלה, «תוצאת הדאבל» אחרי החשיפה (גם במסך הצפייה), שהרווח סוגר אותה וממשיך,
- * ואת meta.villaDoubles / meta.villaSlides בגיבוי שהשרת סופר ממנו את הכרטיסים.
+ * ואת meta.villaDoubles / meta.villaSlides / meta.villaPool בגיבוי שהשרת סופר ממנו
+ * את הכרטיסים. ו«פעם אחת»: חלון הבחירה בפתיחה, התחלה מחדש אחרי ששאלת דאבל הופיעה
+ * (בלעדיהן), «הפעלת ניסיון» בלעדיהן, קובץ שקשור להפעלה אחרת (`run`), והמשך מגיבוי
+ * של ההפעלה שהקובץ קשור אליה מול «משחק חדש».
  *
  *   npm run build && npm run e2e:villa
  *   npm run e2e:villa -- --shots=./villa-shots     # גם צילומים של כל מסך
@@ -81,9 +84,9 @@ function slide(id, type, que, extra = {}, answers = 3) {
   };
 }
 
-const GAME = {
+const makeVillaGame = (id, run) => ({
   name: 'בדיקת שאלות הדאבל',
-  id: GAME_ID,
+  id,
   cloudinaryFolder: 'test',
   setting: {
     titleThroughoutGame: 'בדיקת שאלות הדאבל',
@@ -112,12 +115,61 @@ const GAME = {
   },
   questions: [
     slide(1, 'trivia', 'שאלה רגילה'),
-    slide(2, 'subject', '🎫 שאלת דאבל 1 מתוך 1', { doubleIntro: { n: 1, of: 1, tickets: true } }),
-    slide(3, 'trivia', 'שאלת הדאבל', { double: { n: 1, of: 1, poolId: 'pool-7', tickets: true, stats: STATS } }),
+    slide(2, 'subject', '🎫 שאלת דאבל 1 מתוך 1', {
+      doubleIntro: { n: 1, of: 1, tickets: true, ...(run !== undefined ? { run } : {}) },
+    }),
+    slide(3, 'trivia', 'שאלת הדאבל', {
+      double: { n: 1, of: 1, poolId: 'pool-7', tickets: true, stats: STATS, ...(run !== undefined ? { run } : {}) },
+    }),
     slide(4, 'trivia', 'שאלה אחרונה'),
   ],
   users: '{}',
   room: ROOM,
+});
+
+/** ההפעלה שהשאלות «כבר הופיעו» בה, בקבצים שקשורים להפעלה (`run`). */
+const RUN = 1_764_115_200_123;
+/** הקבצים לפי מזהה (‎/fx/<id>.json‎): הראשי פתוח לכל הפעלה, והשאר לתרחישי «פעם אחת». */
+const GAMES = {
+  [GAME_ID]: makeVillaGame(GAME_ID),
+  'villa-trial-e2e': makeVillaGame('villa-trial-e2e'),
+  'villa-bound-e2e': makeVillaGame('villa-bound-e2e', RUN),
+  'villa-resume-e2e': makeVillaGame('villa-resume-e2e', RUN),
+  'villa-resume-new-e2e': makeVillaGame('villa-resume-new-e2e', RUN),
+};
+/** גיבוי חי של ההפעלה RUN, אחרי שאלה 1 (חמישה ענו), לפני שאלת הדאבל. */
+const liveBackupOf = (id) => {
+  const votes = { '0500000001': 1, '0500000002': 2, '0500000003': 1, '0500000004': 3, '0500000005': 1 };
+  const users = Object.fromEntries(
+    Object.entries(votes).map(([phone, answer]) => [
+      phone,
+      {
+        name: `שחקן ${phone.slice(-2)}`,
+        score: answer === 1 ? 7 : 0,
+        groupId: null,
+        numAnswers: 1,
+        numCorrect: answer === 1 ? 1 : 0,
+        details: { lastQue: 1, lastVote: answer, votes: { 1: answer } },
+      },
+    ]),
+  );
+  return {
+    id,
+    users: JSON.stringify(users),
+    questions: JSON.stringify({
+      1: { queId: 1, type: 'trivia', display: true, numVotes: 5, correctVotes: 3, answers: { 1: 3, 2: 1, 3: 1 } },
+      3: { queId: 3, type: 'trivia', display: false, numVotes: 0, correctVotes: 0, answers: {} },
+      4: { queId: 4, type: 'trivia', display: false, numVotes: 0, correctVotes: 0, answers: {} },
+    }),
+    groups: '[]',
+    meta: JSON.stringify({ currentQueId: 1, phase: 'results', startedAt: RUN, villaSlides: [2, 3], villaPool: ['pool-7'] }),
+    completed: false,
+  };
+};
+/** הגיבויים החיים שהשרת המדומה מחזיר (GET ‎/save-backup/<id>‎). */
+const LIVE_BACKUPS = {
+  'villa-resume-e2e': liveBackupOf('villa-resume-e2e'),
+  'villa-resume-new-e2e': liveBackupOf('villa-resume-new-e2e'),
 };
 
 // ---------------------------------------------------------------------------
@@ -139,9 +191,16 @@ const backupPosts = [];
 
 const server = createServer((req, res) => {
   const path = decodeURIComponent(new URL(req.url ?? '/', 'http://localhost').pathname);
-  if (path === '/fx/game.json') {
+  const fx = /^\/fx\/([\w-]+)\.json$/.exec(path);
+  if (fx !== null && GAMES[fx[1]] !== undefined) {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(GAME));
+    res.end(JSON.stringify(GAMES[fx[1]]));
+    return;
+  }
+  const live = /^\/backup\/save-backup\/([\w-]+)$/.exec(path);
+  if (req.method === 'GET' && live !== null) {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(LIVE_BACKUPS[live[1]] ?? {}));
     return;
   }
   if (path.startsWith('/backup/')) {
@@ -241,19 +300,38 @@ async function playQuestion(votes) {
   await sleep(400);
 }
 
-let crash = null;
-let viewer = null;
-try {
+/** פותח את המשחק `id` עד מסך הפתיחה (כמו קישור מהבונה, עם שרת ההצבעות והגיבוי המדומים). */
+async function open(p, id) {
   const query = new URLSearchParams({
-    game: `${BASE}/fx/game.json`,
+    game: `${BASE}/fx/${id}.json`,
     voteServer: VOTE_URL,
     liveRelay: RELAY,
     backupUrl: `${BASE}/backup`,
   });
-  await page.goto(`${BASE}/?${query}`);
-  await page.getByRole('button', { name: /התחל משחק/ }).click({ timeout: 20000 });
-  await page.locator('.lobby-screen').waitFor({ timeout: 20000 });
+  await p.goto(`${BASE}/?${query}`);
+  await p.getByRole('button', { name: /התחל משחק/ }).click({ timeout: 20000 });
+  await p.locator('.lobby-screen').waitFor({ timeout: 20000 });
   await sleep(800);
+}
+/** הגיבויים האחרונים שנשלחו למשחק `id` (המטא מפוענח). */
+const metasOf = (id) =>
+  backupPosts.filter((p) => p.path === '/save-backup' && p.body?.id === id).map((p) => JSON.parse(p.body.meta));
+
+let crash = null;
+let viewer = null;
+try {
+  await open(page, GAME_ID);
+
+  // «פעם אחת»: לפני הפעלה עם שאלות דאבל המפעיל בוחר, והרווח לא מתחיל מאחורי החלון
+  const modal = (await text(page, '.villa-once-box')) ?? '';
+  check('חלון הבחירה בפתיחה', modal.includes('מופיעות פעם אחת בלבד') && modal.includes('הפעלת ניסיון'), modal);
+  await shot(page, 'once-modal');
+  await space(1);
+  check('הרווח לא מתחיל את המשחק מאחורי החלון', (await count(page, '.lobby-screen')) === 1);
+  check('בלי שורת «בלעדיהן» כשההפעלה משחקת אותן', (await count(page, '.villa-off-badge')) === 0);
+  await page.getByRole('button', { name: /ההפעלה האמיתית/ }).click();
+  await sleep(300);
+  check('החלון נסגר', (await count(page, '.villa-once-box')) === 0);
 
   // מסך הצפייה, בהקשר נפרד (צופה במחשב אחר)
   const viewerContext = await browser.newContext({ viewport: { width: 1280, height: 720 }, serviceWorkers: 'block' });
@@ -336,6 +414,7 @@ try {
   const meta = last ? JSON.parse(last.body.meta) : null;
   check('נשלחו גיבויים', posts.length > 0, `${posts.length}`);
   check('meta.villaSlides = [2, 3]', JSON.stringify(meta?.villaSlides) === '[2,3]', JSON.stringify(meta?.villaSlides));
+  check('meta.villaPool = [pool-7]', JSON.stringify(meta?.villaPool) === '["pool-7"]', JSON.stringify(meta?.villaPool));
   const d = meta?.villaDoubles?.[0];
   check(
     'meta.villaDoubles: שאלה 3, הכרזה 2, 2 מתוך 5, 4 כרטיסים',
@@ -353,6 +432,89 @@ try {
   );
   const gameOver = backupPosts.some((p) => p.path === '/save-backup/game-over');
   check('סוף המשחק נרשם (game-over)', gameOver);
+
+  // התחלה מחדש באותו חלון, אחרי ששאלת הדאבל הופיעה: ההפעלה החדשה בלעדיהן
+  const sentBefore = metasOf(GAME_ID).length;
+  await page.getByTitle('הגדרות').click();
+  await page.getByRole('button', { name: /התחלת המשחק מחדש/ }).click({ timeout: 5000 });
+  await page.locator('.lobby-screen').waitFor({ timeout: 10000 });
+  await sleep(500);
+  check('אחרי התחלה מחדש: בלי חלון הבחירה', (await count(page, '.villa-once-box')) === 0);
+  const usedBadge = (await text(page, '.villa-off-badge')) ?? '';
+  check('אחרי התחלה מחדש: «כבר הופיעו»', usedBadge.includes('כבר הופיעו'), usedBadge);
+  await shot(page, 'restart-without-doubles');
+  await space(1);
+  await sleep(300);
+  check('אחרי התחלה מחדש: המשחק בלי שאלות הדאבל (1/2)', (await counter()) === '1/2', await counter());
+  await playQuestion([['0500000001', 1]]);
+  await space(1);
+  await sleep(500);
+  check('אחרי התחלה מחדש: השאלה הבאה היא האחרונה, בלי הכרזה', (await counter()) === '2/2' && (await count(page, '.double-intro')) === 0, await counter());
+  await sleep(1800);
+  const after = metasOf(GAME_ID).slice(sentBefore);
+  check(
+    'אחרי התחלה מחדש: הגיבויים בלי villaSlides (השרת לא רואה הפעלה עם דאבל)',
+    after.length > 0 && after.every((m) => m.villaSlides === undefined && m.villaPool === undefined),
+    JSON.stringify(after.map((m) => m.villaSlides)),
+  );
+
+  // «הפעלת ניסיון» בחלון: ההפעלה בלעדיהן, והשרת לא רואה כלום
+  const trial = await context.newPage();
+  trial.on('pageerror', (e) => errors.push(`ניסיון: ${String(e)}`));
+  await open(trial, 'villa-trial-e2e');
+  await trial.getByRole('button', { name: /הפעלת ניסיון/ }).click({ timeout: 5000 });
+  await sleep(300);
+  const trialBadge = (await text(trial, '.villa-off-badge')) ?? '';
+  check('ניסיון: השורה «הפעלת ניסיון: בלי שאלות הדאבל»', trialBadge.includes('הפעלת ניסיון'), trialBadge);
+  await shot(trial, 'trial-without-doubles');
+  await trial.keyboard.press('Space');
+  await sleep(500);
+  check('ניסיון: המשחק בלי שאלות הדאבל (1/2)', (await text(trial, '.slide-counter')) === '1/2', await text(trial, '.slide-counter'));
+  await sleep(1800);
+  const trialMetas = metasOf('villa-trial-e2e');
+  check('ניסיון: הגיבויים בלי villaSlides', trialMetas.length > 0 && trialMetas.every((m) => m.villaSlides === undefined), `${trialMetas.length}`);
+  await trial.close();
+
+  // קובץ שקשור להפעלה אחרת (השרת: «כבר הופיעו», רק לרענון שלה), בלי גיבוי שלה: בלעדיהן
+  const bound = await context.newPage();
+  bound.on('pageerror', (e) => errors.push(`קובץ קשור: ${String(e)}`));
+  await open(bound, 'villa-bound-e2e');
+  check('קובץ קשור: בלי חלון הבחירה', (await count(bound, '.villa-once-box')) === 0);
+  check('קובץ קשור: «כבר הופיעו»', ((await text(bound, '.villa-off-badge')) ?? '').includes('כבר הופיעו'));
+  await bound.keyboard.press('Space');
+  await sleep(500);
+  check('קובץ קשור: המשחק בלי שאלות הדאבל (1/2)', (await text(bound, '.slide-counter')) === '1/2', await text(bound, '.slide-counter'));
+  await bound.close();
+
+  // המשך מגיבוי של ההפעלה שהקובץ קשור אליה: ממשיכה עם שאלות הדאבל, בלי לשאול שוב
+  const resume = await context.newPage();
+  resume.on('pageerror', (e) => errors.push(`המשך: ${String(e)}`));
+  await open(resume, 'villa-resume-e2e');
+  await resume.getByRole('button', { name: /המשך מהנקודה/ }).click({ timeout: 10000 });
+  await sleep(500);
+  check('המשך של ההפעלה: בלי חלון הבחירה', (await count(resume, '.villa-once-box')) === 0);
+  check('המשך של ההפעלה: עם שאלות הדאבל (1/4)', (await text(resume, '.slide-counter')) === '1/4', await text(resume, '.slide-counter'));
+  // מהשחזור על «תוצאות» הרווח הראשון חושף את התשובה הנכונה, והבא עובר לשקופית הבאה
+  for (let i = 0; i < 3 && (await text(resume, '.slide-counter')) === '1/4'; i++) {
+    await resume.keyboard.press('Space');
+    await sleep(600);
+  }
+  check('המשך של ההפעלה: ההכרזה אחרי שאלה 1', (await count(resume, '.double-intro')) === 1, await text(resume, '.slide-counter'));
+  await shot(resume, 'resume-with-doubles');
+  await resume.close();
+
+  // אותו גיבוי, «משחק חדש»: הפעלה אחרת, ולכן בלעדיהן
+  const fresh = await context.newPage();
+  fresh.on('pageerror', (e) => errors.push(`משחק חדש: ${String(e)}`));
+  await open(fresh, 'villa-resume-new-e2e');
+  await fresh.getByRole('button', { name: /משחק חדש/ }).click({ timeout: 10000 });
+  await sleep(500);
+  check('«משחק חדש» במקום המשך: בלי חלון הבחירה', (await count(fresh, '.villa-once-box')) === 0);
+  check('«משחק חדש» במקום המשך: «כבר הופיעו»', ((await text(fresh, '.villa-off-badge')) ?? '').includes('כבר הופיעו'));
+  await fresh.keyboard.press('Space');
+  await sleep(500);
+  check('«משחק חדש» במקום המשך: בלי שאלות הדאבל (1/2)', (await text(fresh, '.slide-counter')) === '1/2', await text(fresh, '.slide-counter'));
+  await fresh.close();
 } catch (err) {
   crash = err instanceof Error ? err.message.split('\n')[0] : String(err);
 } finally {

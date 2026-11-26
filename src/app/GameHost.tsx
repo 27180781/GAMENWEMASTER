@@ -59,7 +59,18 @@ import { correctListApplies, correctListCloseDelayMs, correctListOrder } from '.
 import { BetResultsOverlay } from '../render/BetResultsOverlay.tsx';
 import { CorrectListOverlay } from '../render/CorrectListOverlay.tsx';
 import { DoubleResultOverlay } from '../render/DoubleResultOverlay.tsx';
-import { doubleView, doubleWinsTickets, type DoubleView } from './villaDouble.ts';
+import {
+  doubleView,
+  doubleWinsTickets,
+  hasVillaSlides,
+  stripVillaSlides,
+  villaNewRunPlays,
+  villaReachedIn,
+  villaResume,
+  villaRunOf,
+  villaSlideIds,
+  type DoubleView,
+} from './villaDouble.ts';
 import { RosterPanel } from '../render/RosterPanel.tsx';
 import { SlideView } from '../render/SlideView.tsx';
 import { VotesBreakdown } from '../render/VotesBreakdown.tsx';
@@ -160,7 +171,7 @@ import {
   type BackupConfig,
   type BackupData,
 } from './backup.ts';
-import { backupToSnapshot, buildBackupPayload, rosterFromBackup } from './backupState.ts';
+import { backupToSnapshot, backupWithoutVillas, buildBackupPayload, rosterFromBackup } from './backupState.ts';
 import type { ClickerSaveView } from './clickerSave.ts';
 import { canDiskBackup, diskBackupKey, diskBackupKeys, loadDiskBackupAny, saveDiskBackup } from './diskBackup.ts';
 import { downloadGameReport, buildGameReportBytes, reportFilename } from './gameReport.ts';
@@ -313,10 +324,50 @@ export function GameHost({
   demoOnly = false,
   fetchLatestGame,
 }: GameHostProps) {
+  // שאלות הדאבל של הגרלת הווילה מופיעות פעם אחת בכל משחק (villaDouble.ts): כל
+  // הפעלה מחליטה פעם אחת, כשהיא מתחילה, אם היא משחקת אותן, ומשחק שאינו משחק
+  // אותן רץ על הקובץ בלעדיהן (stripVillaSlides). ההחלטה לא משתנה באמצע הפעלה,
+  // כי השקופיות ממוספרות לפי המקום ושינוי היה מזיז אותן מתחת למשחק.
+  const [villaPlayAtStart] = useState(() =>
+    villaNewRunPlays(game, { run: villaRunOf(game), crowd: demoOnly || settings.crowdEnabled, reachedHere: false }),
+  );
+  /** ההפעלה הנוכחית משחקת את שאלות הדאבל שבקובץ. */
+  const [villaPlay, setVillaPlayState] = useState(villaPlayAtStart);
+  const villaPlayRef = useRef(villaPlayAtStart);
+  /**
+   * תשובת המפעיל בחלון הפתיחה של הפעלה עם שאלות דאבל: עוד לא ענה, «הפעלה
+   * אמיתית», או «ניסיון בלי שאלות הדאבל». מתאפס בכל הפעלה חדשה.
+   */
+  const [villaChoice, setVillaChoiceState] = useState<'ask' | 'play' | 'skip'>('ask');
+  const villaChoiceRef = useRef<'ask' | 'play' | 'skip'>('ask');
+  /** ה-startedAt של ההפעלה שבה הופיעה שאלת דאבל בחלון הזה, או null. */
+  const villaReachedRunRef = useRef<number | null>(null);
+  /** הקובץ האחרון שהגיע (ה-prop), ממנו כל שינוי בהחלטה נבנה מחדש. */
+  const latestGameRef = useRef(game);
+  latestGameRef.current = game;
   // המנוע נוצר פעם אחת; רענון תוכן מתבצע דרך engine.updateGame בלי remount,
   // כדי לשמר את מהלך המשחק (ניקוד/מיקום). ראו useEffect על שינוי game למטה.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const engine = useMemo(() => new GameEngine(game), []);
+  const engine = useMemo(() => new GameEngine(villaPlayAtStart ? game : stripVillaSlides(game)), []);
+  /**
+   * קובע אם ההפעלה משחקת את שאלות הדאבל, ומחליף את הקובץ במנוע בהתאם. רק בגבול
+   * של הפעלה: לפני שהתחילה, לפני המשך מגיבוי, או לפני איפוס להתחלה מחדש.
+   */
+  const setVillaPlay = useCallback(
+    (play: boolean) => {
+      if (villaPlayRef.current === play) return;
+      villaPlayRef.current = play;
+      setVillaPlayState(play);
+      const latest = latestGameRef.current;
+      engine.updateGame(play ? latest : stripVillaSlides(latest));
+      debugLog('game', play ? 'שאלות הדאבל במשחק בהפעלה הזאת' : 'ההפעלה הזאת בלי שאלות הדאבל');
+    },
+    [engine],
+  );
+  const setVillaChoice = useCallback((choice: 'ask' | 'play' | 'skip') => {
+    villaChoiceRef.current = choice;
+    setVillaChoiceState(choice);
+  }, []);
   // מקור ההצבעות: שרת הסוקט האמיתי במשחק אונליין (יש קוד חדר ואין שחקני דמה),
   // אחרת ReplayAdapter (דמו/סינתטי, וגם אופליין — בלי רשת).
   const roomId = game.room ?? '';
@@ -332,6 +383,8 @@ export function GameHost({
   const [roomExpired] = useState(() => phonesExpired(game));
   const phonesAvailable = hasRoom && !roomExpired;
   const crowdEnabled = demoOnly || settings.crowdEnabled;
+  const crowdRef = useRef(crowdEnabled);
+  crowdRef.current = crowdEnabled;
   const useClicker = !crowdEnabled && settings.voteClickers && clickersAvailable;
   const useSocket = !crowdEnabled && settings.votePhones && phonesAvailable;
   const isComposite = useClicker && useSocket; // שני המקורות יחד → מיזוג
@@ -1045,7 +1098,23 @@ export function GameHost({
    * המנחה. בלי זה רווח התחיל את המשחק מאחוריו (מוזיקת הפתיחה נעצרה וצליל
    * השאלה הראשונה התנגן), ו«המשך מהנקודה» החזיר אותו אחר כך.
    */
-  const startupModal = resumePrompt !== null || (showLicenseWarning && !licenseAck);
+  /**
+   * חלון הפתיחה של הפעלה עם שאלות דאבל: הן מופיעות פעם אחת, ולכן המפעיל בוחר
+   * אם זו ההפעלה האמיתית או ניסיון בלעדיהן. אחרי בדיקת הגיבוי, כדי שלא יעלה יחד
+   * עם «נמצא משחק פעיל» (המשך של הפעלה לא שואל: היא כבר החליטה).
+   */
+  const villaPrompt =
+    stage === 'opening' && villaPlay && villaChoice === 'ask' && !backupChecking && resumePrompt === null;
+  const startupModal = resumePrompt !== null || (showLicenseWarning && !licenseAck) || villaPrompt;
+  /** בקובץ יש שאלות דאבל וההפעלה הזאת בלעדיהן: למה (שורה למפעיל במסך הפתיחה). */
+  const villaOffReason: 'declined' | 'demo' | 'used' | null =
+    !villaPlay && hasVillaSlides(game)
+      ? villaChoice === 'skip'
+        ? 'declined'
+        : crowdEnabled
+          ? 'demo'
+          : 'used'
+      : null;
   const startupModalRef = useRef(startupModal);
   startupModalRef.current = startupModal;
   const startedAtRef = useRef<number>(Date.now());
@@ -1102,9 +1171,17 @@ export function GameHost({
 
   /** שחזור מגיבוי: הניקוד והמיקום למנוע, ומרשם מגיבוי אם אין מקומי. */
   const resumeFromBackup = useCallback(
-    (data: BackupData) => {
+    (saved: BackupData) => {
       try {
-        engine.restore(backupToSnapshot(game, data));
+        // שאלות הדאבל: ההפעלה ממשיכה איתן רק אם היא זו שהקובץ נשלח אליה (villaResume).
+        // הפעלה ששיחקה אותן וממשיכה מקובץ בלעדיהן יורדת מהן גם בגיבוי, כדי שהמיקום
+        // וההצבעות יישבו על השקופיות הנכונות.
+        const villa = villaResume(latestGameRef.current, saved.meta);
+        const data = villa.drop ? backupWithoutVillas(saved) : saved;
+        setVillaPlay(villa.play);
+        if (villa.play) setVillaChoice('play');
+        if (villa.drop) debugLog('game', 'ההפעלה ממשיכה בלי שאלות הדאבל ששיחקה (הקובץ כבר בלעדיהן)');
+        engine.restore(backupToSnapshot(engine.getGame(), data));
         startedAtRef.current = data.meta.startedAt || Date.now();
         // שחזור המשתתפים שהוסרו (שקופית players) — שההסרה תמשיך להיאכף
         removedRef.current = new Set(data.meta.removedIds ?? []);
@@ -1112,7 +1189,7 @@ export function GameHost({
         engine.setRemovedScores([...removedRef.current], data.meta.removedScores ?? {});
         setGroupBonus({ ...(data.meta.groupBonus ?? {}) }); // בונוסים קבוצתיים ידניים
         // מסנכרנים את מונה טבלת המובילים למצב המשוחזר, כדי שלא תקפוץ מיד בשחזור.
-        autoLeadersShownAtRef.current = completedQuestionCount(game, engine.getState().slidesCompleted);
+        autoLeadersShownAtRef.current = completedQuestionCount(engine.getGame(), engine.getState().slidesCompleted);
         if (rosterRef.current.categories.length === 0 && rosterRef.current.players.length === 0) {
           const restored = rosterFromBackup(data);
           if (restored.players.length > 0 || restored.categories.length > 0) updateRoster(restored);
@@ -1151,7 +1228,7 @@ export function GameHost({
       }
       setResumePrompt(null);
     },
-    [engine, game, updateRoster],
+    [engine, updateRoster, setVillaPlay, setVillaChoice],
   );
 
   // שמירה אוטומטית מדורגת (debounce ~1.5s) בשינויים משמעותיים במצב המשחק
@@ -1169,6 +1246,30 @@ export function GameHost({
       if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
     };
   }, [backupCfg, diskBackup, resumePrompt, stage, state.scores, state.phase, state.currentSlideId, state.votesBySlide, state.slidesCompleted]);
+
+  // שאלות הדאבל מופיעות פעם אחת: ברגע ששאלת דאבל על המסך (כמו `display` בגיבוי,
+  // שלפיו השרת מסמן אותן), החלון זוכר את ההפעלה, וכל הפעלה אחריה בו בלעדיהן.
+  useEffect(() => {
+    if (!villaPlayRef.current || villaReachedRunRef.current === startedAtRef.current) return;
+    if (villaReachedIn(engine.getGame(), state)) {
+      villaReachedRunRef.current = startedAtRef.current;
+      debugLog('game', 'שאלת דאבל הופיעה: מכאן כל הפעלה חדשה בחלון הזה בלי שאלות הדאבל');
+    }
+  }, [engine, state]);
+
+  // לפני שההפעלה מתחילה, ההחלטה על שאלות הדאבל הולכת אחרי שחקני הדמה (בלי דאבל איתם).
+  useEffect(() => {
+    if (stage !== 'opening') return;
+    const latest = latestGameRef.current;
+    setVillaPlay(
+      villaNewRunPlays(latest, {
+        run: villaRunOf(latest),
+        crowd: crowdEnabled,
+        reachedHere: villaReachedRunRef.current !== null,
+        declined: villaChoiceRef.current === 'skip',
+      }),
+    );
+  }, [crowdEnabled, stage, setVillaPlay]);
 
   // סיום משחק: הגענו למסך המנצחים באמת (לא תצוגה מקדימה של W) → שמירה אחרונה
   // ואז נעילת הגיבוי והעברתו לתוצאות.
@@ -1483,7 +1584,28 @@ export function GameHost({
   useEffect(() => {
     if (gameRef.current === game) return; // אותו אובייקט — הטעינה הראשונית, לא רענון
     gameRef.current = game;
-    engine.updateGame(game);
+    if (stageRef.current === 'opening') {
+      // לפני שההפעלה התחילה: ההחלטה על שאלות הדאבל לפי הקובץ החדש, כמו בפתיחה
+      const play = villaNewRunPlays(game, {
+        run: villaRunOf(game),
+        crowd: crowdRef.current,
+        reachedHere: villaReachedRunRef.current !== null,
+        declined: villaChoiceRef.current === 'skip',
+      });
+      villaPlayRef.current = play;
+      setVillaPlayState(play);
+      engine.updateGame(play ? game : stripVillaSlides(game));
+    } else if (!villaPlayRef.current) {
+      engine.updateGame(stripVillaSlides(game));
+    } else {
+      // הפעלה שמשחקת שאלות דאבל נשארת עם שלה: קובץ שמוריד אותן, מזיז אותן או
+      // קושר אותן להפעלה אחרת היה מזיז את השקופיות מתחת למשחק. התוכן נשאר כמו
+      // שהוא עד סוף ההפעלה, והשמות והקבוצות מתעדכנים כרגיל.
+      const run = villaRunOf(game);
+      const same = villaSlideIds(engine.getGame()).join(',') === villaSlideIds(game).join(',');
+      if (same && (run === null || run === startedAtRef.current)) engine.updateGame(game);
+      else debugLog('game', 'רענון הקובץ לא הוחל: הוא משנה את שאלות הדאבל של ההפעלה שרצה');
+    }
     // שמות/קבוצות מעודכנים מהקובץ כבר מוזגו למרשם השמור (App, לפני setGame) —
     // טוענים מחדש כדי שהלשונית/הדירוג הקבוצתי יראו אותם מיד. עריכות ידניות של
     // המפעיל נשמרות: כל שינוי מרשם נכתב ל-localStorage, והמיזוג הוא upsert.
@@ -2291,9 +2413,11 @@ export function GameHost({
   }, [stage, state, reveal, connectedIds, roster, groupBonus, groupRailHidden, groupsOverlay, buildSnapshot]);
 
   // פרסום המשחק המלא (לעריכה) בכל החלפת תוכן — כולל אחרי עריכה חיה (hot-swap).
+  // הקובץ שהמנוע משחק בפועל (בלי שאלות הדאבל כשההפעלה בלעדיהן), כדי שהשקופיות
+  // ומזהי «קפיצה לשקופית» במסך המנחה יתאימו למשחק.
   useEffect(() => {
-    controlRef.current?.post({ t: 'game', game });
-  }, [game]);
+    controlRef.current?.post({ t: 'game', game: engine.getGame() });
+  }, [game, villaPlay, engine]);
 
   // פעימת-לב לערוץ השליטה: התצוגה מפרסמת מצב רק כשמשהו משתנה, ולכן בשקופית
   // סטטית מסך המנחה לא היה יודע אם הקשר נותק (או שהמשחק נסגר) — הוא היה מציג
@@ -3368,8 +3492,19 @@ export function GameHost({
   }, [stage, menuOpen, settingsOpen, rosterOpen, exitConfirm, captureOn, stageManagerOpen, lobbyOverlay, showResetLobby, canExit, leadersOverlay, connectCategory, startupModal, engine, advance, goBack, onRequestRefresh, setGroupRailHidden]);
 
   /** "התחלת המשחק מחדש" מתוך מסך ההגדרות — איפוס מלא וחזרה למסך הפתיחה. */
-  const restartGame = useCallback(() => {
+  const restartGame = useCallback((crowdNext?: boolean) => {
     const wasEnded = gameEndedRef.current;
+    // הפעלה חדשה: ההחלטה על שאלות הדאבל מחדש, לפני האיפוס (הוא נכנס לשקופית
+    // הראשונה של הקובץ שההפעלה משחקת). אחרי ששאלת דאבל הופיעה בחלון הזה, בלעדיהן.
+    const latest = latestGameRef.current;
+    setVillaChoice('ask');
+    setVillaPlay(
+      villaNewRunPlays(latest, {
+        run: villaRunOf(latest),
+        crowd: crowdNext ?? crowdRef.current,
+        reachedHere: villaReachedRunRef.current !== null,
+      }),
+    );
     engine.reset();
     removedRef.current = new Set(); // התחלה מחדש — משתתפים שהוסרו יכולים לחזור
     autoLeadersShownAtRef.current = 0; // מונה טבלת המובילים האוטומטית מתאפס
@@ -3399,7 +3534,7 @@ export function GameHost({
     debugLog('command', 'התחלת המשחק מחדש (מתוך ההגדרות)', {
       backupRun: wasEnded ? 'ריצה חדשה אחרי סיום — הגיבוי ייפתח מחדש' : 'ריצה חדשה',
     });
-  }, [engine, narration]);
+  }, [engine, narration, setVillaChoice, setVillaPlay]);
 
   // מסך הצפייה (‎?view=‎, src/live): במשחק אונליין המסך הזה משודר בלייב למי
   // שפתח את קישור הצפייה — מה שמוצג כאן, בלי מה שמיועד למנחה בלבד.
@@ -3608,6 +3743,16 @@ export function GameHost({
             {...(showJoinBanner ? { joinInfo: { dial: joinDial, code: roomId } } : {})}
           />
         )}
+        {stage === 'opening' && villaOffReason !== null && (
+          <span className="villa-off-badge" role="status">
+            🎫{' '}
+            {villaOffReason === 'declined'
+              ? 'הפעלת ניסיון: בלי שאלות הדאבל'
+              : villaOffReason === 'demo'
+                ? 'עם שחקני דמה אין שאלות דאבל'
+                : 'שאלות הדאבל כבר הופיעו בהפעלה של המשחק, ולכן ההפעלה הזאת בלעדיהן'}
+          </span>
+        )}
         {/* מקש X באמצע המשחק — אותו מסך התחברות, מאופס. תצוגה בלבד: המשחק
             עומד במקומו וממשיך ברווח. */}
         {lobbyOverlay && stage !== 'opening' && (
@@ -3802,6 +3947,33 @@ export function GameHost({
           </div>
         )}
 
+        {/* שאלות הדאבל מופיעות פעם אחת: לפני הפעלה שמשחקת אותן המפעיל בוחר אם זו
+            ההפעלה האמיתית או ניסיון בלעדיהן (villaDouble.ts). אין בחירה ברירת מחדל. */}
+        {villaPrompt && (
+          <div className="license-modal">
+            <div className="license-modal-box villa-once-box" role="dialog" aria-labelledby="villa-once-title">
+              <div className="license-modal-icon">🎫</div>
+              <h2 id="villa-once-title">במשחק הזה יש שאלות דאבל</h2>
+              <p>
+                שאלות הדאבל של הגרלת הווילה מופיעות פעם אחת בלבד: בהפעלה הראשונה שמגיעה אליהן, גם אם זו הפעלת
+                ניסיון עם אדם אחד. בכל הפעלה אחריה המשחק יוצא בלעדיהן.
+              </p>
+              <div className="resume-actions villa-once-actions">
+                <button onClick={() => setVillaChoice('play')}>▶ ההפעלה האמיתית: עם שאלות הדאבל</button>
+                <button
+                  className="resume-new"
+                  onClick={() => {
+                    setVillaChoice('skip');
+                    setVillaPlay(false);
+                  }}
+                >
+                  הפעלת ניסיון: בלי שאלות הדאבל
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* גיבוי חי נמצא — התאוששות מקריסה/רענון */}
         {resumePrompt !== null && (
           <div className="license-modal">
@@ -3891,7 +4063,7 @@ export function GameHost({
             }}
             onRestart={(saved) => {
               onSettingsChange(saved);
-              restartGame();
+              restartGame(demoOnly || saved.crowdEnabled);
             }}
           />
         )}

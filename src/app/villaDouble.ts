@@ -5,8 +5,15 @@
  * במיוחד, כל אחת אחרי מסך הכרזה (`doubleIntro` על שקופית subject). שאלת הדאבל
  * עצמה היא trivia רגילה עם `double`. אחרי חשיפת התשובה, הרווח הבא פותח את
  * «תוצאת הדאבל»: כמה מבני המשפחה צדקו, כמה כרטיסים זה שווה, והשוואה לשאר
- * המשפחות בארץ. הכרטיסים עצמם נספרים בשרת, מתוך `meta.villaDoubles` בגיבוי של
- * סוף המשחק, ורק בהפעלה עם יותר מ-4 משתתפים.
+ * המשפחות בארץ. הכרטיסים עצמם נספרים בשרת, מתוך ההצבעות בגיבוי, ורק על שאלה
+ * שהמשפחה בה גדולה מ-4.
+ *
+ * פעם אחת (בקשת נסים, 2026-11-26: «מספיק לי שיראו אפילו איש אחד את שאלות הדאבל
+ * בשביל להרוס»): ההפעלה הראשונה שמגיעה לשאלת דאבל משתמשת בהן, גם עם אדם אחד.
+ * השרת מחזיר אותן אחר כך רק לרענון של אותה הפעלה (`run` על השקופיות), והמנוע
+ * מוריד אותן מכל הפעלה אחרת: «משחק חדש» במקום המשך, התחלה מחדש באותו חלון אחרי
+ * שאחת הופיעה, ושחקני דמה. משחק בלי שאלות הדאבל הוא בדיוק הקובץ שהשרת שולח למשחק
+ * שאין לו (stripVillaSlides), כך שהגיבוי, התוצאות והקריין לא מרגישים בהן.
  *
  * הכלל (החלטת נסים, 2026-11-25): עד 10 כרטיסים לכל שאלת דאבל, לפי אחוז המשפחה
  * שצדק. «המשפחה» = מי שהצביע בשקופית כלשהי עד שאלת הדאבל הזאת (כולל), כך שמי
@@ -20,7 +27,7 @@ import type { GamePhase } from '../engine/types.ts';
 
 /** הכי הרבה כרטיסים ששאלת דאבל אחת נותנת. */
 export const VILLA_DOUBLE_MAX_TICKETS = 10;
-/** הפעלה עם יותר משתתפים מזה נספרת; עד זה היא הפעלת ניסיון (REHEARSAL_MAX_PLAYERS במערכת יצירת המשחקים). */
+/** שאלת דאבל שהמשפחה בה (מי ששיחק עד אליה) גדולה מזה נותנת כרטיסים; עד זה היא לא נספרת (villa_double_tally בשרת). */
 export const VILLA_REHEARSAL_MAX_PLAYERS = 4;
 /** פחות משפחות מזה, וההשוואה הארצית עוד לא אומרת כלום. */
 export const VILLA_MIN_FAMILIES_FOR_COMPARISON = 5;
@@ -198,7 +205,7 @@ export function doubleTicketLines(view: DoubleView): { main: string; note: strin
   if (!view.counts) {
     return {
       main: `עם יותר מ-${VILLA_REHEARSAL_MAX_PLAYERS} משתתפים זה היה שווה ${worth}`,
-      note: `הפעלת ניסיון: עם עד ${VILLA_REHEARSAL_MAX_PLAYERS} משתתפים הכרטיסים להגרלת הווילה לא נספרים`,
+      note: `כשמשתתפים עד ${VILLA_REHEARSAL_MAX_PLAYERS}, הכרטיסים להגרלת הווילה לא נספרים`,
     };
   }
   const main =
@@ -248,7 +255,116 @@ export interface VillaDoubleMeta {
 
 /** כל השקופיות שמערכת יצירת המשחקים הוסיפה בשביל הדאבל (הכרזות ושאלות), לפי הסדר. */
 export function villaSlideIds(game: GameFile): number[] {
-  return game.questions.filter((s) => isDoubleSlide(s) || isDoubleIntro(s)).map((s) => s.id);
+  return game.questions.filter(isVillaSlide).map((s) => s.id);
+}
+
+/** שקופית שנוספה בשביל הדאבל: הכרזה או שאלה. */
+export function isVillaSlide(slide: Slide | undefined): boolean {
+  return isDoubleSlide(slide) || isDoubleIntro(slide);
+}
+
+/** יש בקובץ שאלות דאבל. */
+export function hasVillaSlides(game: GameFile): boolean {
+  return game.questions.some(isVillaSlide);
+}
+
+/**
+ * מזהי השאלות במאגר של שאלות הדאבל שבקובץ, לגיבוי (`meta.villaPool`): כך השרת
+ * יודע איזו תוכנית ההפעלה משחקת עוד לפני שנסגרה בה שאלה.
+ */
+export function villaPoolIds(game: GameFile): string[] {
+  return game.questions.filter(isDoubleSlide).map((s) => s.double.poolId);
+}
+
+/**
+ * ההפעלה ששאלות הדאבל קשורות אליה (`run` על השקופיות שלהן: ה-startedAt של
+ * ההפעלה שהן כבר הופיעו בה), או null כשהן פתוחות לכל הפעלה. שקופיות שאינן
+ * מסכימות → 1-, שאף הפעלה אינה מתאימה לו.
+ */
+export function villaRunOf(game: GameFile): number | null {
+  const runs = new Set<number>();
+  for (const s of game.questions) {
+    const run = isDoubleSlide(s) ? s.double.run : isDoubleIntro(s) ? s.doubleIntro?.run : undefined;
+    if (run !== undefined) runs.add(run);
+  }
+  if (runs.size === 0) return null;
+  return runs.size === 1 ? [...runs][0]! : -1;
+}
+
+/**
+ * הקובץ בלי שאלות הדאבל: ההכרזות והשאלות יוצאות, ושאר השקופיות ממוספרות מחדש
+ * 1..N לפי הסדר, בדיוק כמו הקובץ שהשרת שולח למשחק שאין לו שאלות דאבל (המזהה
+ * הוא המקום). קובץ שהמזהים בו אינם המקום נשאר עם המזהים שלו. קובץ בלי שאלות
+ * דאבל חוזר כמו שהוא.
+ */
+export function stripVillaSlides(game: GameFile): GameFile {
+  if (!hasVillaSlides(game)) return game;
+  const kept = game.questions.filter((s) => !isVillaSlide(s));
+  if (kept.length === 0) return game; // לא קורה: שאלות הדאבל יושבות רק בין שתי שאלות של המשחק
+  const positional = game.questions.every((s, i) => s.id === i + 1);
+  return {
+    ...game,
+    questions: positional ? kept.map((s, i) => (s.id === i + 1 ? s : { ...s, id: i + 1 })) : kept,
+  };
+}
+
+/** ההפעלה כבר הגיעה לשאלת דאבל: אחת מהן על המסך או מאחורינו (כמו `display` בגיבוי, שלפיו השרת סופר). */
+export function villaReachedIn(
+  game: GameFile,
+  state: { slidesCompleted: readonly number[]; currentSlideId: number },
+): boolean {
+  const done = new Set(state.slidesCompleted);
+  return game.questions.some((s) => isDoubleSlide(s) && (done.has(s.id) || s.id === state.currentSlideId));
+}
+
+/** מה קובע אם הפעלה חדשה משחקת את שאלות הדאבל. */
+export interface VillaNewRun {
+  /** villaRunOf של הקובץ. */
+  run: number | null;
+  /** שחקני דמה: הפעלה שאינה נשמרת לא מציגה אותן. */
+  crowd: boolean;
+  /** בחלון הזה כבר הופיעה שאלת דאבל, בהפעלה קודמת. */
+  reachedHere: boolean;
+  /** המפעיל בחר «הפעלת ניסיון, בלי שאלות הדאבל» להפעלה הזאת. */
+  declined?: boolean;
+}
+
+/**
+ * הפעלה חדשה (המשחק נפתח, «משחק חדש» במקום המשך, או התחלה מחדש) משחקת את
+ * שאלות הדאבל רק כשהן בקובץ ופתוחות לכל הפעלה, בלי שחקני דמה, כשעוד לא הופיעו
+ * בחלון הזה וכשהמפעיל לא בחר בניסיון בלעדיהן.
+ */
+export function villaNewRunPlays(game: GameFile, input: VillaNewRun): boolean {
+  return (
+    hasVillaSlides(game) && input.run === null && !input.crowd && !input.reachedHere && input.declined !== true
+  );
+}
+
+function sameIds(a: readonly number[], b: readonly number[]): boolean {
+  return a.length === b.length && a.every((id, i) => id === b[i]);
+}
+
+/**
+ * המשך של הפעלה שמורה: האם היא ממשיכה עם שאלות הדאבל שבקובץ (`play`), והאם
+ * צריך להוריד מהגיבוי את שקופיות הדאבל שהיא שיחקה (`drop`, backupWithoutVillas)
+ * כי הקובץ כבר אינו נושא אותן.
+ *
+ * - הקובץ קשור להפעלה (`run`): רק אותה הפעלה, ורק אם הגיבוי שלה שיחק דאבל.
+ * - הקובץ פתוח לכל הפעלה: רק הפעלה ששיחקה בדיוק את אותן שקופיות (אותם מזהים).
+ *   הפעלה שהתחילה בלעדיהן ממשיכה בלעדיהן, והפעלה ששיחקה תוכנית אחרת (מנהל התחיל
+ *   אותן מחדש) ממשיכה בלי דאבל.
+ */
+export function villaResume(
+  game: GameFile,
+  backupMeta: { startedAt: number; villaSlides?: readonly number[] | undefined },
+): { play: boolean; drop: boolean } {
+  const fileIds = villaSlideIds(game);
+  const backupIds = Array.isArray(backupMeta.villaSlides) ? backupMeta.villaSlides : [];
+  const played = backupIds.length > 0;
+  if (fileIds.length === 0) return { play: false, drop: played };
+  const run = villaRunOf(game);
+  const play = run !== null ? played && backupMeta.startedAt === run : played && sameIds(fileIds, backupIds);
+  return { play, drop: played && !play };
 }
 
 /**

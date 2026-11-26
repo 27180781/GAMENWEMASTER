@@ -16,13 +16,20 @@ import {
   doubleTitle,
   doubleView,
   doubleWinsTickets,
+  hasVillaSlides,
   isDoubleIntro,
   isDoubleSlide,
+  stripVillaSlides,
   villaDoublesMeta,
+  villaNewRunPlays,
+  villaPoolIds,
+  villaReachedIn,
+  villaResume,
+  villaRunOf,
   villaSlideIds,
   type DoubleView,
 } from '../src/app/villaDouble.ts';
-import { backupToSnapshot, buildBackupPayload } from '../src/app/backupState.ts';
+import { backupToSnapshot, backupWithoutVillas, buildBackupPayload } from '../src/app/backupState.ts';
 import type { BackupData } from '../src/app/backup.ts';
 import { completedQuestionCount } from '../src/app/leaderboardSchedule.ts';
 import { hostKeyHints, type HostHintInput } from '../src/app/hostHints.ts';
@@ -312,8 +319,8 @@ describe('doubleView ו-doubleTicketLines — מה שמסך «תוצאת הדא�
     expect(doubleTicketLines(view({ n: 2, tickets: 0, soFar: 0 }))!.note).toBeNull();
   });
 
-  it('הפעלת ניסיון (עד 4 משתתפים): כמה זה היה שווה, והסבר', () => {
-    const note = 'הפעלת ניסיון: עם עד 4 משתתפים הכרטיסים להגרלת הווילה לא נספרים';
+  it('עד 4 משתתפים: כמה זה היה שווה, והסבר (בלי «הפעלת ניסיון»: שאלות הדאבל מופיעות פעם אחת)', () => {
+    const note = 'כשמשתתפים עד 4, הכרטיסים להגרלת הווילה לא נספרים';
     expect(doubleTicketLines(view({ counts: false, base: 4, tickets: 5 }))).toEqual({
       main: 'עם יותר מ-4 משתתפים זה היה שווה 5 כרטיסים',
       note,
@@ -425,6 +432,208 @@ describe('הגיבוי: meta.villaDoubles ו-meta.villaSlides', () => {
     expect(doubleResult(game, 2, restored.getState().votesBySlide)).toEqual(
       doubleResult(game, 2, d.engine.getState().votesBySlide),
     );
+  });
+});
+
+describe('פעם אחת: run, משחק בלי שאלות הדאבל, הפעלה חדשה והמשך', () => {
+  const R = 1_764_115_200_123;
+  const bound = (run: unknown): GameFile =>
+    makeGame([
+      rawSlide({ id: 1, type: 'trivia', que: 'ש1', answers: fourAnswers(2), scoreForQue: 10, timeForQue: 15 }),
+      { ...intro(2, 1, 1), doubleIntro: { n: 1, of: 1, tickets: true, run } },
+      double(3, 2, { n: 1, of: 1, poolId: 'q-a', tickets: true, run }),
+      rawSlide({ id: 4, type: 'trivia', que: 'ש4', answers: fourAnswers(1), scoreForQue: 10, timeForQue: 15 }),
+    ]);
+  /** גיבוי של הפעלה על הקובץ `game` שעצרה אחרי ש-`plays` שוחקו (ונשארה בתוצאות של האחרונה). */
+  const backupOf = (game: GameFile, startedAt: number, plays: Array<[number, Record<string, number>]>): BackupData => {
+    const d = driver(game);
+    for (const [slideId, votes] of plays) d.play(slideId, votes);
+    return { id: 'g', ...buildBackupPayload(game, d.engine.getState(), EMPTY_ROSTER, (id) => id, startedAt), completed: false };
+  };
+
+  it('הסכמה: run מספר או מחרוזת של ספרות; ערך פגום → 1- (אף הפעלה), וחסר → בלי run', () => {
+    expect(bound(R).questions[2]!.double!.run).toBe(R);
+    expect(bound(R).questions[1]!.doubleIntro!.run).toBe(R);
+    expect(bound(String(R)).questions[2]!.double!.run).toBe(R);
+    expect(bound('אתמול').questions[2]!.double!.run).toBe(-1);
+    expect(bound(-5).questions[1]!.doubleIntro!.run).toBe(-1);
+    expect(villaGame().questions[2]!.double!.run).toBeUndefined();
+    // השקופית עצמה נשארת שאלת דאבל גם כש-run פגום
+    expect(isDoubleSlide(bound('אתמול').questions[2])).toBe(true);
+  });
+
+  it('villaRunOf: null כשהן פתוחות לכל הפעלה, ההפעלה כשהן קשורות, ו-1- כשהשקופיות לא מסכימות', () => {
+    expect(villaRunOf(villaGame())).toBeNull();
+    expect(villaRunOf(bound(R))).toBe(R);
+    const mixed = makeGame([
+      { ...intro(1, 1, 2), doubleIntro: { n: 1, of: 2, run: R } },
+      double(2, 1, { n: 1, of: 2, poolId: 'q-a', run: R + 1 }),
+    ]);
+    expect(villaRunOf(mixed)).toBe(-1);
+  });
+
+  it('stripVillaSlides: הקובץ בלי ההכרזות והשאלות, ממוספר מחדש 1..N כמו קובץ שהשרת שולח בלי דאבל', () => {
+    const game = villaGame();
+    const stripped = stripVillaSlides(game);
+    expect(stripped.questions.map((q) => [q.id, q.question.que])).toEqual([
+      [1, 'ש1'],
+      [2, 'ש4'],
+    ]);
+    expect(hasVillaSlides(stripped)).toBe(false);
+    expect(stripped.id).toBe(game.id);
+    // הקובץ המקורי לא השתנה, וקובץ בלי דאבל חוזר כמו שהוא
+    expect(villaSlideIds(game)).toEqual([2, 3, 5, 6]);
+    expect(stripVillaSlides(stripped)).toBe(stripped);
+    // מזהים שאינם המקום נשארים כמו שהם
+    const odd = makeGame([
+      rawSlide({ id: 10, type: 'trivia', que: 'א', answers: fourAnswers(1) }),
+      intro(20, 1, 1),
+      double(30, 1, { n: 1, of: 1, poolId: 'q-a' }),
+      rawSlide({ id: 40, type: 'trivia', que: 'ב', answers: fourAnswers(1) }),
+    ]);
+    expect(stripVillaSlides(odd).questions.map((q) => q.id)).toEqual([10, 40]);
+  });
+
+  it('הפעלה בלי שאלות הדאבל: הגיבוי שלה זהה לגיבוי של משחק שאין לו (בלי villaSlides, והשרת לא רואה כלום)', () => {
+    const stripped = stripVillaSlides(villaGame());
+    const plain = makeGame([
+      rawSlide({ id: 1, type: 'trivia', que: 'ש1', answers: fourAnswers(2), scoreForQue: 10, timeForQue: 15 }),
+      rawSlide({ id: 2, type: 'trivia', que: 'ש4', answers: fourAnswers(1), scoreForQue: 10, timeForQue: 15 }),
+    ]);
+    const run = (game: GameFile) => {
+      const d = driver(game);
+      d.play(1, VOTES_1);
+      d.play(2, VOTES_4);
+      return buildBackupPayload(game, d.engine.getState(), EMPTY_ROSTER, (id) => id, 42);
+    };
+    expect(run(stripped)).toEqual(run(plain));
+    expect(run(stripped).meta.villaSlides).toBeUndefined();
+  });
+
+  it('meta.villaPool: מזהי השאלות במאגר, כדי שהשרת יידע איזו תוכנית ההפעלה משחקת עוד לפני שנסגרה שאלה', () => {
+    expect(villaPoolIds(villaGame())).toEqual(['q-a', 'q-b']);
+    const d = driver(villaGame());
+    d.play(1, VOTES_1);
+    const p = buildBackupPayload(villaGame(), d.engine.getState(), EMPTY_ROSTER, (id) => id, 42);
+    expect(p.meta.villaPool).toEqual(['q-a', 'q-b']);
+    expect(p.meta.villaDoubles).toBeUndefined();
+  });
+
+  it('villaReachedIn: ההכרזה עוד לא; שאלת דאבל על המסך כן (כמו display בגיבוי)', () => {
+    const game = villaGame();
+    const d = driver(game);
+    expect(villaReachedIn(game, d.engine.getState())).toBe(false);
+    d.play(1, VOTES_1);
+    while (d.engine.getState().currentSlideId !== 2) d.engine.dispatch({ type: 'ADVANCE', at: T0 });
+    expect(villaReachedIn(game, d.engine.getState())).toBe(false); // ההכרזה
+    while (d.engine.getState().currentSlideId !== 3) d.engine.dispatch({ type: 'ADVANCE', at: T0 });
+    expect(d.engine.getState().phase).not.toBe('voting'); // עוד לפני ההצבעה
+    expect(villaReachedIn(game, d.engine.getState())).toBe(true);
+    // ובגיבוי של אותו רגע השאלה מסומנת display, ולכן גם השרת יודע
+    const p = buildBackupPayload(game, d.engine.getState(), EMPTY_ROSTER, (id) => id, 42);
+    expect(p.questions['3']!.display).toBe(true);
+    expect(p.questions['2']).toBeUndefined(); // ההכרזה אינה שאלה
+  });
+
+  it('הפעלה חדשה משחקת אותן רק כשהן פתוחות, בלי שחקני דמה, כשעוד לא הופיעו בחלון ובלי «ניסיון»', () => {
+    const open = villaGame();
+    const base = { run: null, crowd: false, reachedHere: false };
+    expect(villaNewRunPlays(open, base)).toBe(true);
+    expect(villaNewRunPlays(open, { ...base, run: R })).toBe(false);
+    expect(villaNewRunPlays(open, { ...base, crowd: true })).toBe(false);
+    expect(villaNewRunPlays(open, { ...base, reachedHere: true })).toBe(false);
+    expect(villaNewRunPlays(open, { ...base, declined: true })).toBe(false);
+    expect(villaNewRunPlays(stripVillaSlides(open), base)).toBe(false);
+  });
+
+  it('המשך: קובץ פתוח — רק הפעלה ששיחקה בדיוק אותן שקופיות ממשיכה איתן', () => {
+    const game = villaGame();
+    const played = backupOf(game, 7, [[1, VOTES_1]]);
+    expect(villaResume(game, played.meta)).toEqual({ play: true, drop: false });
+    // הפעלה שהתחילה בלעדיהן ממשיכה בלעדיהן
+    const without = backupOf(stripVillaSlides(game), 7, [[1, VOTES_1]]);
+    expect(villaResume(game, without.meta)).toEqual({ play: false, drop: false });
+    // הפעלה ששיחקה תוכנית אחרת (שקופיות אחרות) ממשיכה בלי דאבל, ויורדת מהן בגיבוי
+    expect(villaResume(game, { ...played.meta, villaSlides: [2, 3] })).toEqual({ play: false, drop: true });
+  });
+
+  it('המשך: קובץ שקשור להפעלה — רק אותה הפעלה, ורק אם שיחקה אותן', () => {
+    const game = bound(R);
+    const mine = backupOf(game, R, [[1, VOTES_1]]);
+    expect(villaResume(game, mine.meta)).toEqual({ play: true, drop: false });
+    expect(villaResume(game, { ...mine.meta, startedAt: R + 1 })).toEqual({ play: false, drop: true });
+    const without = backupOf(stripVillaSlides(game), R, [[1, VOTES_1]]);
+    expect(villaResume(game, without.meta)).toEqual({ play: false, drop: false });
+    // קובץ בלי שאלות דאבל, וגיבוי ששיחק אותן: ממשיכים בלעדיהן
+    expect(villaResume(stripVillaSlides(game), mine.meta)).toEqual({ play: false, drop: true });
+  });
+
+  it('backupWithoutVillas: ההפעלה ממשיכה על הקובץ בלי הדאבל, עם המזהים, ההצבעות והמיקום הנכונים', () => {
+    const game = villaGame();
+    const saved = backupOf(game, 7, [
+      [1, VOTES_1],
+      [3, VOTES_3],
+      [4, VOTES_4],
+    ]);
+    const data = backupWithoutVillas(saved);
+    expect(data.meta.villaSlides).toBeUndefined();
+    expect(data.meta.villaPool).toBeUndefined();
+    expect(data.meta.villaDoubles).toBeUndefined();
+    expect(data.meta.startedAt).toBe(7);
+    expect(data.meta.currentQueId).toBe(2); // שקופית 4 היא השנייה בקובץ בלי הדאבל
+    expect(Object.keys(data.questions).sort()).toEqual(['1', '2']);
+    expect(data.questions['2']!.queId).toBe(2);
+    expect(data.users.a!.details.votes).toEqual({ '1': 2, '2': 1 });
+    expect(data.users.f!.details).toMatchObject({ lastQue: 2, votes: { '2': 1 } });
+    // הניקוד נשאר, כולל מה שהושג בדאבל
+    expect(data.users.a!.score).toBe(saved.users.a!.score);
+
+    const stripped = stripVillaSlides(game);
+    const engine = new GameEngine(stripped);
+    engine.restore(backupToSnapshot(stripped, data));
+    const st = engine.getState();
+    expect(st.currentSlideId).toBe(2);
+    expect(engine.getCurrentSlide().question.que).toBe('ש4');
+    expect(st.votesBySlide[1]).toEqual(VOTES_1);
+    expect(st.votesBySlide[2]).toEqual(VOTES_4);
+    expect(st.slidesCompleted).toEqual([1]);
+  });
+
+  it('backupWithoutVillas: הפעלה שנעצרה על הכרזה או על שאלת דאבל ממשיכה מהשקופית שאחריה, מההתחלה', () => {
+    const game = villaGame();
+    const saved = backupOf(game, 7, [
+      [1, VOTES_1],
+      [3, VOTES_3],
+    ]);
+    expect(saved.meta.currentQueId).toBe(3);
+    const onDouble = backupWithoutVillas(saved);
+    expect(onDouble.meta).toMatchObject({ currentQueId: 2, phase: 'showing' });
+    const onIntro = backupWithoutVillas({ ...saved, meta: { ...saved.meta, currentQueId: 5, phase: 'showing' } });
+    expect(onIntro.meta).toMatchObject({ currentQueId: 3, phase: 'showing' }); // אחרי 5 ו-6 אין עוד שקופית: 3 אינו בקובץ
+    const stripped = stripVillaSlides(game);
+    const engine = new GameEngine(stripped);
+    engine.restore(backupToSnapshot(stripped, onDouble));
+    expect(engine.getState()).toMatchObject({ currentSlideId: 2, phase: 'showing' });
+    expect(engine.getState().votesBySlide[1]).toEqual(VOTES_1);
+    // גיבוי בלי שקופיות דאבל חוזר כמו שהוא
+    const plain = backupOf(stripped, 7, [[1, VOTES_1]]);
+    expect(backupWithoutVillas(plain)).toBe(plain);
+  });
+
+  it('backupWithoutVillas: הימורים והכרעות «הרוב קובע» עוברים למזהים החדשים', () => {
+    const saved = backupOf(villaGame(), 7, [[1, VOTES_1]]);
+    const data = backupWithoutVillas({
+      ...saved,
+      meta: {
+        ...saved.meta,
+        betStakes: { '4': { a: 10 }, '3': { b: 5 } },
+        betOutcomes: { '4': { a: { stake: 10, won: true, delta: 10, answerId: 1 } } },
+        majorityBySlide: { '4': [1], '6': [2] },
+      },
+    });
+    expect(data.meta.betStakes).toEqual({ '2': { a: 10 } });
+    expect(data.meta.betOutcomes).toEqual({ '2': { a: { stake: 10, won: true, delta: 10, answerId: 1 } } });
+    expect(data.meta.majorityBySlide).toEqual({ '2': [1] });
   });
 });
 

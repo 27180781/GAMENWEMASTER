@@ -8,7 +8,7 @@ import type { BetOutcome } from '../engine/types.ts';
 import type { GamePhase, GameSnapshot, GameState } from '../engine/types.ts';
 import type { RosterData } from './roster.ts';
 import type { BackupData, BackupGroup, BackupMeta, BackupPayload, BackupQuestion, BackupUser } from './backup.ts';
-import { villaDoublesMeta, villaSlideIds } from './villaDouble.ts';
+import { villaDoublesMeta, villaPoolIds, villaSlideIds } from './villaDouble.ts';
 
 /** קבוצת התשובות הנכונות לכל שקופית trivia. */
 function correctAnswersBySlide(game: GameFile): Map<number, Set<number>> {
@@ -132,16 +132,94 @@ export function buildBackupPayload(
   };
 }
 
-/** `villaDoubles` ו-`villaSlides` למטא של הגיבוי — רק במשחק שיש בו שאלות דאבל. */
+/** `villaSlides`, `villaPool` ו-`villaDoubles` למטא של הגיבוי — רק בהפעלה שמשחקת שאלות דאבל. */
 function villaBackupMeta(
   game: GameFile,
   state: GameState,
   removedIds: readonly string[],
-): Pick<BackupMeta, 'villaDoubles' | 'villaSlides'> {
+): Pick<BackupMeta, 'villaDoubles' | 'villaSlides' | 'villaPool'> {
   const villaSlides = villaSlideIds(game);
   if (villaSlides.length === 0) return {};
+  const villaPool = villaPoolIds(game);
   const villaDoubles = villaDoublesMeta(game, state, new Set(removedIds));
-  return { villaSlides, ...(villaDoubles.length > 0 ? { villaDoubles } : {}) };
+  return {
+    villaSlides,
+    ...(villaPool.length > 0 ? { villaPool } : {}),
+    ...(villaDoubles.length > 0 ? { villaDoubles } : {}),
+  };
+}
+
+/**
+ * הגיבוי של הפעלה ששיחקה שאלות דאבל, כאילו לא היו בה (להמשך מקובץ שכבר אינו
+ * נושא אותן, villaDouble.ts › villaResume): שקופיות הדאבל (`meta.villaSlides`)
+ * וההצבעות עליהן יוצאות, ושאר המזהים ממוספרים מחדש כמו ש-stripVillaSlides
+ * ממספר את הקובץ (המזהה הוא המקום). הפעלה שנעצרה על הכרזה או על שאלת דאבל
+ * ממשיכה מהשקופית שאחריה, מההתחלה. הניקוד נשאר כמו שהוא, כולל מה שהושג בדאבל.
+ */
+export function backupWithoutVillas(backup: BackupData): BackupData {
+  const villa = [...new Set(Array.isArray(backup.meta.villaSlides) ? backup.meta.villaSlides : [])]
+    .filter((id) => typeof id === 'number' && Number.isFinite(id))
+    .sort((a, b) => a - b);
+  if (villa.length === 0) return backup;
+  const villaSet = new Set(villa);
+  const before = (id: number, inclusive: boolean): number =>
+    villa.filter((v) => (inclusive ? v <= id : v < id)).length;
+  /** המזהה בקובץ בלי הדאבל, או null לשקופית דאבל. */
+  const mapId = (id: number): number | null => (villaSet.has(id) ? null : id - before(id, false));
+  const mapKeys = <T>(raw: Readonly<Record<string, T>> | undefined): Record<string, T> | undefined => {
+    if (raw === undefined || raw === null || typeof raw !== 'object') return raw;
+    const out: Record<string, T> = {};
+    for (const [key, value] of Object.entries(raw)) {
+      const id = Number(key);
+      if (!Number.isFinite(id)) continue;
+      const mapped = mapId(id);
+      if (mapped !== null) out[String(mapped)] = value;
+    }
+    return out;
+  };
+
+  const users: BackupData['users'] = {};
+  for (const [voterId, user] of Object.entries(backup.users)) {
+    const details = user.details ?? { lastQue: null, lastVote: null };
+    const votes = mapKeys(details.votes);
+    const lastQue = details.lastQue === null ? null : mapId(details.lastQue);
+    users[voterId] = {
+      ...user,
+      details: {
+        ...details,
+        lastQue,
+        ...(lastQue === null ? { lastVote: null } : {}),
+        ...(votes !== undefined ? { votes } : {}),
+      },
+    };
+  }
+  const questions: BackupData['questions'] = {};
+  for (const q of Object.values(backup.questions)) {
+    const mapped = mapId(q.queId);
+    if (mapped !== null) questions[String(mapped)] = { ...q, queId: mapped };
+  }
+
+  const meta: BackupMeta = { ...backup.meta };
+  delete meta.villaSlides;
+  delete meta.villaPool;
+  delete meta.villaDoubles;
+  const current = backup.meta.currentQueId;
+  if (current !== null) {
+    if (villaSet.has(current)) {
+      // נעצרה על הכרזה או על שאלת דאבל: השקופית הבאה של המשחק, מההתחלה
+      meta.currentQueId = current - before(current, true) + 1;
+      meta.phase = 'showing';
+    } else {
+      meta.currentQueId = current - before(current, false);
+    }
+  }
+  const betStakes = mapKeys(backup.meta.betStakes);
+  const betOutcomes = mapKeys(backup.meta.betOutcomes);
+  const majorityBySlide = mapKeys(backup.meta.majorityBySlide);
+  if (betStakes !== undefined) meta.betStakes = betStakes;
+  if (betOutcomes !== undefined) meta.betOutcomes = betOutcomes;
+  if (majorityBySlide !== undefined) meta.majorityBySlide = majorityBySlide;
+  return { ...backup, users, questions, meta };
 }
 
 /** מפה שמפתחותיה מזהי שקופיות (מחרוזות ב-JSON) — רק לשקופיות שקיימות בקובץ. */
