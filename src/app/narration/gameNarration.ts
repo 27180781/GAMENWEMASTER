@@ -6,6 +6,7 @@
 
 import { isVotableSlide, type GameFile, type Slide } from '../../engine/index.ts';
 import { isNarratedQuestionType, type NarrationAnswerView } from './narrationDirector.ts';
+import { isDoubleSlide } from '../villaDouble.ts';
 
 /** כל כתובות הקריינות של שקופית (שאלה, תשובות, תשובה נכונה), בלי ריקים. */
 export function slideNarrationClips(slide: Slide): string[] {
@@ -47,21 +48,32 @@ export function playableGroupClips(
 }
 
 /**
- * מספר השאלה להכרזה: המקום של השקופית בין שקופיות השאלה (טריוויה/סקר/תמונות).
- * הימור, טקסט, מדיה ופונקציה אינם שאלות ואינם מזיזים את הספירה. 0 = לא שאלה.
+ * האם השקופית נספרת כשאלה של המשחק: טריוויה/סקר/תמונות. הימור, טקסט, מדיה
+ * ופונקציה אינם שאלות. גם שאלת דאבל של הגרלת הווילה (villaDouble.ts) אינה
+ * נספרת: השרת מוסיף אותה למשחק, ואחרת כל שאלה אחריה הייתה מוכרזת במספר גבוה
+ * ממספרה במשחק, ו«חצי הדרך» היה זז. כך גם טבלת המובילים (leaderboardSchedule.ts).
+ */
+function countsAsQuestion(slide: Slide): boolean {
+  return isNarratedQuestionType(slide.type) && !isDoubleSlide(slide);
+}
+
+/**
+ * מספר השאלה להכרזה: המקום של השקופית בין השאלות של המשחק (countsAsQuestion).
+ * 0 = לא שאלה, ובה לא מוכרז מספר (גם בשאלת דאבל, שיש לה מסך הכרזה משלה).
  */
 export function questionOrdinal(game: GameFile, slideId: number): number {
   let ordinal = 0;
   for (const slide of game.questions) {
-    if (isNarratedQuestionType(slide.type)) ordinal += 1;
-    if (slide.id === slideId) return isNarratedQuestionType(slide.type) ? ordinal : 0;
+    const counted = countsAsQuestion(slide);
+    if (counted) ordinal += 1;
+    if (slide.id === slideId) return counted ? ordinal : 0;
   }
   return 0;
 }
 
-/** כמה שקופיות שאלה יש במשחק — ל"עברנו את חצי הדרך" ול"השאלה האחרונה". */
+/** כמה שאלות יש במשחק — ל"עברנו את חצי הדרך" ול"השאלה האחרונה". */
 export function questionTotal(game: GameFile): number {
-  return game.questions.filter((slide) => isNarratedQuestionType(slide.type)).length;
+  return game.questions.filter(countsAsQuestion).length;
 }
 
 /**
