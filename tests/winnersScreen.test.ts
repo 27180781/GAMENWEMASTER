@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   normalizeWinnersStyle,
   WINNERS_CHAMPION_GUARD_MS,
+  WINNERS_CHAMPION_SPEAK_MS,
   WINNERS_MAX,
   WINNERS_STYLES,
   WINNERS_STYLE_LABELS,
@@ -102,6 +103,11 @@ describe('כמה מקומות מוצגים', () => {
 
   it('הרווח אחרי המקום הראשון מחכה לסוף התיפוף', () => {
     expect(WINNERS_CHAMPION_GUARD_MS).toBeGreaterThanOrEqual(SUSPENSE * 1000);
+  });
+
+  it('הקריין מכריז על המקום הראשון אחרי התיפוף, ולפני שרווח יכול לעבור למסך הניקוד', () => {
+    expect(WINNERS_CHAMPION_SPEAK_MS).toBeGreaterThan(SUSPENSE * 1000);
+    expect(WINNERS_CHAMPION_SPEAK_MS).toBeLessThanOrEqual(WINNERS_CHAMPION_GUARD_MS);
   });
 });
 
