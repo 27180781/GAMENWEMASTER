@@ -28,6 +28,7 @@ import {
   type VoteAdapter,
   type VoteSnapshot,
   WINNERS_CHAMPION_GUARD_MS,
+  WINNERS_CHAMPION_SPEAK_MS,
   WINNERS_MAX,
   winnersShownCount,
 } from '../engine/index.ts';
@@ -786,6 +787,8 @@ export function GameHost({
   winnersRevealedRef.current = winnersRevealed;
   /** מתי נחשף המקום הראשון (performance.now) — רווח מיד אחריו לא קוטע את התיפוף. */
   const championAtRef = useRef(-Infinity);
+  /** שם המקום הראשון כבר על המסך, אחרי התיפוף של מסך המנצחים (הקריין ממתין לו). */
+  const [championShown, setChampionShown] = useState(false);
   /** חלונית דיבוג (F12) — מוצגת מעל הכל; ‏?debug=1 פותח אותה מראש. */
   const [debugOpen, setDebugOpen] = useState(
     () => new URLSearchParams(window.location.search).get('debug') === '1',
@@ -2664,6 +2667,17 @@ export function GameHost({
     championAtRef.current = total > 0 && winnersRevealed >= total ? performance.now() : -Infinity;
   }, [stage, winnersRevealed, engine]);
 
+  // ...והרגע שבו השם שלו כבר על המסך: המסך מתופף לפניו, והקריין מכריז עליו רק אחרי
+  // התיפוף (WINNERS_CHAMPION_SPEAK_MS). צעד אחורה או יציאה מהמסך מכבים את הדגל.
+  useEffect(() => {
+    setChampionShown(false);
+    if (stage !== 'winners') return;
+    const total = winnersShownCount(engine.getWinners(engine.getGame().setting.multiWinners).length);
+    if (total === 0 || winnersRevealed < total) return;
+    const id = window.setTimeout(() => setChampionShown(true), WINNERS_CHAMPION_SPEAK_MS);
+    return () => window.clearTimeout(id);
+  }, [stage, winnersRevealed, engine]);
+
   // קהל סינתטי: מזרים snapshots מצטברים בזמן הצבעה, לפי קונפיגורציית הדמו
   useEffect(() => {
     if (!votingActive || !syntheticCrowd) return;
@@ -2874,6 +2888,7 @@ export function GameHost({
               .map((w) => w.score)
           : [],
       winnersRevealed,
+      championShown,
       functionAction: narrationFunctionAction(s),
       // רק תוצאה של *השקופית הזאת* נחשבת "הפעולה בוצעה" — אחרת שקופית הישרדות
       // שנייה הייתה מכריזה מיד את המספר שנשאר מהשקופית הקודמת.
@@ -2920,6 +2935,7 @@ export function GameHost({
     timer,
     narrationOverlay,
     winnersRevealed,
+    championShown,
     functionDetail,
     functionDetailSlide,
     connectedIds,

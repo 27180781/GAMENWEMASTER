@@ -63,6 +63,7 @@ function base(over: Partial<DisplayedState> = {}): DisplayedState {
     leaders: [],
     winners: [],
     winnersRevealed: 0,
+    championShown: false,
     functionAction: null,
     functionDone: false,
     remaining: null,
@@ -420,20 +421,62 @@ describe('מסכי הפתיחה, המנצחים והניקוד', () => {
 
   it('★ מסך המנצחים: הכרזה בכניסה, ואז מקום-מקום מהאחרון לראשון', () => {
     const winners = [100, 90, 80, 70, 60];
-    const at = (revealed: number) =>
-      base({ stage: 'winners', winners, winnersRevealed: revealed });
-    const clips = clipsOf([at(0), at(1), at(2), at(3), at(4), at(5)]);
+    const at = (revealed: number, championShown = false) =>
+      base({ stage: 'winners', winners, winnersRevealed: revealed, championShown });
+    const clips = clipsOf([at(0), at(1), at(2), at(3), at(4), at(5), at(5, true)]);
     expect(clips[0]).toEqual(['lb_winners.mp3']);
     expect(clips[1]).toEqual([]); // מקום 5 — שותק
     expect(clips[2]).toEqual([]); // מקום 4 — שותק
     expect(clips[3]).toEqual(['lb_place_3.mp3', 'tens_80.mp3', 'unit_points.mp3']);
     expect(clips[4]).toEqual(['lb_place_2.mp3', 'tens_90.mp3', 'unit_points.mp3']);
-    expect(clips[5]).toEqual([
+    expect(clips[5]).toEqual([]); // המקום הראשון — המסך מתופף, השם עוד לא עלה
+    expect(clips[6]).toEqual([
       'lb_winner.mp3',
       'lb_place_1.mp3',
       'hundreds_100.mp3',
       'unit_points.mp3',
     ]);
+  });
+
+  it('★ המקום הראשון נאמר רק כשהשם על המסך: שקט בזמן התיפוף, ופעם אחת בביקור', () => {
+    const winners = [100, 90];
+    const at = (revealed: number, championShown = false) =>
+      base({ stage: 'winners', winners, winnersRevealed: revealed, championShown });
+    const [entry, second, drum, shown, again, back, drumAgain, shownAgain] = runSteps([
+      at(0),
+      at(1), // מקום 2
+      at(2), // הלחיצה על המקום הראשון — המסך מתופף
+      at(2, true), // השם עלה
+      at(2, true), // אותו מצב שוב — אין מה לומר
+      at(1), // צעד אחורה — המקום הראשון מוסתר
+      at(2), // ושוב קדימה: תיפוף
+      at(2, true), // השם עלה שוב — כבר נאמר בביקור הזה
+    ]);
+    expect(entry!.clips).toEqual(['lb_winners.mp3']);
+    expect(second!.clips).toEqual(['lb_place_2.mp3', 'tens_90.mp3', 'unit_points.mp3']);
+    // הלחיצה עוצרת את מה שמתנגן (המקום השני) ושותקת עד שהשם עולה
+    expect(drum!.clips).toEqual([]);
+    expect(drum!.cancel).toBe(true);
+    expect(shown!.clips).toEqual([
+      'lb_winner.mp3',
+      'lb_place_1.mp3',
+      'hundreds_100.mp3',
+      'unit_points.mp3',
+    ]);
+    expect(again!.clips).toEqual([]);
+    expect(again!.cancel).toBe(false);
+    expect(back!.clips).toEqual([]);
+    expect(drumAgain!.clips).toEqual([]);
+    expect(shownAgain!.clips).toEqual([]);
+  });
+
+  it('★ מנצח יחיד: הלחיצה הראשונה היא כבר התיפוף, והשם נאמר אחריו', () => {
+    const at = (revealed: number, championShown = false) =>
+      base({ stage: 'winners', winners: [100], winnersRevealed: revealed, championShown });
+    const clips = clipsOf([at(0), at(1), at(1, true)]);
+    expect(clips[0]).toEqual(['lb_winners.mp3']);
+    expect(clips[1]).toEqual([]);
+    expect(clips[2]).toEqual(['lb_winner.mp3', 'lb_place_1.mp3', 'hundreds_100.mp3', 'unit_points.mp3']);
   });
 
   it('★ לוח הניקוד המלא → "לוח המובילים" + "תודה שהשתתפתם"', () => {
@@ -451,7 +494,7 @@ describe('מסכי הפתיחה, המנצחים והניקוד', () => {
       preview({ winnersRevealed: 3 }), // גם חשיפת פודיום בהצצה
       preview({ stage: 'scoreboard', winnersRevealed: 3 }), // עד לוח הניקוד
       base({ questionShown: true }), // W שוב — חזרה למשחק
-      base({ stage: 'winners', winners, winnersRevealed: 3 }), // הסיום האמיתי
+      base({ stage: 'winners', winners, winnersRevealed: 3, championShown: true }), // הסיום האמיתי
       base({ stage: 'scoreboard', winners }),
     ]);
     expect(clips[1]).toEqual([]);
@@ -1209,21 +1252,23 @@ describe('קריאות אווירה', () => {
   });
 
   describe('מנצחים, הימור, הישרדות, הגרלה ולוח', () => {
-    it('★ מסך המנצחים: פתיח, רולאדה רק לפני המקום הראשון, וברכה אחריו', () => {
+    it('★ מסך המנצחים: פתיח, בלי רולאדה (המסך מתופף בעצמו), וברכה אחרי המקום הראשון', () => {
       const winners = [100, 90, 80];
-      const at = (winnersRevealed: number) => amb({ stage: 'winners', winners, winnersRevealed });
-      const clips = clipsOf([at(0), at(1), at(2), at(3)]);
+      const at = (winnersRevealed: number, championShown = false) =>
+        amb({ stage: 'winners', winners, winnersRevealed, championShown });
+      const clips = clipsOf([at(0), at(1), at(2), at(3), at(3, true)]);
       expect(clips[0]).toEqual(['amb_winners_intro.mp3', 'lb_winners.mp3']);
-      // הרולאדה שמורה לרגע השיא: המקומות השלישי והשני נחשפים בלעדיה.
       expect(clips[1]).toEqual(['lb_place_3.mp3', 'tens_80.mp3', 'unit_points.mp3']);
-      expect(clips[3]).toEqual([
-        'amb_drumroll.mp3',
+      // התיפוף של המסך: הקריין שותק, ו«רולאדת תופים» כבר לא נאמרת בכלל
+      expect(clips[3]).toEqual([]);
+      expect(clips[4]).toEqual([
         'lb_winner.mp3',
         'lb_place_1.mp3',
         'hundreds_100.mp3',
         'unit_points.mp3',
         'amb_congrats.mp3',
       ]);
+      expect(clips.flat()).not.toContain('amb_drumroll.mp3');
     });
 
     it('★ דירוג הקבוצות מעל מסכי הסיום (מקש 4): הקבוצה המובילה, וההכרזות של המסך ממתינות לסגירה', () => {
